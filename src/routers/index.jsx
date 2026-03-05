@@ -2,6 +2,7 @@ import { lazy } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import Home from "../pages/home";
 import Info from "../pages/info";
+import GamePage from "../pages/game";
 import NotFound from "../pages/error/NotFound";
 import PageLayout from "../pages/PageLayout";
 
@@ -38,6 +39,10 @@ const router = createBrowserRouter([
       {
         path: "/home",
         element: <Home />,
+      },
+      {
+        path: "/game",
+        element: <GamePage />,
       },
       {
         path: "/info",
