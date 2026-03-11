@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useBlocker } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import apiCaller from "@/services/api-caller";
@@ -572,6 +572,7 @@ function GlobalHitSection({ data, onChange, disabled }) {
 
 export default function SetupPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const user = useAtomValue(userAtom);
   const isAdmin = user?.role === "admin";
 
@@ -662,7 +663,7 @@ export default function SetupPage() {
       {/* 상단 바 */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
         <Box
-          onClick={() => navigate("/t9game")}
+          onClick={() => { const gid = searchParams.get("gameId"); navigate(gid ? `/t9game?gameId=${gid}` : "/t9game"); }}
           sx={{
             display: "inline-flex",
             alignItems: "center",

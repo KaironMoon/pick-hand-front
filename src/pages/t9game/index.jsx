@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
 
 const GRID_ROWS = 6;
@@ -14,8 +14,9 @@ const CELL_BG = {
 };
 
 // 원 컴포넌트
-const Circle = ({ type, filled = true, size = 24 }) => {
+const Circle = ({ type, filled = true, size = 24, label }) => {
   const colors = { P: "#1565c0", B: "#f44336" };
+  const display = label != null ? label : type;
   return (
     <Box
       sx={{
@@ -28,12 +29,12 @@ const Circle = ({ type, filled = true, size = 24 }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: size * 0.5,
+        fontSize: label != null ? size * 0.4 : size * 0.5,
         fontWeight: "bold",
         color: filled ? "#fff" : colors[type],
       }}
     >
-      {type}
+      {display}
     </Box>
   );
 };
@@ -57,7 +58,7 @@ const calculateCircleGrid = (results) => {
     const status = results[i].status || "wait";
 
     if (prevValue === null) {
-      grid[row][col] = { type: current, status };
+      grid[row][col] = { type: current, status, idx: i };
       verticalStartCol = col;
     } else if (current === prevValue) {
       if (isBent) {
@@ -72,14 +73,14 @@ const calculateCircleGrid = (results) => {
         row++;
       }
       if (col >= GRID_COLS) break;
-      grid[row][col] = { type: current, status };
+      grid[row][col] = { type: current, status, idx: i };
     } else {
       verticalStartCol++;
       col = verticalStartCol;
       row = 0;
       isBent = false;
       if (col >= GRID_COLS) break;
-      grid[row][col] = { type: current, status };
+      grid[row][col] = { type: current, status, idx: i };
     }
 
     prevValue = current;
@@ -142,6 +143,7 @@ export default function GamePage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [results, setResults] = useState([]);
   const [pickResult, setPickResult] = useState({ method: "wait", pick: null });
@@ -159,6 +161,8 @@ export default function GamePage() {
   const [line, setLine] = useState(1); // 1~4 LINE
   const [winLoss, setWinLoss] = useState("2W-0W"); // 승패 표시
 
+  // 개별 메서드 매칭 여부 (UI 인디케이터용)
+
   // ED 종료 모드
   const [endingMode, setEndingMode] = useState(false);
   const [endingSnapshot, setEndingSnapshot] = useState(null); // { tn: bool, gh: Set<"PPP-0">, pinch: Set<"pattern"> }
@@ -168,13 +172,16 @@ export default function GamePage() {
   const grid = calculateCircleGrid(results);
 
   // 픽 이미지 결정
-  const pickImage = pickResult.pick === "P" ? "/player.png" : pickResult.pick === "B" ? "/banker.png" : "/wait.png";
+  // combined direction (서버에서 TN+GH+핀치 합산)
+  const displayPick = betData?.combined?.direction && betData.combined.direction !== "wait" ? betData.combined.direction : null;
+  const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
   // 게임 시작
   const startGame = useCallback(async () => {
     try {
       const res = await apiCaller.post("/api/v1/games/start");
       setGameId(res.data.game_id);
+      setSearchParams({ gameId: res.data.game_id }, { replace: true });
       // 초기 픽 조회
       const pickRes = await apiCaller.post("/api/v1/pick", { seq: "" });
       const { globalhit, bet, ...pick } = pickRes.data;
@@ -186,10 +193,41 @@ export default function GamePage() {
     }
   }, []);
 
-  // 페이지 로드 시 게임 시작
+  const restoreGame = async (gid) => {
+    try {
+      const res = await apiCaller.get(`/api/v1/games/${gid}/state`);
+      const data = res.data;
+      setGameId(data.game_id);
+      setResults(data.results || []);
+      setCumPnL(data.cum_pnl || { tn: 0, gh: 0, pinch: 0 });
+      const { globalhit, bet, results: _, cum_pnl: __, game_id: ___, config: ____, status, ending_snapshot: snap, ...pick } = data;
+      setPickResult({ method: pick.method, pick: pick.pick, match_start: pick.match_start, match_end: pick.match_end, matches: pick.matches, order: pick.order });
+      setGlobalhitData(globalhit || []);
+      setBetData(bet || null);
+      if (status === "ending" && snap) {
+        setEndingMode(true);
+        setEndingSnapshot({
+          tn: snap.tn || false,
+          gh: new Set(snap.gh || []),
+          pinch: new Set(snap.pinch || []),
+        });
+      }
+    } catch (err) {
+      console.error("Failed to restore game, starting new:", err);
+      startGame();
+    }
+  };
+
+  // 페이지 로드 시 게임 시작 또는 복원
   useEffect(() => {
-    startGame();
-  }, [startGame]);
+    const urlGameId = searchParams.get("gameId");
+    if (urlGameId) {
+      // URL에 gameId가 있으면 게임 상태 복원 시도
+      restoreGame(parseInt(urlGameId));
+    } else {
+      startGame();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // P/B 입력 → 서버에 라운드 기록 + 다음 상태 수신
   const handleInput = async (inputValue) => {
@@ -219,7 +257,7 @@ export default function GamePage() {
 
       // 다음 라운드 상태 갱신
       const { globalhit, bet, ...pick } = data;
-      setPickResult({ method: pick.method, pick: pick.pick });
+      setPickResult({ method: pick.method, pick: pick.pick, match_start: pick.match_start, match_end: pick.match_end, matches: pick.matches, order: pick.order });
       setGlobalhitData(globalhit || []);
       setBetData(bet || null);
 
@@ -249,10 +287,16 @@ export default function GamePage() {
         pinch: data.cum_pnl.pinch,
       });
 
-      const { globalhit, bet, ...pick } = data;
-      setPickResult({ method: pick.method, pick: pick.pick });
+      const { globalhit, bet, status, ending_snapshot: snap, ...pick } = data;
+      setPickResult({ method: pick.method, pick: pick.pick, match_start: pick.match_start, match_end: pick.match_end, matches: pick.matches, order: pick.order });
       setGlobalhitData(globalhit || []);
       setBetData(bet || null);
+
+      // 엔딩 시점 이전으로 삭제되면 엔딩 모드 해제
+      if (status === "active") {
+        setEndingMode(false);
+        setEndingSnapshot(null);
+      }
     } catch (err) {
       console.error("Failed to delete round:", err);
     }
@@ -364,7 +408,9 @@ export default function GamePage() {
     setCumPnL({ tn: 0, gh: 0, pinch: 0 });
     setBetData(null);
     setPickResult({ method: "wait", pick: null });
+
     setGlobalhitData([]);
+    setSearchParams({}, { replace: true });
     startGame();
   };
 
@@ -392,6 +438,16 @@ export default function GamePage() {
 
     const hasCarryOver = carryOver.tn_step > 0 || carryOver.gh.length > 0 || carryOver.pinch.length > 0;
 
+    // 엔딩 모드 이월: ending_snapshot을 carry_over에 포함
+    const wasEnding = endingMode && endingSnapshot;
+    if (wasEnding) {
+      carryOver.ending_snapshot = {
+        tn: endingSnapshot.tn,
+        gh: endingSnapshot.gh instanceof Set ? [...endingSnapshot.gh] : (endingSnapshot.gh || []),
+        pinch: endingSnapshot.pinch instanceof Set ? [...endingSnapshot.pinch] : (endingSnapshot.pinch || []),
+      };
+    }
+
     // 현재 게임 종료
     try {
       await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gameId } });
@@ -400,8 +456,6 @@ export default function GamePage() {
     }
 
     // 상태 초기화
-    setEndingMode(false);
-    setEndingSnapshot(null);
     setEndingDone(false);
     setResults([]);
     setCumPnL({ tn: 0, gh: 0, pinch: 0 });
@@ -409,12 +463,29 @@ export default function GamePage() {
     setPickResult({ method: "wait", pick: null });
     setGlobalhitData([]);
 
-    // 새 게임 시작 (미처리 단계 전달)
+    // 새 게임 시작 (미처리 단계 + 엔딩 상태 전달)
     try {
       const res = await apiCaller.post("/api/v1/games/start", {
-        carry_over: hasCarryOver ? carryOver : null,
+        carry_over: hasCarryOver || wasEnding ? carryOver : null,
+        prev_game_id: gameId,
       });
       setGameId(res.data.game_id);
+      setSearchParams({ gameId: res.data.game_id }, { replace: true });
+
+      // 엔딩 모드 복원
+      if (res.data.status === "ending" && res.data.ending_snapshot) {
+        const snap = res.data.ending_snapshot;
+        setEndingMode(true);
+        setEndingSnapshot({
+          tn: snap.tn,
+          gh: new Set(snap.gh || []),
+          pinch: new Set(snap.pinch || []),
+        });
+      } else {
+        setEndingMode(false);
+        setEndingSnapshot(null);
+      }
+
       // 초기 픽 조회
       const pickRes = await apiCaller.post("/api/v1/pick", { seq: "" });
       const { globalhit, bet, ...pick } = pickRes.data;
@@ -442,25 +513,32 @@ export default function GamePage() {
         }}
       >
         {grid.map((row, rowIndex) =>
-          row.map((cell, colIndex) => (
-            <Box
-              key={`${rowIndex}-${colIndex}`}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: cell ? (CELL_BG[cell.status] || "background.default") : "background.default",
-              }}
-            >
-              {cell && (
-                <Circle
-                  type={cell.type}
-                  filled={true}
-                  size={isMobile ? 12 : 22}
-                />
-              )}
-            </Box>
-          ))
+          row.map((cell, colIndex) => {
+            const isLscMatch = cell && Array.isArray(pickResult.matches) && pickResult.matches.some(
+              m => cell.idx >= m.start && cell.idx < m.end
+            );
+            return (
+              <Box
+                key={`${rowIndex}-${colIndex}`}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: cell ? (CELL_BG[cell.status] || "background.default") : "background.default",
+                  ...(isLscMatch && { border: "2px solid #4caf50", borderRadius: "2px" }),
+                }}
+              >
+                {cell && (
+                  <Circle
+                    type={cell.type}
+                    filled={true}
+                    size={isMobile ? 12 : 22}
+                    label={cell.idx + 1}
+                  />
+                )}
+              </Box>
+            );
+          })
         )}
       </Box>
 
@@ -474,25 +552,49 @@ export default function GamePage() {
           flexWrap: "wrap",
         }}
       >
-        {/* 픽 방법 표시 */}
-        <Box sx={{ ...toggleBtnSx, border: "2px solid #4caf50", width: 60 }}>
-          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold" }}>{pickResult.method || "wait"}</Typography>
-        </Box>
+        {/* 픽 방법 표시 — TN 배팅 있을 때만 활성, LSC일 때 녹색 테두리 */}
+        {(() => {
+          const tnActive = betData?.triplenine?.amount > 0;
+          const isLsc = /^\d+LSC$/.test(pickResult.method || "");
+          const borderColor = tnActive ? (isLsc ? "#4caf50" : "#ff9800") : "#555";
+          return (
+            <Box sx={{ ...toggleBtnSx, border: `2px solid ${borderColor}`, width: 70, opacity: tnActive ? 1 : 0.35, justifyContent: "center" }}>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: borderColor }}>{pickResult.method || "wait"}</Typography>
+            </Box>
+          );
+        })()}
 
-        {/* M3 */}
-        <Box sx={{ ...toggleBtnSx, border: "2px solid #4caf50" }}>
-          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold" }}>M3</Typography>
-        </Box>
+        {/* M{order} — pattern일 때 pat_seq 표시, 아니면 GH 배팅 상태 */}
+        {(() => {
+          const isPattern = pickResult.method === "pattern" && pickResult.order;
+          const active = isPattern;
+          const label = isPattern ? `M${pickResult.order}` : "M0";
+          return (
+            <Box sx={{ ...toggleBtnSx, border: `2px solid ${active ? "#4caf50" : "#555"}`, opacity: active ? 1 : 0.35 }}>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: active ? "#fff" : "#555" }}>{label}</Typography>
+            </Box>
+          );
+        })()}
 
-        {/* global */}
-        <Box sx={{ ...toggleBtnSx, border: "2px solid #4caf50" }}>
-          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold" }}>global</Typography>
-        </Box>
+        {/* global — GH 배팅 있을 때만 활성 */}
+        {(() => {
+          const ghHasBet = (betData?.globalhit?.P || 0) + (betData?.globalhit?.B || 0) > 0;
+          return (
+            <Box sx={{ ...toggleBtnSx, border: `2px solid ${ghHasBet ? "#4caf50" : "#555"}`, opacity: ghHasBet ? 1 : 0.35 }}>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: ghHasBet ? "#fff" : "#555" }}>global</Typography>
+            </Box>
+          );
+        })()}
 
-        {/* pinch */}
-        <Box sx={{ ...toggleBtnSx, border: "2px solid #4caf50" }}>
-          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold" }}>pinch</Typography>
-        </Box>
+        {/* pinch — 핀치 활성 시에만 켜짐 */}
+        {(() => {
+          const pinchOn = betData?.pinch?.active || false;
+          return (
+            <Box sx={{ ...toggleBtnSx, border: `2px solid ${pinchOn ? "#ff9800" : "#555"}`, opacity: pinchOn ? 1 : 0.35 }}>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pinchOn ? "#ff9800" : "#555" }}>pinch</Typography>
+            </Box>
+          );
+        })()}
 
         {/* ED (종료 모드) */}
         <Box
@@ -621,7 +723,7 @@ export default function GamePage() {
         </Box>
 
         {/* set-up */}
-        <Box onClick={() => navigate("/t9game/setup")} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid rgba(255,255,255,0.3)" }}>
+        <Box onClick={() => navigate(`/t9game/setup${gameId ? `?gameId=${gameId}` : ""}`)} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid rgba(255,255,255,0.3)" }}>
           <Typography variant="caption" sx={{ fontSize: 12 }}>set-up</Typography>
         </Box>
 
@@ -676,20 +778,26 @@ export default function GamePage() {
             <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 1.5, display: "flex", alignItems: "center" }}>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: dirColor }}>{`formal(${combinedDir})`}</Typography>
             </Box>
-            {[
-              { name: "Triplenine", pnl: cumPnL.tn },
-              { name: "globalhit", pnl: cumPnL.gh },
-              { name: "pinch", pnl: cumPnL.pinch },
-            ].map((item, i) => {
-              const clr = item.pnl > 0 ? "#4caf50" : item.pnl < 0 ? "#f44336" : "#fff";
-              const sign = item.pnl > 0 ? "+" : "";
-              return (
-                <Box key={i} sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 2, minWidth: 200, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{item.name}</Typography>
-                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: clr }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
-                </Box>
-              );
-            })}
+            {(() => {
+              const tnHasBet = (betData?.triplenine?.amount || 0) > 0;
+              const ghHasBet = (betData?.globalhit?.P || 0) + (betData?.globalhit?.B || 0) > 0;
+              const pinchOn = betData?.pinch?.active || false;
+              const items = [
+                { name: "Triplenine", pnl: cumPnL.tn, active: tnHasBet },
+                { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
+                { name: "pinch", pnl: cumPnL.pinch, active: pinchOn },
+              ];
+              return items.map((item, i) => {
+                const clr = item.pnl > 0 ? "#4caf50" : item.pnl < 0 ? "#f44336" : "#fff";
+                const sign = item.pnl > 0 ? "+" : "";
+                return (
+                  <Box key={i} sx={{ border: `1px solid ${item.active ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, minWidth: 200, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{item.name}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: clr }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
+                  </Box>
+                );
+              });
+            })()}
             {(() => {
               const totalPnL = cumPnL.tn + cumPnL.gh + cumPnL.pinch;
               const bgColor = "#00bcd4";
@@ -703,49 +811,67 @@ export default function GamePage() {
           </Box>
 
           {/* 메인 상황판 테이블 */}
-          <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 12 }}>
+          {(() => {
+            const anyBet = (tn?.amount || 0) > 0 || (gh?.P || 0) + (gh?.B || 0) > 0 || pinchActive;
+            return (
+          <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 12, opacity: anyBet ? 1 : 0.3 }}>
             <tbody>
-              {/* 1행: 섹션 상세 */}
-              <tr>
-                <td style={{ ...dcB, color: "#00bcd4" }}>Triplenine</td>
-                <td style={{ ...dc, color: "#1565c0" }}>{`${(tn?.direction === "P" ? (tn?.amount || 0) : 0).toLocaleString()}P`}</td>
-                <td style={{ ...dc, color: "#f44336" }}>{`${(tn?.direction === "B" ? (tn?.amount || 0) : 0).toLocaleString()}P`}</td>
-                <td style={{ ...dcB, color: "#00bcd4" }}>globalhit</td>
-                <td style={{ ...dc, color: "#1565c0" }}>{`${(gh?.P || 0).toLocaleString()}P`}</td>
-                <td style={{ ...dc, color: "#f44336" }}>{`${(gh?.B || 0).toLocaleString()}P`}</td>
-                <td style={{ ...dcB, color: "#00bcd4" }}>pinch</td>
-                <td style={{ ...dc, color: "#1565c0" }}>{`${pinchP.toLocaleString()}P`}</td>
-                <td style={{ ...dc, color: "#f44336" }}>{`${pinchB.toLocaleString()}P`}</td>
-                <td style={{ ...dcB, color: "#fff" }}>{currentTurn}</td>
-                <td style={{ ...dc, color: "#1565c0" }}>{`${((tn?.direction === "P" ? (tn?.amount || 0) : 0) + (gh?.P || 0) + pinchP).toLocaleString()}P`}</td>
-                <td style={{ ...dc, color: "#f44336" }}>{`${((tn?.direction === "B" ? (tn?.amount || 0) : 0) + (gh?.B || 0) + pinchB).toLocaleString()}P`}</td>
-              </tr>
+              {/* 1행: 섹션 상세 — 배팅 없으면 dimmed */}
+              {(() => {
+                const tnHasBet = (tn?.amount || 0) > 0;
+                const ghHasBet = (gh?.P || 0) + (gh?.B || 0) > 0;
+                const pinchHasBet = pinchP + pinchB > 0;
+                const tnDim = tnHasBet ? 1 : 0.3;
+                const ghDim = ghHasBet ? 1 : 0.3;
+                const pinchDim = pinchHasBet ? 1 : 0.3;
+                return (
+                  <tr>
+                    <td style={{ ...dcB, color: "#00bcd4", opacity: tnDim }}>Triplenine</td>
+                    <td style={{ ...dc, color: "#1565c0", opacity: tnDim }}>{`${(tn?.direction === "P" ? (tn?.amount || 0) : 0).toLocaleString()}P`}</td>
+                    <td style={{ ...dc, color: "#f44336", opacity: tnDim }}>{`${(tn?.direction === "B" ? (tn?.amount || 0) : 0).toLocaleString()}P`}</td>
+                    <td style={{ ...dcB, color: "#00bcd4", opacity: ghDim }}>globalhit</td>
+                    <td style={{ ...dc, color: "#1565c0", opacity: ghDim }}>{`${(gh?.P || 0).toLocaleString()}P`}</td>
+                    <td style={{ ...dc, color: "#f44336", opacity: ghDim }}>{`${(gh?.B || 0).toLocaleString()}P`}</td>
+                    <td style={{ ...dcB, color: "#00bcd4", opacity: pinchDim }}>pinch</td>
+                    <td style={{ ...dc, color: "#1565c0", opacity: pinchDim }}>{`${pinchP.toLocaleString()}P`}</td>
+                    <td style={{ ...dc, color: "#f44336", opacity: pinchDim }}>{`${pinchB.toLocaleString()}P`}</td>
+                    <td style={{ ...dcB, color: "#fff" }}>{currentTurn}</td>
+                    <td style={{ ...dc, color: "#1565c0" }}>{`${((tn?.direction === "P" ? (tn?.amount || 0) : 0) + (gh?.P || 0) + pinchP).toLocaleString()}P`}</td>
+                    <td style={{ ...dc, color: "#f44336" }}>{`${((tn?.direction === "B" ? (tn?.amount || 0) : 0) + (gh?.B || 0) + pinchB).toLocaleString()}P`}</td>
+                  </tr>
+                );
+              })()}
 
-              {/* 2~5행: 글로벌히트 패턴별 (2패턴×3섹션 = 12열) */}
+              {/* 2~5행: 글로벌히트 패턴별 — 배팅 있는 셀만 활성 */}
               {[[ghPatterns[0], ghPatterns[1]], [ghPatterns[2], ghPatterns[3]], [ghPatterns[4], ghPatterns[5]], [ghPatterns[6], ghPatterns[7]]].map((pair, ri) => (
                 <tr key={`gh-${ri}`}>
                   {pair.map((pat) =>
-                    [0, 1, 2].map((sec) => (
-                      <React.Fragment key={`${pat}-${sec}`}>
-                        <td style={{ ...dc }}>
-                          {pat.split("").map((c, ci) => (
-                            <span key={ci} style={{ color: c === "P" ? "#1565c0" : "#f44336", fontWeight: "bold" }}>{c}</span>
-                          ))}
+                    [0, 1, 2].map((sec) => {
+                      const amt = getPatSec(pat, sec);
+                      const hasBet = amt > 0;
+                      const dim = hasBet ? 1 : 0.3;
+                      return (
+                        <React.Fragment key={`${pat}-${sec}`}>
+                          <td style={{ ...dc, opacity: dim }}>
+                            {pat.split("").map((c, ci) => (
+                              <span key={ci} style={{ color: c === "P" ? "#1565c0" : "#f44336", fontWeight: "bold" }}>{c}</span>
+                            ))}
+                            {(() => {
+                              const active = currentTurn >= sec + 1;
+                              const predict = active ? pat[(currentTurn - 1 - sec) % pat.length] : null;
+                              const clr = !active ? "#fff" : predict === "P" ? "#1565c0" : "#f44336";
+                              return <span style={{ color: clr, fontSize: 9 }}>({sec + 1}sc)</span>;
+                            })()}
+                          </td>
                           {(() => {
                             const active = currentTurn >= sec + 1;
                             const predict = active ? pat[(currentTurn - 1 - sec) % pat.length] : null;
                             const clr = !active ? "#fff" : predict === "P" ? "#1565c0" : "#f44336";
-                            return <span style={{ color: clr, fontSize: 9 }}>({sec + 1}sc)</span>;
+                            return <td style={{ ...dc, color: clr, opacity: dim }}>{`${amt.toLocaleString()}P`}</td>;
                           })()}
-                        </td>
-                        {(() => {
-                          const active = currentTurn >= sec + 1;
-                          const predict = active ? pat[(currentTurn - 1 - sec) % pat.length] : null;
-                          const clr = !active ? "#fff" : predict === "P" ? "#1565c0" : "#f44336";
-                          return <td style={{ ...dc, color: clr }}>{`${getPatSec(pat, sec).toLocaleString()}P`}</td>;
-                        })()}
-                      </React.Fragment>
-                    ))
+                        </React.Fragment>
+                      );
+                    })
                   )}
                 </tr>
               ))}
@@ -769,15 +895,19 @@ export default function GamePage() {
 
                 return (
                   <tr key={name}>
-                    <td style={{ ...dc, color: pinchActive ? (completed ? "#4caf50" : "#fff") : "#555" }}>{name}</td>
+                    <td style={{
+                      ...dc,
+                      color: pinchActive ? (completed ? "#4caf50" : dir ? "#39ff14" : "#555") : "#555",
+                      fontWeight: pinchActive && dir ? "bold" : "normal",
+                    }}>{name}</td>
                     <td style={{
                       ...dc,
                       color: pinchActive
-                        ? (completed ? "#4caf50" : dir === "P" ? "#1565c0" : dir === "B" ? "#f44336" : "#888")
+                        ? (completed ? "#4caf50" : "#f44336")
                         : "#555",
                       fontWeight: pinchActive ? "bold" : "normal",
                     }}>
-                      {pinchActive ? (completed ? "done" : `${remaining.toLocaleString()}P`) : "-"}
+                      {pinchActive ? (completed ? "done" : `-${remaining.toLocaleString()}P`) : "-"}
                     </td>
                     {Array.from({ length: 10 }, (_, i) => {
                       const stepNum = i + 1;
@@ -803,6 +933,8 @@ export default function GamePage() {
               })}
             </tbody>
           </table>
+            );
+          })()}
           </>
         );
       })()}
@@ -883,7 +1015,7 @@ export default function GamePage() {
                           const detail = betData?.globalhit?.details?.find(
                             (d) => d.pattern === pat && d.group === gi + 1
                           );
-                          return detail ? `${detail.amount.toLocaleString()}P` : `${(g.bet ?? 0).toLocaleString()}P`;
+                          return detail ? `${detail.amount.toLocaleString()}P` : "0P";
                         })()}
                       </Typography>
                     </Box>
