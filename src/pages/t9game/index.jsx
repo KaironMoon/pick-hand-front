@@ -221,13 +221,18 @@ export default function GamePage() {
   // 페이지 로드 시 게임 시작 또는 복원
   useEffect(() => {
     const urlGameId = searchParams.get("gameId");
-    if (urlGameId) {
+    const isNew = searchParams.get("new");
+    if (isNew) {
+      // 메뉴에서 새 게임 요청
+      setSearchParams({}, { replace: true });
+      handleNewGame();
+    } else if (urlGameId) {
       // URL에 gameId가 있으면 게임 상태 복원 시도
       restoreGame(parseInt(urlGameId));
     } else {
       startGame();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams.get("new")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // P/B 입력 → 서버에 라운드 기록 + 다음 상태 수신
   const handleInput = async (inputValue) => {
@@ -412,6 +417,28 @@ export default function GamePage() {
     setGlobalhitData([]);
     setSearchParams({}, { replace: true });
     startGame();
+  };
+
+  // new game: 현재 게임 종료 + carry_over 없이 새 게임 시작
+  const handleNewGame = async () => {
+    if (gameId && results.length > 0) {
+      try {
+        await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gameId } });
+      } catch (err) {
+        console.error("Failed to end game:", err);
+      }
+    }
+
+    setEndingMode(false);
+    setEndingSnapshot(null);
+    setEndingDone(false);
+    setResults([]);
+    setCumPnL({ tn: 0, gh: 0, pinch: 0 });
+    setBetData(null);
+    setPickResult({ method: "wait", pick: null });
+    setGlobalhitData([]);
+
+    await startGame();
   };
 
   // next game: 현재 게임 종료 + 단계 미처리 정보 포함하여 새 게임 시작
@@ -738,6 +765,18 @@ export default function GamePage() {
           }}
         >
           <Typography variant="caption" sx={{ fontSize: 12 }}>next game</Typography>
+        </Box>
+
+        {/* new game */}
+        <Box
+          onClick={handleNewGame}
+          sx={{
+            ...controlBtnSx,
+            cursor: "pointer",
+            border: "2px solid #2196f3",
+          }}
+        >
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#2196f3" }}>new game</Typography>
         </Box>
       </Box>
 

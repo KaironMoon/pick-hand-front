@@ -1,1 +1,1 @@
-npm run build && npm run copy
+VITE_API_BASE_URL="" npm run build && npm run copy

@@ -72,7 +72,7 @@ function PageLeftMenu() {
       <Divider sx={{ bgcolor: "military.border", my: 1 }} />
       <List>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavClick("/t9game")}>
+          <ListItemButton onClick={() => handleNavClick(`/t9game?new=${Date.now()}`)}>
             <ListItemIcon>
               <SportsEsportsIcon />
             </ListItemIcon>
