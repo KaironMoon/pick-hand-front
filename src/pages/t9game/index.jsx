@@ -259,7 +259,7 @@ export default function GamePage() {
   }, [results, gameId]);
 
   // ED: 종료 모드 진입
-  const handleEndingMode = () => {
+  const handleEndingMode = async () => {
     if (endingMode) return; // 이미 종료 모드
     if (!betData) return;
 
