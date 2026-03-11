@@ -130,6 +130,11 @@ class ApiInterceptors {
   start() {
     this._instanceInterceptor.request = this._interceptors.request.use(
       (config) => {
+        const token = localStorage.getItem("pick_hand_token");
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+
         console.log("%cHTTP REQUEST %s\n", "color: blue", config.url, config);
 
         return config;
@@ -149,6 +154,13 @@ class ApiInterceptors {
       },
       (error) => {
         console.warn("%cHTTP RESPONSE ERROR\n%s", "color: red", error);
+
+        if (error.response && error.response.status === 401) {
+          localStorage.removeItem("pick_hand_token");
+          if (window.location.pathname !== "/login") {
+            window.location.href = "/login";
+          }
+        }
 
         return Promise.reject(error);
       },

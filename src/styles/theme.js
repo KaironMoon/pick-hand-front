@@ -20,14 +20,15 @@ export const lightTheme = createTheme({
   palette: {
     mode: "light",
     background: {
-      default: "#fafafa",
-      paper: "#ffffff",
-      header: "#e0e0e0",
-      footer: "#f5f5f5",
-      leftMenu: "#d3d3d3",
+      default: "#f0f0f0",
+      paper: "#f5f5f5",
+      header: "#d0d0d0",
+      footer: "#e0e0e0",
+      leftMenu: "#c8c8c8",
     },
     text: {
-      primary: "#333",
+      primary: "#222",
+      secondary: "#555",
     },
   },
 });

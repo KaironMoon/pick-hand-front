@@ -25,7 +25,7 @@ function PageLayout() {
         <PageHeader />
       </AppBar>
       <Box sx={{ display: "flex", flexGrow: 1 }}>
-        <Box sx={{ backgroundColor: theme.palette.background.leftMenu, minHeight: "100%" }}>
+        <Box sx={{ backgroundColor: theme.palette.background.leftMenu, minHeight: "100%", minWidth: 220 }}>
           <PageLeftMenu />
         </Box>
         <Box sx={{ flexGrow: 1, backgroundColor: theme.palette.background.default }}>

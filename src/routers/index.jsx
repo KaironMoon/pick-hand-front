@@ -2,9 +2,14 @@ import { lazy } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import Home from "../pages/home";
 import Info from "../pages/info";
-import GamePage from "../pages/game";
+import GamePage from "../pages/t9game";
+import PatternPage from "../pages/t9game/pattern.jsx";
+import SetupPage from "../pages/t9game/setup.jsx";
 import NotFound from "../pages/error/NotFound";
 import PageLayout from "../pages/PageLayout";
+import LoginPage from "../pages/login";
+import UsersPage from "../pages/users";
+import ProtectedRoute from "../pages/components/ProtectedRoute";
 
 const ProductLayout = lazy(() => import("../pages/product/ProductLayout"));
 const ProductList = lazy(() => import("../pages/product"));
@@ -29,26 +34,48 @@ const ProductRouter = [
 
 const router = createBrowserRouter([
   {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
     path: "/",
-    element: <PageLayout />,
+    element: <ProtectedRoute />,
     children: [
       {
         path: "/",
-        element: <Home />,
+        element: <PageLayout />,
+        children: [
+          {
+            path: "/",
+            element: <Home />,
+          },
+          {
+            path: "/home",
+            element: <Home />,
+          },
+          {
+            path: "/t9game",
+            element: <GamePage />,
+          },
+          {
+            path: "/info",
+            element: <Info />,
+          },
+          {
+            path: "/patterns",
+            element: <PatternPage />,
+          },
+          {
+            path: "/t9game/setup",
+            element: <SetupPage />,
+          },
+          {
+            path: "/users",
+            element: <UsersPage />,
+          },
+          ...ProductRouter,
+        ],
       },
-      {
-        path: "/home",
-        element: <Home />,
-      },
-      {
-        path: "/game",
-        element: <GamePage />,
-      },
-      {
-        path: "/info",
-        element: <Info />,
-      },
-      ...ProductRouter,
     ],
   },
   {
