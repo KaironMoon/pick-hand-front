@@ -151,6 +151,7 @@ export default function GamePage() {
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [cumPnL, setCumPnL] = useState({ tn: 0, gh: 0, pinch: 0 });
+  const [carryPnL, setCarryPnL] = useState({ tn: 0, gh: 0, pinch: 0 }); // next game 이월분
   const [toggles, setToggles] = useState({
     nor1: true,
     m1: true,
@@ -411,6 +412,7 @@ export default function GamePage() {
     setEndingDone(false);
     setResults([]);
     setCumPnL({ tn: 0, gh: 0, pinch: 0 });
+    setCarryPnL({ tn: 0, gh: 0, pinch: 0 });
     setBetData(null);
     setPickResult({ method: "wait", pick: null });
 
@@ -434,6 +436,7 @@ export default function GamePage() {
     setEndingDone(false);
     setResults([]);
     setCumPnL({ tn: 0, gh: 0, pinch: 0 });
+    setCarryPnL({ tn: 0, gh: 0, pinch: 0 });
     setBetData(null);
     setPickResult({ method: "wait", pick: null });
     setGlobalhitData([]);
@@ -463,7 +466,8 @@ export default function GamePage() {
       });
     }
 
-    const hasCarryOver = carryOver.tn_step > 0 || carryOver.gh.length > 0 || carryOver.pinch.length > 0;
+    const hasPnL = (cumPnL.tn !== 0 || cumPnL.gh !== 0 || cumPnL.pinch !== 0);
+    const hasCarryOver = carryOver.tn_step > 0 || carryOver.gh.length > 0 || carryOver.pinch.length > 0 || hasPnL;
 
     // 엔딩 모드 이월: ending_snapshot을 carry_over에 포함
     const wasEnding = endingMode && endingSnapshot;
@@ -475,6 +479,9 @@ export default function GamePage() {
       };
     }
 
+    // PnL 이월: carry_over에 포함
+    carryOver.cum_pnl = { ...cumPnL };
+
     // 현재 게임 종료
     try {
       await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gameId } });
@@ -485,7 +492,6 @@ export default function GamePage() {
     // 상태 초기화
     setEndingDone(false);
     setResults([]);
-    setCumPnL({ tn: 0, gh: 0, pinch: 0 });
     setBetData(null);
     setPickResult({ method: "wait", pick: null });
     setGlobalhitData([]);
@@ -498,6 +504,15 @@ export default function GamePage() {
       });
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
+
+      // PnL 이월 복원
+      if (res.data.carry_pnl) {
+        setCumPnL(res.data.carry_pnl);
+        setCarryPnL(res.data.carry_pnl);
+      } else {
+        setCumPnL({ tn: 0, gh: 0, pinch: 0 });
+        setCarryPnL({ tn: 0, gh: 0, pinch: 0 });
+      }
 
       // 엔딩 모드 복원
       if (res.data.status === "ending" && res.data.ending_snapshot) {
@@ -525,7 +540,7 @@ export default function GamePage() {
   };
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: isMobile ? 0.5 : 2 }}>
       {/* ===== 상단: 6x40 빅로드 격자 ===== */}
       <Box
         sx={{
@@ -569,61 +584,47 @@ export default function GamePage() {
         )}
       </Box>
 
-      {/* ===== 중단: 인터페이스 (한 줄) ===== */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 0.5,
-          mb: 1,
-          flexWrap: "wrap",
-        }}
-      >
-        {/* 픽 방법 표시 — TN 배팅 있을 때만 활성, LSC일 때 녹색 테두리 */}
+      {/* ===== 중단: 인터페이스 (1단) ===== */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1, flexWrap: "wrap" }}>
+        {/* 상태 토글 */}
         {(() => {
           const tnActive = betData?.triplenine?.amount > 0;
           const isLsc = /^\d+LSC$/.test(pickResult.method || "");
+          const isPattern = pickResult.method === "pattern" && pickResult.order;
+          const methodLabel = isPattern ? `pat${pickResult.order}` : (pickResult.method || "wait");
           const borderColor = tnActive ? (isLsc ? "#4caf50" : "#ff9800") : "#555";
           return (
-            <Box sx={{ ...toggleBtnSx, border: `2px solid ${borderColor}`, width: 70, opacity: tnActive ? 1 : 0.35, justifyContent: "center" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: borderColor }}>{pickResult.method || "wait"}</Typography>
+            <Box sx={{ ...toggleBtnSx, border: `2px solid ${borderColor}`, width: isMobile ? 50 : 70, opacity: tnActive ? 1 : 0.35, justifyContent: "center" }}>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: borderColor }}>{methodLabel}</Typography>
             </Box>
           );
         })()}
-
-        {/* M{order} — pattern일 때 pat_seq 표시, 아니면 GH 배팅 상태 */}
         {(() => {
-          const isPattern = pickResult.method === "pattern" && pickResult.order;
-          const active = isPattern;
-          const label = isPattern ? `M${pickResult.order}` : "M0";
+          const tnStep = betData?.triplenine?.step || 0;
+          const tnActive = betData?.triplenine?.amount > 0;
+          const label = `M${tnStep}`;
           return (
-            <Box sx={{ ...toggleBtnSx, border: `2px solid ${active ? "#4caf50" : "#555"}`, opacity: active ? 1 : 0.35 }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: active ? "#fff" : "#555" }}>{label}</Typography>
+            <Box sx={{ ...toggleBtnSx, border: `2px solid ${tnActive ? "#4caf50" : "#555"}`, opacity: tnActive ? 1 : 0.35 }}>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: tnActive ? "#fff" : "#555" }}>{label}</Typography>
             </Box>
           );
         })()}
-
-        {/* global — GH 배팅 있을 때만 활성 */}
         {(() => {
           const ghHasBet = (betData?.globalhit?.P || 0) + (betData?.globalhit?.B || 0) > 0;
           return (
             <Box sx={{ ...toggleBtnSx, border: `2px solid ${ghHasBet ? "#4caf50" : "#555"}`, opacity: ghHasBet ? 1 : 0.35 }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: ghHasBet ? "#fff" : "#555" }}>global</Typography>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: ghHasBet ? "#fff" : "#555" }}>global</Typography>
             </Box>
           );
         })()}
-
-        {/* pinch — 핀치 활성 시에만 켜짐 */}
         {(() => {
           const pinchOn = betData?.pinch?.active || false;
           return (
             <Box sx={{ ...toggleBtnSx, border: `2px solid ${pinchOn ? "#ff9800" : "#555"}`, opacity: pinchOn ? 1 : 0.35 }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pinchOn ? "#ff9800" : "#555" }}>pinch</Typography>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: pinchOn ? "#ff9800" : "#555" }}>pinch</Typography>
             </Box>
           );
         })()}
-
-        {/* ED (종료 모드) */}
         <Box
           onClick={handleEndingMode}
           sx={{
@@ -631,56 +632,36 @@ export default function GamePage() {
             backgroundColor: endingMode ? "#ff6f00" : "#b71c1c",
             borderRadius: 2,
             border: endingMode ? "2px solid #ffab00" : "none",
-            px: 1.5,
+            px: isMobile ? 1 : 1.5,
             cursor: "pointer",
             animation: endingMode ? "pulse 1.5s infinite" : "none",
-            "@keyframes pulse": {
-              "0%": { opacity: 1 },
-              "50%": { opacity: 0.6 },
-              "100%": { opacity: 1 },
-            },
+            "@keyframes pulse": { "0%": { opacity: 1 }, "50%": { opacity: 0.6 }, "100%": { opacity: 1 } },
           }}
         >
-          <Typography variant="caption" sx={{ fontSize: 13, fontWeight: "bold", color: "#fff" }}>
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 11 : 13, fontWeight: "bold", color: "#fff" }}>
             {endingMode ? "ED..." : "ED"}
           </Typography>
         </Box>
-
-        {/* BT */}
-        <Box sx={{ ...toggleBtnSx, backgroundColor: "#1565c0", borderRadius: 2, border: "none", px: 1.5 }}>
-          <Typography variant="caption" sx={{ fontSize: 13, fontWeight: "bold", color: "#fff" }}>BT</Typography>
+        <Box sx={{ ...toggleBtnSx, backgroundColor: "#1565c0", borderRadius: 2, border: "none", px: isMobile ? 1 : 1.5 }}>
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 11 : 13, fontWeight: "bold", color: "#fff" }}>BT</Typography>
         </Box>
-
-        {/* 베팅금액 */}
-        <Box sx={{ ...toggleBtnSx, border: "2px solid #4caf50", cursor: "default", px: 1.5, minWidth: 120, justifyContent: "flex-end" }}>
-          <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: "#4caf50" }}>
+        <Box sx={{ ...toggleBtnSx, border: "2px solid #4caf50", cursor: "default", px: isMobile ? 0.5 : 1.5, minWidth: isMobile ? 50 : 120, justifyContent: "flex-end" }}>
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: "#4caf50" }}>
             {betData?.combined ? `${betData.combined.amount.toLocaleString()}P` : "0P"}
           </Typography>
         </Box>
 
-        {/* 픽 표시 */}
-        <Box
-          sx={{
-            width: 85,
-            height: 85,
-            mx: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <img src={pickImage} alt="pick" style={{ width: 77, height: 77, objectFit: "contain" }} />
-          <Typography variant="caption" sx={{ fontSize: 9, color: "text.secondary", mt: -0.5 }}>
-            {pickResult.method}
-          </Typography>
-        </Box>
+        {/* 구분선 */}
+        <Box sx={{ width: "1px", height: 28, backgroundColor: "rgba(255,255,255,0.2)", mx: 0.3 }} />
 
-        {/* 턴 번호 */}
+        {/* 픽이미지 + 턴 + P/B + 컨트롤 */}
+        <Box sx={{ width: isMobile ? 32 : 85, height: isMobile ? 32 : 85, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <img src={pickImage} alt="pick" style={{ width: isMobile ? 28 : 77, height: isMobile ? 28 : 77, objectFit: "contain" }} />
+        </Box>
         <Box
           sx={{
-            width: 40,
-            height: 40,
+            width: isMobile ? 24 : 40,
+            height: isMobile ? 24 : 40,
             border: "2px solid rgba(255,255,255,0.3)",
             borderRadius: 1,
             backgroundColor: "#333",
@@ -689,94 +670,44 @@ export default function GamePage() {
             justifyContent: "center",
           }}
         >
-          <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 16 }}>{currentTurn}</Typography>
+          <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
         </Box>
-
-        {/* P 버튼 */}
         <Box
           onClick={() => handleInput("P")}
           sx={{
-            width: 55,
-            height: 55,
-            borderRadius: 2,
-            backgroundColor: "#1565c0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            fontSize: 24,
-            fontWeight: "bold",
-            cursor: "pointer",
-            "&:hover": { opacity: 0.85 },
-            "&:active": { transform: "scale(0.95)" },
+            width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
+            backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold", cursor: "pointer",
+            "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
-        >
-          P
-        </Box>
-
-        {/* B 버튼 */}
+        >P</Box>
         <Box
           onClick={() => handleInput("B")}
           sx={{
-            width: 55,
-            height: 55,
-            borderRadius: 2,
-            backgroundColor: "#f44336",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            fontSize: 24,
-            fontWeight: "bold",
-            cursor: "pointer",
-            "&:hover": { opacity: 0.85 },
-            "&:active": { transform: "scale(0.95)" },
+            width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
+            backgroundColor: "#f44336", display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold", cursor: "pointer",
+            "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
-        >
-          B
-        </Box>
-
-        {/* del */}
+        >B</Box>
+        <Box sx={{ width: isMobile ? 32 : 0 }} />
         <Box
           onClick={results.length > 0 ? handleDeleteOne : undefined}
-          sx={{
-            ...controlBtnSx,
-            ml: 5,
-            cursor: results.length > 0 ? "pointer" : "default",
-            opacity: results.length > 0 ? 1 : 0.4,
-          }}
+          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4 }}
         >
-          <Typography variant="caption" sx={{ fontSize: 13 }}>del</Typography>
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
-
-        {/* set-up */}
         <Box onClick={() => navigate(`/t9game/setup${gameId ? `?gameId=${gameId}` : ""}`)} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid rgba(255,255,255,0.3)" }}>
-          <Typography variant="caption" sx={{ fontSize: 12 }}>set-up</Typography>
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>set-up</Typography>
         </Box>
-
-        {/* next game */}
         <Box
           onClick={results.length > 0 ? handleNextGame : undefined}
-          sx={{
-            ...controlBtnSx,
-            cursor: results.length > 0 ? "pointer" : "default",
-            opacity: results.length > 0 ? 1 : 0.4,
-            border: "2px solid rgba(255,255,255,0.3)",
-          }}
+          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}
         >
-          <Typography variant="caption" sx={{ fontSize: 12 }}>next game</Typography>
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
         </Box>
-
-        {/* new game */}
-        <Box
-          onClick={handleNewGame}
-          sx={{
-            ...controlBtnSx,
-            cursor: "pointer",
-            border: "2px solid #2196f3",
-          }}
-        >
-          <Typography variant="caption" sx={{ fontSize: 12, color: "#2196f3" }}>new game</Typography>
+        <Box onClick={handleNewGame} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #2196f3" }}>
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
         </Box>
       </Box>
 
@@ -799,7 +730,7 @@ export default function GamePage() {
           else if (m.direction === "B") pinchB += m.amount || 0;
         });
 
-        const dc = { border: "1px solid #555", padding: "3px 12px", fontSize: 10, textAlign: "center", whiteSpace: "nowrap" };
+        const dc = { border: "1px solid #555", padding: isMobile ? "2px 4px" : "3px 12px", fontSize: isMobile ? 8 : 10, textAlign: "center", whiteSpace: "nowrap" };
         const dcB = { ...dc, fontWeight: "bold" };
 
         const ghPatterns = ["PPP", "BBB", "PBP", "BPB", "PPB", "BBP", "PBB", "BPP"];
@@ -812,7 +743,8 @@ export default function GamePage() {
 
         return (
           <>
-          {/* 최상단: 요약 바 */}
+          {/* 데스크톱: 상단 요약 바 */}
+          {!isMobile && (
           <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5, mb: 0.5, flexWrap: "wrap" }}>
             <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 1.5, display: "flex", alignItems: "center" }}>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: dirColor }}>{`formal(${combinedDir})`}</Typography>
@@ -839,41 +771,42 @@ export default function GamePage() {
             })()}
             {(() => {
               const totalPnL = cumPnL.tn + cumPnL.gh + cumPnL.pinch;
-              const bgColor = "#00bcd4";
               const sign = totalPnL > 0 ? "+" : "";
               return (
-                <Box sx={{ px: 2, minWidth: 200, backgroundColor: bgColor, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                <Box sx={{ px: 2, minWidth: 200, backgroundColor: "#00bcd4", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
                   <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: totalPnL < 0 ? "#f44336" : "#000" }}>{`${sign}${totalPnL.toLocaleString()}P`}</Typography>
                 </Box>
               );
             })()}
           </Box>
+          )}
 
-          {/* 메인 상황판 테이블 */}
+          {/* 상황판 테이블 + 모바일 우측 요약 */}
+          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 0.5 }}>
           {(() => {
             const anyBet = (tn?.amount || 0) > 0 || (gh?.P || 0) + (gh?.B || 0) > 0 || pinchActive;
             return (
-          <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 12, opacity: anyBet ? 1 : 0.3 }}>
+          <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 12, filter: anyBet ? "none" : "grayscale(100%)", opacity: anyBet ? 1 : 0.8 }}>
             <tbody>
               {/* 1행: 섹션 상세 — 배팅 없으면 dimmed */}
               {(() => {
                 const tnHasBet = (tn?.amount || 0) > 0;
                 const ghHasBet = (gh?.P || 0) + (gh?.B || 0) > 0;
                 const pinchHasBet = pinchP + pinchB > 0;
-                const tnDim = tnHasBet ? 1 : 0.3;
-                const ghDim = ghHasBet ? 1 : 0.3;
-                const pinchDim = pinchHasBet ? 1 : 0.3;
+                const tnDimStyle = tnHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+                const ghDimStyle = ghHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+                const pinchDimStyle = pinchHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
                 return (
                   <tr>
-                    <td style={{ ...dcB, color: "#00bcd4", opacity: tnDim }}>Triplenine</td>
-                    <td style={{ ...dc, color: "#1565c0", opacity: tnDim }}>{`${(tn?.direction === "P" ? (tn?.amount || 0) : 0).toLocaleString()}P`}</td>
-                    <td style={{ ...dc, color: "#f44336", opacity: tnDim }}>{`${(tn?.direction === "B" ? (tn?.amount || 0) : 0).toLocaleString()}P`}</td>
-                    <td style={{ ...dcB, color: "#00bcd4", opacity: ghDim }}>globalhit</td>
-                    <td style={{ ...dc, color: "#1565c0", opacity: ghDim }}>{`${(gh?.P || 0).toLocaleString()}P`}</td>
-                    <td style={{ ...dc, color: "#f44336", opacity: ghDim }}>{`${(gh?.B || 0).toLocaleString()}P`}</td>
-                    <td style={{ ...dcB, color: "#00bcd4", opacity: pinchDim }}>pinch</td>
-                    <td style={{ ...dc, color: "#1565c0", opacity: pinchDim }}>{`${pinchP.toLocaleString()}P`}</td>
-                    <td style={{ ...dc, color: "#f44336", opacity: pinchDim }}>{`${pinchB.toLocaleString()}P`}</td>
+                    <td style={{ ...dcB, color: "#00bcd4", ...tnDimStyle }}>Triplenine</td>
+                    <td style={{ ...dc, color: "#1565c0", ...tnDimStyle }}>{`${(tn?.direction === "P" ? (tn?.amount || 0) : 0).toLocaleString()}P`}</td>
+                    <td style={{ ...dc, color: "#f44336", ...tnDimStyle }}>{`${(tn?.direction === "B" ? (tn?.amount || 0) : 0).toLocaleString()}P`}</td>
+                    <td style={{ ...dcB, color: "#00bcd4", ...ghDimStyle }}>globalhit</td>
+                    <td style={{ ...dc, color: "#1565c0", ...ghDimStyle }}>{`${(gh?.P || 0).toLocaleString()}P`}</td>
+                    <td style={{ ...dc, color: "#f44336", ...ghDimStyle }}>{`${(gh?.B || 0).toLocaleString()}P`}</td>
+                    <td style={{ ...dcB, color: "#00bcd4", ...pinchDimStyle }}>pinch</td>
+                    <td style={{ ...dc, color: "#1565c0", ...pinchDimStyle }}>{`${pinchP.toLocaleString()}P`}</td>
+                    <td style={{ ...dc, color: "#f44336", ...pinchDimStyle }}>{`${pinchB.toLocaleString()}P`}</td>
                     <td style={{ ...dcB, color: "#fff" }}>{currentTurn}</td>
                     <td style={{ ...dc, color: "#1565c0" }}>{`${((tn?.direction === "P" ? (tn?.amount || 0) : 0) + (gh?.P || 0) + pinchP).toLocaleString()}P`}</td>
                     <td style={{ ...dc, color: "#f44336" }}>{`${((tn?.direction === "B" ? (tn?.amount || 0) : 0) + (gh?.B || 0) + pinchB).toLocaleString()}P`}</td>
@@ -888,10 +821,10 @@ export default function GamePage() {
                     [0, 1, 2].map((sec) => {
                       const amt = getPatSec(pat, sec);
                       const hasBet = amt > 0;
-                      const dim = hasBet ? 1 : 0.3;
+                      const dimStyle = hasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
                       return (
                         <React.Fragment key={`${pat}-${sec}`}>
-                          <td style={{ ...dc, opacity: dim }}>
+                          <td style={{ ...dc, ...dimStyle }}>
                             {pat.split("").map((c, ci) => (
                               <span key={ci} style={{ color: c === "P" ? "#1565c0" : "#f44336", fontWeight: "bold" }}>{c}</span>
                             ))}
@@ -906,7 +839,7 @@ export default function GamePage() {
                             const active = currentTurn >= sec + 1;
                             const predict = active ? pat[(currentTurn - 1 - sec) % pat.length] : null;
                             const clr = !active ? "#fff" : predict === "P" ? "#1565c0" : "#f44336";
-                            return <td style={{ ...dc, color: clr, opacity: dim }}>{`${amt.toLocaleString()}P`}</td>;
+                            return <td style={{ ...dc, color: clr, ...dimStyle }}>{`${amt.toLocaleString()}P`}</td>;
                           })()}
                         </React.Fragment>
                       );
@@ -974,6 +907,54 @@ export default function GamePage() {
           </table>
             );
           })()}
+
+          {/* 모바일: 우측 요약 패널 */}
+          {isMobile && (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 105 }}>
+            {(() => {
+              const tnHasBet = (betData?.triplenine?.amount || 0) > 0;
+              const ghHasBet = (betData?.globalhit?.P || 0) + (betData?.globalhit?.B || 0) > 0;
+              const pinchOn = betData?.pinch?.active || false;
+              const totalPnL = cumPnL.tn + cumPnL.gh + cumPnL.pinch;
+              const items = [
+                { name: "formal", value: combinedDir, color: dirColor, isFormal: true },
+                { name: "Triplenine", pnl: cumPnL.tn, active: tnHasBet },
+                { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
+                { name: "pinch", pnl: cumPnL.pinch, active: pinchOn },
+                { name: "합계", pnl: totalPnL, isTotal: true },
+              ];
+              const rowSx = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5, borderRadius: 1, px: 0.8, py: 0.3, whiteSpace: "nowrap" };
+              return items.map((item, i) => {
+                if (item.isFormal) {
+                  return (
+                    <Box key={i} sx={{ ...rowSx, border: "1px solid rgba(255,255,255,0.3)" }}>
+                      <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{item.name}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: item.color }}>{item.value}</Typography>
+                    </Box>
+                  );
+                }
+                if (item.isTotal) {
+                  const sign = item.pnl > 0 ? "+" : "";
+                  return (
+                    <Box key={i} sx={{ ...rowSx, backgroundColor: "#00bcd4" }}>
+                      <Typography variant="caption" sx={{ fontSize: 9, color: "#000" }}>{item.name}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: item.pnl < 0 ? "#f44336" : "#000" }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
+                    </Box>
+                  );
+                }
+                const clr = item.pnl > 0 ? "#4caf50" : item.pnl < 0 ? "#f44336" : "#fff";
+                const sign = item.pnl > 0 ? "+" : "";
+                return (
+                  <Box key={i} sx={{ ...rowSx, border: `1px solid ${item.active ? "rgba(255,255,255,0.3)" : "#333"}` }}>
+                    <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{item.name}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: clr }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
+                  </Box>
+                );
+              });
+            })()}
+          </Box>
+          )}
+          </Box>
           </>
         );
       })()}

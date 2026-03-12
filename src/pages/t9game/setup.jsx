@@ -13,8 +13,8 @@ const LABEL_COLOR = "#c62828";
 const CELL_BORDER = "1px solid #555";
 const LABEL_BG = "rgba(255,255,255,0.04)";
 
-const BET_TYPES = ["martin", "kkangbet", "fixed", "cruise"];
-const BET_TYPE_LABELS = { martin: "마틴", kkangbet: "깡벳", fixed: "고정벳", cruise: "크루즈" };
+const BET_TYPES = ["martin", "kkangbet", "fixed", "manual", "cruise"];
+const BET_TYPE_LABELS = { martin: "마틴", kkangbet: "깡벳", fixed: "고정벳", manual: "수동", cruise: "크루즈" };
 const DISABLED_BET_TYPES = ["cruise"];
 
 function calcAmounts(amounts, editedIdx, editedVal, betType, stepMin, stepMax) {
@@ -37,6 +37,7 @@ function calcAmounts(amounts, editedIdx, editedVal, betType, stepMin, stepMax) {
       newAmounts[i] = editedVal;
     }
   }
+  // manual: 입력한 셀만 변경, 나머지 유지
   return newAmounts;
 }
 
@@ -191,7 +192,6 @@ function BettingSection({ title, data, onChange, disabled }) {
             <ToggleCell key={t} active={data.bet_type === t} label={BET_TYPE_LABELS[t]} onClick={() => handleBetType(t)} disabled={disabled || DISABLED_BET_TYPES.includes(t)} />
           ))}
           <td style={normalCell}></td>
-          <td style={normalCell}></td>
         </tr>
         <tr>
           <td style={labelCellStyle}>단계설정</td>
@@ -321,7 +321,6 @@ function PinchSection({ data, onChange, disabled, triplenineData }) {
             <ToggleCell key={t} active={data.bet_type === t} label={BET_TYPE_LABELS[t]} onClick={() => handleBetType(t)} disabled={disabled || DISABLED_BET_TYPES.includes(t)} />
           ))}
           <td style={normalCell}></td>
-          <td style={normalCell}></td>
         </tr>
         <tr>
           <td style={labelCellStyle}>단계설정</td>
@@ -411,7 +410,7 @@ function PinchSection({ data, onChange, disabled, triplenineData }) {
         </tr>
         {remaining !== 0 && (
           <tr>
-            <td colSpan={7} style={{ ...normalCell, color: "#f44336", fontSize: 9, textAlign: "left" }}>
+            <td colSpan={8} style={{ ...normalCell, color: "#f44336", fontSize: 9, textAlign: "left" }}>
               잔여: {remaining.toLocaleString()}P (합계가 총 손실액과 다릅니다)
             </td>
           </tr>
@@ -468,7 +467,6 @@ function GlobalHitSection({ data, onChange, disabled }) {
           {BET_TYPES.map((t) => (
             <ToggleCell key={t} active={data.bet_type === t} label={BET_TYPE_LABELS[t]} onClick={() => handleBetType(t)} disabled={disabled || DISABLED_BET_TYPES.includes(t)} />
           ))}
-          <td style={normalCell}></td>
         </tr>
         <tr>
           <td style={labelCellStyle}>단계설정</td>

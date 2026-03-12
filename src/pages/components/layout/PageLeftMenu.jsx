@@ -15,7 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { useAtomValue, useSetAtom } from "jotai";
 import { userAtom, logoutAtom } from "@/store/auth-store";
 
-function PageLeftMenu() {
+function PageLeftMenu({ isMobile, onMenuClose }) {
   const theme = useTheme();
   const navigate = useNavigate();
   const user = useAtomValue(userAtom);
@@ -24,6 +24,7 @@ function PageLeftMenu() {
 
   const handleNavClick = (path) => {
     navigate(path);
+    if (isMobile && onMenuClose) onMenuClose();
   };
 
   const handleLogout = async () => {
