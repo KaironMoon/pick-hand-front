@@ -655,8 +655,8 @@ export default function GamePage() {
         <Box sx={{ width: "1px", height: 28, backgroundColor: "rgba(255,255,255,0.2)", mx: 0.3 }} />
 
         {/* 픽이미지 + 턴 + P/B + 컨트롤 */}
-        <Box sx={{ width: isMobile ? 32 : 85, height: isMobile ? 32 : 85, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-          <img src={pickImage} alt="pick" style={{ width: isMobile ? 28 : 77, height: isMobile ? 28 : 77, objectFit: "contain" }} />
+        <Box sx={{ width: isMobile ? 44 : 85, height: isMobile ? 44 : 85, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <img src={pickImage} alt="pick" style={{ width: isMobile ? 40 : 77, height: isMobile ? 40 : 77, objectFit: "contain" }} />
         </Box>
         <Box
           sx={{
