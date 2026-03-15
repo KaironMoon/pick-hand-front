@@ -700,6 +700,9 @@ export default function GamePage() {
         <Box onClick={() => navigate(`/t9game/setup${gameId ? `?gameId=${gameId}` : ""}`)} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid rgba(255,255,255,0.3)" }}>
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>set-up</Typography>
         </Box>
+        <Box onClick={() => gameId ? navigate(`/t9game/current-setup?gameId=${gameId}`) : undefined} sx={{ ...controlBtnSx, cursor: gameId ? "pointer" : "default", opacity: gameId ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}>
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 8 : 10, lineHeight: 1.2, textAlign: "center" }}>현게임{"\n"}설정</Typography>
+        </Box>
         <Box
           onClick={results.length > 0 ? handleNextGame : undefined}
           sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}
