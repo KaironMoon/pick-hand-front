@@ -936,9 +936,9 @@ export default function GamePage() {
             width: cellSize, height: cellSize, border: "1px solid #555", padding: 0, textAlign: "center",
             backgroundColor: GH_CELL_BG[status],
           });
-          const circleStyle = (predict) => ({
+          const circleStyle = (charIdx) => ({
             width: cellSize - 2, height: cellSize - 2, borderRadius: "50%",
-            backgroundColor: predict === "P" ? "#1565c0" : "#f44336",
+            backgroundColor: pat[charIdx % pat.length] === "P" ? "#1565c0" : "#f44336",
             display: "inline-flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontSize: 9, fontWeight: "bold",
           });
@@ -1024,7 +1024,7 @@ export default function GamePage() {
                           const style = { ...base, ...(hasData && isGroupEnd && { borderRight: "2px solid #aaa" }) };
                           return (
                             <td key={colIdx} style={style}>
-                              {hasData && <div style={circleStyle(item.predict)}>{roundNum}</div>}
+                              {hasData && <div style={circleStyle(roundNum - 1)}>{roundNum}</div>}
                             </td>
                           );
                         })}
@@ -1039,7 +1039,7 @@ export default function GamePage() {
                           const style = { ...base, ...(hasData && isGroupEnd && { borderRight: "2px solid #aaa" }) };
                           return (
                             <td key={colIdx} style={style}>
-                              {hasData && <div style={circleStyle(item.predict)}>{roundNum}</div>}
+                              {hasData && <div style={circleStyle(roundNum - 1)}>{roundNum}</div>}
                             </td>
                           );
                         })}
