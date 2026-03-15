@@ -6,11 +6,20 @@ import GamePage from "../pages/t9game";
 import PatternPage from "../pages/t9game/pattern.jsx";
 import SetupPage from "../pages/t9game/setup.jsx";
 import CurrentSetupPage from "../pages/t9game/current-setup.jsx";
+import UserGamePage from "../pages/t9game/user-game.jsx";
 import NotFound from "../pages/error/NotFound";
 import PageLayout from "../pages/PageLayout";
 import LoginPage from "../pages/login";
 import UsersPage from "../pages/users";
 import ProtectedRoute from "../pages/components/ProtectedRoute";
+import { Navigate } from "react-router-dom";
+import { useAtomValue } from "jotai";
+import { userAtom } from "../store/auth-store";
+
+function RootRedirect() {
+  const user = useAtomValue(userAtom);
+  return <Navigate to={user?.role === "admin" ? "/t9game" : "/t9game/user"} replace />;
+}
 
 const ProductLayout = lazy(() => import("../pages/product/ProductLayout"));
 const ProductList = lazy(() => import("../pages/product"));
@@ -48,35 +57,44 @@ const router = createBrowserRouter([
         children: [
           {
             path: "/",
-            element: <GamePage />,
+            element: <RootRedirect />,
           },
           {
             path: "/home",
             element: <Home />,
           },
           {
-            path: "/t9game",
-            element: <GamePage />,
-          },
-          {
             path: "/info",
             element: <Info />,
           },
           {
-            path: "/patterns",
-            element: <PatternPage />,
-          },
-          {
-            path: "/t9game/setup",
-            element: <SetupPage />,
+            path: "/t9game/user",
+            element: <UserGamePage />,
           },
           {
             path: "/t9game/current-setup",
             element: <CurrentSetupPage />,
           },
           {
-            path: "/users",
-            element: <UsersPage />,
+            element: <ProtectedRoute adminOnly />,
+            children: [
+              {
+                path: "/t9game",
+                element: <GamePage />,
+              },
+              {
+                path: "/t9game/setup",
+                element: <SetupPage />,
+              },
+              {
+                path: "/patterns",
+                element: <PatternPage />,
+              },
+              {
+                path: "/users",
+                element: <UsersPage />,
+              },
+            ],
           },
           ...ProductRouter,
         ],

@@ -73,11 +73,11 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
       <Divider sx={{ bgcolor: "military.border", my: 1 }} />
       <List>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavClick(`/t9game?new=${Date.now()}`)}>
+          <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? `/t9game?new=${Date.now()}` : `/t9game/user?new=${Date.now()}`)}>
             <ListItemIcon>
               <SportsEsportsIcon />
             </ListItemIcon>
-            <ListItemText primary="트리플나인" />
+            <ListItemText primary={user?.role === "admin" ? "어드민 트리플나인" : "트리플나인"} />
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>

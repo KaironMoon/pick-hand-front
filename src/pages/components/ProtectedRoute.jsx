@@ -44,7 +44,7 @@ function ProtectedRoute({ adminOnly = false }) {
   }
 
   if (adminOnly && user?.role !== "admin") {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/404" replace />;
   }
 
   return <Outlet />;
