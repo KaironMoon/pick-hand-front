@@ -2,9 +2,6 @@ import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divide
 import { useTheme } from "@mui/material/styles";
 
 import InfoIcon from "@mui/icons-material/Info";
-import MenuBookIcon from "@mui/icons-material/MenuBook";
-import SettingsIcon from "@mui/icons-material/Settings";
-import ListIcon from "@mui/icons-material/List";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import HomeIcon from "@mui/icons-material/Home";
@@ -20,7 +17,6 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
   const navigate = useNavigate();
   const user = useAtomValue(userAtom);
   const logout = useSetAtom(logoutAtom);
-  const debugMode = true;
 
   const handleNavClick = (path) => {
     navigate(path);
@@ -62,30 +58,11 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavClick("/info")}>
-            <ListItemIcon>
-              <InfoIcon />
-            </ListItemIcon>
-            <ListItemText primary="Info" />
-          </ListItemButton>
-        </ListItem>
-      </List>
-      <Divider sx={{ bgcolor: "military.border", my: 1 }} />
-      <List>
-        <ListItem disablePadding>
           <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? `/t9game?new=${Date.now()}` : `/t9game/user?new=${Date.now()}`)}>
             <ListItemIcon>
               <SportsEsportsIcon />
             </ListItemIcon>
-            <ListItemText primary={user?.role === "admin" ? "어드민 트리플나인" : "트리플나인"} />
-          </ListItemButton>
-        </ListItem>
-        <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavClick("/patterns")}>
-            <ListItemIcon>
-              <ViewListIcon />
-            </ListItemIcon>
-            <ListItemText primary="패턴 관리" />
+            <ListItemText primary="트리플나인" />
           </ListItemButton>
         </ListItem>
       </List>
@@ -93,6 +70,22 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
         <>
           <Divider sx={{ bgcolor: "military.border", my: 1 }} />
           <List>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/info")}>
+                <ListItemIcon>
+                  <InfoIcon />
+                </ListItemIcon>
+                <ListItemText primary="Info" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/patterns")}>
+                <ListItemIcon>
+                  <ViewListIcon />
+                </ListItemIcon>
+                <ListItemText primary="패턴 관리" />
+              </ListItemButton>
+            </ListItem>
             <ListItem disablePadding>
               <ListItemButton onClick={() => handleNavClick("/users")}>
                 <ListItemIcon>
@@ -103,42 +96,6 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
             </ListItem>
           </List>
         </>
-      )}
-      {debugMode && (
-        <div style={{ flex: 1 }}>
-          <Divider
-            sx={{
-              bgcolor: "military.border",
-              my: 1,
-            }}
-          />
-          <List>
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/tactic-manuals")}>
-                <ListItemIcon>
-                  <MenuBookIcon />
-                </ListItemIcon>
-                <ListItemText primary="메뉴3" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/session")}>
-                <ListItemIcon>
-                  <ListIcon />
-                </ListItemIcon>
-                <ListItemText primary="메뉴4" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/client-options")}>
-                <ListItemIcon>
-                  <SettingsIcon />
-                </ListItemIcon>
-                <ListItemText primary="Client Option" />
-              </ListItemButton>
-            </ListItem>
-          </List>
-        </div>
       )}
       <Box sx={{ mt: "auto", p: 1.5 }}>
         <Divider sx={{ bgcolor: "military.border", mb: 1.5 }} />
