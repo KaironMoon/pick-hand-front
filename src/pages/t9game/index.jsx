@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
@@ -168,6 +168,7 @@ export default function GamePage() {
   const [endingMode, setEndingMode] = useState(false);
   const [endingSnapshot, setEndingSnapshot] = useState(null); // { tn: bool, gh: Set<"PPP-0">, pinch: Set<"pattern"> }
   const [endingDone, setEndingDone] = useState(false); // 팝업 표시용
+  const processingRef = useRef(false); // API 호출 중 잠금 (연타 방지)
 
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
@@ -237,7 +238,8 @@ export default function GamePage() {
 
   // P/B 입력 → 서버에 라운드 기록 + 다음 상태 수신
   const handleInput = async (inputValue) => {
-    if (!gameId) return;
+    if (!gameId || processingRef.current) return;
+    processingRef.current = true;
 
     let status = "wait";
     if (pickResult.pick) {
@@ -275,12 +277,15 @@ export default function GamePage() {
       }
     } catch (err) {
       console.error("Failed to record round:", err);
+    } finally {
+      processingRef.current = false;
     }
   };
 
   // 마지막 1개 삭제 (서버 + 프론트 동기화)
   const handleDeleteOne = useCallback(async () => {
-    if (results.length === 0 || !gameId) return;
+    if (results.length === 0 || !gameId || processingRef.current) return;
+    processingRef.current = true;
 
     try {
       const res = await apiCaller.delete(`/api/v1/games/${gameId}/last-round`);
@@ -305,6 +310,8 @@ export default function GamePage() {
       }
     } catch (err) {
       console.error("Failed to delete round:", err);
+    } finally {
+      processingRef.current = false;
     }
   }, [results, gameId]);
 
@@ -421,8 +428,9 @@ export default function GamePage() {
     startGame();
   };
 
-  // new game: 현재 게임 종료 + carry_over 없이 새 게임 시작
+  // new game: 현재 게임 종료 + carry_over 없이 새 게임 시작 (테스트용)
   const handleNewGame = async () => {
+    if (!window.confirm("테스트용 기능입니다.\ncarry-over 없이 새 게임을 시작합니다.\n계속하시겠습니까?")) return;
     if (gameId && results.length > 0) {
       try {
         await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gameId } });
