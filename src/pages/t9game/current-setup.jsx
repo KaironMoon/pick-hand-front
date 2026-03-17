@@ -31,10 +31,23 @@ const PINCH_METHODS = ["pattern", "LongJ", "1LSC", "2LSC", "3LSC", "4LSC"];
 
 function ReadOnlyBettingSection({ title, data }) {
   if (!data) return null;
+  const enabled = data.enabled ?? true;
   return (
     <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 16 }}>
       <thead>
-        <tr><td colSpan={7} style={headerStyle}>{title}</td></tr>
+        <tr>
+          <td colSpan={7} style={headerStyle}>
+            {title}
+            <span style={{
+              display: "inline-block", marginLeft: 10, padding: "2px 12px",
+              borderRadius: 4, fontSize: 12, fontWeight: "bold",
+              backgroundColor: enabled ? "#555" : "#d32f2f",
+              color: enabled ? "#ccc" : "#fff",
+            }}>
+              사용중지
+            </span>
+          </td>
+        </tr>
       </thead>
       <tbody>
         <tr>
@@ -188,6 +201,7 @@ function ReadOnlyGlobalHitSection({ data }) {
 
 function ReadOnlyPinchSection({ data, triplenineData }) {
   if (!data) return null;
+  const mainEnable = data.main_enable ?? false;
 
   const totalLoss = triplenineData
     ? Array.from({ length: triplenineData.step_max - triplenineData.step_min + 1 }, (_, i) => triplenineData.amounts[triplenineData.step_min - 1 + i] || 0).reduce((a, b) => a + b, 0)
@@ -201,7 +215,19 @@ function ReadOnlyPinchSection({ data, triplenineData }) {
   return (
     <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 16 }}>
       <thead>
-        <tr><td colSpan={7} style={headerStyle}>pinch</td></tr>
+        <tr>
+          <td colSpan={7} style={headerStyle}>
+            pinch
+            <span style={{
+              display: "inline-block", marginLeft: 10, padding: "2px 12px",
+              borderRadius: 4, fontSize: 12, fontWeight: "bold",
+              backgroundColor: mainEnable ? GREEN : "#555",
+              color: mainEnable ? "#1b2e1b" : "#ccc",
+            }}>
+              메인
+            </span>
+          </td>
+        </tr>
       </thead>
       <tbody>
         <tr>

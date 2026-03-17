@@ -23,8 +23,6 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
-import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
-import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import apiCaller from "@/services/api-caller";
 
 const API_BASE = "/api/v1/patterns";
@@ -115,7 +113,7 @@ export default function PatternPage() {
       setLoading(true);
       const res = await apiCaller.get(API_BASE);
       const data = res.data?.data ?? res.data ?? [];
-      const sorted = [...data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const sorted = [...data].sort((a, b) => (a.pat_group ?? 0) - (b.pat_group ?? 0) || (a.order ?? 0) - (b.order ?? 0));
       setPatterns(sorted);
     } catch (err) {
       console.error("Failed to fetch patterns:", err);
@@ -135,6 +133,7 @@ export default function PatternPage() {
       pattern: row.pattern ?? "",
       pick: row.pick ?? "",
       order: row.order ?? 0,
+      pat_group: row.pat_group ?? 0,
     });
   };
 
@@ -155,6 +154,7 @@ export default function PatternPage() {
         pattern: editValues.pattern,
         pick: editValues.pick,
         order: Number(editValues.order),
+        pat_group: Number(editValues.pat_group),
       });
       setSnackbar({ open: true, message: "저장되었습니다.", severity: "success" });
       setEditingSeq(null);
@@ -189,23 +189,6 @@ export default function PatternPage() {
     setDeleteTarget(null);
   };
 
-  const handleMove = async (index, direction) => {
-    const targetIdx = direction === "up" ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= patterns.length) return;
-    const current = patterns[index];
-    const target = patterns[targetIdx];
-    try {
-      await Promise.all([
-        apiCaller.put(`${API_BASE}/${current.pat_seq}`, { order: target.order }),
-        apiCaller.put(`${API_BASE}/${target.pat_seq}`, { order: current.order }),
-      ]);
-      await fetchPatterns();
-    } catch (err) {
-      console.error("Failed to move pattern:", err);
-      setSnackbar({ open: true, message: "순서 변경에 실패했습니다.", severity: "error" });
-    }
-  };
-
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: 300 }}>
@@ -224,11 +207,12 @@ export default function PatternPage() {
         <Table size="small" sx={{ width: "auto" }}>
           <TableHead>
             <TableRow>
+              <TableCell sx={{ ...headerCellSx, width: 50 }}>그룹</TableCell>
               <TableCell sx={{ ...headerCellSx, width: 60 }}>순서</TableCell>
               <TableCell sx={{ ...headerCellSx, width: 60 }}>번호</TableCell>
               <TableCell sx={{ ...headerCellSx, pr: "10px" }}>패턴</TableCell>
               <TableCell sx={{ ...headerCellSx, pl: 0 }}>픽</TableCell>
-              <TableCell sx={{ ...headerCellSx, width: 120, textAlign: "center" }}>수정 / 삭제</TableCell>
+              <TableCell sx={{ ...headerCellSx, width: 130, textAlign: "center" }}>수정 / 취소 / 삭제</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -242,6 +226,23 @@ export default function PatternPage() {
                     "&:hover": { backgroundColor: "rgba(255,255,255,0.03)" },
                   }}
                 >
+                  {/* 그룹 (pat_group) */}
+                  <TableCell sx={cellSx}>
+                    {isEditing ? (
+                      <TextField
+                        type="number"
+                        size="small"
+                        value={editValues.pat_group}
+                        onChange={(e) => handleEditChange("pat_group", e.target.value)}
+                        variant="outlined"
+                        sx={{ width: 50 }}
+                        inputProps={{ style: { fontSize: 13, padding: "4px 8px" } }}
+                      />
+                    ) : (
+                      row.pat_group || 0
+                    )}
+                  </TableCell>
+
                   {/* 순서 (order) */}
                   <TableCell sx={cellSx}>
                     {isEditing ? (
@@ -255,27 +256,7 @@ export default function PatternPage() {
                         inputProps={{ style: { fontSize: 13, padding: "4px 8px" } }}
                       />
                     ) : (
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
-                        <span>{row.order}</span>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleMove(patterns.indexOf(row), "up")}
-                          disabled={patterns.indexOf(row) === 0}
-                          sx={{ p: 0.2 }}
-                          aria-label="위로"
-                        >
-                          <ArrowUpwardIcon sx={{ fontSize: 14 }} />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleMove(patterns.indexOf(row), "down")}
-                          disabled={patterns.indexOf(row) === patterns.length - 1}
-                          sx={{ p: 0.2 }}
-                          aria-label="아래로"
-                        >
-                          <ArrowDownwardIcon sx={{ fontSize: 14 }} />
-                        </IconButton>
-                      </Box>
+                      row.order
                     )}
                   </TableCell>
 
@@ -314,7 +295,7 @@ export default function PatternPage() {
                     )}
                   </TableCell>
 
-                  {/* 수정 / 삭제 */}
+                  {/* 수정 / 취소 / 삭제 */}
                   <TableCell sx={{ ...cellSx, textAlign: "center" }}>
                     {isEditing ? (
                       <Box sx={{ display: "flex", justifyContent: "center", gap: 0.5 }}>
@@ -336,6 +317,15 @@ export default function PatternPage() {
                         >
                           <CancelIcon fontSize="small" />
                         </IconButton>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleDeleteClick(row)}
+                          disabled={saving}
+                          aria-label="삭제"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
                       </Box>
                     ) : (
                       <Box sx={{ display: "flex", justifyContent: "center", gap: 0.5 }}>
@@ -345,14 +335,6 @@ export default function PatternPage() {
                           aria-label="수정"
                         >
                           <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDeleteClick(row)}
-                          aria-label="삭제"
-                        >
-                          <DeleteIcon fontSize="small" />
                         </IconButton>
                       </Box>
                     )}

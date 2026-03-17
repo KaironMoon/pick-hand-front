@@ -148,7 +148,7 @@ function EditableCell({ value, onChange, prefix = "", suffix = "", style = norma
 
   return (
     <td style={style} onClick={handleClick}>
-      {prefix}{prefix === "" && !value ? "" : value}{suffix}
+      {prefix}{prefix === "" && (value === undefined || value === null || value === "") ? "" : value}{suffix}
     </td>
   );
 }
@@ -167,7 +167,7 @@ function ToggleCell({ active, label, onClick, disabled = false }) {
 }
 
 // Section 1 & 3: Triplenine / Pinch
-function BettingSection({ title, data, onChange, disabled }) {
+function BettingSection({ title, data, onChange, disabled, sectionEnabled, onToggleEnabled }) {
   if (!data) return null;
 
   const handleBetType = (type) => {
@@ -183,7 +183,28 @@ function BettingSection({ title, data, onChange, disabled }) {
   return (
     <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 16 }}>
       <thead>
-        <tr><td colSpan={7} style={headerStyle}>{title}</td></tr>
+        <tr>
+          <td colSpan={7} style={headerStyle}>
+            {title}
+            <span
+              style={{
+                display: "inline-block",
+                marginLeft: 10,
+                padding: "2px 12px",
+                borderRadius: 4,
+                fontSize: 12,
+                fontWeight: "bold",
+                cursor: disabled ? "default" : "pointer",
+                backgroundColor: sectionEnabled ? "#555" : "#d32f2f",
+                color: sectionEnabled ? "#ccc" : "#fff",
+                border: `1px solid ${sectionEnabled ? "#666" : "#d32f2f"}`,
+              }}
+              onClick={disabled ? undefined : onToggleEnabled}
+            >
+              사용중지
+            </span>
+          </td>
+        </tr>
       </thead>
       <tbody>
         <tr>
@@ -264,7 +285,7 @@ function calcTotalLoss(tnData) {
 }
 
 // Section 3: Pinch (BettingSection + 손실 분배)
-function PinchSection({ data, onChange, disabled, triplenineData }) {
+function PinchSection({ data, onChange, disabled, triplenineData, sectionEnabled, onToggleEnabled }) {
   if (!data) return null;
 
   const totalLoss = calcTotalLoss(triplenineData);
@@ -312,7 +333,28 @@ function PinchSection({ data, onChange, disabled, triplenineData }) {
   return (
     <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 16 }}>
       <thead>
-        <tr><td colSpan={7} style={headerStyle}>pinch</td></tr>
+        <tr>
+          <td colSpan={7} style={headerStyle}>
+            pinch
+            <span
+              style={{
+                display: "inline-block",
+                marginLeft: 10,
+                padding: "2px 12px",
+                borderRadius: 4,
+                fontSize: 12,
+                fontWeight: "bold",
+                cursor: disabled ? "default" : "pointer",
+                backgroundColor: sectionEnabled ? GREEN : "#555",
+                color: sectionEnabled ? "#1b2e1b" : "#ccc",
+                border: `1px solid ${sectionEnabled ? GREEN : "#666"}`,
+              }}
+              onClick={disabled ? undefined : onToggleEnabled}
+            >
+              메인
+            </span>
+          </td>
+        </tr>
       </thead>
       <tbody>
         <tr>
@@ -649,6 +691,19 @@ export default function SetupPage() {
     }
   };
 
+  const handleToggleEnabled = () => {
+    if (disabled) return;
+    setConfig((prev) => {
+      const newTnEnabled = !(prev.triplenine?.enabled ?? true);
+      return {
+        ...prev,
+        triplenine: { ...prev.triplenine, enabled: newTnEnabled },
+        pinch: { ...prev.pinch, main_enable: !newTnEnabled },
+      };
+    });
+    setDirty(true);
+  };
+
   const updateSection = (section, newData) => {
     setConfig((prev) => ({ ...prev, [section]: newData }));
     setDirty(true);
@@ -748,6 +803,8 @@ export default function SetupPage() {
           data={config?.triplenine}
           onChange={(d) => updateSection("triplenine", d)}
           disabled={disabled}
+          sectionEnabled={config?.triplenine?.enabled ?? true}
+          onToggleEnabled={handleToggleEnabled}
         />
         <GlobalHitSection
           data={config?.globalhit}
@@ -759,6 +816,8 @@ export default function SetupPage() {
           onChange={(d) => updateSection("pinch", d)}
           disabled={disabled}
           triplenineData={config?.triplenine}
+          sectionEnabled={config?.pinch?.main_enable ?? false}
+          onToggleEnabled={handleToggleEnabled}
         />
       </Box>
 

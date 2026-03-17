@@ -225,9 +225,28 @@ export default function GamePage() {
     const urlGameId = searchParams.get("gameId");
     const isNew = searchParams.get("new");
     if (isNew) {
-      // 메뉴에서 새 게임 요청
-      setSearchParams({}, { replace: true });
-      handleNewGame();
+      // 메뉴에서 새 게임 요청 — 바로 새 게임 시작
+      const doNew = async () => {
+        if (gameId && results.length > 0) {
+          try {
+            await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gameId } });
+          } catch (err) {
+            console.error("Failed to end game:", err);
+          }
+        }
+        setEndingMode(false);
+        setEndingSnapshot(null);
+        setEndingDone(false);
+        setResults([]);
+        setCumPnL({ tn: 0, gh: 0, pinch: 0 });
+        setCarryPnL({ tn: 0, gh: 0, pinch: 0 });
+        setBetData(null);
+        setPickResult({ method: "wait", pick: null });
+        setGlobalhitData([]);
+        await startGame();
+      };
+      doNew();
+      return;
     } else if (urlGameId) {
       // URL에 gameId가 있으면 게임 상태 복원 시도
       restoreGame(parseInt(urlGameId));
@@ -332,12 +351,14 @@ export default function GamePage() {
       snapshot.tn = true;
     }
 
-    // 글로벌히트: 각 패턴×섹션
-    if (gh?.details) {
-      gh.details.forEach((d) => {
-        if (d.step > 1) {
-          snapshot.gh.add(`${d.pattern}-${d.group}`);
-        }
+    // 글로벌히트: 원본 데이터에서 전체 그룹의 step 확인
+    if (globalhitData) {
+      globalhitData.forEach((pat) => {
+        pat.groups.forEach((g) => {
+          if (g.step > 1) {
+            snapshot.gh.add(`${pat.pattern}-${g.group + 1}`);
+          }
+        });
       });
     }
 
@@ -350,15 +371,25 @@ export default function GamePage() {
       });
     }
 
-    // 모든 배팅이 이미 step 1이면 즉시 종료
+    // 모든 배팅이 이미 step 1이면 엔딩 진입 + 완료 팝업
     if (!snapshot.tn && snapshot.gh.size === 0 && snapshot.pinch.size === 0) {
-      handleFinishGame();
+      try {
+        await apiCaller.post("/api/v1/games/ending", {
+          game_id: gameId,
+          snapshot: { tn: false, gh: [], pinch: [] },
+        });
+      } catch (err) {
+        console.error("Failed to start ending:", err);
+      }
+      setEndingMode(true);
+      setEndingSnapshot(snapshot);
+      setEndingDone(true);
       return;
     }
 
-    // 서버에 엔딩 모드 진입 기록
+    // 서버에 엔딩 모드 진입 기록 + 재계산된 상태 반영
     try {
-      await apiCaller.post("/api/v1/games/ending", {
+      const res = await apiCaller.post("/api/v1/games/ending", {
         game_id: gameId,
         snapshot: {
           tn: snapshot.tn,
@@ -366,6 +397,13 @@ export default function GamePage() {
           pinch: [...snapshot.pinch],
         },
       });
+      const data = res.data;
+
+      // 재계산된 픽/배팅/글로벌히트 반영
+      const { globalhit, bet, game_id: _gid, status: _st, snapshot: _snap, ...pick } = data;
+      setPickResult({ method: pick.method, pick: pick.pick, match_start: pick.match_start, match_end: pick.match_end, matches: pick.matches, order: pick.order });
+      setGlobalhitData(globalhit || []);
+      setBetData(bet || null);
     } catch (err) {
       console.error("Failed to start ending:", err);
     }
@@ -385,12 +423,17 @@ export default function GamePage() {
     // TN 체크
     if (endingSnapshot.tn && tn && tn.step > 1) return false;
 
-    // GH 체크
-    if (gh?.details) {
+    // GH 체크 — 원본 globalhitData에서 step 확인 (details는 필터링된 목록이라 누락 가능)
+    if (data.globalhit) {
       for (const key of endingSnapshot.gh) {
         const [pat, grp] = key.split("-");
-        const d = gh.details.find((x) => x.pattern === pat && x.group === parseInt(grp));
-        if (d && d.step > 1) return false;
+        const grpNum = parseInt(grp);
+        for (const patData of data.globalhit) {
+          if (patData.pattern === pat) {
+            const g = patData.groups.find((x) => x.group === grpNum - 1);
+            if (g && g.step > 1) return false;
+          }
+        }
       }
     }
 
@@ -428,9 +471,19 @@ export default function GamePage() {
     startGame();
   };
 
-  // new game: 현재 게임 종료 + carry_over 없이 새 게임 시작 (테스트용)
-  const handleNewGame = async () => {
-    if (!window.confirm("테스트용 기능입니다.\ncarry-over 없이 새 게임을 시작합니다.\n계속하시겠습니까?")) return;
+  // new game: 확인 대화상자
+  const [showNewConfirm, setShowNewConfirm] = useState(false);
+
+  const handleNewGame = () => {
+    setShowNewConfirm(true);
+  };
+
+  const handleNewGameConfirm = async () => {
+    setShowNewConfirm(false);
+    // ?new 파라미터 제거
+    if (searchParams.get("new")) {
+      setSearchParams({}, { replace: true });
+    }
     if (gameId && results.length > 0) {
       try {
         await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gameId } });
@@ -553,19 +606,21 @@ export default function GamePage() {
         {/* 상태 토글 */}
         {(() => {
           const tnActive = betData?.triplenine?.amount > 0;
+          const pinchMain = betData?.pinch?.main_enable && betData?.pinch?.active;
+          const isActive = tnActive || pinchMain;
           const isLsc = /^\d+LSC$/.test(pickResult.method || "");
           const isPattern = pickResult.method === "pattern" && pickResult.order;
           const methodLabel = isPattern ? `pat${pickResult.order}` : (pickResult.method || "wait");
-          const borderColor = tnActive ? (isLsc ? "#4caf50" : "#ff9800") : "#555";
+          const borderColor = isActive ? (isLsc ? "#4caf50" : "#ff9800") : "#555";
           return (
-            <Box sx={{ ...toggleBtnSx, border: `2px solid ${borderColor}`, width: isMobile ? 50 : 70, opacity: tnActive ? 1 : 0.35, justifyContent: "center" }}>
+            <Box sx={{ ...toggleBtnSx, border: `2px solid ${borderColor}`, width: isMobile ? 50 : 70, opacity: isActive ? 1 : 0.35, justifyContent: "center" }}>
               <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: borderColor }}>{methodLabel}</Typography>
             </Box>
           );
         })()}
         {(() => {
           const tnStep = betData?.triplenine?.step || 0;
-          const tnActive = betData?.triplenine?.amount > 0;
+          const tnActive = !betData?.pinch?.main_enable && betData?.triplenine?.amount > 0;
           const label = `M${tnStep}`;
           return (
             <Box sx={{ ...toggleBtnSx, border: `2px solid ${tnActive ? "#4caf50" : "#555"}`, opacity: tnActive ? 1 : 0.35 }}>
@@ -824,8 +879,11 @@ export default function GamePage() {
                 ))}
               </tr>
 
-              {/* 8~13행: pinch 방법별 */}
-              {["pattern", "LongJ", "1LSC", "2LSC", "3LSC", "4LSC"].map((name) => {
+              {/* 8행~: pinch 방법별 */}
+              {(pinch?.main_enable
+                ? ["LongJ", "1LSC", "2LSC", "3LSC", "4LSC", "pattern1", "pattern2", "pattern3", "pattern4", "pattern5", "pattern6"]
+                : ["pattern", "LongJ", "1LSC", "2LSC", "3LSC", "4LSC"]
+              ).map((name) => {
                 const pm = pinchMethods[name];
                 const step = pm?.step || 0;
                 const remaining = pm?.remaining || 0;
@@ -1083,6 +1141,20 @@ export default function GamePage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleFinishGame} variant="contained">새 게임 시작</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 새 게임 확인 대화상자 */}
+      <Dialog open={showNewConfirm} onClose={() => { setShowNewConfirm(false); if (searchParams.get("new")) setSearchParams(gameId ? { gameId } : {}, { replace: true }); }}>
+        <DialogTitle sx={{ fontWeight: "bold" }}>새 게임</DialogTitle>
+        <DialogContent>
+          <Typography>테스트용 기능입니다.</Typography>
+          <Typography>carry-over 없이 새 게임을 시작합니다.</Typography>
+          <Typography>계속하시겠습니까?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setShowNewConfirm(false); if (searchParams.get("new")) setSearchParams(gameId ? { gameId } : {}, { replace: true }); }}>취소</Button>
+          <Button onClick={handleNewGameConfirm} variant="contained">확인</Button>
         </DialogActions>
       </Dialog>
     </Box>
