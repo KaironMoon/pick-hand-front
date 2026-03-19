@@ -4,8 +4,10 @@ import { useTheme } from "@mui/material/styles";
 import InfoIcon from "@mui/icons-material/Info";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
+import HiveIcon from "@mui/icons-material/Hive";
 import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
+import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
 
 import { useNavigate } from "react-router-dom";
@@ -51,46 +53,58 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
       <List>
         <ListItem disablePadding>
           <ListItemButton onClick={() => handleNavClick("/")}>
-            <ListItemIcon>
-              <HomeIcon />
-            </ListItemIcon>
+            <ListItemIcon><HomeIcon /></ListItemIcon>
             <ListItemText primary="Home" />
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
+          <ListItemButton onClick={() => handleNavClick("/info")}>
+            <ListItemIcon><InfoIcon /></ListItemIcon>
+            <ListItemText primary="Info" />
+          </ListItemButton>
+        </ListItem>
+      </List>
+      <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+      <List>
+        <ListItem disablePadding>
           <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? `/t9game?new=${Date.now()}` : `/t9game/user?new=${Date.now()}`)}>
-            <ListItemIcon>
-              <SportsEsportsIcon />
-            </ListItemIcon>
+            <ListItemIcon><SportsEsportsIcon /></ListItemIcon>
             <ListItemText primary="트리플나인" />
           </ListItemButton>
         </ListItem>
+        {user?.role === "admin" && (
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => handleNavClick("/patterns")}>
+              <ListItemIcon><ViewListIcon /></ListItemIcon>
+              <ListItemText primary="패턴 관리" />
+            </ListItemButton>
+          </ListItem>
+        )}
+      </List>
+      <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+      <List>
+        <ListItem disablePadding>
+          <ListItemButton onClick={() => handleNavClick(`/hbgame?new=${Date.now()}`)}>
+            <ListItemIcon><HiveIcon /></ListItemIcon>
+            <ListItemText primary="허니비" />
+          </ListItemButton>
+        </ListItem>
+        {user?.role === "admin" && (
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => handleNavClick("/hbgame/setup")}>
+              <ListItemIcon><SettingsIcon /></ListItemIcon>
+              <ListItemText primary="허니비 설정" />
+            </ListItemButton>
+          </ListItem>
+        )}
       </List>
       {user?.role === "admin" && (
         <>
           <Divider sx={{ bgcolor: "military.border", my: 1 }} />
           <List>
             <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/info")}>
-                <ListItemIcon>
-                  <InfoIcon />
-                </ListItemIcon>
-                <ListItemText primary="Info" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/patterns")}>
-                <ListItemIcon>
-                  <ViewListIcon />
-                </ListItemIcon>
-                <ListItemText primary="패턴 관리" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
               <ListItemButton onClick={() => handleNavClick("/users")}>
-                <ListItemIcon>
-                  <PeopleIcon />
-                </ListItemIcon>
+                <ListItemIcon><PeopleIcon /></ListItemIcon>
                 <ListItemText primary="사용자 관리" />
               </ListItemButton>
             </ListItem>
