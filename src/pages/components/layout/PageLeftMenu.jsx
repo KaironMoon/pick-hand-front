@@ -7,7 +7,6 @@ import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import HiveIcon from "@mui/icons-material/Hive";
 import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
-import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
 
 import { useNavigate } from "react-router-dom";
@@ -84,19 +83,11 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
       <Divider sx={{ bgcolor: "military.border", my: 1 }} />
       <List>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavClick(`/hbgame?new=${Date.now()}`)}>
+          <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? `/hbgame?new=${Date.now()}` : `/hbgame/user?new=${Date.now()}`)}>
             <ListItemIcon><HiveIcon /></ListItemIcon>
             <ListItemText primary="허니비" />
           </ListItemButton>
         </ListItem>
-        {user?.role === "admin" && (
-          <ListItem disablePadding>
-            <ListItemButton onClick={() => handleNavClick("/hbgame/setup")}>
-              <ListItemIcon><SettingsIcon /></ListItemIcon>
-              <ListItemText primary="허니비 설정" />
-            </ListItemButton>
-          </ListItem>
-        )}
       </List>
       {user?.role === "admin" && (
         <>

@@ -8,6 +8,7 @@ import SetupPage from "../pages/t9game/setup.jsx";
 import CurrentSetupPage from "../pages/t9game/current-setup.jsx";
 import UserGamePage from "../pages/t9game/user-game.jsx";
 import HbGamePage from "../pages/hbgame";
+import HbUserGamePage from "../pages/hbgame/user-game.jsx";
 import HbSetupPage from "../pages/hbgame/setup.jsx";
 import NotFound from "../pages/error/NotFound";
 import PageLayout from "../pages/PageLayout";
@@ -76,6 +77,10 @@ const router = createBrowserRouter([
           {
             path: "/t9game/current-setup",
             element: <CurrentSetupPage />,
+          },
+          {
+            path: "/hbgame/user",
+            element: <HbUserGamePage />,
           },
           {
             element: <ProtectedRoute adminOnly />,
