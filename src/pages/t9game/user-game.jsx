@@ -169,6 +169,7 @@ export default function GamePage() {
   const [endingSnapshot, setEndingSnapshot] = useState(null); // { tn: bool, gh: Set<"PPP-0">, pinch: Set<"pattern"> }
   const [endingDone, setEndingDone] = useState(false); // 팝업 표시용
   const [showNextConfirm, setShowNextConfirm] = useState(false);
+  const [showNewConfirm, setShowNewConfirm] = useState(false);
   const processingRef = useRef(false); // API 호출 중 잠금 (연타 방지)
 
   const currentTurn = results.length + 1;
@@ -430,7 +431,13 @@ export default function GamePage() {
     startGame();
   };
 
-  // new game: 현재 게임 종료 + carry_over 없이 새 게임 시작
+  // new game: 확인 대화상자 후 carry_over 없이 새 게임 시작
+  const handleNewGameConfirm = async () => {
+    setShowNewConfirm(false);
+    if (searchParams.get("new")) setSearchParams({}, { replace: true });
+    await handleNewGame();
+  };
+
   const handleNewGame = async () => {
     if (gameId && results.length > 0) {
       try {
@@ -630,6 +637,12 @@ export default function GamePage() {
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
         </Box>
+        <Box
+          onClick={() => setShowNewConfirm(true)}
+          sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #2196f3" }}
+        >
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
+        </Box>
       </Box>
 
       {/* ===== 대시보드 (단일 12열 테이블) ===== */}
@@ -754,6 +767,19 @@ export default function GamePage() {
       })()}
 
       {/* ED 종료 완료 팝업 */}
+      {/* 새 게임 확인 대화상자 */}
+      <Dialog open={showNewConfirm} onClose={() => setShowNewConfirm(false)}>
+        <DialogTitle sx={{ fontWeight: "bold" }}>새 게임</DialogTitle>
+        <DialogContent>
+          <Typography>carry-over 없이 새 게임을 시작합니다.</Typography>
+          <Typography>계속하시겠습니까?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowNewConfirm(false)}>취소</Button>
+          <Button onClick={handleNewGameConfirm} variant="contained">확인</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* 넥스트 게임 확인 */}
       <Dialog open={showNextConfirm} onClose={() => setShowNextConfirm(false)}>
         <DialogTitle sx={{ fontWeight: "bold" }}>다음 게임</DialogTitle>

@@ -87,6 +87,7 @@ export default function GhUserGamePage() {
   const [config, setConfig] = useState(null);
   const [cumPnL, setCumPnL] = useState({ gh: 0 });
   const [showNextConfirm, setShowNextConfirm] = useState(false);
+  const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [endingMode, setEndingMode] = useState(false);
   const [endingSnapshot, setEndingSnapshot] = useState(null);
   const [endingDone, setEndingDone] = useState(false);
@@ -281,6 +282,20 @@ export default function GhUserGamePage() {
     startGame();
   };
 
+  // new game: carry-over 없이 새 게임 시작
+  const handleNewGameConfirm = async () => {
+    setShowNewConfirm(false);
+    if (gameId && results.length > 0) {
+      try {
+        await apiCaller.post(GH_GAMES_API.END, { game_id: gameId, actual: "P" });
+      } catch {}
+    }
+    setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
+    setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
+    setGlobalhitData([]);
+    await startGame();
+  };
+
   return (
     <Box sx={{ p: isMobile ? 0.5 : 2 }}>
       {/* ===== 상단: 6x40 빅로드 격자 ===== */}
@@ -369,15 +384,21 @@ export default function GhUserGamePage() {
         <Box sx={{ width: isMobile ? 32 : 0 }} />
         <Box
           onClick={results.length > 0 ? handleDeleteOne : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4 }}
+          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, mr: 1 }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
         <Box
           onClick={results.length > 0 ? () => setShowNextConfirm(true) : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}
+          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)", mr: 1 }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
+        </Box>
+        <Box
+          onClick={() => setShowNewConfirm(true)}
+          sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #2196f3" }}
+        >
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
         </Box>
       </Box>
 
@@ -397,6 +418,19 @@ export default function GhUserGamePage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleFinishGame} variant="contained">새 게임 시작</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 새 게임 확인 대화상자 */}
+      <Dialog open={showNewConfirm} onClose={() => setShowNewConfirm(false)}>
+        <DialogTitle sx={{ fontWeight: "bold" }}>새 게임</DialogTitle>
+        <DialogContent>
+          <Typography>carry-over 없이 새 게임을 시작합니다.</Typography>
+          <Typography>계속하시겠습니까?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowNewConfirm(false)}>취소</Button>
+          <Button onClick={handleNewGameConfirm} variant="contained">확인</Button>
         </DialogActions>
       </Dialog>
 

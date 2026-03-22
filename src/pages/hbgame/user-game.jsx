@@ -89,6 +89,7 @@ export default function HbUserGamePage() {
   const [config, setConfig] = useState(null);
   const [cumPnL, setCumPnL] = useState({ hb: 0, gh: 0 });
   const [showNextConfirm, setShowNextConfirm] = useState(false);
+  const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [nicknames, setNicknames] = useState([]);
   const [endingMode, setEndingMode] = useState(false);
   const [endingSnapshot, setEndingSnapshot] = useState(null);
@@ -309,6 +310,21 @@ export default function HbUserGamePage() {
     startGame();
   };
 
+  // new game: carry-over 없이 새 게임 시작
+  const handleNewGameConfirm = async () => {
+    setShowNewConfirm(false);
+    if (gameId && results.length > 0) {
+      try {
+        await apiCaller.post(HB_GAMES_API.END, { game_id: gameId, actual: "P" });
+      } catch {}
+    }
+    setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
+    setResults([]); setCumPnL({ hb: 0, gh: 0 }); setBetData(null);
+    setPickResult({ method: "wait", pick: null, nickname: null });
+    setHbPatterns({}); setGlobalhitData([]);
+    await startGame();
+  };
+
   const sortedPatterns = nicknames.length > 0 ? nicknames : Object.keys(hbPatterns).sort();
 
   return (
@@ -399,15 +415,21 @@ export default function HbUserGamePage() {
         <Box sx={{ width: isMobile ? 32 : 0 }} />
         <Box
           onClick={results.length > 0 ? handleDeleteOne : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4 }}
+          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, mr: 1 }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
         <Box
           onClick={results.length > 0 ? () => setShowNextConfirm(true) : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}
+          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)", mr: 1 }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
+        </Box>
+        <Box
+          onClick={() => setShowNewConfirm(true)}
+          sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #2196f3" }}
+        >
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
         </Box>
       </Box>
 
@@ -432,6 +454,19 @@ export default function HbUserGamePage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleFinishGame} variant="contained">새 게임 시작</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 새 게임 확인 대화상자 */}
+      <Dialog open={showNewConfirm} onClose={() => setShowNewConfirm(false)}>
+        <DialogTitle sx={{ fontWeight: "bold" }}>새 게임</DialogTitle>
+        <DialogContent>
+          <Typography>carry-over 없이 새 게임을 시작합니다.</Typography>
+          <Typography>계속하시겠습니까?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowNewConfirm(false)}>취소</Button>
+          <Button onClick={handleNewGameConfirm} variant="contained">확인</Button>
         </DialogActions>
       </Dialog>
 
