@@ -114,6 +114,7 @@ export default function HbGamePage() {
       const res = await apiCaller.post(HB_GAMES_API.START);
       setGameId(res.data.game_id);
       setConfig(res.data.config);
+      setGlobalhitData(res.data.globalhit || []);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
     } catch (err) {
       console.error("Failed to start game:", err);
@@ -297,7 +298,8 @@ export default function HbGamePage() {
       setEndingDone(false);
       setResults([]); setBetData(null);
       setPickResult({ method: "wait", pick: null, nickname: null });
-      setHbPatterns({}); setGlobalhitData([]);
+      setHbPatterns({});
+      setGlobalhitData(res.data.globalhit || []);
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
@@ -790,12 +792,25 @@ export default function HbGamePage() {
 
       {/* 종료 다이얼로그 */}
       <Dialog open={endingDone} onClose={() => {}}>
-        <DialogTitle>모든 배팅이 완료되어 정지합니다</DialogTitle>
+        <DialogTitle sx={{ fontWeight: "bold" }}>게임 종료</DialogTitle>
         <DialogContent>
-          <Typography variant="body2">모든 패턴이 step 1로 돌아왔습니다.</Typography>
+          <Typography>모든 배팅이 완료되었습니다.</Typography>
+          <Box sx={{ mt: 2 }}>
+            {[
+              { name: "Honeybee", pnl: cumPnL.hb },
+              { name: "Globalhit", pnl: cumPnL.gh },
+            ].map((item) => (
+              <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
+                {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
+              </Typography>
+            ))}
+            <Typography sx={{ mt: 1, fontWeight: "bold", color: (cumPnL.hb + cumPnL.gh) >= 0 ? "#4caf50" : "#f44336" }}>
+              Total: {(cumPnL.hb + cumPnL.gh) > 0 ? "+" : ""}{(cumPnL.hb + cumPnL.gh).toLocaleString()}P
+            </Typography>
+          </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleFinishGame} color="error" variant="contained">종료</Button>
+          <Button onClick={handleFinishGame} variant="contained">새 게임 시작</Button>
         </DialogActions>
       </Dialog>
 

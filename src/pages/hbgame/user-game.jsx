@@ -108,6 +108,7 @@ export default function HbUserGamePage() {
       const res = await apiCaller.post(HB_GAMES_API.START);
       setGameId(res.data.game_id);
       setConfig(res.data.config);
+      setGlobalhitData(res.data.globalhit || []);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
     } catch (err) {
       console.error("Failed to start game:", err);
@@ -198,7 +199,8 @@ export default function HbUserGamePage() {
       const res = await apiCaller.post(HB_GAMES_API.NEXT, null, { params: { game_id: gameId } });
       setResults([]); setBetData(null);
       setPickResult({ method: "wait", pick: null, nickname: null });
-      setHbPatterns({}); setGlobalhitData([]);
+      setHbPatterns({});
+      setGlobalhitData(res.data.globalhit || []);
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
