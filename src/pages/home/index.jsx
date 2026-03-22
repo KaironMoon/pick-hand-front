@@ -14,7 +14,7 @@ const Home = () => {
   const user = useAtomValue(userAtom);
 
   return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 2, py: 3, px: 2, backgroundColor: "#d0d0d6", minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 2, py: 3, px: 2, backgroundColor: "#e2e0d8", minHeight: "100vh" }}>
       {games.map((g) => (
         <Box
           key={g.name}
@@ -28,16 +28,17 @@ const Home = () => {
             borderRadius: 3,
             overflow: "hidden",
             cursor: "pointer",
-            border: "1px solid #ccc",
-            backgroundColor: "#fff",
+            border: "none",
+            backgroundColor: "#FFFFFF",
             transition: "transform 0.2s, box-shadow 0.2s",
-            "&:hover": { transform: "translateY(-2px)", boxShadow: "0 4px 16px rgba(0,0,0,0.15)" },
+            boxShadow: "0 3px 10px rgba(0,0,0,0.15)",
+            "&:hover": { transform: "translateY(-2px)", boxShadow: "0 6px 20px rgba(0,0,0,0.2)" },
           }}
         >
-          <Box sx={{ width: { xs: "100%", sm: 160 }, height: 120, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#f0e8c0" }}>
+          <Box sx={{ width: { xs: "100%", sm: 160 }, height: 120, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#2a2a3a" }}>
             <Box component="img" src={g.img} alt={g.name} sx={{ maxHeight: 100, maxWidth: "85%", objectFit: "contain" }} />
           </Box>
-          <Typography variant="body1" sx={{ fontWeight: "bold", fontSize: 16, flex: 1, textAlign: "center", color: "#333" }}>{g.name}</Typography>
+          <Typography variant="body1" sx={{ fontWeight: "bold", fontSize: 16, flex: 1, textAlign: "center", color: "#0F172A", py: { xs: 1, sm: 0 } }}>{g.name}</Typography>
         </Box>
       ))}
     </Box>
