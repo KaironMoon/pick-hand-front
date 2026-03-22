@@ -168,6 +168,7 @@ export default function GamePage() {
   const [endingMode, setEndingMode] = useState(false);
   const [endingSnapshot, setEndingSnapshot] = useState(null); // { tn: bool, gh: Set<"PPP-0">, pinch: Set<"pattern"> }
   const [endingDone, setEndingDone] = useState(false); // 팝업 표시용
+  const [showNextConfirm, setShowNextConfirm] = useState(false);
   const processingRef = useRef(false); // API 호출 중 잠금 (연타 방지)
 
   const currentTurn = results.length + 1;
@@ -623,7 +624,7 @@ export default function GamePage() {
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
         <Box
-          onClick={results.length > 0 ? handleNextGame : undefined}
+          onClick={results.length > 0 ? () => setShowNextConfirm(true) : undefined}
           sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)", mr: 2 }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
@@ -669,6 +670,26 @@ export default function GamePage() {
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: dirColor }}>{`formal(${combinedDir})`}</Typography>
             </Box>
             {(() => {
+              const tnHasBet = (betData?.triplenine?.amount || 0) > 0;
+              const ghHasBet = (betData?.globalhit?.P || 0) + (betData?.globalhit?.B || 0) > 0;
+              const pinchOn = betData?.pinch?.active || false;
+              const items = [
+                { name: "Triplenine", pnl: cumPnL.tn, active: tnHasBet },
+                { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
+                { name: "pinch", pnl: cumPnL.pinch, active: pinchOn },
+              ];
+              return items.map((item, i) => {
+                const clr = item.pnl > 0 ? "#4caf50" : item.pnl < 0 ? "#f44336" : "#fff";
+                const sign = item.pnl > 0 ? "+" : "";
+                return (
+                  <Box key={i} sx={{ border: `1px solid ${item.active ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, minWidth: 200, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{item.name}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: clr }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
+                  </Box>
+                );
+              });
+            })()}
+            {(() => {
               const totalPnL = cumPnL.tn + cumPnL.gh + cumPnL.pinch;
               const sign = totalPnL > 0 ? "+" : "";
               return (
@@ -680,11 +701,70 @@ export default function GamePage() {
           </Box>
           )}
 
+          {/* 모바일: 우측 요약 패널 */}
+          {isMobile && (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mb: 0.5 }}>
+            {(() => {
+              const tnHasBet = (betData?.triplenine?.amount || 0) > 0;
+              const ghHasBet = (betData?.globalhit?.P || 0) + (betData?.globalhit?.B || 0) > 0;
+              const pinchOn = betData?.pinch?.active || false;
+              const totalPnL = cumPnL.tn + cumPnL.gh + cumPnL.pinch;
+              const items = [
+                { name: "formal", value: combinedDir, color: dirColor, isFormal: true },
+                { name: "Triplenine", pnl: cumPnL.tn, active: tnHasBet },
+                { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
+                { name: "pinch", pnl: cumPnL.pinch, active: pinchOn },
+                { name: "합계", pnl: totalPnL, isTotal: true },
+              ];
+              const rowSx = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5, borderRadius: 1, px: 0.8, py: 0.3, whiteSpace: "nowrap" };
+              return items.map((item, i) => {
+                if (item.isFormal) {
+                  return (
+                    <Box key={i} sx={{ ...rowSx, border: "1px solid rgba(255,255,255,0.3)" }}>
+                      <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{item.name}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: item.color }}>{item.value}</Typography>
+                    </Box>
+                  );
+                }
+                if (item.isTotal) {
+                  const sign = item.pnl > 0 ? "+" : "";
+                  return (
+                    <Box key={i} sx={{ ...rowSx, backgroundColor: "#00bcd4" }}>
+                      <Typography variant="caption" sx={{ fontSize: 9, color: "#000" }}>{item.name}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: item.pnl < 0 ? "#f44336" : "#000" }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
+                    </Box>
+                  );
+                }
+                const clr = item.pnl > 0 ? "#4caf50" : item.pnl < 0 ? "#f44336" : "#fff";
+                const sign = item.pnl > 0 ? "+" : "";
+                return (
+                  <Box key={i} sx={{ ...rowSx, border: `1px solid ${item.active ? "rgba(255,255,255,0.3)" : "#333"}` }}>
+                    <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{item.name}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: clr }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
+                  </Box>
+                );
+              });
+            })()}
+          </Box>
+          )}
+
           </>
         );
       })()}
 
       {/* ED 종료 완료 팝업 */}
+      {/* 넥스트 게임 확인 */}
+      <Dialog open={showNextConfirm} onClose={() => setShowNextConfirm(false)}>
+        <DialogTitle sx={{ fontWeight: "bold" }}>다음 게임</DialogTitle>
+        <DialogContent>
+          <Typography>현재 게임을 종료하고 다음 게임으로 넘어가시겠습니까?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowNextConfirm(false)}>취소</Button>
+          <Button onClick={() => { setShowNextConfirm(false); handleNextGame(); }} variant="contained">확인</Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={endingDone} onClose={() => {}}>
         <DialogTitle sx={{ fontWeight: "bold" }}>게임 종료</DialogTitle>
         <DialogContent>

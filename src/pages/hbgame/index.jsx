@@ -135,7 +135,7 @@ export default function HbGamePage() {
     } else {
       startGame();
     }
-  }, [searchParams.get("new")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams.get("new"), searchParams.get("gameId")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const restoreGame = async (gid) => {
     try {
@@ -317,6 +317,7 @@ export default function HbGamePage() {
     }
   };
 
+  const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const handleNewGame = () => setShowNewConfirm(true);
   const handleNewGameConfirm = async () => {
@@ -445,14 +446,14 @@ export default function HbGamePage() {
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
-        <Box onClick={() => navigate(`/hbgame/setup`)} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid rgba(255,255,255,0.3)" }}>
+        <Box onClick={() => navigate(gameId ? `/hbgame/setup?gameId=${gameId}` : `/hbgame/setup`)} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid rgba(255,255,255,0.3)" }}>
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>set-up</Typography>
         </Box>
         <Box onClick={() => gameId ? navigate(`/hbgame/setup?gameId=${gameId}`) : undefined} sx={{ ...controlBtnSx, cursor: gameId ? "pointer" : "default", opacity: gameId ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}>
           <Typography variant="caption" sx={{ fontSize: isMobile ? 8 : 10, lineHeight: 1.2, textAlign: "center" }}>현게임{"\n"}설정</Typography>
         </Box>
         <Box
-          onClick={results.length > 0 ? handleNextGame : undefined}
+          onClick={results.length > 0 ? () => setShowNextConfirm(true) : undefined}
           sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
@@ -811,6 +812,18 @@ export default function HbGamePage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleFinishGame} variant="contained">새 게임 시작</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 넥스트 게임 확인 */}
+      <Dialog open={showNextConfirm} onClose={() => setShowNextConfirm(false)}>
+        <DialogTitle>다음 게임</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">현재 게임을 종료하고 다음 게임으로 넘어가시겠습니까?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowNextConfirm(false)}>취소</Button>
+          <Button onClick={() => { setShowNextConfirm(false); handleNextGame(); }} color="primary" variant="contained">확인</Button>
         </DialogActions>
       </Dialog>
 
