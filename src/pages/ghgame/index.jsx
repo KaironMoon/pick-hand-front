@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
-import { HB_GAMES_API } from "@/constants/api-url";
+import { GH_GAMES_API } from "@/constants/api-url";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -74,21 +74,18 @@ const controlBtnSx = {
   "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" },
 };
 
-export default function HbGamePage() {
+export default function GhGamePage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [results, setResults] = useState([]);
-  const [pickResult, setPickResult] = useState({ method: "wait", pick: null, nickname: null });
-  const [hbPatterns, setHbPatterns] = useState({});
   const [globalhitData, setGlobalhitData] = useState([]);
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
-  const [config, setConfig] = useState(null);
-  const [cumPnL, setCumPnL] = useState({ hb: 0, gh: 0 });
-  const [nicknames, setNicknames] = useState([]);
+  const [config, setConfig] = useState(null); // eslint-disable-line no-unused-vars
+  const [cumPnL, setCumPnL] = useState({ gh: 0 });
 
   const [endingMode, setEndingMode] = useState(false);
   const [endingSnapshot, setEndingSnapshot] = useState(null);
@@ -102,17 +99,10 @@ export default function HbGamePage() {
   const displayPick = betData?.combined?.direction && betData.combined.direction !== "wait" ? betData.combined.direction : null;
   const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
-  // 닉네임 로드
-  useEffect(() => {
-    apiCaller.get(HB_GAMES_API.NICKNAMES).then((res) => {
-      setNicknames(res.data.nicknames || []);
-    });
-  }, []);
-
   // 게임 시작
   const startGame = useCallback(async () => {
     try {
-      const res = await apiCaller.post(HB_GAMES_API.START);
+      const res = await apiCaller.post(GH_GAMES_API.START);
       setGameId(res.data.game_id);
       setConfig(res.data.config);
       setGlobalhitData(res.data.globalhit || []);
@@ -127,9 +117,8 @@ export default function HbGamePage() {
     const urlGameId = searchParams.get("gameId");
     if (isNew) {
       setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-      setResults([]); setCumPnL({ hb: 0, gh: 0 }); setBetData(null);
-      setPickResult({ method: "wait", pick: null, nickname: null });
-      setHbPatterns({}); setGlobalhitData([]);
+      setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
+      setGlobalhitData([]);
       startGame();
     } else if (urlGameId) {
       restoreGame(parseInt(urlGameId));
@@ -140,17 +129,14 @@ export default function HbGamePage() {
 
   const restoreGame = async (gid) => {
     try {
-      const res = await apiCaller.get(HB_GAMES_API.STATE(gid));
+      const res = await apiCaller.get(GH_GAMES_API.STATE(gid));
       const data = res.data;
       setGameId(data.game_id);
       setConfig(data.config);
-      setCumPnL(data.cum_pnl || { hb: 0, gh: 0 });
-      // results 복원
+      setCumPnL(data.cum_pnl || { gh: 0 });
       const seq = data.seq || "";
-      const restoredResults = seq.split("").map((v, i) => ({ value: v, status: "wait" }));
+      const restoredResults = seq.split("").map((v) => ({ value: v, status: "wait" }));
       setResults(restoredResults);
-      setPickResult({ method: data.method, pick: data.pick, nickname: data.nickname });
-      setHbPatterns(data.hb_patterns || {});
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
       if (data.status === "ending" && data.ending_snapshot) {
@@ -169,17 +155,16 @@ export default function HbGamePage() {
     processingRef.current = true;
 
     let status = "wait";
-    if (pickResult.pick) {
-      status = pickResult.pick === inputValue ? "hit" : "miss";
+    const pick = betData?.combined?.direction;
+    if (pick && pick !== "wait") {
+      status = pick === inputValue ? "hit" : "miss";
     }
     setResults((prev) => [...prev, { value: inputValue, status }]);
 
     try {
-      const res = await apiCaller.post(HB_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
+      const res = await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
       const data = res.data;
-      setCumPnL({ hb: data.cum_pnl.hb, gh: data.cum_pnl.gh });
-      setPickResult({ method: data.method, pick: data.pick, nickname: data.nickname });
-      setHbPatterns(data.hb_patterns || {});
+      setCumPnL({ gh: data.cum_pnl.gh });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
 
@@ -196,11 +181,6 @@ export default function HbGamePage() {
 
   const checkEndingComplete = (data) => {
     if (!endingSnapshot) return false;
-    const hbTracked = endingSnapshot.hb || [];
-    for (const nn of hbTracked) {
-      const st = data.hb_patterns?.[nn];
-      if (st && st.step > 1) return false;
-    }
     const ghTracked = endingSnapshot.gh || [];
     if (data.globalhit) {
       for (const key of ghTracked) {
@@ -220,10 +200,7 @@ export default function HbGamePage() {
   // ED
   const handleEndingMode = async () => {
     if (endingMode || !gameId) return;
-    const snapshot = { hb: [], gh: [] };
-    Object.entries(hbPatterns).forEach(([nn, st]) => {
-      if (st.step > 1) snapshot.hb.push(nn);
-    });
+    const snapshot = { gh: [] };
     if (globalhitData) {
       globalhitData.forEach((pat) => {
         pat.groups.forEach((g) => {
@@ -232,19 +209,17 @@ export default function HbGamePage() {
       });
     }
 
-    if (snapshot.hb.length === 0 && snapshot.gh.length === 0) {
+    if (snapshot.gh.length === 0) {
       try {
-        await apiCaller.post(HB_GAMES_API.ENDING, { game_id: gameId, snapshot });
+        await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
       } catch {}
       setEndingMode(true); setEndingSnapshot(snapshot); setEndingDone(true);
       return;
     }
 
     try {
-      const res = await apiCaller.post(HB_GAMES_API.ENDING, { game_id: gameId, snapshot });
+      const res = await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
       const data = res.data;
-      setPickResult({ method: data.method, pick: data.pick, nickname: data.nickname });
-      setHbPatterns(data.hb_patterns || {});
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
     } catch (err) {
@@ -256,13 +231,12 @@ export default function HbGamePage() {
   const handleFinishGame = async () => {
     if (gameId) {
       try {
-        await apiCaller.post(HB_GAMES_API.END, { game_id: gameId, actual: "P" });
+        await apiCaller.post(GH_GAMES_API.END, { game_id: gameId, actual: "P" });
       } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ hb: 0, gh: 0 }); setBetData(null);
-    setPickResult({ method: "wait", pick: null, nickname: null });
-    setHbPatterns({}); setGlobalhitData([]);
+    setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
+    setGlobalhitData([]);
     setSearchParams({}, { replace: true });
     startGame();
   };
@@ -272,12 +246,10 @@ export default function HbGamePage() {
     if (results.length === 0 || !gameId || processingRef.current) return;
     processingRef.current = true;
     try {
-      const res = await apiCaller.delete(HB_GAMES_API.LAST_ROUND(gameId));
+      const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
       setResults(results.slice(0, -1));
-      setCumPnL(data.cum_pnl || { hb: 0, gh: 0 });
-      setPickResult({ method: data.method, pick: data.pick, nickname: data.nickname });
-      setHbPatterns(data.hb_patterns || {});
+      setCumPnL(data.cum_pnl || { gh: 0 });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
       if (data.status === "ending" && data.ending_snapshot) {
@@ -296,18 +268,16 @@ export default function HbGamePage() {
   const handleNextGame = async () => {
     if (!gameId || results.length === 0) return;
     try {
-      const res = await apiCaller.post(HB_GAMES_API.NEXT, null, { params: { game_id: gameId } });
+      const res = await apiCaller.post(GH_GAMES_API.NEXT, null, { params: { game_id: gameId } });
       setEndingDone(false);
       setResults([]); setBetData(null);
-      setPickResult({ method: "wait", pick: null, nickname: null });
-      setHbPatterns({});
       setGlobalhitData(res.data.globalhit || []);
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
         setCumPnL(res.data.carry_pnl);
       } else {
-        setCumPnL({ hb: 0, gh: 0 });
+        setCumPnL({ gh: 0 });
       }
       if (res.data.status === "ending" && res.data.ending_snapshot) {
         setEndingMode(true); setEndingSnapshot(res.data.ending_snapshot);
@@ -325,17 +295,13 @@ export default function HbGamePage() {
   const handleNewGameConfirm = async () => {
     setShowNewConfirm(false);
     if (gameId && results.length > 0) {
-      try { await apiCaller.post(HB_GAMES_API.END, { game_id: gameId, actual: "P" }); } catch {}
+      try { await apiCaller.post(GH_GAMES_API.END, { game_id: gameId, actual: "P" }); } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ hb: 0, gh: 0 }); setBetData(null);
-    setPickResult({ method: "wait", pick: null, nickname: null });
-    setHbPatterns({}); setGlobalhitData([]);
+    setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
+    setGlobalhitData([]);
     await startGame();
   };
-
-  // 패턴×스텝 표시할 패턴 목록
-  const sortedPatterns = nicknames.length > 0 ? nicknames : Object.keys(hbPatterns).sort();
 
   return (
     <Box sx={{ p: isMobile ? 0.5 : 2 }}>
@@ -366,18 +332,6 @@ export default function HbGamePage() {
 
       {/* ===== 중단: 인터페이스 ===== */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1, flexWrap: "wrap" }}>
-        {/* 허니비 닉네임 */}
-        {(() => {
-          const nn = pickResult.nickname;
-          const hbHasBet = (betData?.honeybee?.P || 0) + (betData?.honeybee?.B || 0) > 0;
-          return (
-            <Box sx={{ ...toggleBtnSx, border: `2px solid ${hbHasBet ? "#ff9800" : "#555"}`, opacity: hbHasBet ? 1 : 0.35, minWidth: isMobile ? 50 : 70 }}>
-              <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: hbHasBet ? "#ff9800" : "#555" }}>
-                {nn || "wait"}
-              </Typography>
-            </Box>
-          );
-        })()}
         {/* GH */}
         {(() => {
           const ghHasBet = (betData?.globalhit?.P || 0) + (betData?.globalhit?.B || 0) > 0;
@@ -448,11 +402,11 @@ export default function HbGamePage() {
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
-        <Box onClick={() => navigate(gameId ? `/hbgame/setup?gameId=${gameId}` : `/hbgame/setup`)} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid rgba(255,255,255,0.3)" }}>
+        <Box onClick={() => navigate(gameId ? `/ghgame/setup?gameId=${gameId}` : `/ghgame/setup`)} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid rgba(255,255,255,0.3)" }}>
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>set-up</Typography>
         </Box>
-        <Box onClick={() => gameId ? navigate(`/hbgame/setup?gameId=${gameId}`) : undefined} sx={{ ...controlBtnSx, cursor: gameId ? "pointer" : "default", opacity: gameId ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}>
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 8 : 10, lineHeight: 1.2, textAlign: "center" }}>현게임{"\n"}설정</Typography>
+        <Box onClick={() => gameId ? navigate(`/ghgame/setup?gameId=${gameId}`) : undefined} sx={{ ...controlBtnSx, cursor: gameId ? "pointer" : "default", opacity: gameId ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}>
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 8 : 10, lineHeight: 1.2, textAlign: "center" }}>{"현게임\n설정"}</Typography>
         </Box>
         <Box
           onClick={results.length > 0 ? () => setShowNextConfirm(true) : undefined}
@@ -465,9 +419,8 @@ export default function HbGamePage() {
         </Box>
       </Box>
 
-      {/* ===== 대시보드 (허니비 + GH 배팅 테이블) ===== */}
+      {/* ===== 대시보드 (GH 배팅 테이블) ===== */}
       {(() => {
-        const hb = betData?.honeybee;
         const gh = betData?.globalhit;
         const combined = betData?.combined;
         const combinedDir = combined?.direction || "wait";
@@ -482,9 +435,7 @@ export default function HbGamePage() {
           return d ? d.amount : 0;
         };
 
-        const hbHasBet = (hb?.P || 0) + (hb?.B || 0) > 0;
         const ghHasBet = (gh?.P || 0) + (gh?.B || 0) > 0;
-        const anyBet = hbHasBet || ghHasBet;
 
         return (
           <>
@@ -495,7 +446,6 @@ export default function HbGamePage() {
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: dirColor }}>{`formal(${combinedDir})`}</Typography>
             </Box>
             {[
-              { name: "Honeybee", pnl: cumPnL.hb, active: hbHasBet },
               { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
             ].map((item, i) => {
               const clr = item.pnl > 0 ? "#4caf50" : item.pnl < 0 ? "#f44336" : "#fff";
@@ -508,7 +458,7 @@ export default function HbGamePage() {
               );
             })}
             {(() => {
-              const totalPnL = cumPnL.hb + cumPnL.gh;
+              const totalPnL = cumPnL.gh;
               const sign = totalPnL > 0 ? "+" : "";
               return (
                 <Box sx={{ px: 2, minWidth: 200, backgroundColor: "#00bcd4", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
@@ -519,34 +469,30 @@ export default function HbGamePage() {
           </Box>
           )}
 
-          {/* 배팅 상황판 — 단일 16열 테이블 */}
+          {/* 배팅 상황판 — GH 패턴 테이블 */}
           <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 0.5 }}>
           <Box>
-          <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 12, opacity: anyBet ? 1 : 0.8 }}>
+          <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 12, opacity: ghHasBet ? 1 : 0.8 }}>
             <tbody>
-              {/* 1행: HB + GH 요약 + 빈칸 (16열 맞춤) */}
+              {/* 1행: GH 요약 */}
               {(() => {
-                const hbDimStyle = hbHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
                 const ghDimStyle = ghHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
                 return (
                   <tr>
-                    <td style={{ ...dcB, color: "#00bcd4", ...hbDimStyle }}>honeybee</td>
-                    <td style={{ ...dc, color: "#1565c0", ...hbDimStyle }}>{`${(hb?.P || 0).toLocaleString()}P`}</td>
-                    <td style={{ ...dc, color: "#f44336", ...hbDimStyle }}>{`${(hb?.B || 0).toLocaleString()}P`}</td>
                     <td style={{ ...dcB, color: "#00bcd4", ...ghDimStyle }}>globalhit</td>
                     <td style={{ ...dc, color: "#1565c0", ...ghDimStyle }}>{`${(gh?.P || 0).toLocaleString()}P`}</td>
                     <td style={{ ...dc, color: "#f44336", ...ghDimStyle }}>{`${(gh?.B || 0).toLocaleString()}P`}</td>
                     <td style={{ ...dcB, color: "#fff" }}>{currentTurn}</td>
-                    <td style={{ ...dc, color: "#1565c0" }}>{`${((hb?.P || 0) + (gh?.P || 0)).toLocaleString()}P`}</td>
-                    <td style={{ ...dc, color: "#f44336" }}>{`${((hb?.B || 0) + (gh?.B || 0)).toLocaleString()}P`}</td>
-                    {Array.from({ length: 7 }, (_, i) => (
+                    <td style={{ ...dc, color: "#1565c0" }}>{`${(gh?.P || 0).toLocaleString()}P`}</td>
+                    <td style={{ ...dc, color: "#f44336" }}>{`${(gh?.B || 0).toLocaleString()}P`}</td>
+                    {Array.from({ length: 10 }, (_, i) => (
                       <td key={i} style={{ ...dc }}></td>
                     ))}
                   </tr>
                 );
               })()}
 
-              {/* 2~5행: GH 패턴별 + 빈칸 (16열 맞춤) */}
+              {/* 2~5행: GH 패턴별 */}
               {[[ghPatterns[0], ghPatterns[1]], [ghPatterns[2], ghPatterns[3]], [ghPatterns[4], ghPatterns[5]], [ghPatterns[6], ghPatterns[7]]].map((pair, ri) => (
                 <tr key={`gh-${ri}`}>
                   {pair.map((pat) =>
@@ -567,71 +513,12 @@ export default function HbGamePage() {
                       );
                     })
                   )}
-                  {/* GH 행은 12열 → 나머지 4열 빈칸 */}
+                  {/* GH 행은 12열 -> 나머지 4열 빈칸 */}
                   {Array.from({ length: 4 }, (_, i) => (
                     <td key={`pad-${i}`} style={{ ...dc }}></td>
                   ))}
                 </tr>
               ))}
-
-              {/* 허니비 스텝 헤더 */}
-              {(() => {
-                const hbAmounts = config?.honeybee?.amounts || new Array(20).fill(0);
-                const hbStepMin = config?.honeybee?.step_min || 1;
-                const hbStepMax = config?.honeybee?.step_max || 20;
-                return (
-                  <>
-                    <tr>
-                      <td style={{ ...dcB, color: "#ff9800" }}>honeybee</td>
-                      <td style={{ ...dcB, color: "#ff9800" }}>pick</td>
-                      {Array.from({ length: 14 }, (_, i) => (
-                        <td key={i} style={{ ...dc, color: "#ff9800" }}>{i + 1}step</td>
-                      ))}
-                    </tr>
-
-                    {/* 허니비 패턴×스텝 데이터 */}
-                    {sortedPatterns.map((nn) => {
-                      const st = hbPatterns[nn] || { step: 1, wins: 0, losses: 0, amount: 0, direction: null };
-                      const isCurrentPick = pickResult.nickname === nn;
-                      const hasBet = st.amount > 0;
-                      return (
-                        <tr key={nn}>
-                          <td style={{
-                            ...dc,
-                            color: isCurrentPick ? "#fff" : "#555",
-                            fontWeight: isCurrentPick ? "bold" : "normal",
-                          }}>{nn}</td>
-                          <td style={{
-                            ...dc,
-                            color: isCurrentPick
-                              ? (st.direction === "P" ? "#1565c0" : st.direction === "B" ? "#f44336" : "#555")
-                              : "#555",
-                            fontWeight: isCurrentPick ? "bold" : "normal",
-                          }}>
-                            {isCurrentPick ? (st.direction || "-") : "-"}
-                          </td>
-                          {Array.from({ length: 14 }, (_, i) => {
-                            const stepNum = i + 1;
-                            const isCurrent = st.step === stepNum;
-                            const inRange = stepNum >= hbStepMin && stepNum <= hbStepMax;
-                            const amt = inRange ? (hbAmounts[stepNum - 1] || 0) : 0;
-                            return (
-                              <td key={i} style={{
-                                ...dc,
-                                color: isCurrent && isCurrentPick ? "#fff" : stepNum < st.step ? "#c8a415" : "#555",
-                                fontWeight: (isCurrent && isCurrentPick) || stepNum < st.step ? "bold" : "normal",
-                                backgroundColor: isCurrent && isCurrentPick ? "rgba(255,255,255,0.08)" : "transparent",
-                              }}>
-                                {inRange ? amt.toLocaleString() : ""}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </>
-                );
-              })()}
             </tbody>
           </table>
           </Box>
@@ -640,10 +527,9 @@ export default function HbGamePage() {
           {isMobile && (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 105 }}>
             {(() => {
-              const totalPnL = cumPnL.hb + cumPnL.gh;
+              const totalPnL = cumPnL.gh;
               const items = [
                 { name: "formal", value: combinedDir, color: dirColor, isFormal: true },
-                { name: "Honeybee", pnl: cumPnL.hb, active: hbHasBet },
                 { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
                 { name: "합계", pnl: totalPnL, isTotal: true },
               ];
@@ -683,7 +569,7 @@ export default function HbGamePage() {
         );
       })()}
 
-      {/* ===== 하단: GlobalHit 패턴별 상세 (t9game 스타일) ===== */}
+      {/* ===== 하단: GlobalHit 패턴별 상세 ===== */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
         {globalhitData.map((patData) => {
           const pat = patData.pattern;
@@ -805,16 +691,11 @@ export default function HbGamePage() {
         <DialogContent>
           <Typography>모든 배팅이 완료되었습니다.</Typography>
           <Box sx={{ mt: 2 }}>
-            {[
-              { name: "Honeybee", pnl: cumPnL.hb },
-              { name: "Globalhit", pnl: cumPnL.gh },
-            ].map((item) => (
-              <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
-                {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
-              </Typography>
-            ))}
-            <Typography sx={{ mt: 1, fontWeight: "bold", color: (cumPnL.hb + cumPnL.gh) >= 0 ? "#4caf50" : "#f44336" }}>
-              Total: {(cumPnL.hb + cumPnL.gh) > 0 ? "+" : ""}{(cumPnL.hb + cumPnL.gh).toLocaleString()}P
+            <Typography sx={{ color: cumPnL.gh >= 0 ? "#4caf50" : "#f44336" }}>
+              Globalhit: {cumPnL.gh > 0 ? "+" : ""}{cumPnL.gh.toLocaleString()}P
+            </Typography>
+            <Typography sx={{ mt: 1, fontWeight: "bold", color: cumPnL.gh >= 0 ? "#4caf50" : "#f44336" }}>
+              Total: {cumPnL.gh > 0 ? "+" : ""}{cumPnL.gh.toLocaleString()}P
             </Typography>
           </Box>
         </DialogContent>

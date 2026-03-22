@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
-import { HB_GAMES_API } from "@/constants/api-url";
+import { GH_GAMES_API } from "@/constants/api-url";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -74,22 +74,19 @@ const controlBtnSx = {
   "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" },
 };
 
-export default function HbUserGamePage() {
+export default function GhUserGamePage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [results, setResults] = useState([]);
-  const [pickResult, setPickResult] = useState({ method: "wait", pick: null, nickname: null });
-  const [hbPatterns, setHbPatterns] = useState({});
   const [globalhitData, setGlobalhitData] = useState([]);
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
-  const [cumPnL, setCumPnL] = useState({ hb: 0, gh: 0 });
+  const [cumPnL, setCumPnL] = useState({ gh: 0 });
   const [showNextConfirm, setShowNextConfirm] = useState(false);
-  const [nicknames, setNicknames] = useState([]);
   const [endingMode, setEndingMode] = useState(false);
   const [endingSnapshot, setEndingSnapshot] = useState(null);
   const [endingDone, setEndingDone] = useState(false);
@@ -101,15 +98,9 @@ export default function HbUserGamePage() {
   const displayPick = betData?.combined?.direction && betData.combined.direction !== "wait" ? betData.combined.direction : null;
   const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
-  useEffect(() => {
-    apiCaller.get(HB_GAMES_API.NICKNAMES).then((res) => {
-      setNicknames(res.data.nicknames || []);
-    });
-  }, []);
-
   const startGame = useCallback(async () => {
     try {
-      const res = await apiCaller.post(HB_GAMES_API.START);
+      const res = await apiCaller.post(GH_GAMES_API.START);
       setGameId(res.data.game_id);
       setConfig(res.data.config);
       setGlobalhitData(res.data.globalhit || []);
@@ -123,9 +114,8 @@ export default function HbUserGamePage() {
     const isNew = searchParams.get("new");
     const urlGameId = searchParams.get("gameId");
     if (isNew) {
-      setResults([]); setCumPnL({ hb: 0, gh: 0 }); setBetData(null);
-      setPickResult({ method: "wait", pick: null, nickname: null });
-      setHbPatterns({}); setGlobalhitData([]);
+      setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
+      setGlobalhitData([]);
       startGame();
     } else if (urlGameId) {
       restoreGame(parseInt(urlGameId));
@@ -136,15 +126,13 @@ export default function HbUserGamePage() {
 
   const restoreGame = async (gid) => {
     try {
-      const res = await apiCaller.get(HB_GAMES_API.STATE(gid));
+      const res = await apiCaller.get(GH_GAMES_API.STATE(gid));
       const data = res.data;
       setGameId(data.game_id);
       setConfig(data.config);
-      setCumPnL(data.cum_pnl || { hb: 0, gh: 0 });
+      setCumPnL(data.cum_pnl || { gh: 0 });
       const seq = data.seq || "";
       setResults(seq.split("").map((v) => ({ value: v, status: "wait" })));
-      setPickResult({ method: data.method, pick: data.pick, nickname: data.nickname });
-      setHbPatterns(data.hb_patterns || {});
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
       if (data.status === "ending" && data.ending_snapshot) {
@@ -162,17 +150,16 @@ export default function HbUserGamePage() {
     processingRef.current = true;
 
     let status = "wait";
-    if (pickResult.pick) {
-      status = pickResult.pick === inputValue ? "hit" : "miss";
+    const pick = betData?.combined?.direction;
+    if (pick && pick !== "wait") {
+      status = pick === inputValue ? "hit" : "miss";
     }
     setResults((prev) => [...prev, { value: inputValue, status }]);
 
     try {
-      const res = await apiCaller.post(HB_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
+      const res = await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
       const data = res.data;
-      setCumPnL({ hb: data.cum_pnl.hb, gh: data.cum_pnl.gh });
-      setPickResult({ method: data.method, pick: data.pick, nickname: data.nickname });
-      setHbPatterns(data.hb_patterns || {});
+      setCumPnL({ gh: data.cum_pnl.gh });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
 
@@ -191,12 +178,10 @@ export default function HbUserGamePage() {
     if (results.length === 0 || !gameId || processingRef.current) return;
     processingRef.current = true;
     try {
-      const res = await apiCaller.delete(HB_GAMES_API.LAST_ROUND(gameId));
+      const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
       setResults(results.slice(0, -1));
-      setCumPnL(data.cum_pnl || { hb: 0, gh: 0 });
-      setPickResult({ method: data.method, pick: data.pick, nickname: data.nickname });
-      setHbPatterns(data.hb_patterns || {});
+      setCumPnL(data.cum_pnl || { gh: 0 });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
       if (data.status === "ending" && data.ending_snapshot) {
@@ -214,17 +199,15 @@ export default function HbUserGamePage() {
   const handleNextGame = async () => {
     if (!gameId || results.length === 0) return;
     try {
-      const res = await apiCaller.post(HB_GAMES_API.NEXT, null, { params: { game_id: gameId } });
+      const res = await apiCaller.post(GH_GAMES_API.NEXT, null, { params: { game_id: gameId } });
       setResults([]); setBetData(null);
-      setPickResult({ method: "wait", pick: null, nickname: null });
-      setHbPatterns({});
       setGlobalhitData(res.data.globalhit || []);
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
         setCumPnL(res.data.carry_pnl);
       } else {
-        setCumPnL({ hb: 0, gh: 0 });
+        setCumPnL({ gh: 0 });
       }
       if (res.data.status === "ending" && res.data.ending_snapshot) {
         setEndingMode(true); setEndingSnapshot(res.data.ending_snapshot);
@@ -239,10 +222,7 @@ export default function HbUserGamePage() {
   // ED: 종료 모드 진입
   const handleEndingMode = async () => {
     if (endingMode || !gameId) return;
-    const snapshot = { hb: [], gh: [] };
-    Object.entries(hbPatterns).forEach(([nn, st]) => {
-      if (st.step > 1) snapshot.hb.push(nn);
-    });
+    const snapshot = { gh: [] };
     if (globalhitData) {
       globalhitData.forEach((pat) => {
         pat.groups.forEach((g) => {
@@ -251,19 +231,17 @@ export default function HbUserGamePage() {
       });
     }
 
-    if (snapshot.hb.length === 0 && snapshot.gh.length === 0) {
+    if (snapshot.gh.length === 0) {
       try {
-        await apiCaller.post(HB_GAMES_API.ENDING, { game_id: gameId, snapshot });
+        await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
       } catch {}
       setEndingMode(true); setEndingSnapshot(snapshot); setEndingDone(true);
       return;
     }
 
     try {
-      const res = await apiCaller.post(HB_GAMES_API.ENDING, { game_id: gameId, snapshot });
+      const res = await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
       const data = res.data;
-      setPickResult({ method: data.method, pick: data.pick, nickname: data.nickname });
-      setHbPatterns(data.hb_patterns || {});
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
     } catch (err) {
@@ -274,11 +252,6 @@ export default function HbUserGamePage() {
 
   const checkEndingComplete = (data) => {
     if (!endingSnapshot) return false;
-    const hbTracked = endingSnapshot.hb || [];
-    for (const nn of hbTracked) {
-      const st = data.hb_patterns?.[nn];
-      if (st && st.step > 1) return false;
-    }
     const ghTracked = endingSnapshot.gh || [];
     if (data.globalhit) {
       for (const key of ghTracked) {
@@ -298,18 +271,15 @@ export default function HbUserGamePage() {
   const handleFinishGame = async () => {
     if (gameId) {
       try {
-        await apiCaller.post(HB_GAMES_API.END, { game_id: gameId, actual: "P" });
+        await apiCaller.post(GH_GAMES_API.END, { game_id: gameId, actual: "P" });
       } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ hb: 0, gh: 0 }); setBetData(null);
-    setPickResult({ method: "wait", pick: null, nickname: null });
-    setHbPatterns({}); setGlobalhitData([]);
+    setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
+    setGlobalhitData([]);
     setSearchParams({}, { replace: true });
     startGame();
   };
-
-  const sortedPatterns = nicknames.length > 0 ? nicknames : Object.keys(hbPatterns).sort();
 
   return (
     <Box sx={{ p: isMobile ? 0.5 : 2 }}>
@@ -417,16 +387,11 @@ export default function HbUserGamePage() {
         <DialogContent>
           <Typography>모든 배팅이 완료되었습니다.</Typography>
           <Box sx={{ mt: 2 }}>
-            {[
-              { name: "Honeybee", pnl: cumPnL.hb },
-              { name: "Globalhit", pnl: cumPnL.gh },
-            ].map((item) => (
-              <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
-                {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
-              </Typography>
-            ))}
-            <Typography sx={{ mt: 1, fontWeight: "bold", color: (cumPnL.hb + cumPnL.gh) >= 0 ? "#4caf50" : "#f44336" }}>
-              Total: {(cumPnL.hb + cumPnL.gh) > 0 ? "+" : ""}{(cumPnL.hb + cumPnL.gh).toLocaleString()}P
+            <Typography sx={{ color: cumPnL.gh >= 0 ? "#4caf50" : "#f44336" }}>
+              Globalhit: {cumPnL.gh > 0 ? "+" : ""}{cumPnL.gh.toLocaleString()}P
+            </Typography>
+            <Typography sx={{ mt: 1, fontWeight: "bold", color: cumPnL.gh >= 0 ? "#4caf50" : "#f44336" }}>
+              Total: {cumPnL.gh > 0 ? "+" : ""}{cumPnL.gh.toLocaleString()}P
             </Typography>
           </Box>
         </DialogContent>
@@ -449,19 +414,16 @@ export default function HbUserGamePage() {
 
       {/* ===== 총금액 요약 ===== */}
       {(() => {
-        const hb = betData?.honeybee;
         const gh = betData?.globalhit;
         const combined = betData?.combined;
         const combinedDir = combined?.direction || "wait";
         const dirColor = combinedDir === "P" ? "#1565c0" : combinedDir === "B" ? "#f44336" : "#888";
-        const hbHasBet = (hb?.P || 0) + (hb?.B || 0) > 0;
         const ghHasBet = (gh?.P || 0) + (gh?.B || 0) > 0;
-        const totalPnL = cumPnL.hb + cumPnL.gh;
+        const totalPnL = cumPnL.gh;
 
         if (isMobile) {
           const items = [
             { name: "formal", value: combinedDir, color: dirColor, isFormal: true },
-            { name: "Honeybee", pnl: cumPnL.hb, active: hbHasBet },
             { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
             { name: "합계", pnl: totalPnL, isTotal: true },
           ];
@@ -505,7 +467,6 @@ export default function HbUserGamePage() {
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: dirColor }}>{`formal(${combinedDir})`}</Typography>
             </Box>
             {[
-              { name: "Honeybee", pnl: cumPnL.hb, active: hbHasBet },
               { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
             ].map((item, i) => {
               const clr = item.pnl > 0 ? "#4caf50" : item.pnl < 0 ? "#f44336" : "#fff";

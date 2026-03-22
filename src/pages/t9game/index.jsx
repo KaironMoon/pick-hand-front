@@ -168,6 +168,7 @@ export default function GamePage() {
   const [endingMode, setEndingMode] = useState(false);
   const [endingSnapshot, setEndingSnapshot] = useState(null); // { tn: bool, gh: Set<"PPP-0">, pinch: Set<"pattern"> }
   const [endingDone, setEndingDone] = useState(false); // 팝업 표시용
+  const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const processingRef = useRef(false); // API 호출 중 잠금 (연타 방지)
 
   const currentTurn = results.length + 1;
@@ -292,6 +293,7 @@ export default function GamePage() {
       if (endingMode && endingSnapshot) {
         if (checkEndingComplete(data)) {
           setEndingDone(true);
+          setBetData(null);
         }
       }
     } catch (err) {
@@ -1014,6 +1016,7 @@ export default function GamePage() {
             <Box key={pat}>
               {/* 헤더 바 */}
               <Box
+                onClick={() => setCollapsedPatterns((prev) => ({ ...prev, [pat]: !prev[pat] }))}
                 sx={{
                   display: "flex",
                   alignItems: "center",
@@ -1023,6 +1026,8 @@ export default function GamePage() {
                   backgroundColor: "background.paper",
                   px: 0.5,
                   py: 0.3,
+                  cursor: "pointer",
+                  "&:hover": { backgroundColor: "rgba(255,255,255,0.05)" },
                 }}
               >
                 {/* 글로벌히트소분류 */}
@@ -1053,7 +1058,7 @@ export default function GamePage() {
                       <Typography variant="caption" sx={{ fontSize: 10 }}>SC{gi + 1}</Typography>
                     </Box>
                     <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.6, py: 0.2 }}>
-                      <Typography variant="caption" sx={{ fontSize: 10 }}>{g.step ?? 0}S</Typography>
+                      <Typography variant="caption" sx={{ fontSize: 10, ...((g.step ?? 0) !== 1 && { color: "#f44336", fontWeight: "bold" }) }}>{g.step ?? 0}S</Typography>
                     </Box>
                     <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.8, py: 0.2 }}>
                       <Typography variant="caption" sx={{ fontSize: 10 }}>
@@ -1072,6 +1077,7 @@ export default function GamePage() {
               </Box>
 
               {/* 3조 격자 - table (서버 데이터 기반) */}
+              {collapsedPatterns[pat] && (
               <table style={{ borderCollapse: "collapse", borderSpacing: 0 }}>
                 <tbody>
                   {patData.groups.map((group, gi) => {
@@ -1115,6 +1121,7 @@ export default function GamePage() {
                   })}
                 </tbody>
               </table>
+              )}
             </Box>
           );
         })}

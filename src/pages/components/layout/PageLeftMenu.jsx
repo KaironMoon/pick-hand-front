@@ -5,6 +5,7 @@ import InfoIcon from "@mui/icons-material/Info";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import HiveIcon from "@mui/icons-material/Hive";
+import PublicIcon from "@mui/icons-material/Public";
 import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -86,6 +87,15 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
           <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? `/hbgame?new=${Date.now()}` : `/hbgame/user?new=${Date.now()}`)}>
             <ListItemIcon><HiveIcon /></ListItemIcon>
             <ListItemText primary="허니비" />
+          </ListItemButton>
+        </ListItem>
+      </List>
+      <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+      <List>
+        <ListItem disablePadding>
+          <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? `/ghgame?new=${Date.now()}` : `/ghgame/user?new=${Date.now()}`)}>
+            <ListItemIcon><PublicIcon /></ListItemIcon>
+            <ListItemText primary="글로벌히트" />
           </ListItemButton>
         </ListItem>
       </List>

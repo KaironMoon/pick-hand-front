@@ -274,6 +274,7 @@ export default function GamePage() {
       if (endingMode && endingSnapshot) {
         if (checkEndingComplete(data)) {
           setEndingDone(true);
+          setBetData(null);
         }
       }
     } catch (err) {

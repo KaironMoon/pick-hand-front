@@ -10,6 +10,9 @@ import UserGamePage from "../pages/t9game/user-game.jsx";
 import HbGamePage from "../pages/hbgame";
 import HbUserGamePage from "../pages/hbgame/user-game.jsx";
 import HbSetupPage from "../pages/hbgame/setup.jsx";
+import GhGamePage from "../pages/ghgame";
+import GhUserGamePage from "../pages/ghgame/user-game.jsx";
+import GhSetupPage from "../pages/ghgame/setup.jsx";
 import NotFound from "../pages/error/NotFound";
 import PageLayout from "../pages/PageLayout";
 import LoginPage from "../pages/login";
@@ -60,10 +63,6 @@ const router = createBrowserRouter([
         children: [
           {
             path: "/",
-            element: <RootRedirect />,
-          },
-          {
-            path: "/home",
             element: <Home />,
           },
           {
@@ -81,6 +80,10 @@ const router = createBrowserRouter([
           {
             path: "/hbgame/user",
             element: <HbUserGamePage />,
+          },
+          {
+            path: "/ghgame/user",
+            element: <GhUserGamePage />,
           },
           {
             element: <ProtectedRoute adminOnly />,
@@ -108,6 +111,14 @@ const router = createBrowserRouter([
               {
                 path: "/hbgame/setup",
                 element: <HbSetupPage />,
+              },
+              {
+                path: "/ghgame",
+                element: <GhGamePage />,
+              },
+              {
+                path: "/ghgame/setup",
+                element: <GhSetupPage />,
               },
             ],
           },
