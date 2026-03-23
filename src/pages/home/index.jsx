@@ -4,9 +4,9 @@ import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
 
 const games = [
-  { name: "트리플나인", img: "/triplenine.png", adminPath: "/t9game", userPath: "/t9game/user" },
-  { name: "허니비", img: "/honeybee.png", adminPath: "/hbgame", userPath: "/hbgame/user" },
-  { name: "글로벌히트", img: "/globalhit.png", adminPath: "/ghgame", userPath: "/ghgame/user" },
+  { name: "트리플나인", img: "/triplenine.png", adminPath: "/t9game", userPath: "/t9game/user", userReady: false },
+  { name: "허니비", img: "/honeybee.png", adminPath: "/hbgame", userPath: "/hbgame/user", userReady: true },
+  { name: "글로벌히트", img: "/globalhit.png", adminPath: "/ghgame", userPath: "/ghgame/user", userReady: true },
 ];
 
 const Home = () => {
@@ -18,7 +18,15 @@ const Home = () => {
       {games.map((g) => (
         <Box
           key={g.name}
-          onClick={() => navigate(user?.role === "admin" ? `${g.adminPath}?new=${Date.now()}` : `${g.userPath}?new=${Date.now()}`)}
+          onClick={() => {
+            if (user?.role === "admin") {
+              navigate(`${g.adminPath}?new=${Date.now()}`);
+            } else if (g.userReady) {
+              navigate(`${g.userPath}?new=${Date.now()}`);
+            } else {
+              alert("준비중입니다.");
+            }
+          }}
           sx={{
             width: "calc(50% - 8px)",
             display: "flex",

@@ -579,6 +579,19 @@ export default function HbGamePage() {
                 const hbAmounts = config?.honeybee?.amounts || new Array(20).fill(0);
                 const hbStepMin = config?.honeybee?.step_min || 1;
                 const hbStepMax = config?.honeybee?.step_max || 20;
+                // 배팅묶기: 현재 픽 패턴과 같은 그룹이면 같이 활성화
+                const hbGroups = config?.honeybee?.groups || [];
+                const currentNn = pickResult.nickname;
+                const groupedSet = new Set();
+                if (currentNn) {
+                  groupedSet.add(currentNn);
+                  for (const g of hbGroups) {
+                    const members = (g.patterns || []).filter(Boolean);
+                    if (members.includes(currentNn)) {
+                      members.forEach((m) => groupedSet.add(m));
+                    }
+                  }
+                }
                 return (
                   <>
                     <tr>
@@ -592,8 +605,9 @@ export default function HbGamePage() {
                     {/* 허니비 패턴×스텝 데이터 */}
                     {sortedPatterns.map((nn) => {
                       const st = hbPatterns[nn] || { step: 1, wins: 0, losses: 0, amount: 0, direction: null };
-                      const isCurrentPick = pickResult.nickname === nn;
+                      const isCurrentPick = groupedSet.has(nn);
                       const hasBet = st.amount > 0;
+                      const isExactPick = pickResult.nickname === nn;
                       return (
                         <tr key={nn}>
                           <td style={{
@@ -603,12 +617,12 @@ export default function HbGamePage() {
                           }}>{nn}</td>
                           <td style={{
                             ...dc,
-                            color: isCurrentPick
+                            color: isExactPick
                               ? (st.direction === "P" ? "#1565c0" : st.direction === "B" ? "#f44336" : "#555")
                               : "#555",
-                            fontWeight: isCurrentPick ? "bold" : "normal",
+                            fontWeight: isExactPick ? "bold" : "normal",
                           }}>
-                            {isCurrentPick ? (st.direction || "-") : "-"}
+                            {isExactPick ? (st.direction || "-") : "-"}
                           </td>
                           {Array.from({ length: 14 }, (_, i) => {
                             const stepNum = i + 1;
