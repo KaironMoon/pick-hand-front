@@ -113,6 +113,7 @@ export default function GhUserGamePage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const isNew = searchParams.get("new");
     const urlGameId = searchParams.get("gameId");
     if (isNew) {
@@ -124,6 +125,7 @@ export default function GhUserGamePage() {
     } else {
       // 직전 게임이 active면 복원 여부 확인
       apiCaller.get(GH_GAMES_API.LAST_ACTIVE).then(async (res) => {
+        if (cancelled) return;
         const game = res.data?.game;
         if (game && game.round_count > 0) {
           setResumeGame(game);
@@ -131,10 +133,11 @@ export default function GhUserGamePage() {
           if (game) {
             try { await apiCaller.post(GH_GAMES_API.END, { game_id: game.game_id, actual: "P" }); } catch {}
           }
-          startGame();
+          if (!cancelled) startGame();
         }
-      }).catch(() => startGame());
+      }).catch(() => { if (!cancelled) startGame(); });
     }
+    return () => { cancelled = true; };
   }, [searchParams.get("new"), searchParams.get("gameId")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const restoreGame = async (gid) => {

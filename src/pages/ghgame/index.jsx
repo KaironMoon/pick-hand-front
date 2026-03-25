@@ -113,6 +113,7 @@ export default function GhGamePage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const isNew = searchParams.get("new");
     const urlGameId = searchParams.get("gameId");
     if (isNew) {
@@ -123,8 +124,20 @@ export default function GhGamePage() {
     } else if (urlGameId) {
       restoreGame(parseInt(urlGameId));
     } else {
-      startGame();
+      apiCaller.get(GH_GAMES_API.LAST_ACTIVE).then(async (res) => {
+        if (cancelled) return;
+        const game = res.data?.game;
+        if (game && game.round_count > 0) {
+          setResumeGame(game);
+        } else {
+          if (game) {
+            try { await apiCaller.post(GH_GAMES_API.END, { game_id: game.game_id, actual: "P" }); } catch {}
+          }
+          if (!cancelled) startGame();
+        }
+      }).catch(() => { if (!cancelled) startGame(); });
     }
+    return () => { cancelled = true; };
   }, [searchParams.get("new"), searchParams.get("gameId")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const restoreGame = async (gid) => {
@@ -291,6 +304,7 @@ export default function GhGamePage() {
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
+  const [resumeGame, setResumeGame] = useState(null);
   const handleNewGame = () => setShowNewConfirm(true);
   const handleNewGameConfirm = async () => {
     setShowNewConfirm(false);
@@ -717,6 +731,19 @@ export default function GhGamePage() {
         <DialogActions>
           <Button onClick={() => setShowNextConfirm(false)}>취소</Button>
           <Button onClick={() => { setShowNextConfirm(false); handleNextGame(); }} color="primary" variant="contained">확인</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 이전 게임 복원 확인 */}
+      <Dialog open={!!resumeGame} onClose={async () => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) { try { await apiCaller.post(GH_GAMES_API.END, { game_id: gid, actual: "P" }); } catch {} } startGame(); }}>
+        <DialogTitle sx={{ fontWeight: "bold" }}>이전 게임 복원</DialogTitle>
+        <DialogContent>
+          <Typography>진행 중인 게임이 있습니다. (#{resumeGame?.game_id}, {resumeGame?.round_count}회차)</Typography>
+          <Typography>이어서 하시겠습니까?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={async () => { const gid = resumeGame.game_id; setResumeGame(null); try { await apiCaller.post(GH_GAMES_API.END, { game_id: gid, actual: "P" }); } catch {} startGame(); }}>새 게임</Button>
+          <Button onClick={() => { const gid = resumeGame.game_id; setResumeGame(null); restoreGame(gid); }} variant="contained">이어하기</Button>
         </DialogActions>
       </Dialog>
 

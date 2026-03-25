@@ -252,7 +252,20 @@ export default function GamePage() {
       // URL에 gameId가 있으면 게임 상태 복원 시도
       restoreGame(parseInt(urlGameId));
     } else {
-      startGame();
+      let cancelled = false;
+      apiCaller.get("/api/v1/games/last-active").then(async (res) => {
+        if (cancelled) return;
+        const game = res.data?.game;
+        if (game && game.round_count > 0) {
+          setResumeGame(game);
+        } else {
+          if (game) {
+            try { await apiCaller.post("/api/v1/games/end", null, { params: { game_id: game.game_id } }); } catch {}
+          }
+          if (!cancelled) startGame();
+        }
+      }).catch(() => { if (!cancelled) startGame(); });
+      return () => { cancelled = true; };
     }
   }, [searchParams.get("new")]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -476,6 +489,7 @@ export default function GamePage() {
   // next / new game: 확인 대화상자
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
+  const [resumeGame, setResumeGame] = useState(null);
 
   const handleNewGame = () => {
     setShowNewConfirm(true);
@@ -1165,6 +1179,19 @@ export default function GamePage() {
         <DialogActions>
           <Button onClick={() => setShowNextConfirm(false)}>취소</Button>
           <Button onClick={() => { setShowNextConfirm(false); handleNextGame(); }} variant="contained">확인</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 이전 게임 복원 확인 */}
+      <Dialog open={!!resumeGame} onClose={async () => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) { try { await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gid } }); } catch {} } startGame(); }}>
+        <DialogTitle sx={{ fontWeight: "bold" }}>이전 게임 복원</DialogTitle>
+        <DialogContent>
+          <Typography>진행 중인 게임이 있습니다. (#{resumeGame?.game_id}, {resumeGame?.round_count}회차)</Typography>
+          <Typography>이어서 하시겠습니까?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={async () => { const gid = resumeGame.game_id; setResumeGame(null); try { await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gid } }); } catch {} startGame(); }}>새 게임</Button>
+          <Button onClick={() => { const gid = resumeGame.game_id; setResumeGame(null); restoreGame(gid); }} variant="contained">이어하기</Button>
         </DialogActions>
       </Dialog>
 

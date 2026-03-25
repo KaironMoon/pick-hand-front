@@ -69,7 +69,7 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
         <ListItem disablePadding>
           <ListItemButton onClick={() => {
             if (user?.role === "admin") {
-              handleNavClick(`/t9game?new=${Date.now()}`);
+              handleNavClick("/t9game");
             } else {
               alert("준비중입니다.");
               if (isMobile && onMenuClose) onMenuClose();
@@ -91,7 +91,7 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
       <Divider sx={{ bgcolor: "military.border", my: 1 }} />
       <List>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? `/hbgame?new=${Date.now()}` : `/hbgame/user?new=${Date.now()}`)}>
+          <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? "/hbgame" : "/hbgame/user")}>
             <ListItemIcon><HiveIcon /></ListItemIcon>
             <ListItemText primary="허니비" />
           </ListItemButton>
@@ -100,7 +100,7 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
       <Divider sx={{ bgcolor: "military.border", my: 1 }} />
       <List>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? `/ghgame?new=${Date.now()}` : `/ghgame/user?new=${Date.now()}`)}>
+          <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? "/ghgame" : "/ghgame/user")}>
             <ListItemIcon><PublicIcon /></ListItemIcon>
             <ListItemText primary="글로벌히트" />
           </ListItemButton>

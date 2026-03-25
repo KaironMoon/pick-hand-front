@@ -225,6 +225,7 @@ export default function GamePage() {
 
   // 페이지 로드 시 게임 시작 또는 복원
   useEffect(() => {
+    let cancelled = false;
     const urlGameId = searchParams.get("gameId");
     const isNew = searchParams.get("new");
     if (isNew) {
@@ -237,6 +238,7 @@ export default function GamePage() {
     } else {
       // 직전 게임이 active면 복원 여부 확인
       apiCaller.get("/api/v1/games/last-active").then(async (res) => {
+        if (cancelled) return;
         const game = res.data?.game;
         if (game && game.round_count > 0) {
           setResumeGame(game);
@@ -244,10 +246,11 @@ export default function GamePage() {
           if (game) {
             try { await apiCaller.post("/api/v1/games/end", null, { params: { game_id: game.game_id } }); } catch {}
           }
-          startGame();
+          if (!cancelled) startGame();
         }
-      }).catch(() => startGame());
+      }).catch(() => { if (!cancelled) startGame(); });
     }
+    return () => { cancelled = true; };
   }, [searchParams.get("new")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // P/B 입력 → 서버에 라운드 기록 + 다음 상태 수신

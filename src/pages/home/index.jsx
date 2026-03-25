@@ -20,9 +20,9 @@ const Home = () => {
           key={g.name}
           onClick={() => {
             if (user?.role === "admin") {
-              navigate(`${g.adminPath}?new=${Date.now()}`);
+              navigate(g.adminPath);
             } else if (g.userReady) {
-              navigate(`${g.userPath}?new=${Date.now()}`);
+              navigate(g.userPath);
             } else {
               alert("준비중입니다.");
             }
