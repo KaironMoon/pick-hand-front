@@ -32,6 +32,7 @@ const HB_GAMES_API = {
   ENDING: "/api/v1/hb/games/ending",
   END: "/api/v1/hb/games/end",
   NEXT: "/api/v1/hb/games/next",
+  LAST_ACTIVE: "/api/v1/hb/games/last-active",
   LAST_ROUND: (id) => `/api/v1/hb/games/${id}/last-round`,
   STATE: (id) => `/api/v1/hb/games/state/${id}`,
   NICKNAMES: "/api/v1/hb/games/nicknames",
@@ -50,6 +51,7 @@ const GH_GAMES_API = {
   ENDING: "/api/v1/gh/games/ending",
   END: "/api/v1/gh/games/end",
   NEXT: "/api/v1/gh/games/next",
+  LAST_ACTIVE: "/api/v1/gh/games/last-active",
   LAST_ROUND: (id) => `/api/v1/gh/games/${id}/last-round`,
   STATE: (id) => `/api/v1/gh/games/state/${id}`,
 };

@@ -130,7 +130,7 @@ class ApiInterceptors {
   start() {
     this._instanceInterceptor.request = this._interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem("pick_hand_token");
+        const token = sessionStorage.getItem("pick_hand_token");
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -156,7 +156,7 @@ class ApiInterceptors {
         console.warn("%cHTTP RESPONSE ERROR\n%s", "color: red", error);
 
         if (error.response && error.response.status === 401) {
-          localStorage.removeItem("pick_hand_token");
+          sessionStorage.removeItem("pick_hand_token");
           if (window.location.pathname !== "/login") {
             window.location.href = "/login";
           }

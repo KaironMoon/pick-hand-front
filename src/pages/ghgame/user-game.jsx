@@ -91,6 +91,7 @@ export default function GhUserGamePage() {
   const [endingMode, setEndingMode] = useState(false);
   const [endingSnapshot, setEndingSnapshot] = useState(null);
   const [endingDone, setEndingDone] = useState(false);
+  const [resumeGame, setResumeGame] = useState(null);
   const processingRef = useRef(false);
 
   const currentTurn = results.length + 1;
@@ -121,7 +122,18 @@ export default function GhUserGamePage() {
     } else if (urlGameId) {
       restoreGame(parseInt(urlGameId));
     } else {
-      startGame();
+      // 직전 게임이 active면 복원 여부 확인
+      apiCaller.get(GH_GAMES_API.LAST_ACTIVE).then(async (res) => {
+        const game = res.data?.game;
+        if (game && game.round_count > 0) {
+          setResumeGame(game);
+        } else {
+          if (game) {
+            try { await apiCaller.post(GH_GAMES_API.END, { game_id: game.game_id, actual: "P" }); } catch {}
+          }
+          startGame();
+        }
+      }).catch(() => startGame());
     }
   }, [searchParams.get("new"), searchParams.get("gameId")]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -170,6 +182,8 @@ export default function GhUserGamePage() {
       }
     } catch (err) {
       console.error("Failed to record round:", err);
+      setResults((prev) => prev.slice(0, -1));
+      alert("서버 오류로 입력이 반영되지 않았습니다. 다시 시도해주세요.");
     } finally {
       processingRef.current = false;
     }
@@ -298,6 +312,10 @@ export default function GhUserGamePage() {
 
   return (
     <Box sx={{ p: isMobile ? 0.5 : 2 }}>
+      <Box sx={{ mb: 1, display: "flex", alignItems: "baseline", gap: 1 }}>
+        <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>글로벌히트</span>
+        {gameId && <span style={{ fontSize: 11, color: "#888" }}>#{gameId}</span>}
+      </Box>
       {/* ===== 상단: 6x40 빅로드 격자 ===== */}
       <Box
         sx={{
@@ -422,6 +440,19 @@ export default function GhUserGamePage() {
       </Dialog>
 
       {/* 새 게임 확인 대화상자 */}
+      {/* 이전 게임 복원 확인 */}
+      <Dialog open={!!resumeGame} onClose={async () => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) { try { await apiCaller.post(GH_GAMES_API.END, { game_id: gid, actual: "P" }); } catch {} } startGame(); }}>
+        <DialogTitle sx={{ fontWeight: "bold" }}>이전 게임 복원</DialogTitle>
+        <DialogContent>
+          <Typography>진행 중인 게임이 있습니다. (#{resumeGame?.game_id}, {resumeGame?.round_count}회차)</Typography>
+          <Typography>이어서 하시겠습니까?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={async () => { const gid = resumeGame.game_id; setResumeGame(null); try { await apiCaller.post(GH_GAMES_API.END, { game_id: gid, actual: "P" }); } catch {} startGame(); }}>새 게임</Button>
+          <Button onClick={() => { const gid = resumeGame.game_id; setResumeGame(null); restoreGame(gid); }} variant="contained">이어하기</Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={showNewConfirm} onClose={() => setShowNewConfirm(false)}>
         <DialogTitle sx={{ fontWeight: "bold" }}>새 게임</DialogTitle>
         <DialogContent>

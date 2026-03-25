@@ -339,6 +339,10 @@ export default function HbGamePage() {
 
   return (
     <Box sx={{ p: isMobile ? 0.5 : 2 }}>
+      <Box sx={{ mb: 1, display: "flex", alignItems: "baseline", gap: 1 }}>
+        <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>허니비</span>
+        {gameId && <span style={{ fontSize: 11, color: "#888" }}>#{gameId}</span>}
+      </Box>
       {/* ===== 상단: 6x40 빅로드 격자 ===== */}
       <Box
         sx={{
