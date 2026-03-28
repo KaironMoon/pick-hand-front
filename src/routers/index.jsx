@@ -13,6 +13,9 @@ import HbSetupPage from "../pages/hbgame/setup.jsx";
 import GhGamePage from "../pages/ghgame";
 import GhUserGamePage from "../pages/ghgame/user-game.jsx";
 import GhSetupPage from "../pages/ghgame/setup.jsx";
+import T9UserSetupPage from "../pages/t9game/user-setup.jsx";
+import HbUserSetupPage from "../pages/hbgame/user-setup.jsx";
+import GhUserSetupPage from "../pages/ghgame/user-setup.jsx";
 import NotFound from "../pages/error/NotFound";
 import PageLayout from "../pages/PageLayout";
 import LoginPage from "../pages/login";
@@ -78,12 +81,24 @@ const router = createBrowserRouter([
             element: <CurrentSetupPage />,
           },
           {
+            path: "/t9game/user-setup",
+            element: <T9UserSetupPage />,
+          },
+          {
             path: "/hbgame/user",
             element: <HbUserGamePage />,
           },
           {
+            path: "/hbgame/user-setup",
+            element: <HbUserSetupPage />,
+          },
+          {
             path: "/ghgame/user",
             element: <GhUserGamePage />,
+          },
+          {
+            path: "/ghgame/user-setup",
+            element: <GhUserSetupPage />,
           },
           {
             element: <ProtectedRoute adminOnly />,

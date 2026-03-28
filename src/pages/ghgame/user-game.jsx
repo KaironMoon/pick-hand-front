@@ -85,7 +85,7 @@ export default function GhUserGamePage() {
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
-  const [cumPnL, setCumPnL] = useState({ gh: 0 });
+  const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0 });
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [endingMode, setEndingMode] = useState(false);
@@ -117,7 +117,7 @@ export default function GhUserGamePage() {
     const isNew = searchParams.get("new");
     const urlGameId = searchParams.get("gameId");
     if (isNew) {
-      setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
+      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0 }); setBetData(null);
       setGlobalhitData([]);
       startGame();
     } else if (urlGameId) {
@@ -146,11 +146,16 @@ export default function GhUserGamePage() {
       const data = res.data;
       setGameId(data.game_id);
       setConfig(data.config);
-      setCumPnL(data.cum_pnl || { gh: 0 });
+      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0 });
       const seq = data.seq || "";
-      setResults(seq.split("").map((v) => ({ value: v, status: "wait" })));
+      const picks = data.round_picks || [];
+      setResults(seq.split("").map((v, i) => {
+        const pick = picks[i];
+        const status = pick ? (pick === v ? "hit" : "miss") : "wait";
+        return { value: v, status };
+      }));
       setGlobalhitData(data.globalhit || []);
-      setBetData(data.bet || null);
+      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       if (data.status === "ending" && data.ending_snapshot) {
         setEndingMode(true);
         setEndingSnapshot(data.ending_snapshot);
@@ -175,9 +180,9 @@ export default function GhUserGamePage() {
     try {
       const res = await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
       const data = res.data;
-      setCumPnL({ gh: data.cum_pnl.gh });
+      setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0 });
       setGlobalhitData(data.globalhit || []);
-      setBetData(data.bet || null);
+      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
 
       if (endingMode && endingSnapshot && checkEndingComplete(data)) {
         setEndingDone(true);
@@ -199,9 +204,9 @@ export default function GhUserGamePage() {
       const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
       setResults(results.slice(0, -1));
-      setCumPnL(data.cum_pnl || { gh: 0 });
+      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0 });
       setGlobalhitData(data.globalhit || []);
-      setBetData(data.bet || null);
+      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       if (data.status === "ending" && data.ending_snapshot) {
         setEndingMode(true); setEndingSnapshot(data.ending_snapshot);
       } else {
@@ -223,9 +228,9 @@ export default function GhUserGamePage() {
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
-        setCumPnL(res.data.carry_pnl);
+        setCumPnL({ gh: res.data.carry_pnl.gh || 0, user_a: res.data.carry_pnl.user_a || 0, user_z: res.data.carry_pnl.user_z || 0 });
       } else {
-        setCumPnL({ gh: 0 });
+        setCumPnL({ gh: 0, user_a: 0, user_z: 0 });
       }
       if (res.data.status === "ending" && res.data.ending_snapshot) {
         setEndingMode(true); setEndingSnapshot(res.data.ending_snapshot);
@@ -261,7 +266,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
       const data = res.data;
       setGlobalhitData(data.globalhit || []);
-      setBetData(data.bet || null);
+      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
     } catch (err) {
       console.error("Failed to start ending:", err);
     }
@@ -293,7 +298,7 @@ export default function GhUserGamePage() {
       } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
+    setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0 }); setBetData(null);
     setGlobalhitData([]);
     setSearchParams({}, { replace: true });
     startGame();
@@ -308,7 +313,7 @@ export default function GhUserGamePage() {
       } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
+    setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0 }); setBetData(null);
     setGlobalhitData([]);
     await startGame();
   };
@@ -344,43 +349,57 @@ export default function GhUserGamePage() {
         )}
       </Box>
 
-      {/* ===== 중단: 인터페이스 ===== */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1, flexWrap: "wrap" }}>
-        {/* ED */}
-        <Box
-          onClick={handleEndingMode}
-          sx={{
-            ...toggleBtnSx,
-            backgroundColor: endingMode ? "#ff6f00" : "#b71c1c",
-            borderRadius: 2,
-            border: endingMode ? "2px solid #ffab00" : "none",
-            px: isMobile ? 1 : 1.5,
-            cursor: "pointer",
-            animation: endingMode ? "pulse 1.5s infinite" : "none",
-            "@keyframes pulse": { "0%": { opacity: 1 }, "50%": { opacity: 0.6 }, "100%": { opacity: 1 } },
-          }}
-        >
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 11 : 13, fontWeight: "bold", color: "#fff" }}>
-            {endingMode ? "ED..." : "ED"}
-          </Typography>
-        </Box>
-        {/* BT */}
-        <Box sx={{ ...toggleBtnSx, backgroundColor: "#1565c0", borderRadius: 2, border: "none", px: isMobile ? 1 : 1.5 }}>
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 11 : 13, fontWeight: "bold", color: "#fff" }}>BT</Typography>
-        </Box>
-        {/* 합산 금액 */}
-        <Box sx={{ ...toggleBtnSx, border: "2px solid #4caf50", cursor: "default", px: isMobile ? 0.5 : 1.5, minWidth: isMobile ? 50 : 120, justifyContent: "flex-end" }}>
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: "#4caf50" }}>
-            {betData?.combined ? `${betData.combined.amount.toLocaleString()}P` : "0P"}
-          </Typography>
+      {/* ===== 중단: 인터페이스 (한줄) ===== */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: isMobile ? 0.5 : 1, mb: 1, flexWrap: "wrap" }}>
+        {/* 좌: 마틴A/Z 2행 */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+          {/* 마틴A 행 */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>마틴A</Typography>
+            </Box>
+            <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: "#4caf50" }}>
+                {betData?.user_martin?.martin_a?.amount ? `${betData.user_martin.martin_a.amount.toLocaleString()}${betData.user_martin.martin_a.direction || ""}` : "0"}
+              </Typography>
+            </Box>
+          </Box>
+          {/* 마틴Z 행 */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: "#c62828", display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>마틴Z</Typography>
+            </Box>
+            <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: "#4caf50" }}>
+                {betData?.user_martin?.martin_z?.amount ? `${betData.user_martin.martin_z.amount.toLocaleString()}${betData.user_martin.martin_z.direction || ""}` : "0"}
+              </Typography>
+            </Box>
+          </Box>
         </Box>
 
-        <Box sx={{ width: "1px", height: 28, backgroundColor: "rgba(255,255,255,0.2)", mx: 0.3 }} />
-
-        {/* 픽이미지 + 턴 + P/B */}
-        <Box sx={{ width: isMobile ? 44 : 85, height: isMobile ? 44 : 85, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-          <img src={pickImage} alt="pick" style={{ width: isMobile ? 40 : 77, height: isMobile ? 40 : 77, objectFit: "contain" }} />
-        </Box>
+        {/* 픽이미지 A/Z 2개 */}
+        {(() => {
+          const umA = betData?.user_martin?.martin_a;
+          const umZ = betData?.user_martin?.martin_z;
+          const pickA = umA?.direction || null;
+          const pickZ = umZ?.direction || null;
+          const imgA = pickA === "P" ? "/player.png" : pickA === "B" ? "/banker.png" : "/wait.png";
+          const imgZ = pickZ === "P" ? "/player.png" : pickZ === "B" ? "/banker.png" : "/wait.png";
+          const sz = isMobile ? 46 : 85;
+          const boxSz = isMobile ? 52 : 95;
+          return (
+            <Box sx={{ display: "flex", gap: 0.5 }}>
+              <Box sx={{ width: boxSz, height: boxSz, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                <img src={imgA} alt="pickA" style={{ width: sz, height: sz, objectFit: "contain" }} />
+                <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, color: "#1565c0", fontWeight: "bold" }}>A</Typography>
+              </Box>
+              <Box sx={{ width: boxSz, height: boxSz, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                <img src={imgZ} alt="pickZ" style={{ width: sz, height: sz, objectFit: "contain" }} />
+                <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, color: "#c62828", fontWeight: "bold" }}>Z</Typography>
+              </Box>
+            </Box>
+          );
+        })()}
         <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
         </Box>
@@ -402,16 +421,17 @@ export default function GhUserGamePage() {
             "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >B</Box>
-        <Box sx={{ width: isMobile ? 32 : 0 }} />
+
+        {/* del/next/new/셋업 */}
         <Box
           onClick={results.length > 0 ? handleDeleteOne : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, mr: 1 }}
+          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4 }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
         <Box
           onClick={results.length > 0 ? () => setShowNextConfirm(true) : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)", mr: 1 }}
+          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
         </Box>
@@ -421,6 +441,12 @@ export default function GhUserGamePage() {
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
         </Box>
+        <Box
+          onClick={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
+          sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ff9800" }}
+        >
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
+        </Box>
       </Box>
 
       {/* 종료 다이얼로그 */}
@@ -429,12 +455,19 @@ export default function GhUserGamePage() {
         <DialogContent>
           <Typography>모든 배팅이 완료되었습니다.</Typography>
           <Box sx={{ mt: 2 }}>
-            <Typography sx={{ color: cumPnL.gh >= 0 ? "#4caf50" : "#f44336" }}>
-              Globalhit: {cumPnL.gh > 0 ? "+" : ""}{cumPnL.gh.toLocaleString()}P
-            </Typography>
-            <Typography sx={{ mt: 1, fontWeight: "bold", color: cumPnL.gh >= 0 ? "#4caf50" : "#f44336" }}>
-              Total: {cumPnL.gh > 0 ? "+" : ""}{cumPnL.gh.toLocaleString()}P
-            </Typography>
+            {[
+              { name: "마틴A", pnl: cumPnL.user_a },
+              { name: "마틴Z", pnl: cumPnL.user_z },
+            ].map((item) => (
+              <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
+                {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
+              </Typography>
+            ))}
+            {(() => { const t = cumPnL.user_a + cumPnL.user_z; return (
+              <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
+                Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
+              </Typography>
+            ); })()}
           </Box>
         </DialogContent>
         <DialogActions>
@@ -480,80 +513,66 @@ export default function GhUserGamePage() {
         </DialogActions>
       </Dialog>
 
-      {/* ===== 총금액 요약 ===== */}
+      {/* ===== 총금액 요약 (A그룹 / Z그룹) ===== */}
       {(() => {
-        const gh = betData?.globalhit;
-        const combined = betData?.combined;
-        const combinedDir = combined?.direction || "wait";
-        const dirColor = combinedDir === "P" ? "#1565c0" : combinedDir === "B" ? "#f44336" : "#888";
-        const ghHasBet = (gh?.P || 0) + (gh?.B || 0) > 0;
-        const totalPnL = cumPnL.gh;
+        const umA = betData?.user_martin?.martin_a;
+        const umZ = betData?.user_martin?.martin_z;
+        const aDirRaw = umA?.direction || "wait";
+        const zDirRaw = umZ?.direction || "wait";
+        const aDirColor = aDirRaw === "P" ? "#1565c0" : aDirRaw === "B" ? "#f44336" : "#888";
+        const zDirColor = zDirRaw === "P" ? "#1565c0" : zDirRaw === "B" ? "#f44336" : "#888";
+        const umAHasBet = (umA?.amount || 0) > 0;
+        const umZHasBet = (umZ?.amount || 0) > 0;
+
+        const pnlText = (v) => { const s = v > 0 ? "+" : ""; return `${s}${v.toLocaleString()}P`; };
+        const pnlColor = (v) => v > 0 ? "#4caf50" : v < 0 ? "#f44336" : "#fff";
 
         if (isMobile) {
-          const items = [
-            { name: "formal", value: combinedDir, color: dirColor, isFormal: true },
-            { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
-            { name: "합계", pnl: totalPnL, isTotal: true },
-          ];
           const rowSx = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5, borderRadius: 1, px: 0.8, py: 0.3, whiteSpace: "nowrap" };
+          const renderGroup = (label, fDir, fColor, martinPnl, martinActive) => (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
+              <Box sx={{ ...rowSx, border: "1px solid rgba(255,255,255,0.3)" }}>
+                <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>formal</Typography>
+                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{fDir}</Typography>
+              </Box>
+              <Box sx={{ ...rowSx, border: `1px solid ${martinActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
+                <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{label}</Typography>
+                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(martinPnl) }}>{pnlText(martinPnl)}</Typography>
+              </Box>
+              <Box sx={{ ...rowSx, backgroundColor: "#00bcd4" }}>
+                <Typography variant="caption" sx={{ fontSize: 9, color: "#000" }}>합계</Typography>
+                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: martinPnl < 0 ? "#f44336" : "#000" }}>{pnlText(martinPnl)}</Typography>
+              </Box>
+            </Box>
+          );
           return (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mb: 1 }}>
-              {items.map((item, i) => {
-                if (item.isFormal) {
-                  return (
-                    <Box key={i} sx={{ ...rowSx, border: "1px solid rgba(255,255,255,0.3)" }}>
-                      <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{item.name}</Typography>
-                      <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: item.color }}>{item.value}</Typography>
-                    </Box>
-                  );
-                }
-                if (item.isTotal) {
-                  const sign = item.pnl > 0 ? "+" : "";
-                  return (
-                    <Box key={i} sx={{ ...rowSx, backgroundColor: "#00bcd4" }}>
-                      <Typography variant="caption" sx={{ fontSize: 9, color: "#000" }}>{item.name}</Typography>
-                      <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: item.pnl < 0 ? "#f44336" : "#000" }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
-                    </Box>
-                  );
-                }
-                const clr = item.pnl > 0 ? "#4caf50" : item.pnl < 0 ? "#f44336" : "#fff";
-                const sign = item.pnl > 0 ? "+" : "";
-                return (
-                  <Box key={i} sx={{ ...rowSx, border: `1px solid ${item.active ? "rgba(255,255,255,0.3)" : "#333"}` }}>
-                    <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{item.name}</Typography>
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: clr }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
-                  </Box>
-                );
-              })}
+            <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
+              {renderGroup("마틴A", aDirRaw, aDirColor, cumPnL.user_a, umAHasBet)}
+              {renderGroup("마틴Z", zDirRaw, zDirColor, cumPnL.user_z, umZHasBet)}
             </Box>
           );
         }
 
-        return (
-          <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5, mb: 1, flexWrap: "wrap" }}>
-            <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 1.5, display: "flex", alignItems: "center" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: dirColor }}>{`formal(${combinedDir})`}</Typography>
+        const renderGroup = (label, fDir, fColor, martinPnl, martinActive) => (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
+            <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#888" }}>formal</Typography>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{fDir}</Typography>
             </Box>
-            {[
-              { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
-            ].map((item, i) => {
-              const clr = item.pnl > 0 ? "#4caf50" : item.pnl < 0 ? "#f44336" : "#fff";
-              const sign = item.pnl > 0 ? "+" : "";
-              return (
-                <Box key={i} sx={{ border: `1px solid ${item.active ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, minWidth: 200, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{item.name}</Typography>
-                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: clr }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
-                </Box>
-              );
-            })}
-            {(() => {
-              const sign = totalPnL > 0 ? "+" : "";
-              return (
-                <Box sx={{ px: 2, minWidth: 200, backgroundColor: "#00bcd4", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: totalPnL < 0 ? "#f44336" : "#000" }}>{`${sign}${totalPnL.toLocaleString()}P`}</Typography>
-                </Box>
-              );
-            })()}
+            <Box sx={{ border: `1px solid ${martinActive ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{label}</Typography>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(martinPnl) }}>{pnlText(martinPnl)}</Typography>
+            </Box>
+            <Box sx={{ backgroundColor: "#00bcd4", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: martinPnl < 0 ? "#f44336" : "#000" }}>{pnlText(martinPnl)}</Typography>
+            </Box>
+          </Box>
+        );
+
+        return (
+          <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
+            {renderGroup("마틴A", aDirRaw, aDirColor, cumPnL.user_a, umAHasBet)}
+            {renderGroup("마틴Z", zDirRaw, zDirColor, cumPnL.user_z, umZHasBet)}
           </Box>
         );
       })()}

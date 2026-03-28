@@ -189,10 +189,10 @@ export default function GamePage() {
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       // 초기 픽 조회
       const pickRes = await apiCaller.post("/api/v1/pick", { seq: "" });
-      const { globalhit, bet, ...pick } = pickRes.data;
+      const { globalhit, bet, user_martin, ...pick } = pickRes.data;
       setPickResult(pick);
       setGlobalhitData(globalhit || []);
-      setBetData(bet || null);
+      setBetData(bet ? { ...bet, user_martin } : null);
     } catch (err) {
       console.error("Failed to start game:", err);
     }
@@ -205,10 +205,10 @@ export default function GamePage() {
       setGameId(data.game_id);
       setResults(data.results || []);
       setCumPnL(data.cum_pnl || { tn: 0, gh: 0, pinch: 0 });
-      const { globalhit, bet, results: _, cum_pnl: __, game_id: ___, config: ____, status, ending_snapshot: snap, ...pick } = data;
+      const { globalhit, bet, user_martin, results: _, cum_pnl: __, game_id: ___, config: ____, status, ending_snapshot: snap, ...pick } = data;
       setPickResult({ method: pick.method, pick: pick.pick, match_start: pick.match_start, match_end: pick.match_end, matches: pick.matches, order: pick.order });
       setGlobalhitData(globalhit || []);
-      setBetData(bet || null);
+      setBetData(bet ? { ...bet, user_martin } : null);
       if (status === "ending" && snap) {
         setEndingMode(true);
         setEndingSnapshot({
@@ -281,10 +281,10 @@ export default function GamePage() {
       });
 
       // 다음 라운드 상태 갱신
-      const { globalhit, bet, ...pick } = data;
+      const { globalhit, bet, user_martin: um, ...pick } = data;
       setPickResult({ method: pick.method, pick: pick.pick, match_start: pick.match_start, match_end: pick.match_end, matches: pick.matches, order: pick.order });
       setGlobalhitData(globalhit || []);
-      setBetData(bet || null);
+      setBetData(bet ? { ...bet, user_martin: um } : null);
 
       // 종료 모드: 모든 추적 배팅이 step 1로 돌아왔는지 체크
       if (endingMode && endingSnapshot) {
@@ -318,10 +318,10 @@ export default function GamePage() {
         pinch: data.cum_pnl.pinch,
       });
 
-      const { globalhit, bet, status, ending_snapshot: snap, ...pick } = data;
+      const { globalhit, bet, user_martin: um2, status, ending_snapshot: snap, ...pick } = data;
       setPickResult({ method: pick.method, pick: pick.pick, match_start: pick.match_start, match_end: pick.match_end, matches: pick.matches, order: pick.order });
       setGlobalhitData(globalhit || []);
-      setBetData(bet || null);
+      setBetData(bet ? { ...bet, user_martin: um2 } : null);
 
       // 엔딩 시점 이전으로 삭제되면 엔딩 모드 해제
       if (status === "active") {
@@ -519,10 +519,10 @@ export default function GamePage() {
 
       // 초기 픽 조회
       const pickRes = await apiCaller.post("/api/v1/pick", { seq: "" });
-      const { globalhit, bet, ...pick } = pickRes.data;
+      const { globalhit, bet, user_martin: um3, ...pick } = pickRes.data;
       setPickResult(pick);
       setGlobalhitData(globalhit || []);
-      setBetData(bet || null);
+      setBetData(bet ? { ...bet, user_martin: um3 } : null);
     } catch (err) {
       console.error("Failed to next game:", err);
     }
@@ -577,54 +577,39 @@ export default function GamePage() {
         )}
       </Box>
 
-      {/* ===== 중단: 인터페이스 (1단) ===== */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1, flexWrap: "wrap" }}>
-        {/* 상태 토글 */}
-        <Box
-          onClick={handleEndingMode}
-          sx={{
-            ...toggleBtnSx,
-            backgroundColor: endingMode ? "#ff6f00" : "#b71c1c",
-            borderRadius: 2,
-            border: endingMode ? "2px solid #ffab00" : "none",
-            px: isMobile ? 1 : 1.5,
-            cursor: "pointer",
-            animation: endingMode ? "pulse 1.5s infinite" : "none",
-            "@keyframes pulse": { "0%": { opacity: 1 }, "50%": { opacity: 0.6 }, "100%": { opacity: 1 } },
-          }}
-        >
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 11 : 13, fontWeight: "bold", color: "#fff" }}>
-            {endingMode ? "ED..." : "ED"}
-          </Typography>
-        </Box>
-        <Box sx={{ ...toggleBtnSx, backgroundColor: "#1565c0", borderRadius: 2, border: "none", px: isMobile ? 1 : 1.5 }}>
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 11 : 13, fontWeight: "bold", color: "#fff" }}>BT</Typography>
-        </Box>
-        <Box sx={{ ...toggleBtnSx, border: "2px solid #4caf50", cursor: "default", px: isMobile ? 0.5 : 1.5, minWidth: isMobile ? 50 : 120, justifyContent: "flex-end" }}>
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: "#4caf50" }}>
-            {betData?.combined ? `${betData.combined.amount.toLocaleString()}P` : "0P"}
-          </Typography>
+      {/* ===== 중단: 인터페이스 (한줄) ===== */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: isMobile ? 0.5 : 1, mb: 1, flexWrap: "wrap" }}>
+        {/* 좌: 마틴A/Z 2행 */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+          {/* 마틴A 행 */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>마틴A</Typography>
+            </Box>
+            <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: "#4caf50" }}>
+                {betData?.user_martin?.martin_a?.total_P || betData?.user_martin?.martin_a?.total_B ? `${((betData.user_martin.martin_a.total_P || 0) + (betData.user_martin.martin_a.total_B || 0)).toLocaleString()}P` : "0P"}
+              </Typography>
+            </Box>
+          </Box>
+          {/* 마틴Z 행 */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: "#c62828", display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>마틴Z</Typography>
+            </Box>
+            <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: "#4caf50" }}>
+                {betData?.user_martin?.martin_z?.amount ? `${betData.user_martin.martin_z.amount.toLocaleString()}P` : "0P"}
+              </Typography>
+            </Box>
+          </Box>
         </Box>
 
-        {/* 구분선 */}
-        <Box sx={{ width: "1px", height: 28, backgroundColor: "rgba(255,255,255,0.2)", mx: 0.3 }} />
-
-        {/* 픽이미지 + 턴 + P/B + 컨트롤 */}
-        <Box sx={{ width: isMobile ? 44 : 85, height: isMobile ? 44 : 85, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-          <img src={pickImage} alt="pick" style={{ width: isMobile ? 40 : 77, height: isMobile ? 40 : 77, objectFit: "contain" }} />
+        {/* 픽이미지 + 턴 + P/B */}
+        <Box sx={{ width: isMobile ? 52 : 95, height: isMobile ? 52 : 95, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <img src={pickImage} alt="pick" style={{ width: isMobile ? 46 : 85, height: isMobile ? 46 : 85, objectFit: "contain" }} />
         </Box>
-        <Box
-          sx={{
-            width: isMobile ? 24 : 40,
-            height: isMobile ? 24 : 40,
-            border: "2px solid rgba(255,255,255,0.3)",
-            borderRadius: 1,
-            backgroundColor: "#333",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
+        <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
         </Box>
         <Box
@@ -645,16 +630,17 @@ export default function GamePage() {
             "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >B</Box>
-        <Box sx={{ width: 200 }} />
+
+        {/* del/next/new/셋업 */}
         <Box
           onClick={results.length > 0 ? handleDeleteOne : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, mr: 2 }}
+          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4 }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
         <Box
           onClick={results.length > 0 ? () => setShowNextConfirm(true) : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)", mr: 2 }}
+          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
         </Box>
@@ -663,6 +649,12 @@ export default function GamePage() {
           sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #2196f3" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
+        </Box>
+        <Box
+          onClick={() => navigate(`/t9game/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
+          sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ff9800" }}
+        >
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
         </Box>
       </Box>
 

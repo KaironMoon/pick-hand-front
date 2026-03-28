@@ -435,8 +435,8 @@ export default function HbGamePage() {
         <Box sx={{ width: "1px", height: 28, backgroundColor: "rgba(255,255,255,0.2)", mx: 0.3 }} />
 
         {/* 픽이미지 + 턴 + P/B */}
-        <Box sx={{ width: isMobile ? 44 : 85, height: isMobile ? 44 : 85, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-          <img src={pickImage} alt="pick" style={{ width: isMobile ? 40 : 77, height: isMobile ? 40 : 77, objectFit: "contain" }} />
+        <Box sx={{ width: isMobile ? 52 : 95, height: isMobile ? 52 : 95, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <img src={pickImage} alt="pick" style={{ width: isMobile ? 46 : 85, height: isMobile ? 46 : 85, objectFit: "contain" }} />
         </Box>
         <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>

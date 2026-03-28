@@ -56,4 +56,9 @@ const GH_GAMES_API = {
   STATE: (id) => `/api/v1/gh/games/state/${id}`,
 };
 
-export { API_URL, AUTH_API, USERS_API, SETTINGS_API, HB_SETTINGS_API, HB_GAMES_API, GH_SETTINGS_API, GH_GAMES_API };
+const USER_BET_SETTINGS_API = {
+  GET: (gameType) => `/api/v1/user-settings/${gameType}`,
+  SAVE: (gameType) => `/api/v1/user-settings/${gameType}`,
+};
+
+export { API_URL, AUTH_API, USERS_API, SETTINGS_API, HB_SETTINGS_API, HB_GAMES_API, GH_SETTINGS_API, GH_GAMES_API, USER_BET_SETTINGS_API };
