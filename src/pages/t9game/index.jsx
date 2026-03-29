@@ -182,7 +182,7 @@ export default function GamePage() {
   // 게임 시작
   const startGame = useCallback(async () => {
     try {
-      const res = await apiCaller.post("/api/v1/games/start");
+      const res = await apiCaller.post("/api/v1/games/start?mode=admin");
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       // 초기 픽 조회
@@ -253,7 +253,7 @@ export default function GamePage() {
       restoreGame(parseInt(urlGameId));
     } else {
       let cancelled = false;
-      apiCaller.get("/api/v1/games/last-active").then(async (res) => {
+      apiCaller.get("/api/v1/games/last-active?mode=admin").then(async (res) => {
         if (cancelled) return;
         const game = res.data?.game;
         if (game && game.round_count > 0) {

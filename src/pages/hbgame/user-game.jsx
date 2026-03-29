@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { useAtomValue } from "jotai";
+import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
 import { HB_GAMES_API } from "@/constants/api-url";
 
@@ -78,10 +80,12 @@ export default function HbUserGamePage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const navigate = useNavigate();
+  const user = useAtomValue(userAtom);
+  const isAdmin = user?.role === "admin";
   const [searchParams, setSearchParams] = useSearchParams();
-
   const [results, setResults] = useState([]);
   const [pickResult, setPickResult] = useState({ method: "wait", pick: null, nickname: null });
+  const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const [hbPatterns, setHbPatterns] = useState({});
   const [globalhitData, setGlobalhitData] = useState([]);
   const [betData, setBetData] = useState(null);
@@ -94,6 +98,8 @@ export default function HbUserGamePage() {
   const [endingMode, setEndingMode] = useState(false);
   const [endingSnapshot, setEndingSnapshot] = useState(null);
   const [endingDone, setEndingDone] = useState(false);
+  const [userSummary, setUserSummary] = useState(null);
+  const [userMartinDashboard, setUserMartinDashboard] = useState(null);
   const [resumeGame, setResumeGame] = useState(null);
   const processingRef = useRef(false);
 
@@ -111,7 +117,7 @@ export default function HbUserGamePage() {
 
   const startGame = useCallback(async () => {
     try {
-      const res = await apiCaller.post(HB_GAMES_API.START);
+      const res = await apiCaller.post(HB_GAMES_API.START + "?mode=user");
       setGameId(res.data.game_id);
       setConfig(res.data.config);
       setGlobalhitData(res.data.globalhit || []);
@@ -134,7 +140,7 @@ export default function HbUserGamePage() {
       restoreGame(parseInt(urlGameId));
     } else {
       // 직전 게임이 active면 복원 여부 확인
-      apiCaller.get(HB_GAMES_API.LAST_ACTIVE).then(async (res) => {
+      apiCaller.get(HB_GAMES_API.LAST_ACTIVE + "?mode=user").then(async (res) => {
         if (cancelled) return;
         const game = res.data?.game;
         if (game && game.round_count > 0) {
@@ -168,6 +174,8 @@ export default function HbUserGamePage() {
       setHbPatterns(data.hb_patterns || {});
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+      setUserSummary(data.user_summary || null);
+      setUserMartinDashboard(data.user_martin_dashboard || null);
       if (data.status === "ending" && data.ending_snapshot) {
         setEndingMode(true);
         setEndingSnapshot(data.ending_snapshot);
@@ -196,6 +204,8 @@ export default function HbUserGamePage() {
       setHbPatterns(data.hb_patterns || {});
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+      setUserSummary(data.user_summary || null);
+      setUserMartinDashboard(data.user_martin_dashboard || null);
 
       if (endingMode && endingSnapshot && checkEndingComplete(data)) {
         setEndingDone(true);
@@ -222,6 +232,8 @@ export default function HbUserGamePage() {
       setHbPatterns(data.hb_patterns || {});
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+      setUserSummary(data.user_summary || null);
+      setUserMartinDashboard(data.user_martin_dashboard || null);
       if (data.status === "ending" && data.ending_snapshot) {
         setEndingMode(true); setEndingSnapshot(data.ending_snapshot);
       } else {
@@ -289,6 +301,8 @@ export default function HbUserGamePage() {
       setHbPatterns(data.hb_patterns || {});
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+      setUserSummary(data.user_summary || null);
+      setUserMartinDashboard(data.user_martin_dashboard || null);
     } catch (err) {
       console.error("Failed to start ending:", err);
     }
@@ -545,91 +559,416 @@ export default function HbUserGamePage() {
 
       {/* ===== 총금액 요약 (A그룹 / Z그룹) ===== */}
       {(() => {
-        const hb = betData?.honeybee;
-        const gh = betData?.globalhit;
-        const umA = betData?.user_martin?.martin_a;
-        const umZ = betData?.user_martin?.martin_z;
-        const aDirRaw = umA?.direction || "wait";
-        const zDirRaw = umZ?.direction || "wait";
-        const aDirColor = aDirRaw === "P" ? "#1565c0" : aDirRaw === "B" ? "#f44336" : "#888";
-        const zDirColor = zDirRaw === "P" ? "#1565c0" : zDirRaw === "B" ? "#f44336" : "#888";
-        const ghHasBet = (gh?.P || 0) + (gh?.B || 0) > 0;
-        const umAHasBet = (umA?.amount || 0) > 0;
-        const umZHasBet = (umZ?.amount || 0) > 0;
-        const sumA = cumPnL.user_a + cumPnL.gh;
-        const sumZ = cumPnL.user_z + cumPnL.gh;
+        const sA = userSummary?.martin_a;
+        const sZ = userSummary?.martin_z;
 
-        // formal A: 어드민(hb+gh) + 마틴A 합산 방향
-        const adminP = (hb?.P || 0) + (gh?.P || 0);
-        const adminB = (hb?.B || 0) + (gh?.B || 0);
-        const formalAP = adminP + (aDirRaw === "P" ? (umA?.amount || 0) : 0);
-        const formalAB = adminB + (aDirRaw === "B" ? (umA?.amount || 0) : 0);
-        const formalADir = formalAP > formalAB ? "P" : formalAB > formalAP ? "B" : "wait";
+        const formalADir = sA?.direction || "wait";
+        const formalZDir = sZ?.direction || "wait";
         const formalAColor = formalADir === "P" ? "#1565c0" : formalADir === "B" ? "#f44336" : "#888";
-        // formal Z: 어드민(hb+gh) + 마틴Z 합산 방향
-        const formalZP = adminP + (zDirRaw === "P" ? (umZ?.amount || 0) : 0);
-        const formalZB = adminB + (zDirRaw === "B" ? (umZ?.amount || 0) : 0);
-        const formalZDir = formalZP > formalZB ? "P" : formalZB > formalZP ? "B" : "wait";
         const formalZColor = formalZDir === "P" ? "#1565c0" : formalZDir === "B" ? "#f44336" : "#888";
+
+        const martinPnlA = sA?.pnl || 0;
+        const martinPnlZ = sZ?.pnl || 0;
+
+        const martinActive = (sA?.bet_p || 0) + (sA?.bet_b || 0) > 0;
+        const martinZActive = (sZ?.bet_p || 0) + (sZ?.bet_b || 0) > 0;
 
         const pnlText = (v) => { const s = v > 0 ? "+" : ""; return `${s}${v.toLocaleString()}P`; };
         const pnlColor = (v) => v > 0 ? "#4caf50" : v < 0 ? "#f44336" : "#fff";
 
         if (isMobile) {
           const rowSx = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5, borderRadius: 1, px: 0.8, py: 0.3, whiteSpace: "nowrap" };
-          const renderGroup = (label, fDir, fColor, mDir, mDirColor, martinPnl, martinActive, ghPnl, ghActive, total) => (
+          const renderGroup = (label, fDir, fColor, mPnl, mActive) => (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
               <Box sx={{ ...rowSx, border: "1px solid rgba(255,255,255,0.3)" }}>
                 <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>formal</Typography>
                 <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{fDir}</Typography>
               </Box>
-              <Box sx={{ ...rowSx, border: `1px solid ${martinActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
+              <Box sx={{ ...rowSx, border: `1px solid ${mActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
                 <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{label}</Typography>
-                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(martinPnl) }}>{pnlText(martinPnl)}</Typography>
-              </Box>
-              <Box sx={{ ...rowSx, border: `1px solid ${ghActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
-                <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>GH</Typography>
-                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(ghPnl) }}>{pnlText(ghPnl)}</Typography>
+                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(mPnl) }}>{pnlText(mPnl)}</Typography>
               </Box>
               <Box sx={{ ...rowSx, backgroundColor: "#00bcd4" }}>
                 <Typography variant="caption" sx={{ fontSize: 9, color: "#000" }}>합계</Typography>
-                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: total < 0 ? "#f44336" : "#000" }}>{pnlText(total)}</Typography>
+                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: mPnl < 0 ? "#f44336" : "#000" }}>{pnlText(mPnl)}</Typography>
               </Box>
             </Box>
           );
           return (
             <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
-              {renderGroup("마틴A", formalADir, formalAColor, aDirRaw, aDirColor, cumPnL.user_a, umAHasBet, cumPnL.gh, ghHasBet, sumA)}
-              {renderGroup("마틴Z", formalZDir, formalZColor, zDirRaw, zDirColor, cumPnL.user_z, umZHasBet, cumPnL.gh, ghHasBet, sumZ)}
+              {renderGroup("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
+              {renderGroup("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
             </Box>
           );
         }
 
-        const renderGroup = (label, fDir, fColor, mDir, mDirColor, martinPnl, martinActive, ghPnl, ghActive, total) => (
+        const renderGroup = (label, fDir, fColor, mPnl, mActive) => (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
             <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#888" }}>formal</Typography>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{fDir}</Typography>
             </Box>
-            <Box sx={{ border: `1px solid ${martinActive ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <Box sx={{ border: `1px solid ${mActive ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{label}</Typography>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(martinPnl) }}>{pnlText(martinPnl)}</Typography>
-            </Box>
-            <Box sx={{ border: `1px solid ${ghActive ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>GH</Typography>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(ghPnl) }}>{pnlText(ghPnl)}</Typography>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(mPnl) }}>{pnlText(mPnl)}</Typography>
             </Box>
             <Box sx={{ backgroundColor: "#00bcd4", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: total < 0 ? "#f44336" : "#000" }}>{pnlText(total)}</Typography>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: mPnl < 0 ? "#f44336" : "#000" }}>{pnlText(mPnl)}</Typography>
             </Box>
           </Box>
         );
 
         return (
           <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
-            {renderGroup("마틴A", formalADir, formalAColor, aDirRaw, aDirColor, cumPnL.user_a, umAHasBet, cumPnL.gh, ghHasBet, sumA)}
-            {renderGroup("마틴Z", formalZDir, formalZColor, zDirRaw, zDirColor, cumPnL.user_z, umZHasBet, cumPnL.gh, ghHasBet, sumZ)}
+            {renderGroup("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
+            {renderGroup("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
           </Box>
+        );
+      })()}
+
+      {/* ===== 어드민 전용: 대시보드 + 글로벌히트 상세 ===== */}
+      {isAdmin && (() => {
+        const hb = betData?.honeybee;
+        const gh = betData?.globalhit;
+        const combined = betData?.combined;
+        const combinedDir = combined?.direction || "wait";
+        const dirColor = combinedDir === "P" ? "#1565c0" : combinedDir === "B" ? "#f44336" : "#888";
+        const dc = { border: "1px solid #555", padding: isMobile ? "2px 4px" : "3px 12px", fontSize: isMobile ? 8 : 10, textAlign: "center", whiteSpace: "nowrap" };
+        const dcB = { ...dc, fontWeight: "bold" };
+        const ghPatterns = ["PPP", "BBB", "PBP", "BPB", "PPB", "BBP", "PBB", "BPP"];
+        const getPatSec = (pat, sec) => {
+          const d = gh?.details?.find((x) => x.pattern === pat && x.group === sec + 1);
+          return d ? d.amount : 0;
+        };
+        const hbHasBet = (hb?.P || 0) + (hb?.B || 0) > 0;
+        const ghHasBet = (gh?.P || 0) + (gh?.B || 0) > 0;
+        const anyBet = hbHasBet || ghHasBet;
+
+        const umaDash = userMartinDashboard?.martin_a || {};
+        const umzDash = userMartinDashboard?.martin_z || {};
+        const hbGroups = config?.honeybee?.groups || [];
+        const currentNn = pickResult.nickname;
+        const groupedSet = new Set();
+        if (currentNn) {
+          groupedSet.add(currentNn);
+          for (const g of hbGroups) {
+            const members = (g.patterns || []).filter(Boolean);
+            if (members.includes(currentNn)) members.forEach((m) => groupedSet.add(m));
+          }
+        }
+
+        return (
+          <>
+            {/* 상단 요약 바 — 마틴A / 마틴Z 분리 */}
+            {!isMobile && (() => {
+              const umA = betData?.user_martin?.martin_a;
+              const umZ = betData?.user_martin?.martin_z;
+              const adminP = (hb?.P || 0) + (gh?.P || 0);
+              const adminB = (hb?.B || 0) + (gh?.B || 0);
+              const aDirRaw = umA?.direction || "wait";
+              const zDirRaw = umZ?.direction || "wait";
+              const fAP = adminP + (aDirRaw === "P" ? (umA?.amount || 0) : 0);
+              const fAB = adminB + (aDirRaw === "B" ? (umA?.amount || 0) : 0);
+              const fADir = fAP > fAB ? "P" : fAB > fAP ? "B" : "wait";
+              const fAColor = fADir === "P" ? "#1565c0" : fADir === "B" ? "#f44336" : "#888";
+              const fZP = adminP + (zDirRaw === "P" ? (umZ?.amount || 0) : 0);
+              const fZB = adminB + (zDirRaw === "B" ? (umZ?.amount || 0) : 0);
+              const fZDir = fZP > fZB ? "P" : fZB > fZP ? "B" : "wait";
+              const fZColor = fZDir === "P" ? "#1565c0" : fZDir === "B" ? "#f44336" : "#888";
+              const pnlText = (v) => `${v > 0 ? "+" : ""}${v.toLocaleString()}P`;
+              const pnlClr = (v) => v > 0 ? "#4caf50" : v < 0 ? "#f44336" : "#fff";
+              const umAHasBet = (umA?.amount || 0) > 0;
+              const umZHasBet = (umZ?.amount || 0) > 0;
+              const sumA = cumPnL.user_a + cumPnL.gh;
+              const sumZ = cumPnL.user_z + cumPnL.gh;
+              const barSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1 };
+              const renderBar = (label, fDir, fColor, martinPnl, martinActive, ghPnl, total) => (
+                <Box sx={{ display: "flex", gap: 0.5, flex: 1 }}>
+                  <Box sx={{ ...barSx, minWidth: 0, justifyContent: "center" }}>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{`formal(${fDir})`}</Typography>
+                  </Box>
+                  <Box sx={{ ...barSx, border: `1px solid ${martinActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{label}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlClr(martinPnl) }}>{pnlText(martinPnl)}</Typography>
+                  </Box>
+                  <Box sx={{ ...barSx, border: `1px solid ${ghHasBet ? "rgba(255,255,255,0.3)" : "#333"}` }}>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>GH</Typography>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlClr(ghPnl) }}>{pnlText(ghPnl)}</Typography>
+                  </Box>
+                  <Box sx={{ backgroundColor: "#00bcd4", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end", minWidth: 80 }}>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: total < 0 ? "#f44336" : "#000" }}>{pnlText(total)}</Typography>
+                  </Box>
+                </Box>
+              );
+              return (
+                <Box sx={{ display: "flex", gap: 1, mb: 0.5 }}>
+                  {renderBar("마틴A", fADir, fAColor, cumPnL.user_a, umAHasBet, cumPnL.gh, sumA)}
+                  {renderBar("마틴Z", fZDir, fZColor, cumPnL.user_z, umZHasBet, cumPnL.gh, sumZ)}
+                </Box>
+              );
+            })()}
+
+            {/* 배팅 상황판 — 마틴A / 마틴Z 각각 독립 테이블 */}
+            {(() => {
+              const umA = betData?.user_martin?.martin_a;
+              const umZ = betData?.user_martin?.martin_z;
+              const adminP = (hb?.P || 0) + (gh?.P || 0);
+              const adminB = (hb?.B || 0) + (gh?.B || 0);
+              const hbDimStyle = hbHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+              const ghDimStyle = ghHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+              const martinTable = (label, um, labelColor, dash) => {
+                const hbAmounts = dash.amounts || new Array(20).fill(0);
+                const hbStepMin = dash.step_min || 1;
+                const hbStepMax = dash.step_max || 20;
+                // 마틴Z: dash.step (통합 단계), 마틴A: dash.steps (패턴별 단계)
+                const unifiedStep = dash.step || null;
+                const patternSteps = dash.steps || {};
+                const mDir = um?.direction || "wait";
+                const mAmt = um?.amount || 0;
+                const mP = mDir === "P" ? mAmt : 0;
+                const mB = mDir === "B" ? mAmt : 0;
+                const totalP = adminP + mP;
+                const totalB = adminB + mB;
+                const fDir = totalP > totalB ? "P" : totalB > totalP ? "B" : "wait";
+                const fColor = fDir === "P" ? "#1565c0" : fDir === "B" ? "#f44336" : "#888";
+                const mHasBet = mAmt > 0;
+                const mDimStyle = mHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+                return (
+                  <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 0.5 }}>
+                  <Box>
+                  <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 4, opacity: anyBet ? 1 : 0.8 }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ ...dcB, color: fColor }}>{`formal(${fDir})`}</td>
+                        <td style={{ ...dcB, color: labelColor, ...mDimStyle }}>{label}</td>
+                        <td style={{ ...dc, color: "#1565c0", ...mDimStyle }}>{`${mP.toLocaleString()}P`}</td>
+                        <td style={{ ...dc, color: "#f44336", ...mDimStyle }}>{`${mB.toLocaleString()}P`}</td>
+                        <td style={{ ...dcB, color: "#00bcd4", ...ghDimStyle }}>GH</td>
+                        <td style={{ ...dc, color: "#1565c0", ...ghDimStyle }}>{`${(gh?.P || 0).toLocaleString()}P`}</td>
+                        <td style={{ ...dc, color: "#f44336", ...ghDimStyle }}>{`${(gh?.B || 0).toLocaleString()}P`}</td>
+                        <td style={{ ...dcB, color: "#fff" }}>{currentTurn}</td>
+                        <td style={{ ...dc, color: "#1565c0" }}>{`${totalP.toLocaleString()}P`}</td>
+                        <td style={{ ...dc, color: "#f44336" }}>{`${totalB.toLocaleString()}P`}</td>
+                        {Array.from({ length: 6 }, (_, i) => <td key={i} style={{ ...dc }}></td>)}
+                      </tr>
+                      {[[ghPatterns[0], ghPatterns[1]], [ghPatterns[2], ghPatterns[3]], [ghPatterns[4], ghPatterns[5]], [ghPatterns[6], ghPatterns[7]]].map((pair, ri) => (
+                        <tr key={`gh-${ri}`}>
+                          {pair.map((pat) =>
+                            [0, 1, 2].map((sec) => {
+                              const amt = getPatSec(pat, sec);
+                              const hasBet = amt > 0;
+                              const dimStyle = hasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+                              return (
+                                <React.Fragment key={`${pat}-${sec}`}>
+                                  <td style={{ ...dc, ...dimStyle }}>
+                                    {pat.split("").map((c, ci) => (
+                                      <span key={ci} style={{ color: c === "P" ? "#1565c0" : "#f44336", fontWeight: "bold" }}>{c}</span>
+                                    ))}
+                                    <span style={{ fontSize: 9 }}>({sec + 1}sc)</span>
+                                  </td>
+                                  <td style={{ ...dc, ...dimStyle }}>{`${amt.toLocaleString()}P`}</td>
+                                </React.Fragment>
+                              );
+                            })
+                          )}
+                          {Array.from({ length: 4 }, (_, i) => <td key={`pad-${i}`} style={{ ...dc }}></td>)}
+                        </tr>
+                      ))}
+                      <tr>
+                        <td style={{ ...dcB, color: "#ff9800" }}>honeybee</td>
+                        <td style={{ ...dcB, color: "#ff9800" }}>pick</td>
+                        {Array.from({ length: 14 }, (_, i) => (
+                          <td key={i} style={{ ...dc, color: "#ff9800" }}>{i + 1}step</td>
+                        ))}
+                      </tr>
+                      {sortedPatterns.map((nn) => {
+                        const st = hbPatterns[nn] || { step: 1, wins: 0, losses: 0, amount: 0, direction: null };
+                        const isCurrentPick = groupedSet.has(nn);
+                        const isExactPick = pickResult.nickname === nn;
+                        // 마틴Z: 통합 단계, 마틴A: 패턴별 단계 (서버에서 계산된 값)
+                        const currentStep = unifiedStep != null ? unifiedStep : (patternSteps[nn] || hbStepMin);
+                        return (
+                          <tr key={nn}>
+                            <td style={{ ...dc, color: isCurrentPick ? "#fff" : "#555", fontWeight: isCurrentPick ? "bold" : "normal" }}>{nn}</td>
+                            <td style={{ ...dc, color: isExactPick ? (st.direction === "P" ? "#1565c0" : st.direction === "B" ? "#f44336" : "#555") : "#555", fontWeight: isExactPick ? "bold" : "normal" }}>
+                              {isExactPick ? (st.direction || "-") : "-"}
+                            </td>
+                            {Array.from({ length: 14 }, (_, i) => {
+                              const stepNum = i + 1;
+                              const isCurrent = currentStep === stepNum;
+                              const inRange = stepNum >= hbStepMin && stepNum <= hbStepMax;
+                              const amt = inRange ? (hbAmounts[stepNum - 1] || 0) : 0;
+                              return (
+                                <td key={i} style={{
+                                  ...dc,
+                                  color: isCurrent && isCurrentPick ? "#fff" : stepNum < currentStep ? "#c8a415" : "#555",
+                                  fontWeight: (isCurrent && isCurrentPick) || stepNum < currentStep ? "bold" : "normal",
+                                  backgroundColor: isCurrent && isCurrentPick ? "rgba(255,255,255,0.08)" : "transparent",
+                                }}>
+                                  {inRange ? amt.toLocaleString() : ""}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  </Box>
+                  </Box>
+                );
+              };
+              return (
+                <>
+                  {martinTable("마틴A", umA, "#1565c0", umaDash)}
+                  {martinTable("마틴Z", umZ, "#c62828", umzDash)}
+                </>
+              );
+            })()}
+
+            {/* 모바일: 우측 요약 */}
+            {isMobile && (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 105 }}>
+              {(() => {
+                const totalPnL = cumPnL.hb + cumPnL.gh;
+                const items = [
+                  { name: "formal", value: combinedDir, color: dirColor, isFormal: true },
+                  { name: "Honeybee", pnl: cumPnL.hb, active: hbHasBet },
+                  { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
+                  { name: "합계", pnl: totalPnL, isTotal: true },
+                ];
+                const rowSx = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5, borderRadius: 1, px: 0.8, py: 0.3, whiteSpace: "nowrap" };
+                return items.map((item, i) => {
+                  if (item.isFormal) return (
+                    <Box key={i} sx={{ ...rowSx, border: "1px solid rgba(255,255,255,0.3)" }}>
+                      <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{item.name}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: item.color }}>{item.value}</Typography>
+                    </Box>
+                  );
+                  if (item.isTotal) {
+                    const sign = item.pnl > 0 ? "+" : "";
+                    return (
+                      <Box key={i} sx={{ ...rowSx, backgroundColor: "#00bcd4" }}>
+                        <Typography variant="caption" sx={{ fontSize: 9, color: "#000" }}>{item.name}</Typography>
+                        <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: item.pnl < 0 ? "#f44336" : "#000" }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
+                      </Box>
+                    );
+                  }
+                  const clr = item.pnl > 0 ? "#4caf50" : item.pnl < 0 ? "#f44336" : "#fff";
+                  const sign = item.pnl > 0 ? "+" : "";
+                  return (
+                    <Box key={i} sx={{ ...rowSx, border: `1px solid ${item.active ? "rgba(255,255,255,0.3)" : "#333"}` }}>
+                      <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{item.name}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: clr }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
+                    </Box>
+                  );
+                });
+              })()}
+            </Box>
+            )}
+
+            {/* GlobalHit 패턴별 상세 */}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              {globalhitData.map((patData) => {
+                const pat = patData.pattern;
+                const cellSize = 20;
+                const colsPerRow = 30;
+                const totalCols = colsPerRow + 2;
+                const GH_CELL_BG = { hit: "#00e676", miss: "#ffeb3b", wait: "#555" };
+                const tdStyleFn = (status) => ({
+                  width: cellSize, height: cellSize, border: "1px solid #555", padding: 0, textAlign: "center",
+                  backgroundColor: status ? (GH_CELL_BG[status] || "#333") : "#333",
+                });
+                const circleStyle = (charIdx) => ({
+                  width: cellSize - 2, height: cellSize - 2, borderRadius: "50%",
+                  backgroundColor: pat[charIdx % pat.length] === "P" ? "#1565c0" : "#f44336",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff", fontSize: 9, fontWeight: "bold",
+                });
+                return (
+                  <Box key={pat}>
+                    <Box
+                      onClick={() => setCollapsedPatterns((prev) => ({ ...prev, [pat]: !prev[pat] }))}
+                      sx={{
+                        display: "flex", alignItems: "center", gap: 0.5, mb: 0.5,
+                        border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "background.paper",
+                        px: 0.5, py: 0.3, cursor: "pointer",
+                        "&:hover": { backgroundColor: "rgba(255,255,255,0.05)" },
+                      }}
+                    >
+                      <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 1, py: 0.2 }}>
+                        <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold" }}>
+                          {pat.split("").map((c, ci) => (
+                            <Typography key={ci} component="span" sx={{ color: c === "P" ? "#1565c0" : "#f44336", fontWeight: "bold", fontSize: 11 }}>{c}</Typography>
+                          ))}
+                          <Typography component="span" sx={{ fontSize: 10, color: "text.secondary" }}>(123)</Typography>
+                        </Typography>
+                      </Box>
+                      <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.8, py: 0.2 }}>
+                        <Typography variant="caption" sx={{ fontSize: 10 }}>{results.length}</Typography>
+                      </Box>
+                      {patData.groups.map((g, gi) => (
+                        <Box key={gi} sx={{ display: "flex", gap: 0.3, ml: gi > 0 ? 1 : 0 }}>
+                          <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.6, py: 0.2 }}>
+                            <Typography variant="caption" sx={{ fontSize: 10 }}>SC{gi + 1}</Typography>
+                          </Box>
+                          <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.6, py: 0.2 }}>
+                            <Typography variant="caption" sx={{ fontSize: 10, ...((g.step ?? 0) !== 1 && { color: "#f44336", fontWeight: "bold" }) }}>{g.step ?? 0}S</Typography>
+                          </Box>
+                          <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.8, py: 0.2 }}>
+                            <Typography variant="caption" sx={{ fontSize: 10 }}>
+                              {(() => {
+                                const detail = betData?.globalhit?.details?.find((d) => d.pattern === pat && d.group === gi + 1);
+                                return detail ? `${detail.amount.toLocaleString()}P` : "0P";
+                              })()}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                      <Box sx={{ flexGrow: 1 }} />
+                    </Box>
+                    {collapsedPatterns[pat] && (
+                    <table style={{ borderCollapse: "collapse", borderSpacing: 0 }}>
+                      <tbody>
+                        {patData.groups.map((group, gi) => {
+                          const row1 = group.row1;
+                          const row2 = group.row2;
+                          return [
+                            gi > 0 && <tr key={`${gi}-gap`}><td colSpan={totalCols} style={{ height: 4, padding: 0 }} /></tr>,
+                            <tr key={`${gi}-0`}>
+                              {Array.from({ length: totalCols }, (_, colIdx) => {
+                                const dataIdx = colIdx - gi;
+                                const hasData = dataIdx >= 0 && dataIdx < row1.length;
+                                const isEmpty = colIdx < gi;
+                                const item = hasData ? row1[dataIdx] : null;
+                                const roundNum = item?.round;
+                                const isGroupEnd = hasData && (roundNum - gi) % 3 === 0;
+                                const base = hasData ? tdStyleFn(item.status) : (isEmpty ? tdStyleFn(null) : { width: cellSize, height: cellSize, border: "none", padding: 0 });
+                                const style = { ...base, ...(hasData && isGroupEnd && { borderRight: "2px solid #aaa" }) };
+                                return <td key={colIdx} style={style}>{hasData && <div style={circleStyle(roundNum - 1)}>{roundNum}</div>}</td>;
+                              })}
+                            </tr>,
+                            <tr key={`${gi}-1`}>
+                              {Array.from({ length: totalCols }, (_, colIdx) => {
+                                const hasData = colIdx < row2.length;
+                                const item = hasData ? row2[colIdx] : null;
+                                const roundNum = item?.round;
+                                const isGroupEnd = hasData && (roundNum - gi) % 3 === 0;
+                                const base = hasData ? tdStyleFn(item.status) : { width: cellSize, height: cellSize, border: "none", padding: 0 };
+                                const style = { ...base, ...(hasData && isGroupEnd && { borderRight: "2px solid #aaa" }) };
+                                return <td key={colIdx} style={style}>{hasData && <div style={circleStyle(roundNum - 1)}>{roundNum}</div>}</td>;
+                              })}
+                            </tr>,
+                          ];
+                        })}
+                      </tbody>
+                    </table>
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+          </>
         );
       })()}
 

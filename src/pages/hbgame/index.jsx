@@ -112,7 +112,7 @@ export default function HbGamePage() {
   // 게임 시작
   const startGame = useCallback(async () => {
     try {
-      const res = await apiCaller.post(HB_GAMES_API.START);
+      const res = await apiCaller.post(HB_GAMES_API.START + "?mode=admin");
       setGameId(res.data.game_id);
       setConfig(res.data.config);
       setGlobalhitData(res.data.globalhit || []);
@@ -135,7 +135,7 @@ export default function HbGamePage() {
     } else if (urlGameId) {
       restoreGame(parseInt(urlGameId));
     } else {
-      apiCaller.get(HB_GAMES_API.LAST_ACTIVE).then(async (res) => {
+      apiCaller.get(HB_GAMES_API.LAST_ACTIVE + "?mode=admin").then(async (res) => {
         if (cancelled) return;
         const game = res.data?.game;
         if (game && game.round_count > 0) {

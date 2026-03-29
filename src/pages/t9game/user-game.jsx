@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAtomValue } from "jotai";
+import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
 
 const GRID_ROWS = 6;
@@ -150,7 +152,7 @@ export default function GamePage() {
   const [globalhitData, setGlobalhitData] = useState([]);
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
-  const [cumPnL, setCumPnL] = useState({ tn: 0, gh: 0, pinch: 0 });
+  const [cumPnL, setCumPnL] = useState({ tn: 0, gh: 0, pinch: 0, user_a: 0, user_z: 0 });
   const [carryPnL, setCarryPnL] = useState({ tn: 0, gh: 0, pinch: 0 }); // next game 이월분
   const [toggles, setToggles] = useState({
     nor1: true,
@@ -168,10 +170,15 @@ export default function GamePage() {
   const [endingMode, setEndingMode] = useState(false);
   const [endingSnapshot, setEndingSnapshot] = useState(null); // { tn: bool, gh: Set<"PPP-0">, pinch: Set<"pattern"> }
   const [endingDone, setEndingDone] = useState(false); // 팝업 표시용
+  const [userSummary, setUserSummary] = useState(null);
+  const [userMartinDashboard, setUserMartinDashboard] = useState(null);
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [resumeGame, setResumeGame] = useState(null);
   const processingRef = useRef(false); // API 호출 중 잠금 (연타 방지)
+  const user = useAtomValue(userAtom);
+  const isAdmin = user?.role === "admin";
+  const [collapsedPatterns, setCollapsedPatterns] = useState({});
 
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
@@ -184,15 +191,17 @@ export default function GamePage() {
   // 게임 시작
   const startGame = useCallback(async () => {
     try {
-      const res = await apiCaller.post("/api/v1/games/start");
+      const res = await apiCaller.post("/api/v1/games/start?mode=user");
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       // 초기 픽 조회
       const pickRes = await apiCaller.post("/api/v1/pick", { seq: "" });
-      const { globalhit, bet, user_martin, ...pick } = pickRes.data;
+      const { globalhit, bet, user_martin, user_summary, user_martin_dashboard, ...pick } = pickRes.data;
       setPickResult(pick);
       setGlobalhitData(globalhit || []);
       setBetData(bet ? { ...bet, user_martin } : null);
+      setUserSummary(user_summary || null);
+      setUserMartinDashboard(user_martin_dashboard || null);
     } catch (err) {
       console.error("Failed to start game:", err);
     }
@@ -204,11 +213,13 @@ export default function GamePage() {
       const data = res.data;
       setGameId(data.game_id);
       setResults(data.results || []);
-      setCumPnL(data.cum_pnl || { tn: 0, gh: 0, pinch: 0 });
-      const { globalhit, bet, user_martin, results: _, cum_pnl: __, game_id: ___, config: ____, status, ending_snapshot: snap, ...pick } = data;
+      setCumPnL(data.cum_pnl || { tn: 0, gh: 0, pinch: 0, user_a: 0, user_z: 0 });
+      const { globalhit, bet, user_martin, user_summary, user_martin_dashboard, results: _, cum_pnl: __, game_id: ___, config: ____, status, ending_snapshot: snap, ...pick } = data;
       setPickResult({ method: pick.method, pick: pick.pick, match_start: pick.match_start, match_end: pick.match_end, matches: pick.matches, order: pick.order });
       setGlobalhitData(globalhit || []);
       setBetData(bet ? { ...bet, user_martin } : null);
+      setUserSummary(user_summary || null);
+      setUserMartinDashboard(user_martin_dashboard || null);
       if (status === "ending" && snap) {
         setEndingMode(true);
         setEndingSnapshot({
@@ -237,7 +248,7 @@ export default function GamePage() {
       restoreGame(parseInt(urlGameId));
     } else {
       // 직전 게임이 active면 복원 여부 확인
-      apiCaller.get("/api/v1/games/last-active").then(async (res) => {
+      apiCaller.get("/api/v1/games/last-active?mode=user").then(async (res) => {
         if (cancelled) return;
         const game = res.data?.game;
         if (game && game.round_count > 0) {
@@ -278,13 +289,17 @@ export default function GamePage() {
         tn: data.cum_pnl.tn,
         gh: data.cum_pnl.gh,
         pinch: data.cum_pnl.pinch,
+        user_a: data.cum_pnl.user_a || 0,
+        user_z: data.cum_pnl.user_z || 0,
       });
 
       // 다음 라운드 상태 갱신
-      const { globalhit, bet, user_martin: um, ...pick } = data;
+      const { globalhit, bet, user_martin: um, user_summary: uSummary, user_martin_dashboard: umDash, ...pick } = data;
       setPickResult({ method: pick.method, pick: pick.pick, match_start: pick.match_start, match_end: pick.match_end, matches: pick.matches, order: pick.order });
       setGlobalhitData(globalhit || []);
       setBetData(bet ? { ...bet, user_martin: um } : null);
+      setUserSummary(uSummary || null);
+      setUserMartinDashboard(umDash || null);
 
       // 종료 모드: 모든 추적 배팅이 step 1로 돌아왔는지 체크
       if (endingMode && endingSnapshot) {
@@ -316,12 +331,16 @@ export default function GamePage() {
         tn: data.cum_pnl.tn,
         gh: data.cum_pnl.gh,
         pinch: data.cum_pnl.pinch,
+        user_a: data.cum_pnl.user_a || 0,
+        user_z: data.cum_pnl.user_z || 0,
       });
 
-      const { globalhit, bet, user_martin: um2, status, ending_snapshot: snap, ...pick } = data;
+      const { globalhit, bet, user_martin: um2, user_summary: uSummary2, user_martin_dashboard: umDash2, status, ending_snapshot: snap, ...pick } = data;
       setPickResult({ method: pick.method, pick: pick.pick, match_start: pick.match_start, match_end: pick.match_end, matches: pick.matches, order: pick.order });
       setGlobalhitData(globalhit || []);
       setBetData(bet ? { ...bet, user_martin: um2 } : null);
+      setUserSummary(uSummary2 || null);
+      setUserMartinDashboard(umDash2 || null);
 
       // 엔딩 시점 이전으로 삭제되면 엔딩 모드 해제
       if (status === "active") {
@@ -438,9 +457,11 @@ export default function GamePage() {
     setEndingSnapshot(null);
     setEndingDone(false);
     setResults([]);
-    setCumPnL({ tn: 0, gh: 0, pinch: 0 });
+    setCumPnL({ tn: 0, gh: 0, pinch: 0, user_a: 0, user_z: 0 });
     setCarryPnL({ tn: 0, gh: 0, pinch: 0 });
     setBetData(null);
+    setUserSummary(null);
+    setUserMartinDashboard(null);
     setPickResult({ method: "wait", pick: null });
 
     setGlobalhitData([]);
@@ -468,9 +489,11 @@ export default function GamePage() {
     setEndingSnapshot(null);
     setEndingDone(false);
     setResults([]);
-    setCumPnL({ tn: 0, gh: 0, pinch: 0 });
+    setCumPnL({ tn: 0, gh: 0, pinch: 0, user_a: 0, user_z: 0 });
     setCarryPnL({ tn: 0, gh: 0, pinch: 0 });
     setBetData(null);
+    setUserSummary(null);
+    setUserMartinDashboard(null);
     setPickResult({ method: "wait", pick: null });
     setGlobalhitData([]);
 
@@ -488,6 +511,8 @@ export default function GamePage() {
       setEndingDone(false);
       setResults([]);
       setBetData(null);
+      setUserSummary(null);
+      setUserMartinDashboard(null);
       setPickResult({ method: "wait", pick: null });
       setGlobalhitData([]);
 
@@ -496,10 +521,11 @@ export default function GamePage() {
 
       // PnL 이월 복원
       if (res.data.carry_pnl) {
-        setCumPnL(res.data.carry_pnl);
-        setCarryPnL(res.data.carry_pnl);
+        const cp = res.data.carry_pnl;
+        setCumPnL({ tn: cp.tn || 0, gh: cp.gh || 0, pinch: cp.pinch || 0, user_a: cp.user_a || 0, user_z: cp.user_z || 0 });
+        setCarryPnL(cp);
       } else {
-        setCumPnL({ tn: 0, gh: 0, pinch: 0 });
+        setCumPnL({ tn: 0, gh: 0, pinch: 0, user_a: 0, user_z: 0 });
         setCarryPnL({ tn: 0, gh: 0, pinch: 0 });
       }
 
@@ -519,10 +545,12 @@ export default function GamePage() {
 
       // 초기 픽 조회
       const pickRes = await apiCaller.post("/api/v1/pick", { seq: "" });
-      const { globalhit, bet, user_martin: um3, ...pick } = pickRes.data;
+      const { globalhit, bet, user_martin: um3, user_summary: uSummary3, user_martin_dashboard: umDash3, ...pick } = pickRes.data;
       setPickResult(pick);
       setGlobalhitData(globalhit || []);
       setBetData(bet ? { ...bet, user_martin: um3 } : null);
+      setUserSummary(uSummary3 || null);
+      setUserMartinDashboard(umDash3 || null);
     } catch (err) {
       console.error("Failed to next game:", err);
     }
@@ -690,32 +718,62 @@ export default function GamePage() {
 
         return (
           <>
-          {/* 데스크톱: 상단 요약 바 */}
-          {!isMobile && (
+          {/* 데스크톱: 상단 요약 바 — 마틴A / 마틴Z 분리 */}
+          {!isMobile && isAdmin && (() => {
+            const umA = betData?.user_martin?.martin_a;
+            const umZ = betData?.user_martin?.martin_z;
+            const adminP = (tn?.P || 0) + (gh?.P || 0) + pinchP;
+            const adminB = (tn?.B || 0) + (gh?.B || 0) + pinchB;
+            const aDirRaw = umA?.direction || "wait";
+            const zDirRaw = umZ?.direction || "wait";
+            const fAP = adminP + (aDirRaw === "P" ? (umA?.amount || 0) : 0);
+            const fAB = adminB + (aDirRaw === "B" ? (umA?.amount || 0) : 0);
+            const fADir = fAP > fAB ? "P" : fAB > fAP ? "B" : "wait";
+            const fAColor = fADir === "P" ? "#1565c0" : fADir === "B" ? "#f44336" : "#888";
+            const fZP = adminP + (zDirRaw === "P" ? (umZ?.amount || 0) : 0);
+            const fZB = adminB + (zDirRaw === "B" ? (umZ?.amount || 0) : 0);
+            const fZDir = fZP > fZB ? "P" : fZB > fZP ? "B" : "wait";
+            const fZColor = fZDir === "P" ? "#1565c0" : fZDir === "B" ? "#f44336" : "#888";
+
+            const pnlText = (v) => { const n = v || 0; return `${n > 0 ? "+" : ""}${n.toLocaleString()}P`; };
+            const pnlClr = (v) => { const n = v || 0; return n > 0 ? "#4caf50" : n < 0 ? "#f44336" : "#fff"; };
+            const umAHasBet = (umA?.amount || 0) > 0;
+            const umZHasBet = (umZ?.amount || 0) > 0;
+            const ghHasBet = (gh?.P || 0) + (gh?.B || 0) > 0;
+            const sumA = (cumPnL.user_a || 0) + (cumPnL.gh || 0);
+            const sumZ = (cumPnL.user_z || 0) + (cumPnL.gh || 0);
+            const barSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1 };
+            const renderBar = (label, fDir, fColor, martinPnl, martinAct, ghPnlVal, total) => (
+              <Box sx={{ display: "flex", gap: 0.5, flex: 1 }}>
+                <Box sx={{ ...barSx, minWidth: 0, justifyContent: "center" }}>
+                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{`formal(${fDir})`}</Typography>
+                </Box>
+                <Box sx={{ ...barSx, border: `1px solid ${martinAct ? "rgba(255,255,255,0.3)" : "#333"}` }}>
+                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{label}</Typography>
+                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlClr(martinPnl) }}>{pnlText(martinPnl)}</Typography>
+                </Box>
+                <Box sx={{ ...barSx, border: `1px solid ${ghHasBet ? "rgba(255,255,255,0.3)" : "#333"}` }}>
+                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>GH</Typography>
+                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlClr(ghPnlVal) }}>{pnlText(ghPnlVal)}</Typography>
+                </Box>
+                <Box sx={{ backgroundColor: "#00bcd4", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end", minWidth: 80 }}>
+                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: total < 0 ? "#f44336" : "#000" }}>{pnlText(total)}</Typography>
+                </Box>
+              </Box>
+            );
+            return (
+              <Box sx={{ display: "flex", gap: 1, mb: 0.5 }}>
+                {renderBar("마틴A", fADir, fAColor, cumPnL.user_a, umAHasBet, cumPnL.gh, sumA)}
+                {renderBar("마틴Z", fZDir, fZColor, cumPnL.user_z, umZHasBet, cumPnL.gh, sumZ)}
+              </Box>
+            );
+          })()}
+          {/* 데스크톱: 비어드민 요약 바 */}
+          {!isMobile && !isAdmin && (
           <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5, mb: 0.5, flexWrap: "wrap" }}>
             <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 1.5, display: "flex", alignItems: "center" }}>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: dirColor }}>{`formal(${combinedDir})`}</Typography>
             </Box>
-            {(() => {
-              const tnHasBet = (betData?.triplenine?.amount || 0) > 0;
-              const ghHasBet = (betData?.globalhit?.P || 0) + (betData?.globalhit?.B || 0) > 0;
-              const pinchOn = betData?.pinch?.active || false;
-              const items = [
-                { name: "Triplenine", pnl: cumPnL.tn, active: tnHasBet },
-                { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
-                { name: "pinch", pnl: cumPnL.pinch, active: pinchOn },
-              ];
-              return items.map((item, i) => {
-                const clr = item.pnl > 0 ? "#4caf50" : item.pnl < 0 ? "#f44336" : "#fff";
-                const sign = item.pnl > 0 ? "+" : "";
-                return (
-                  <Box key={i} sx={{ border: `1px solid ${item.active ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, minWidth: 200, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{item.name}</Typography>
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: clr }}>{`${sign}${item.pnl.toLocaleString()}P`}</Typography>
-                  </Box>
-                );
-              });
-            })()}
             {(() => {
               const totalPnL = cumPnL.tn + cumPnL.gh + cumPnL.pinch;
               const sign = totalPnL > 0 ? "+" : "";
@@ -775,9 +833,232 @@ export default function GamePage() {
           </Box>
           )}
 
+          {isAdmin && (() => {
+            const umA = betData?.user_martin?.martin_a;
+            const umZ = betData?.user_martin?.martin_z;
+            const adminP = (tn?.direction === "P" ? (tn?.amount || 0) : 0) + (gh?.P || 0) + pinchP;
+            const adminB = (tn?.direction === "B" ? (tn?.amount || 0) : 0) + (gh?.B || 0) + pinchB;
+            const tnHasBet = (tn?.amount || 0) > 0;
+            const ghHasBet = (gh?.P || 0) + (gh?.B || 0) > 0;
+            const pinchHasBet = pinchP + pinchB > 0;
+            const tnDimStyle = tnHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+            const ghDimStyle = ghHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+            const martinTable = (label, um, labelColor, dash, isUnified) => {
+              const mDir = um?.direction || "wait";
+              const mAmt = um?.amount || 0;
+              const mP = mDir === "P" ? mAmt : 0;
+              const mB = mDir === "B" ? mAmt : 0;
+              const totalP = adminP + mP;
+              const totalB = adminB + mB;
+              const fDir = totalP > totalB ? "P" : totalB > totalP ? "B" : "wait";
+              const fColor = fDir === "P" ? "#1565c0" : fDir === "B" ? "#f44336" : "#888";
+              const mHasBet = mAmt > 0;
+              const mDimStyle = mHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+              return (
+                <Box sx={{ mb: 0.5 }}>
+                <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 4 }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ ...dcB, color: fColor }}>{`formal(${fDir})`}</td>
+                      <td style={{ ...dcB, color: labelColor, ...mDimStyle }}>{label}</td>
+                      <td style={{ ...dc, color: "#1565c0", ...mDimStyle }}>{`${mP.toLocaleString()}P`}</td>
+                      <td style={{ ...dc, color: "#f44336", ...mDimStyle }}>{`${mB.toLocaleString()}P`}</td>
+                      <td style={{ ...dcB, color: "#00bcd4", ...ghDimStyle }}>GH</td>
+                      <td style={{ ...dc, color: "#1565c0", ...ghDimStyle }}>{`${(gh?.P || 0).toLocaleString()}P`}</td>
+                      <td style={{ ...dc, color: "#f44336", ...ghDimStyle }}>{`${(gh?.B || 0).toLocaleString()}P`}</td>
+                      <td style={{ ...dcB, color: "#fff" }}>{currentTurn}</td>
+                      <td style={{ ...dc, color: "#1565c0" }}>{`${totalP.toLocaleString()}P`}</td>
+                      <td style={{ ...dc, color: "#f44336" }}>{`${totalB.toLocaleString()}P`}</td>
+                    </tr>
+                    {[[ghPatterns[0], ghPatterns[1]], [ghPatterns[2], ghPatterns[3]], [ghPatterns[4], ghPatterns[5]], [ghPatterns[6], ghPatterns[7]]].map((pair, ri) => (
+                      <tr key={`gh-${ri}`}>
+                        {pair.map((pat) =>
+                          [0, 1, 2].map((sec) => {
+                            const amt = getPatSec(pat, sec);
+                            const hasBet = amt > 0;
+                            const dimStyle = hasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+                            return (
+                              <React.Fragment key={`${pat}-${sec}`}>
+                                <td style={{ ...dc, ...dimStyle }}>
+                                  {pat.split("").map((c, ci) => (
+                                    <span key={ci} style={{ color: c === "P" ? "#1565c0" : "#f44336", fontWeight: "bold" }}>{c}</span>
+                                  ))}
+                                  {(() => {
+                                    const active = currentTurn >= sec + 1;
+                                    const predict = active ? pat[(currentTurn - 1 - sec) % pat.length] : null;
+                                    const clr = !active ? "#fff" : predict === "P" ? "#1565c0" : "#f44336";
+                                    return <span style={{ color: clr, fontSize: 9 }}>({sec + 1}sc)</span>;
+                                  })()}
+                                </td>
+                                {(() => {
+                                  const active = currentTurn >= sec + 1;
+                                  const predict = active ? pat[(currentTurn - 1 - sec) % pat.length] : null;
+                                  const clr = !active ? "#fff" : predict === "P" ? "#1565c0" : "#f44336";
+                                  return <td style={{ ...dc, color: clr, ...dimStyle }}>{`${amt.toLocaleString()}P`}</td>;
+                                })()}
+                              </React.Fragment>
+                            );
+                          })
+                        )}
+                      </tr>
+                    ))}
+                    <tr>
+                      <td style={{ ...dcB, color: pinchActive ? "#00bcd4" : "#555" }}>pinch</td>
+                      <td style={{ ...dcB, color: pinchActive ? "#00bcd4" : "#555" }}>mission</td>
+                      {Array.from({ length: 10 }, (_, i) => (
+                        <td key={i} style={{ ...dc, color: pinchActive ? "#4caf50" : "#555" }}>{i + 1}step</td>
+                      ))}
+                    </tr>
+                    {(pinch?.main_enable
+                      ? ["LongJ", "1LSC", "2LSC", "3LSC", "4LSC", "pattern1", "pattern2", "pattern3", "pattern4", "pattern5", "pattern6"]
+                      : ["pattern", "LongJ", "1LSC", "2LSC", "3LSC", "4LSC"]
+                    ).map((name) => {
+                      const pm = pinchMethods[name];
+                      const step = dash ? (isUnified ? (dash.step || 0) : (dash.steps?.[name] || 0)) : (pm?.step || 0);
+                      const remaining = pm?.remaining || 0;
+                      const dir = pm?.direction;
+                      const completed = pm?.completed || false;
+                      return (
+                        <tr key={name}>
+                          <td style={{ ...dc, color: pinchActive ? (completed ? "#4caf50" : dir ? "#39ff14" : "#555") : "#555", fontWeight: pinchActive && dir ? "bold" : "normal" }}>{name}</td>
+                          <td style={{ ...dc, color: pinchActive ? (completed ? "#4caf50" : "#f44336") : "#555", fontWeight: pinchActive ? "bold" : "normal" }}>
+                            {pinchActive ? (completed ? "done" : `-${remaining.toLocaleString()}P`) : "-"}
+                          </td>
+                          {Array.from({ length: 10 }, (_, i) => {
+                            const stepNum = i + 1;
+                            const isCurrentStep = pinchActive && !completed && stepNum === step;
+                            const isPastStep = pinchActive && !completed && stepNum < step;
+                            return (
+                              <td key={i} style={{ ...dc, color: !pinchActive ? "#555" : completed ? "#555" : isCurrentStep ? "#4caf50" : isPastStep ? "#f44336" : "#fff", fontWeight: isCurrentStep ? "bold" : "normal", backgroundColor: isCurrentStep ? "rgba(76,175,80,0.15)" : "transparent" }}>
+                                {stepNum}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                </Box>
+              );
+            };
+            return (
+              <>
+                {martinTable("마틴A", umA, "#1565c0", userMartinDashboard?.martin_a, false)}
+                {martinTable("마틴Z", umZ, "#c62828", userMartinDashboard?.martin_z, true)}
+              </>
+            );
+          })()}
+
           </>
         );
       })()}
+
+      {isAdmin && (
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+        {globalhitData.map((patData) => {
+          const pat = patData.pattern;
+          const cellSize = 20;
+          const colsPerRow = 30;
+          const totalCols = colsPerRow + 2;
+          const GH_CELL_BG = { hit: "#00e676", miss: "#ffeb3b", wait: "#555" };
+          const tdStyleFn = (status) => ({
+            width: cellSize, height: cellSize, border: "1px solid #555", padding: 0, textAlign: "center",
+            backgroundColor: GH_CELL_BG[status],
+          });
+          const circleStyle = (charIdx) => ({
+            width: cellSize - 2, height: cellSize - 2, borderRadius: "50%",
+            backgroundColor: pat[charIdx % pat.length] === "P" ? "#1565c0" : "#f44336",
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontSize: 9, fontWeight: "bold",
+          });
+          return (
+            <Box key={pat}>
+              <Box
+                onClick={() => setCollapsedPatterns((prev) => ({ ...prev, [pat]: !prev[pat] }))}
+                sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.5, border: "1px solid rgba(255,255,255,0.2)", backgroundColor: "background.paper", px: 0.5, py: 0.3, cursor: "pointer", "&:hover": { backgroundColor: "rgba(255,255,255,0.05)" } }}
+              >
+                <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 1, py: 0.2 }}>
+                  <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold" }}>
+                    {pat.split("").map((c, i) => (
+                      <Typography key={i} component="span" sx={{ color: c === "P" ? "#1565c0" : "#f44336", fontWeight: "bold", fontSize: 11 }}>{c}</Typography>
+                    ))}
+                    <Typography component="span" sx={{ fontSize: 10, color: "text.secondary" }}>(123)</Typography>
+                  </Typography>
+                </Box>
+                <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.8, py: 0.2 }}>
+                  <Typography variant="caption" sx={{ fontSize: 10 }}>{results.length}</Typography>
+                </Box>
+                {patData.groups.map((g, gi) => (
+                  <Box key={gi} sx={{ display: "flex", gap: 0.3, ml: gi > 0 ? 1 : 0 }}>
+                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.6, py: 0.2 }}>
+                      <Typography variant="caption" sx={{ fontSize: 10 }}>SC{gi + 1}</Typography>
+                    </Box>
+                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.6, py: 0.2 }}>
+                      <Typography variant="caption" sx={{ fontSize: 10, ...((g.step ?? 0) !== 1 && { color: "#f44336", fontWeight: "bold" }) }}>{g.step ?? 0}S</Typography>
+                    </Box>
+                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.8, py: 0.2 }}>
+                      <Typography variant="caption" sx={{ fontSize: 10 }}>
+                        {(() => {
+                          const detail = betData?.globalhit?.details?.find((d) => d.pattern === pat && d.group === gi + 1);
+                          return detail ? `${detail.amount.toLocaleString()}P` : "0P";
+                        })()}
+                      </Typography>
+                    </Box>
+                  </Box>
+                ))}
+                <Box sx={{ flexGrow: 1 }} />
+              </Box>
+              {collapsedPatterns[pat] && (
+              <table style={{ borderCollapse: "collapse", borderSpacing: 0 }}>
+                <tbody>
+                  {patData.groups.map((group, gi) => {
+                    const row1 = group.row1;
+                    const row2 = group.row2;
+                    return [
+                      gi > 0 && <tr key={`${gi}-gap`}><td colSpan={totalCols} style={{ height: 4, padding: 0 }} /></tr>,
+                      <tr key={`${gi}-0`}>
+                        {Array.from({ length: totalCols }, (_, colIdx) => {
+                          const dataIdx = colIdx - gi;
+                          const hasData = dataIdx >= 0 && dataIdx < row1.length;
+                          const isEmpty = colIdx < gi;
+                          const item = hasData ? row1[dataIdx] : null;
+                          const roundNum = item?.round;
+                          const isGroupEnd = hasData && (roundNum - gi) % 3 === 0;
+                          const base = hasData ? tdStyleFn(item.status) : (isEmpty ? tdStyleFn(null) : { width: cellSize, height: cellSize, border: "none", padding: 0 });
+                          const style = { ...base, ...(hasData && isGroupEnd && { borderRight: "2px solid #aaa" }) };
+                          return (
+                            <td key={colIdx} style={style}>
+                              {hasData && <div style={circleStyle(roundNum - 1)}>{roundNum}</div>}
+                            </td>
+                          );
+                        })}
+                      </tr>,
+                      <tr key={`${gi}-1`}>
+                        {Array.from({ length: totalCols }, (_, colIdx) => {
+                          const hasData = colIdx < row2.length;
+                          const item = hasData ? row2[colIdx] : null;
+                          const roundNum = item?.round;
+                          const isGroupEnd = hasData && (roundNum - gi) % 3 === 0;
+                          const base = hasData ? tdStyleFn(item.status) : { width: cellSize, height: cellSize, border: "none", padding: 0 };
+                          const style = { ...base, ...(hasData && isGroupEnd && { borderRight: "2px solid #aaa" }) };
+                          return (
+                            <td key={colIdx} style={style}>
+                              {hasData && <div style={circleStyle(roundNum - 1)}>{roundNum}</div>}
+                            </td>
+                          );
+                        })}
+                      </tr>,
+                    ];
+                  })}
+                </tbody>
+              </table>
+              )}
+            </Box>
+          );
+        })}
+      </Box>
+      )}
 
       {/* ED 종료 완료 팝업 */}
       {/* 새 게임 확인 대화상자 */}

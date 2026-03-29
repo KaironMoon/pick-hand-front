@@ -65,47 +65,103 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
         </ListItem>
       </List>
       <Divider sx={{ bgcolor: "military.border", my: 1 }} />
-      <List>
-        <ListItem disablePadding>
-          <ListItemButton onClick={() => {
-            if (user?.role === "admin") {
-              handleNavClick("/t9game");
-            } else {
-              alert("준비중입니다.");
-              if (isMobile && onMenuClose) onMenuClose();
-            }
-          }}>
-            <ListItemIcon><SportsEsportsIcon /></ListItemIcon>
-            <ListItemText primary="트리플나인" />
-          </ListItemButton>
-        </ListItem>
-        {user?.role === "admin" && (
-          <ListItem disablePadding>
-            <ListItemButton onClick={() => handleNavClick("/patterns")}>
-              <ListItemIcon><ViewListIcon /></ListItemIcon>
-              <ListItemText primary="패턴 관리" />
-            </ListItemButton>
-          </ListItem>
-        )}
-      </List>
-      <Divider sx={{ bgcolor: "military.border", my: 1 }} />
-      <List>
-        <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? "/hbgame" : "/hbgame/user")}>
-            <ListItemIcon><HiveIcon /></ListItemIcon>
-            <ListItemText primary="허니비" />
-          </ListItemButton>
-        </ListItem>
-      </List>
-      <Divider sx={{ bgcolor: "military.border", my: 1 }} />
-      <List>
-        <ListItem disablePadding>
-          <ListItemButton onClick={() => handleNavClick(user?.role === "admin" ? "/ghgame" : "/ghgame/user")}>
-            <ListItemIcon><PublicIcon /></ListItemIcon>
-            <ListItemText primary="글로벌히트" />
-          </ListItemButton>
-        </ListItem>
-      </List>
+      {user?.role === "admin" ? (
+        <>
+          {/* 트리플나인 */}
+          <List dense>
+            <ListItem disablePadding>
+              <ListItemButton disabled sx={{ pb: 0 }}>
+                <ListItemIcon><SportsEsportsIcon /></ListItemIcon>
+                <ListItemText primary="트리플나인" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/t9game")} sx={{ pl: 7 }}>
+                <ListItemText primary="어드민" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/t9game/user")} sx={{ pl: 7 }}>
+                <ListItemText primary="유저" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/patterns")} sx={{ pl: 7 }}>
+                <ListItemText primary="패턴 관리" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          {/* 허니비 */}
+          <List dense>
+            <ListItem disablePadding>
+              <ListItemButton disabled sx={{ pb: 0 }}>
+                <ListItemIcon><HiveIcon /></ListItemIcon>
+                <ListItemText primary="허니비" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/hbgame")} sx={{ pl: 7 }}>
+                <ListItemText primary="어드민" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/hbgame/user")} sx={{ pl: 7 }}>
+                <ListItemText primary="유저" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          {/* 글로벌히트 */}
+          <List dense>
+            <ListItem disablePadding>
+              <ListItemButton disabled sx={{ pb: 0 }}>
+                <ListItemIcon><PublicIcon /></ListItemIcon>
+                <ListItemText primary="글로벌히트" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/ghgame")} sx={{ pl: 7 }}>
+                <ListItemText primary="어드민" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/ghgame/user")} sx={{ pl: 7 }}>
+                <ListItemText primary="유저" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        </>
+      ) : (
+        <>
+          <List>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => { alert("준비중입니다."); if (isMobile && onMenuClose) onMenuClose(); }}>
+                <ListItemIcon><SportsEsportsIcon /></ListItemIcon>
+                <ListItemText primary="트리플나인" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          <List>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/hbgame/user")}>
+                <ListItemIcon><HiveIcon /></ListItemIcon>
+                <ListItemText primary="허니비" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          <List>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/ghgame/user")}>
+                <ListItemIcon><PublicIcon /></ListItemIcon>
+                <ListItemText primary="글로벌히트" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        </>
+      )}
       {user?.role === "admin" && (
         <>
           <Divider sx={{ bgcolor: "military.border", my: 1 }} />
