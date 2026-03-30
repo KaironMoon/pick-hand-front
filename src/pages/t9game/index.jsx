@@ -170,6 +170,7 @@ export default function GamePage() {
   const [endingDone, setEndingDone] = useState(false); // 팝업 표시용
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const processingRef = useRef(false); // API 호출 중 잠금 (연타 방지)
+  const [processing, setProcessing] = useState(false);
 
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
@@ -273,6 +274,7 @@ export default function GamePage() {
   const handleInput = async (inputValue) => {
     if (!gameId || processingRef.current) return;
     processingRef.current = true;
+    setProcessing(true);
 
     let status = "wait";
     if (pickResult.pick) {
@@ -288,6 +290,11 @@ export default function GamePage() {
         actual: inputValue,
       });
       const data = res.data;
+      if (data.round_num !== undefined && data.round_num !== results.length + 1) {
+        alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
+        window.location.reload();
+        return;
+      }
 
       // 서버에서 받은 누적 P&L
       setCumPnL({
@@ -313,6 +320,7 @@ export default function GamePage() {
       console.error("Failed to record round:", err);
     } finally {
       processingRef.current = false;
+      setProcessing(false);
     }
   };
 
@@ -320,6 +328,7 @@ export default function GamePage() {
   const handleDeleteOne = useCallback(async () => {
     if (results.length === 0 || !gameId || processingRef.current) return;
     processingRef.current = true;
+    setProcessing(true);
 
     try {
       const res = await apiCaller.delete(`/api/v1/games/${gameId}/last-round`);
@@ -346,6 +355,7 @@ export default function GamePage() {
       console.error("Failed to delete round:", err);
     } finally {
       processingRef.current = false;
+      setProcessing(false);
     }
   }, [results, gameId]);
 
@@ -497,34 +507,40 @@ export default function GamePage() {
 
   const handleNewGameConfirm = async () => {
     setShowNewConfirm(false);
-    // ?new 파라미터 제거
-    if (searchParams.get("new")) {
-      setSearchParams({}, { replace: true });
-    }
-    if (gameId && results.length > 0) {
-      try {
-        await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gameId } });
-      } catch (err) {
-        console.error("Failed to end game:", err);
+    setProcessing(true);
+    try {
+      // ?new 파라미터 제거
+      if (searchParams.get("new")) {
+        setSearchParams({}, { replace: true });
       }
+      if (gameId && results.length > 0) {
+        try {
+          await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gameId } });
+        } catch (err) {
+          console.error("Failed to end game:", err);
+        }
+      }
+
+      setEndingMode(false);
+      setEndingSnapshot(null);
+      setEndingDone(false);
+      setResults([]);
+      setCumPnL({ tn: 0, gh: 0, pinch: 0 });
+      setCarryPnL({ tn: 0, gh: 0, pinch: 0 });
+      setBetData(null);
+      setPickResult({ method: "wait", pick: null });
+      setGlobalhitData([]);
+
+      await startGame();
+    } finally {
+      setProcessing(false);
     }
-
-    setEndingMode(false);
-    setEndingSnapshot(null);
-    setEndingDone(false);
-    setResults([]);
-    setCumPnL({ tn: 0, gh: 0, pinch: 0 });
-    setCarryPnL({ tn: 0, gh: 0, pinch: 0 });
-    setBetData(null);
-    setPickResult({ method: "wait", pick: null });
-    setGlobalhitData([]);
-
-    await startGame();
   };
 
   // next game: 서버가 carry-over를 자체 구성하여 처리
   const handleNextGame = async () => {
     if (!gameId) return;
+    setProcessing(true);
 
     try {
       const res = await apiCaller.post("/api/v1/games/next", null, { params: { game_id: gameId } });
@@ -570,6 +586,8 @@ export default function GamePage() {
       setBetData(bet || null);
     } catch (err) {
       console.error("Failed to next game:", err);
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -717,8 +735,9 @@ export default function GamePage() {
           sx={{
             width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
             backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold", cursor: "pointer",
-            "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
+            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
+            cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
+            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >P</Box>
         <Box
@@ -726,14 +745,15 @@ export default function GamePage() {
           sx={{
             width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
             backgroundColor: "#f44336", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold", cursor: "pointer",
-            "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
+            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
+            cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
+            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >B</Box>
         <Box sx={{ width: isMobile ? 32 : 0 }} />
         <Box
-          onClick={results.length > 0 ? handleDeleteOne : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4 }}
+          onClick={results.length > 0 && !processing ? handleDeleteOne : undefined}
+          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
@@ -744,12 +764,12 @@ export default function GamePage() {
           <Typography variant="caption" sx={{ fontSize: isMobile ? 8 : 10, lineHeight: 1.2, textAlign: "center" }}>현게임{"\n"}설정</Typography>
         </Box>
         <Box
-          onClick={results.length > 0 ? () => setShowNextConfirm(true) : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}
+          onClick={results.length > 0 && !processing ? () => setShowNextConfirm(true) : undefined}
+          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto", border: "2px solid rgba(255,255,255,0.3)" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
         </Box>
-        <Box onClick={handleNewGame} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #2196f3" }}>
+        <Box onClick={!processing ? handleNewGame : undefined} sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto", border: "2px solid #2196f3" }}>
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
         </Box>
       </Box>

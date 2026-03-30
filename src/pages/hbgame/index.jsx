@@ -95,6 +95,7 @@ export default function HbGamePage() {
   const [endingDone, setEndingDone] = useState(false);
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const processingRef = useRef(false);
+  const [processing, setProcessing] = useState(false);
 
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
@@ -185,6 +186,7 @@ export default function HbGamePage() {
   const handleInput = async (inputValue) => {
     if (!gameId || processingRef.current) return;
     processingRef.current = true;
+    setProcessing(true);
 
     let status = "wait";
     if (pickResult.pick) {
@@ -195,6 +197,11 @@ export default function HbGamePage() {
     try {
       const res = await apiCaller.post(HB_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
       const data = res.data;
+      if (data.round_num !== undefined && data.round_num !== results.length + 1) {
+        alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
+        window.location.reload();
+        return;
+      }
       setCumPnL({ hb: data.cum_pnl.hb, gh: data.cum_pnl.gh });
       setPickResult({ method: data.method, pick: data.pick, nickname: data.nickname });
       setHbPatterns(data.hb_patterns || {});
@@ -209,6 +216,7 @@ export default function HbGamePage() {
       console.error("Failed to record round:", err);
     } finally {
       processingRef.current = false;
+      setProcessing(false);
     }
   };
 
@@ -289,6 +297,7 @@ export default function HbGamePage() {
   const handleDeleteOne = useCallback(async () => {
     if (results.length === 0 || !gameId || processingRef.current) return;
     processingRef.current = true;
+    setProcessing(true);
     try {
       const res = await apiCaller.delete(HB_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
@@ -307,12 +316,14 @@ export default function HbGamePage() {
       console.error("Failed to delete last round:", err);
     } finally {
       processingRef.current = false;
+      setProcessing(false);
     }
   }, [gameId, results]);
 
   // next game
   const handleNextGame = async () => {
-    if (!gameId || results.length === 0) return;
+    if (!gameId || results.length === 0 || processing) return;
+    setProcessing(true);
     try {
       const res = await apiCaller.post(HB_GAMES_API.NEXT, null, { params: { game_id: gameId } });
       setEndingDone(false);
@@ -335,6 +346,8 @@ export default function HbGamePage() {
     } catch (err) {
       const msg = err.response?.data?.detail || "다음 게임 전환에 실패했습니다";
       alert(msg);
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -344,14 +357,19 @@ export default function HbGamePage() {
   const handleNewGame = () => setShowNewConfirm(true);
   const handleNewGameConfirm = async () => {
     setShowNewConfirm(false);
-    if (gameId && results.length > 0) {
-      try { await apiCaller.post(HB_GAMES_API.END, { game_id: gameId, actual: "P" }); } catch {}
+    setProcessing(true);
+    try {
+      if (gameId && results.length > 0) {
+        try { await apiCaller.post(HB_GAMES_API.END, { game_id: gameId, actual: "P" }); } catch {}
+      }
+      setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
+      setResults([]); setCumPnL({ hb: 0, gh: 0 }); setBetData(null);
+      setPickResult({ method: "wait", pick: null, nickname: null });
+      setHbPatterns({}); setGlobalhitData([]);
+      await startGame();
+    } finally {
+      setProcessing(false);
     }
-    setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ hb: 0, gh: 0 }); setBetData(null);
-    setPickResult({ method: "wait", pick: null, nickname: null });
-    setHbPatterns({}); setGlobalhitData([]);
-    await startGame();
   };
 
   // 패턴×스텝 표시할 패턴 목록
@@ -452,8 +470,10 @@ export default function HbGamePage() {
           sx={{
             width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
             backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold", cursor: "pointer",
-            "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
+            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
+            cursor: processing ? "not-allowed" : "pointer",
+            opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
+            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >P</Box>
         <Box
@@ -461,14 +481,16 @@ export default function HbGamePage() {
           sx={{
             width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
             backgroundColor: "#f44336", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold", cursor: "pointer",
-            "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
+            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
+            cursor: processing ? "not-allowed" : "pointer",
+            opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
+            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >B</Box>
         <Box sx={{ width: isMobile ? 32 : 0 }} />
         <Box
-          onClick={results.length > 0 ? handleDeleteOne : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4 }}
+          onClick={results.length > 0 && !processing ? handleDeleteOne : undefined}
+          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
@@ -479,12 +501,12 @@ export default function HbGamePage() {
           <Typography variant="caption" sx={{ fontSize: isMobile ? 8 : 10, lineHeight: 1.2, textAlign: "center" }}>현게임{"\n"}설정</Typography>
         </Box>
         <Box
-          onClick={results.length > 0 ? () => setShowNextConfirm(true) : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}
+          onClick={results.length > 0 && !processing ? () => setShowNextConfirm(true) : undefined}
+          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto", border: "2px solid rgba(255,255,255,0.3)" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
         </Box>
-        <Box onClick={handleNewGame} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #2196f3" }}>
+        <Box onClick={!processing ? handleNewGame : undefined} sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto", border: "2px solid #2196f3" }}>
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
         </Box>
       </Box>

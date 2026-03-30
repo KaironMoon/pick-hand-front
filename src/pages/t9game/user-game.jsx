@@ -176,12 +176,28 @@ export default function GamePage() {
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [resumeGame, setResumeGame] = useState(null);
   const processingRef = useRef(false); // API 호출 중 잠금 (연타 방지)
+  const [processing, setProcessing] = useState(false);
+  const goalAlertedRef = useRef({ a: false, z: false });
+  const [goalDialog, setGoalDialog] = useState({ open: false, msgs: [] });
   const user = useAtomValue(userAtom);
   const isAdmin = user?.role === "admin";
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
 
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
+
+  const checkGoalAlert = useCallback((summary) => {
+    if (!summary) return;
+    const ref = goalAlertedRef.current;
+    const aReached = summary.martin_a?.goal_reached;
+    const zReached = summary.martin_z?.goal_reached;
+    const msgs = [];
+    if (aReached && !ref.a) msgs.push("마틴 A");
+    if (zReached && !ref.z) msgs.push("마틴 Z");
+    ref.a = !!aReached;
+    ref.z = !!zReached;
+    if (msgs.length > 0) setGoalDialog({ open: true, msgs });
+  }, []);
 
   // 픽 이미지 결정
   // combined direction (서버에서 TN+GH+핀치 합산)
@@ -268,6 +284,7 @@ export default function GamePage() {
   const handleInput = async (inputValue) => {
     if (!gameId || processingRef.current) return;
     processingRef.current = true;
+    setProcessing(true);
 
     let status = "wait";
     if (pickResult.pick) {
@@ -283,6 +300,11 @@ export default function GamePage() {
         actual: inputValue,
       });
       const data = res.data;
+      if (data.round_num !== undefined && data.round_num !== results.length + 1) {
+        alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
+        window.location.reload();
+        return;
+      }
 
       // 서버에서 받은 누적 P&L
       setCumPnL({
@@ -300,6 +322,7 @@ export default function GamePage() {
       setBetData(bet ? { ...bet, user_martin: um } : null);
       setUserSummary(uSummary || null);
       setUserMartinDashboard(umDash || null);
+      checkGoalAlert(uSummary);
 
       // 종료 모드: 모든 추적 배팅이 step 1로 돌아왔는지 체크
       if (endingMode && endingSnapshot) {
@@ -314,6 +337,7 @@ export default function GamePage() {
       alert("서버 오류로 입력이 반영되지 않았습니다. 다시 시도해주세요.");
     } finally {
       processingRef.current = false;
+      setProcessing(false);
     }
   };
 
@@ -321,6 +345,7 @@ export default function GamePage() {
   const handleDeleteOne = useCallback(async () => {
     if (results.length === 0 || !gameId || processingRef.current) return;
     processingRef.current = true;
+    setProcessing(true);
 
     try {
       const res = await apiCaller.delete(`/api/v1/games/${gameId}/last-round`);
@@ -351,6 +376,7 @@ export default function GamePage() {
       console.error("Failed to delete round:", err);
     } finally {
       processingRef.current = false;
+      setProcessing(false);
     }
   }, [results, gameId]);
 
@@ -477,32 +503,38 @@ export default function GamePage() {
   };
 
   const handleNewGame = async () => {
-    if (gameId && results.length > 0) {
-      try {
-        await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gameId } });
-      } catch (err) {
-        console.error("Failed to end game:", err);
+    setProcessing(true);
+    try {
+      if (gameId && results.length > 0) {
+        try {
+          await apiCaller.post("/api/v1/games/end", null, { params: { game_id: gameId } });
+        } catch (err) {
+          console.error("Failed to end game:", err);
+        }
       }
+
+      setEndingMode(false);
+      setEndingSnapshot(null);
+      setEndingDone(false);
+      setResults([]);
+      setCumPnL({ tn: 0, gh: 0, pinch: 0, user_a: 0, user_z: 0 });
+      setCarryPnL({ tn: 0, gh: 0, pinch: 0 });
+      setBetData(null);
+      setUserSummary(null);
+      setUserMartinDashboard(null);
+      setPickResult({ method: "wait", pick: null });
+      setGlobalhitData([]);
+
+      await startGame();
+    } finally {
+      setProcessing(false);
     }
-
-    setEndingMode(false);
-    setEndingSnapshot(null);
-    setEndingDone(false);
-    setResults([]);
-    setCumPnL({ tn: 0, gh: 0, pinch: 0, user_a: 0, user_z: 0 });
-    setCarryPnL({ tn: 0, gh: 0, pinch: 0 });
-    setBetData(null);
-    setUserSummary(null);
-    setUserMartinDashboard(null);
-    setPickResult({ method: "wait", pick: null });
-    setGlobalhitData([]);
-
-    await startGame();
   };
 
   // next game: 서버가 carry-over를 자체 구성하여 처리
   const handleNextGame = async () => {
     if (!gameId) return;
+    setProcessing(true);
 
     try {
       const res = await apiCaller.post("/api/v1/games/next", null, { params: { game_id: gameId } });
@@ -553,6 +585,8 @@ export default function GamePage() {
       setUserMartinDashboard(umDash3 || null);
     } catch (err) {
       console.error("Failed to next game:", err);
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -645,8 +679,9 @@ export default function GamePage() {
           sx={{
             width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
             backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold", cursor: "pointer",
-            "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
+            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
+            cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
+            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >P</Box>
         <Box
@@ -654,27 +689,28 @@ export default function GamePage() {
           sx={{
             width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
             backgroundColor: "#f44336", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold", cursor: "pointer",
-            "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
+            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
+            cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
+            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >B</Box>
 
         {/* del/next/new/셋업 */}
         <Box
-          onClick={results.length > 0 ? handleDeleteOne : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4 }}
+          onClick={results.length > 0 && !processing ? handleDeleteOne : undefined}
+          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
         <Box
-          onClick={results.length > 0 ? () => setShowNextConfirm(true) : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}
+          onClick={results.length > 0 && !processing ? () => setShowNextConfirm(true) : undefined}
+          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto", border: "2px solid rgba(255,255,255,0.3)" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
         </Box>
         <Box
-          onClick={() => setShowNewConfirm(true)}
-          sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #2196f3" }}
+          onClick={!processing ? () => setShowNewConfirm(true) : undefined}
+          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto", border: "2px solid #2196f3" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
         </Box>
@@ -1120,6 +1156,41 @@ export default function GamePage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleFinishGame} variant="contained">새 게임 시작</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={goalDialog.open} onClose={() => setGoalDialog({ open: false, msgs: [] })}>
+        <DialogTitle sx={{ fontWeight: "bold" }}>목표금액 도달</DialogTitle>
+        <DialogContent>
+          <Typography>목표금액에 도달하여 배팅이 정지됩니다.</Typography>
+          <Box sx={{ mt: 2 }}>
+            {[
+              { name: "마틴A", pnl: cumPnL.user_a },
+              { name: "마틴Z", pnl: cumPnL.user_z },
+              { name: "Triplenine", pnl: cumPnL.tn },
+              { name: "Globalhit", pnl: cumPnL.gh },
+              { name: "Pinch", pnl: cumPnL.pinch },
+            ].map((item) => (
+              <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
+                {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
+              </Typography>
+            ))}
+            {(() => { const t = cumPnL.user_a + cumPnL.user_z + cumPnL.tn + cumPnL.gh + cumPnL.pinch; return (
+              <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
+                Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
+              </Typography>
+            ); })()}
+          </Box>
+          <Box sx={{ mt: 2 }}>
+            {goalDialog.msgs.map((m) => (
+              <Typography key={m} sx={{ fontSize: "0.85rem", color: "text.secondary" }}>
+                * {m} 배팅 정지
+              </Typography>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setGoalDialog({ open: false, msgs: [] })} variant="contained">확인</Button>
         </DialogActions>
       </Dialog>
     </Box>

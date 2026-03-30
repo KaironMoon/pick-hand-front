@@ -92,6 +92,7 @@ export default function GhGamePage() {
   const [endingDone, setEndingDone] = useState(false);
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const processingRef = useRef(false);
+  const [processing, setProcessing] = useState(false);
 
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
@@ -171,6 +172,7 @@ export default function GhGamePage() {
   const handleInput = async (inputValue) => {
     if (!gameId || processingRef.current) return;
     processingRef.current = true;
+    setProcessing(true);
 
     let status = "wait";
     const pick = betData?.combined?.direction;
@@ -182,6 +184,11 @@ export default function GhGamePage() {
     try {
       const res = await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
       const data = res.data;
+      if (data.round_num !== undefined && data.round_num !== results.length + 1) {
+        alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
+        window.location.reload();
+        return;
+      }
       setCumPnL({ gh: data.cum_pnl.gh });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
@@ -194,6 +201,7 @@ export default function GhGamePage() {
       console.error("Failed to record round:", err);
     } finally {
       processingRef.current = false;
+      setProcessing(false);
     }
   };
 
@@ -263,6 +271,7 @@ export default function GhGamePage() {
   const handleDeleteOne = useCallback(async () => {
     if (results.length === 0 || !gameId || processingRef.current) return;
     processingRef.current = true;
+    setProcessing(true);
     try {
       const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
@@ -279,12 +288,14 @@ export default function GhGamePage() {
       console.error("Failed to delete last round:", err);
     } finally {
       processingRef.current = false;
+      setProcessing(false);
     }
   }, [gameId, results]);
 
   // next game
   const handleNextGame = async () => {
     if (!gameId || results.length === 0) return;
+    setProcessing(true);
     try {
       const res = await apiCaller.post(GH_GAMES_API.NEXT, null, { params: { game_id: gameId } });
       setEndingDone(false);
@@ -304,6 +315,8 @@ export default function GhGamePage() {
       }
     } catch (err) {
       console.error("Failed to next game:", err);
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -313,13 +326,18 @@ export default function GhGamePage() {
   const handleNewGame = () => setShowNewConfirm(true);
   const handleNewGameConfirm = async () => {
     setShowNewConfirm(false);
-    if (gameId && results.length > 0) {
-      try { await apiCaller.post(GH_GAMES_API.END, { game_id: gameId, actual: "P" }); } catch {}
+    setProcessing(true);
+    try {
+      if (gameId && results.length > 0) {
+        try { await apiCaller.post(GH_GAMES_API.END, { game_id: gameId, actual: "P" }); } catch {}
+      }
+      setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
+      setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
+      setGlobalhitData([]);
+      await startGame();
+    } finally {
+      setProcessing(false);
     }
-    setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
-    setGlobalhitData([]);
-    await startGame();
   };
 
   return (
@@ -405,8 +423,9 @@ export default function GhGamePage() {
           sx={{
             width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
             backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold", cursor: "pointer",
-            "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
+            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
+            cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
+            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >P</Box>
         <Box
@@ -414,14 +433,15 @@ export default function GhGamePage() {
           sx={{
             width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
             backgroundColor: "#f44336", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold", cursor: "pointer",
-            "&:hover": { opacity: 0.85 }, "&:active": { transform: "scale(0.95)" },
+            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
+            cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
+            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >B</Box>
         <Box sx={{ width: isMobile ? 32 : 0 }} />
         <Box
-          onClick={results.length > 0 ? handleDeleteOne : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4 }}
+          onClick={results.length > 0 && !processing ? handleDeleteOne : undefined}
+          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
         </Box>
@@ -432,12 +452,12 @@ export default function GhGamePage() {
           <Typography variant="caption" sx={{ fontSize: isMobile ? 8 : 10, lineHeight: 1.2, textAlign: "center" }}>{"현게임\n설정"}</Typography>
         </Box>
         <Box
-          onClick={results.length > 0 ? () => setShowNextConfirm(true) : undefined}
-          sx={{ ...controlBtnSx, cursor: results.length > 0 ? "pointer" : "default", opacity: results.length > 0 ? 1 : 0.4, border: "2px solid rgba(255,255,255,0.3)" }}
+          onClick={results.length > 0 && !processing ? () => setShowNextConfirm(true) : undefined}
+          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto", border: "2px solid rgba(255,255,255,0.3)" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
         </Box>
-        <Box onClick={handleNewGame} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #2196f3" }}>
+        <Box onClick={!processing ? handleNewGame : undefined} sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto", border: "2px solid #2196f3" }}>
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
         </Box>
       </Box>
