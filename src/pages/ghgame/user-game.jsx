@@ -422,6 +422,15 @@ export default function GhUserGamePage() {
                 {betData?.user_martin?.martin_z?.amount ? `${betData.user_martin.martin_z.amount.toLocaleString()}${betData.user_martin.martin_z.direction || ""}` : "0"}
               </Typography>
             </Box>
+            {(() => {
+              const dashZ = userMartinDashboard?.martin_z;
+              const zStep = dashZ?.step || dashZ?.step_min || 1;
+              return (
+                <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2 }}>
+                  <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#ffeb3b" }}>{zStep}S</Typography>
+                </Box>
+              );
+            })()}
           </Box>
         </Box>
 
@@ -763,10 +772,43 @@ export default function GhUserGamePage() {
                   </Box>
                 );
               };
+              /* ── 마틴Z 간소화: 단계 + 금액만 표시 ── */
+              const martinZSimple = () => {
+                if (!umZ && !dashZ) return null;
+                const mDir = umZ?.direction || "wait";
+                const mAmt = umZ?.amount || 0;
+                const mP = mDir === "P" ? mAmt : 0;
+                const mB = mDir === "B" ? mAmt : 0;
+                const fDir = mP > mB ? "P" : mB > mP ? "B" : "wait";
+                const fColor = fDir === "P" ? "#1565c0" : fDir === "B" ? "#f44336" : "#888";
+                const mHasBet = mAmt > 0;
+                const mDimStyle = mHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+                const amounts = dashZ?.amounts || [];
+                const stepMin = dashZ?.step_min || 1;
+                const curStep = dashZ?.step || stepMin;
+                const curAmt = (curStep >= 1 && curStep <= amounts.length) ? amounts[curStep - 1] : 0;
+                return (
+                  <Box sx={{ mb: 0.5 }}>
+                    <table style={{ borderCollapse: "collapse", width: "fit-content" }}>
+                      <tbody>
+                        <tr>
+                          <td style={{ ...dcB, color: fColor }}>{`formal(${fDir})`}</td>
+                          <td style={{ ...dcB, color: "#c62828", ...mDimStyle }}>마틴Z</td>
+                          <td style={{ ...dc, color: "#1565c0", ...mDimStyle }}>{`${mP.toLocaleString()}P`}</td>
+                          <td style={{ ...dc, color: "#f44336", ...mDimStyle }}>{`${mB.toLocaleString()}P`}</td>
+                          <td style={{ ...dcB, color: "#fff" }}>{currentTurn}</td>
+                          <td style={{ ...dcB, color: "#ffeb3b" }}>{`${curStep}S`}</td>
+                          <td style={{ ...dc, color: "#ffeb3b", fontWeight: "bold" }}>{`${curAmt.toLocaleString()}P`}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </Box>
+                );
+              };
               return (
                 <>
                   {martinTable("마틴A", umA, "#1565c0", dashA, false)}
-                  {martinTable("마틴Z", umZ, "#c62828", dashZ, true)}
+                  {martinZSimple()}
                 </>
               );
             })()}
@@ -901,7 +943,6 @@ export default function GhUserGamePage() {
               return (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   {renderPatternBlock("마틴A", "#1565c0", dashA, false)}
-                  {renderPatternBlock("마틴Z", "#c62828", dashZ, true)}
                 </Box>
               );
             })()}
