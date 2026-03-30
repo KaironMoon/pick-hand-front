@@ -158,9 +158,14 @@ export default function HbGamePage() {
       setGameId(data.game_id);
       setConfig(data.config);
       setCumPnL(data.cum_pnl || { hb: 0, gh: 0 });
-      // results 복원
+      // results 복원 (pick vs actual 비교로 hit/miss 판정)
       const seq = data.seq || "";
-      const restoredResults = seq.split("").map((v, i) => ({ value: v, status: "wait" }));
+      const picks = data.round_picks || [];
+      const restoredResults = seq.split("").map((v, i) => {
+        const pick = picks[i];
+        const st = pick ? (v === pick ? "hit" : "miss") : "wait";
+        return { value: v, status: st };
+      });
       setResults(restoredResults);
       setPickResult({ method: data.method, pick: data.pick, nickname: data.nickname });
       setHbPatterns(data.hb_patterns || {});
@@ -328,7 +333,8 @@ export default function HbGamePage() {
         setEndingMode(false); setEndingSnapshot(null);
       }
     } catch (err) {
-      console.error("Failed to next game:", err);
+      const msg = err.response?.data?.detail || "다음 게임 전환에 실패했습니다";
+      alert(msg);
     }
   };
 

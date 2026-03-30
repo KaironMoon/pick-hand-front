@@ -148,7 +148,12 @@ export default function GhGamePage() {
       setConfig(data.config);
       setCumPnL(data.cum_pnl || { gh: 0 });
       const seq = data.seq || "";
-      const restoredResults = seq.split("").map((v) => ({ value: v, status: "wait" }));
+      const picks = data.round_picks || [];
+      const restoredResults = seq.split("").map((v, i) => {
+        const pick = picks[i];
+        const st = pick ? (v === pick ? "hit" : "miss") : "wait";
+        return { value: v, status: st };
+      });
       setResults(restoredResults);
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
