@@ -119,7 +119,12 @@ export default function GhUserGamePage() {
     if (msgs.length > 0) setGoalDialog({ open: true, msgs });
   }, []);
 
-  const displayPick = betData?.combined?.direction && betData.combined.direction !== "wait" ? betData.combined.direction : null;
+  const displayPick = (() => {
+    const umComb = betData?.user_martin?.combined?.direction;
+    if (umComb && umComb !== "wait") return umComb;
+    const adComb = betData?.combined?.direction;
+    return adComb && adComb !== "wait" ? adComb : null;
+  })();
   const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
   const startGame = useCallback(async () => {
@@ -196,7 +201,7 @@ export default function GhUserGamePage() {
     setProcessing(true);
 
     let status = "wait";
-    const pick = betData?.combined?.direction;
+    const pick = betData?.user_martin?.combined?.direction || betData?.combined?.direction;
     if (pick && pick !== "wait") {
       status = pick === inputValue ? "hit" : "miss";
     }
