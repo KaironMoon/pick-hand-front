@@ -169,7 +169,7 @@ export default function GhUserGamePage() {
 
   const restoreGame = async (gid) => {
     try {
-      const res = await apiCaller.get(GH_GAMES_API.STATE(gid));
+      const res = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user");
       const data = res.data;
       setGameId(data.game_id);
       setConfig(data.config);
@@ -427,15 +427,6 @@ export default function GhUserGamePage() {
                 {betData?.user_martin?.martin_z?.amount ? `${betData.user_martin.martin_z.amount.toLocaleString()}${betData.user_martin.martin_z.direction || ""}` : "0"}
               </Typography>
             </Box>
-            {(() => {
-              const dashZ = userMartinDashboard?.martin_z;
-              const zStep = dashZ?.step || dashZ?.step_min || 1;
-              return (
-                <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2 }}>
-                  <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#ffeb3b" }}>{zStep}S</Typography>
-                </Box>
-              );
-            })()}
           </Box>
         </Box>
 

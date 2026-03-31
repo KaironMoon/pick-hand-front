@@ -174,7 +174,7 @@ export default function HbUserGamePage() {
 
   const restoreGame = async (gid) => {
     try {
-      const res = await apiCaller.get(HB_GAMES_API.STATE(gid));
+      const res = await apiCaller.get(HB_GAMES_API.STATE(gid) + "?mode=user");
       const data = res.data;
       setGameId(data.game_id);
       setConfig(data.config);

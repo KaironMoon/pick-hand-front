@@ -225,7 +225,7 @@ export default function GamePage() {
 
   const restoreGame = async (gid) => {
     try {
-      const res = await apiCaller.get(`/api/v1/games/${gid}/state`);
+      const res = await apiCaller.get(`/api/v1/games/${gid}/state?mode=user`);
       const data = res.data;
       setGameId(data.game_id);
       setResults(data.results || []);
