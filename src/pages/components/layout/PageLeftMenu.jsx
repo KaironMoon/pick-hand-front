@@ -1,4 +1,5 @@
-import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider, Button } from "@mui/material";
+import { useState, useEffect } from "react";
+import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider, Button, Dialog, DialogTitle, DialogContent, DialogActions, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
 import InfoIcon from "@mui/icons-material/Info";
@@ -8,21 +9,39 @@ import HiveIcon from "@mui/icons-material/Hive";
 import PublicIcon from "@mui/icons-material/Public";
 import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
+import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
 
 import { useNavigate } from "react-router-dom";
 import { useAtomValue, useSetAtom } from "jotai";
 import { userAtom, logoutAtom } from "@/store/auth-store";
+import { blockedGamesAtom, fetchBlockedGamesAtom } from "@/store/app-settings-store";
 
 function PageLeftMenu({ isMobile, onMenuClose }) {
   const theme = useTheme();
   const navigate = useNavigate();
   const user = useAtomValue(userAtom);
   const logout = useSetAtom(logoutAtom);
+  const blockedGames = useAtomValue(blockedGamesAtom);
+  const fetchBlocked = useSetAtom(fetchBlockedGamesAtom);
+  const [popupOpen, setPopupOpen] = useState(false);
+
+  useEffect(() => {
+    fetchBlocked();
+  }, [fetchBlocked]);
 
   const handleNavClick = (path) => {
     navigate(path);
     if (isMobile && onMenuClose) onMenuClose();
+  };
+
+  const handleUserGameClick = (gameKey, path) => {
+    if (blockedGames.includes(gameKey)) {
+      setPopupOpen(true);
+      if (isMobile && onMenuClose) onMenuClose();
+    } else {
+      handleNavClick(path);
+    }
   };
 
   const handleLogout = async () => {
@@ -136,7 +155,7 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
         <>
           <List>
             <ListItem disablePadding>
-              <ListItemButton onClick={() => { alert("준비중입니다."); if (isMobile && onMenuClose) onMenuClose(); }}>
+              <ListItemButton onClick={() => handleUserGameClick("t9", "/t9game/user")}>
                 <ListItemIcon><SportsEsportsIcon /></ListItemIcon>
                 <ListItemText primary="트리플나인" />
               </ListItemButton>
@@ -145,7 +164,7 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
           <Divider sx={{ bgcolor: "military.border", my: 1 }} />
           <List>
             <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/hbgame/user")}>
+              <ListItemButton onClick={() => handleUserGameClick("hb", "/hbgame/user")}>
                 <ListItemIcon><HiveIcon /></ListItemIcon>
                 <ListItemText primary="허니비" />
               </ListItemButton>
@@ -154,7 +173,7 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
           <Divider sx={{ bgcolor: "military.border", my: 1 }} />
           <List>
             <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/ghgame/user")}>
+              <ListItemButton onClick={() => handleUserGameClick("gh", "/ghgame/user")}>
                 <ListItemIcon><PublicIcon /></ListItemIcon>
                 <ListItemText primary="글로벌히트" />
               </ListItemButton>
@@ -172,9 +191,30 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
                 <ListItemText primary="사용자 관리" />
               </ListItemButton>
             </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/app-settings")}>
+                <ListItemIcon><SettingsIcon /></ListItemIcon>
+                <ListItemText primary="앱 설정" />
+              </ListItemButton>
+            </ListItem>
           </List>
         </>
       )}
+      <Dialog
+        open={popupOpen}
+        onClose={() => setPopupOpen(false)}
+        PaperProps={{ sx: { backgroundColor: "background.paper", border: "1px solid #333", minWidth: 320, textAlign: "center" } }}
+      >
+        <DialogTitle sx={{ color: "text.primary", fontWeight: 600 }}>준비중입니다</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "text.secondary" }}>현재 이 게임은 이용할 수 없습니다.</Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: "center", pb: 2 }}>
+          <Button variant="contained" onClick={() => setPopupOpen(false)} sx={{ backgroundColor: "#2e7d32", "&:hover": { backgroundColor: "#1b5e20" } }}>
+            확인
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Box sx={{ mt: "auto", p: 1.5 }}>
         <Divider sx={{ bgcolor: "military.border", mb: 1.5 }} />
         {user && (

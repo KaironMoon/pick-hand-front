@@ -20,7 +20,9 @@ import NotFound from "../pages/error/NotFound";
 import PageLayout from "../pages/PageLayout";
 import LoginPage from "../pages/login";
 import UsersPage from "../pages/users";
+import AppSettingsPage from "../pages/app-settings";
 import ProtectedRoute from "../pages/components/ProtectedRoute";
+import GameGuard from "../pages/components/GameGuard";
 import { Navigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "../store/auth-store";
@@ -74,7 +76,7 @@ const router = createBrowserRouter([
           },
           {
             path: "/t9game/user",
-            element: <UserGamePage />,
+            element: <GameGuard gameType="t9"><UserGamePage /></GameGuard>,
           },
           {
             path: "/t9game/current-setup",
@@ -86,7 +88,7 @@ const router = createBrowserRouter([
           },
           {
             path: "/hbgame/user",
-            element: <HbUserGamePage />,
+            element: <GameGuard gameType="hb"><HbUserGamePage /></GameGuard>,
           },
           {
             path: "/hbgame/user-setup",
@@ -94,7 +96,7 @@ const router = createBrowserRouter([
           },
           {
             path: "/ghgame/user",
-            element: <GhUserGamePage />,
+            element: <GameGuard gameType="gh"><GhUserGamePage /></GameGuard>,
           },
           {
             path: "/ghgame/user-setup",
@@ -118,6 +120,10 @@ const router = createBrowserRouter([
               {
                 path: "/users",
                 element: <UsersPage />,
+              },
+              {
+                path: "/app-settings",
+                element: <AppSettingsPage />,
               },
               {
                 path: "/hbgame",

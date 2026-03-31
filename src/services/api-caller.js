@@ -162,6 +162,16 @@ class ApiInterceptors {
           }
         }
 
+        if (error.response && error.response.status === 403) {
+          const detail = error.response.data?.detail;
+          if (detail?.redirect) {
+            window.dispatchEvent(new CustomEvent("game-blocked", {
+              detail: { message: detail.message, redirect: detail.redirect },
+            }));
+            return new Promise(() => {});
+          }
+        }
+
         return Promise.reject(error);
       },
     );

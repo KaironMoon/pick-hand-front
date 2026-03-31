@@ -3,6 +3,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useAtomValue, useSetAtom } from "jotai";
 import { Box, CircularProgress } from "@mui/material";
 import { userAtom, isAuthenticatedAtom, initAuthAtom } from "@/store/auth-store";
+import { fetchBlockedGamesAtom } from "@/store/app-settings-store";
 import authService from "@/services/auth-service";
 
 // eslint-disable-next-line react/prop-types
@@ -10,6 +11,7 @@ function ProtectedRoute({ adminOnly = false }) {
   const user = useAtomValue(userAtom);
   const isAuthenticated = useAtomValue(isAuthenticatedAtom);
   const initAuth = useSetAtom(initAuthAtom);
+  const fetchBlocked = useSetAtom(fetchBlockedGamesAtom);
   const [loading, setLoading] = useState(true);
 
   const initialize = useCallback(async () => {
@@ -22,6 +24,14 @@ function ProtectedRoute({ adminOnly = false }) {
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  // 1분마다 blocked_games 자동 갱신
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchBlocked();
+    const id = setInterval(() => fetchBlocked(), 60 * 1000);
+    return () => clearInterval(id);
+  }, [isAuthenticated, fetchBlocked]);
 
   if (loading) {
     return (

@@ -7,6 +7,7 @@ import { useTheme } from "@mui/material/styles";
 import PageHeader from "@/pages/components/layout/PageHeader";
 import PageLeftMenu from "@/pages/components/layout/PageLeftMenu";
 import PageFooter from "@/pages/components/layout/PageFooter";
+import GameBlockedDialog from "@/pages/components/GameBlockedDialog";
 
 const DRAWER_WIDTH = 200;
 
@@ -75,6 +76,7 @@ function PageLayout() {
           <PageFooter />
         </>
       )}
+      <GameBlockedDialog />
     </Container>
   );
 }

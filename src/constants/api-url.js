@@ -61,4 +61,9 @@ const USER_BET_SETTINGS_API = {
   SAVE: (gameType) => `/api/v1/user-settings/${gameType}`,
 };
 
-export { API_URL, AUTH_API, USERS_API, SETTINGS_API, HB_SETTINGS_API, HB_GAMES_API, GH_SETTINGS_API, GH_GAMES_API, USER_BET_SETTINGS_API };
+const APP_SETTINGS_API = {
+  BASE: "/api/v1/app-settings",
+  BLOCKED_GAMES: "/api/v1/app-settings/blocked-games",
+};
+
+export { API_URL, AUTH_API, USERS_API, SETTINGS_API, HB_SETTINGS_API, HB_GAMES_API, GH_SETTINGS_API, GH_GAMES_API, USER_BET_SETTINGS_API, APP_SETTINGS_API };
