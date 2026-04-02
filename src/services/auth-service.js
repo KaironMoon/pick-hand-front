@@ -21,6 +21,10 @@ const authService = {
 
   async getMe() {
     const response = await apiCaller.get(AUTH_API.ME);
+    // 토큰 갱신
+    if (response.data.access_token) {
+      sessionStorage.setItem(TOKEN_KEY, response.data.access_token);
+    }
     return response.data;
   },
 

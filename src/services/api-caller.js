@@ -113,6 +113,36 @@ class ApiCaller {
   }
 }
 
+// JWT exp 디코딩 (base64)
+function getTokenExp(token) {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.exp || 0;
+  } catch { return 0; }
+}
+
+const TOKEN_REFRESH_THRESHOLD = 12 * 60 * 60; // 12시간 (초)
+let _refreshing = null;
+
+async function refreshTokenIfNeeded() {
+  const token = sessionStorage.getItem("pick_hand_token");
+  if (!token) return;
+  const exp = getTokenExp(token);
+  const remaining = exp - Date.now() / 1000;
+  if (remaining > TOKEN_REFRESH_THRESHOLD) return;
+  // 이미 갱신 중이면 대기
+  if (_refreshing) return _refreshing;
+  _refreshing = axios.get(
+    (import.meta.env.VITE_API_BASE_URL || "") + "/api/v1/auth/me",
+    { headers: { Authorization: `Bearer ${token}` } },
+  ).then((res) => {
+    if (res.data.access_token) {
+      sessionStorage.setItem("pick_hand_token", res.data.access_token);
+    }
+  }).catch(() => {}).finally(() => { _refreshing = null; });
+  return _refreshing;
+}
+
 class ApiInterceptors {
   _axiosInstance = null;
   _interceptors = null;
@@ -129,7 +159,11 @@ class ApiInterceptors {
 
   start() {
     this._instanceInterceptor.request = this._interceptors.request.use(
-      (config) => {
+      async (config) => {
+        // /auth/me 자체는 갱신 루프 방지
+        if (!config.url?.includes("/auth/me")) {
+          await refreshTokenIfNeeded();
+        }
         const token = sessionStorage.getItem("pick_hand_token");
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;

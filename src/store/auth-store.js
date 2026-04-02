@@ -16,18 +16,29 @@ const logoutAtom = atom(null, async (get, set) => {
   set(userAtom, null);
 });
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const initAuthAtom = atom(null, async (get, set) => {
   if (!authService.isAuthenticated()) {
     set(userAtom, null);
     return;
   }
-  try {
-    const user = await authService.getMe();
-    set(userAtom, user);
-  } catch {
-    authService.logout();
-    set(userAtom, null);
+
+  const MAX_RETRIES = 10;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const user = await authService.getMe();
+      set(userAtom, user);
+      return;
+    } catch {
+      if (attempt < MAX_RETRIES) {
+        await sleep(5000);
+      }
+    }
   }
+  // 모든 재시도 실패 → 로그아웃
+  authService.logout();
+  set(userAtom, null);
 });
 
 export { userAtom, isAuthenticatedAtom, loginAtom, logoutAtom, initAuthAtom };

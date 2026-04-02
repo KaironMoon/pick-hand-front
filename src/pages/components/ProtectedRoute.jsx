@@ -33,6 +33,7 @@ function ProtectedRoute({ adminOnly = false }) {
     return () => clearInterval(id);
   }, [isAuthenticated, fetchBlocked]);
 
+
   if (loading) {
     return (
       <Box

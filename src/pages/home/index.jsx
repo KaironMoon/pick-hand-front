@@ -9,6 +9,7 @@ const games = [
   { name: "트리플나인", key: "t9", img: "/triplenine.png", adminPath: "/t9game", userPath: "/t9game/user" },
   { name: "허니비", key: "hb", img: "/honeybee.png", adminPath: "/hbgame", userPath: "/hbgame/user" },
   { name: "글로벌히트", key: "gh", img: "/globalhit.png", adminPath: "/ghgame", userPath: "/ghgame/user" },
+  { name: "나이스초이스", key: "nc", img: "/nicechoice.png", adminPath: "/ncgame", userPath: "/ncgame/user" },
 ];
 
 const Home = () => {

@@ -7,6 +7,7 @@ import ViewListIcon from "@mui/icons-material/ViewList";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import HiveIcon from "@mui/icons-material/Hive";
 import PublicIcon from "@mui/icons-material/Public";
+import StarIcon from "@mui/icons-material/Star";
 import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
 import SettingsIcon from "@mui/icons-material/Settings";
@@ -150,6 +151,26 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
               </ListItemButton>
             </ListItem>
           </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          {/* 나이스초이스 */}
+          <List dense>
+            <ListItem disablePadding>
+              <ListItemButton disabled sx={{ pb: 0 }}>
+                <ListItemIcon><StarIcon /></ListItemIcon>
+                <ListItemText primary="나이스초이스" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/ncgame")} sx={{ pl: 7 }}>
+                <ListItemText primary="어드민" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/ncgame/user")} sx={{ pl: 7 }}>
+                <ListItemText primary="유저" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+          </List>
         </>
       ) : (
         <>
@@ -176,6 +197,15 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
               <ListItemButton onClick={() => handleUserGameClick("gh", "/ghgame/user")}>
                 <ListItemIcon><PublicIcon /></ListItemIcon>
                 <ListItemText primary="글로벌히트" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          <List>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleUserGameClick("nc", "/ncgame/user")}>
+                <ListItemIcon><StarIcon /></ListItemIcon>
+                <ListItemText primary="나이스초이스" />
               </ListItemButton>
             </ListItem>
           </List>

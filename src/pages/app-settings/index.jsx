@@ -10,6 +10,7 @@ const GAME_TYPES = [
   { key: "t9", label: "트리플나인" },
   { key: "hb", label: "허니비" },
   { key: "gh", label: "글로벌히트" },
+  { key: "nc", label: "나이스초이스" },
 ];
 
 function AppSettingsPage() {

@@ -16,6 +16,12 @@ import GhSetupPage from "../pages/ghgame/setup.jsx";
 import T9UserSetupPage from "../pages/t9game/user-setup.jsx";
 import HbUserSetupPage from "../pages/hbgame/user-setup.jsx";
 import GhUserSetupPage from "../pages/ghgame/user-setup.jsx";
+import NcGamePage from "../pages/ncgame";
+import NcUserGamePage from "../pages/ncgame/user-game.jsx";
+import NcSetupPage from "../pages/ncgame/setup.jsx";
+import NcCurrentSetupPage from "../pages/ncgame/current-setup.jsx";
+import NcUserSetupPage from "../pages/ncgame/user-setup.jsx";
+import NcPatternPage from "../pages/ncgame/pattern.jsx";
 import NotFound from "../pages/error/NotFound";
 import PageLayout from "../pages/PageLayout";
 import LoginPage from "../pages/login";
@@ -103,6 +109,18 @@ const router = createBrowserRouter([
             element: <GhUserSetupPage />,
           },
           {
+            path: "/ncgame/user",
+            element: <GameGuard gameType="nc"><NcUserGamePage /></GameGuard>,
+          },
+          {
+            path: "/ncgame/current-setup",
+            element: <NcCurrentSetupPage />,
+          },
+          {
+            path: "/ncgame/user-setup",
+            element: <NcUserSetupPage />,
+          },
+          {
             element: <ProtectedRoute adminOnly />,
             children: [
               {
@@ -140,6 +158,18 @@ const router = createBrowserRouter([
               {
                 path: "/ghgame/setup",
                 element: <GhSetupPage />,
+              },
+              {
+                path: "/ncgame",
+                element: <NcGamePage />,
+              },
+              {
+                path: "/ncgame/setup",
+                element: <NcSetupPage />,
+              },
+              {
+                path: "/ncgame/patterns",
+                element: <NcPatternPage />,
               },
             ],
           },
