@@ -582,7 +582,7 @@ export default function NcUserGamePage() {
       </Box>
 
       {/* 상단 PnL 요약 바 (마틴A/Z) */}
-      {!isMobile && (() => {
+      {(() => {
         const gh = betData?.globalhit;
         const ghHasBet = (gh?.P || 0) + (gh?.B || 0) > 0;
         const umA = userMartin?.martin_a;
