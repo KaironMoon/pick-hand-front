@@ -611,7 +611,7 @@ export default function GamePage() {
       >
         {grid.map((row, rowIndex) =>
           row.map((cell, colIndex) => {
-            const isLscMatch = cell && Array.isArray(pickResult.matches) && pickResult.matches.some(
+            const isLscMatch = isAdmin && cell && Array.isArray(pickResult.matches) && pickResult.matches.some(
               m => cell.idx >= m.start && cell.idx < m.end
             );
             return (
@@ -811,7 +811,7 @@ export default function GamePage() {
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: dirColor }}>{`formal(${combinedDir})`}</Typography>
             </Box>
             {(() => {
-              const totalPnL = cumPnL.tn + cumPnL.gh + cumPnL.pinch;
+              const totalPnL = (cumPnL.tn || 0) + (cumPnL.gh || 0) + (cumPnL.pinch || 0);
               const sign = totalPnL > 0 ? "+" : "";
               return (
                 <Box sx={{ px: 2, minWidth: 200, backgroundColor: "#00bcd4", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
@@ -829,12 +829,15 @@ export default function GamePage() {
               const tnHasBet = (betData?.triplenine?.amount || 0) > 0;
               const ghHasBet = (betData?.globalhit?.P || 0) + (betData?.globalhit?.B || 0) > 0;
               const pinchOn = betData?.pinch?.active || false;
-              const totalPnL = cumPnL.tn + cumPnL.gh + cumPnL.pinch;
+              const tnPnl = cumPnL.tn || 0;
+              const ghPnl = cumPnL.gh || 0;
+              const pinchPnl = cumPnL.pinch || 0;
+              const totalPnL = tnPnl + ghPnl + pinchPnl;
               const items = [
                 { name: "formal", value: combinedDir, color: dirColor, isFormal: true },
-                { name: "Triplenine", pnl: cumPnL.tn, active: tnHasBet },
-                { name: "globalhit", pnl: cumPnL.gh, active: ghHasBet },
-                { name: "pinch", pnl: cumPnL.pinch, active: pinchOn },
+                { name: "Triplenine", pnl: tnPnl, active: tnHasBet },
+                { name: "globalhit", pnl: ghPnl, active: ghHasBet },
+                { name: "pinch", pnl: pinchPnl, active: pinchOn },
                 { name: "합계", pnl: totalPnL, isTotal: true },
               ];
               const rowSx = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5, borderRadius: 1, px: 0.8, py: 0.3, whiteSpace: "nowrap" };
@@ -1141,17 +1144,19 @@ export default function GamePage() {
           <Typography>모든 배팅이 완료되었습니다.</Typography>
           <Box sx={{ mt: 2 }}>
             {[
-              { name: "Triplenine", pnl: cumPnL.tn },
-              { name: "Globalhit", pnl: cumPnL.gh },
-              { name: "Pinch", pnl: cumPnL.pinch },
+              { name: "Triplenine", pnl: cumPnL.tn || 0 },
+              { name: "Globalhit", pnl: cumPnL.gh || 0 },
+              { name: "Pinch", pnl: cumPnL.pinch || 0 },
             ].map((item) => (
               <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
                 {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
               </Typography>
             ))}
-            <Typography sx={{ mt: 1, fontWeight: "bold", color: (cumPnL.tn + cumPnL.gh + cumPnL.pinch) >= 0 ? "#4caf50" : "#f44336" }}>
-              Total: {(cumPnL.tn + cumPnL.gh + cumPnL.pinch) > 0 ? "+" : ""}{(cumPnL.tn + cumPnL.gh + cumPnL.pinch).toLocaleString()}P
+            {(() => { const t = (cumPnL.tn || 0) + (cumPnL.gh || 0) + (cumPnL.pinch || 0); return (
+            <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
+              Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
             </Typography>
+            ); })()}
           </Box>
         </DialogContent>
         <DialogActions>
@@ -1165,17 +1170,17 @@ export default function GamePage() {
           <Typography>목표금액에 도달하여 배팅이 정지됩니다.</Typography>
           <Box sx={{ mt: 2 }}>
             {[
-              { name: "마틴A", pnl: cumPnL.user_a },
-              { name: "마틴Z", pnl: cumPnL.user_z },
-              { name: "Triplenine", pnl: cumPnL.tn },
-              { name: "Globalhit", pnl: cumPnL.gh },
-              { name: "Pinch", pnl: cumPnL.pinch },
+              { name: "마틴A", pnl: cumPnL.user_a || 0 },
+              { name: "마틴Z", pnl: cumPnL.user_z || 0 },
+              { name: "Triplenine", pnl: cumPnL.tn || 0 },
+              { name: "Globalhit", pnl: cumPnL.gh || 0 },
+              { name: "Pinch", pnl: cumPnL.pinch || 0 },
             ].map((item) => (
               <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
                 {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
               </Typography>
             ))}
-            {(() => { const t = cumPnL.user_a + cumPnL.user_z + cumPnL.tn + cumPnL.gh + cumPnL.pinch; return (
+            {(() => { const t = (cumPnL.user_a || 0) + (cumPnL.user_z || 0) + (cumPnL.tn || 0) + (cumPnL.gh || 0) + (cumPnL.pinch || 0); return (
               <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
                 Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
               </Typography>
