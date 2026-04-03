@@ -595,27 +595,28 @@ export default function NcUserGamePage() {
         const sumZ = (cumPnL.user_z || 0) + (cumPnL.gh || 0);
         const pnlClr = (v) => v > 0 ? "#4caf50" : v < 0 ? "#f44336" : "#fff";
         const pnlText = (v) => `${v > 0 ? "+" : ""}${v.toLocaleString()}P`;
-        const barSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between", minWidth: 80 };
+        const fs = isMobile ? 9 : 11;
+        const barSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: isMobile ? 1 : 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1 };
         const renderBar = (label, fDir, martinPnl, martinActive, ghPnl, total) => (
           <Box sx={{ display: "flex", gap: 0.5, flex: 1 }}>
             <Box sx={{ ...barSx, minWidth: 0, justifyContent: "center" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{`formal(${fDir})`}</Typography>
+              <Typography variant="caption" sx={{ fontSize: fs, fontWeight: "bold", color: "#fff" }}>{`formal(${fDir})`}</Typography>
             </Box>
             <Box sx={{ ...barSx, border: `1px solid ${martinActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{label}</Typography>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlClr(martinPnl) }}>{pnlText(martinPnl)}</Typography>
+              <Typography variant="caption" sx={{ fontSize: fs, fontWeight: "bold", color: "#fff" }}>{label}</Typography>
+              <Typography variant="caption" sx={{ fontSize: fs, fontWeight: "bold", color: pnlClr(martinPnl) }}>{pnlText(martinPnl)}</Typography>
             </Box>
             <Box sx={{ ...barSx, border: `1px solid ${ghHasBet ? "rgba(255,255,255,0.3)" : "#333"}` }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>GH</Typography>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlClr(ghPnl) }}>{pnlText(ghPnl)}</Typography>
+              <Typography variant="caption" sx={{ fontSize: fs, fontWeight: "bold", color: "#fff" }}>GH</Typography>
+              <Typography variant="caption" sx={{ fontSize: fs, fontWeight: "bold", color: pnlClr(ghPnl) }}>{pnlText(ghPnl)}</Typography>
             </Box>
-            <Box sx={{ backgroundColor: "#00bcd4", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end", minWidth: 80 }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: total < 0 ? "#f44336" : "#000" }}>{pnlText(total)}</Typography>
+            <Box sx={{ backgroundColor: "#00bcd4", borderRadius: 2, px: isMobile ? 1 : 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end", flex: 1 }}>
+              <Typography variant="caption" sx={{ fontSize: fs, fontWeight: "bold", color: total < 0 ? "#f44336" : "#000" }}>{pnlText(total)}</Typography>
             </Box>
           </Box>
         );
         return (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mb: 0.5 }}>
+          <Box sx={{ display: "flex", gap: isMobile ? 0.5 : 1, mb: 0.5 }}>
             {renderBar("마틴A", aDirRaw, cumPnL.user_a || 0, umAHasBet, cumPnL.gh || 0, sumA)}
             {renderBar("마틴Z", zDirRaw, cumPnL.user_z || 0, umZHasBet, cumPnL.gh || 0, sumZ)}
           </Box>
