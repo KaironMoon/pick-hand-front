@@ -8,6 +8,9 @@ import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import HiveIcon from "@mui/icons-material/Hive";
 import PublicIcon from "@mui/icons-material/Public";
 import StarIcon from "@mui/icons-material/Star";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import WhatshotIcon from "@mui/icons-material/Whatshot";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
 import SettingsIcon from "@mui/icons-material/Settings";
@@ -171,6 +174,66 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
               </ListItemButton>
             </ListItem>
           </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          {/* 위너히트 */}
+          <List dense>
+            <ListItem disablePadding>
+              <ListItemButton disabled sx={{ pb: 0 }}>
+                <ListItemIcon><EmojiEventsIcon /></ListItemIcon>
+                <ListItemText primary="위너히트" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/whgame")} sx={{ pl: 7 }}>
+                <ListItemText primary="어드민" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/whgame/user")} sx={{ pl: 7 }}>
+                <ListItemText primary="유저" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          {/* 메가히트 */}
+          <List dense>
+            <ListItem disablePadding>
+              <ListItemButton disabled sx={{ pb: 0 }}>
+                <ListItemIcon><WhatshotIcon /></ListItemIcon>
+                <ListItemText primary="메가히트" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/mhgame")} sx={{ pl: 7 }}>
+                <ListItemText primary="어드민" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/mhgame/user")} sx={{ pl: 7 }}>
+                <ListItemText primary="유저" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          {/* 드림히트 */}
+          <List dense>
+            <ListItem disablePadding>
+              <ListItemButton disabled sx={{ pb: 0 }}>
+                <ListItemIcon><AutoAwesomeIcon /></ListItemIcon>
+                <ListItemText primary="드림히트" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/dhgame")} sx={{ pl: 7 }}>
+                <ListItemText primary="어드민" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/dhgame/user")} sx={{ pl: 7 }}>
+                <ListItemText primary="유저" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+          </List>
         </>
       ) : (
         <>
@@ -206,6 +269,33 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
               <ListItemButton onClick={() => handleUserGameClick("nc", "/ncgame/user")}>
                 <ListItemIcon><StarIcon /></ListItemIcon>
                 <ListItemText primary="나이스초이스" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          <List>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleUserGameClick("wh", "/whgame/user")}>
+                <ListItemIcon><EmojiEventsIcon /></ListItemIcon>
+                <ListItemText primary="위너히트" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          <List>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleUserGameClick("mh", "/mhgame/user")}>
+                <ListItemIcon><WhatshotIcon /></ListItemIcon>
+                <ListItemText primary="메가히트" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          <List>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleUserGameClick("dh", "/dhgame/user")}>
+                <ListItemIcon><AutoAwesomeIcon /></ListItemIcon>
+                <ListItemText primary="드림히트" />
               </ListItemButton>
             </ListItem>
           </List>

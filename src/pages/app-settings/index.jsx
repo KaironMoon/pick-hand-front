@@ -11,6 +11,9 @@ const GAME_TYPES = [
   { key: "hb", label: "허니비" },
   { key: "gh", label: "글로벌히트" },
   { key: "nc", label: "나이스초이스" },
+  { key: "wh", label: "위너히트" },
+  { key: "mh", label: "메가히트" },
+  { key: "dh", label: "드림히트" },
 ];
 
 function AppSettingsPage() {

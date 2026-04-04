@@ -22,6 +22,24 @@ import NcSetupPage from "../pages/ncgame/setup.jsx";
 import NcCurrentSetupPage from "../pages/ncgame/current-setup.jsx";
 import NcUserSetupPage from "../pages/ncgame/user-setup.jsx";
 import NcPatternPage from "../pages/ncgame/pattern.jsx";
+import WhGamePage from "../pages/whgame";
+import WhUserGamePage from "../pages/whgame/user-game.jsx";
+import WhSetupPage from "../pages/whgame/setup.jsx";
+import WhCurrentSetupPage from "../pages/whgame/current-setup.jsx";
+import WhUserSetupPage from "../pages/whgame/user-setup.jsx";
+import WhPatternPage from "../pages/whgame/pattern.jsx";
+import MhGamePage from "../pages/mhgame";
+import MhUserGamePage from "../pages/mhgame/user-game.jsx";
+import MhSetupPage from "../pages/mhgame/setup.jsx";
+import MhCurrentSetupPage from "../pages/mhgame/current-setup.jsx";
+import MhUserSetupPage from "../pages/mhgame/user-setup.jsx";
+import MhPatternPage from "../pages/mhgame/pattern.jsx";
+import DhGamePage from "../pages/dhgame";
+import DhUserGamePage from "../pages/dhgame/user-game.jsx";
+import DhSetupPage from "../pages/dhgame/setup.jsx";
+import DhCurrentSetupPage from "../pages/dhgame/current-setup.jsx";
+import DhUserSetupPage from "../pages/dhgame/user-setup.jsx";
+import DhPatternPage from "../pages/dhgame/pattern.jsx";
 import NotFound from "../pages/error/NotFound";
 import PageLayout from "../pages/PageLayout";
 import LoginPage from "../pages/login";
@@ -121,6 +139,42 @@ const router = createBrowserRouter([
             element: <NcUserSetupPage />,
           },
           {
+            path: "/whgame/user",
+            element: <GameGuard gameType="wh"><WhUserGamePage /></GameGuard>,
+          },
+          {
+            path: "/whgame/current-setup",
+            element: <WhCurrentSetupPage />,
+          },
+          {
+            path: "/whgame/user-setup",
+            element: <WhUserSetupPage />,
+          },
+          {
+            path: "/mhgame/user",
+            element: <GameGuard gameType="mh"><MhUserGamePage /></GameGuard>,
+          },
+          {
+            path: "/mhgame/current-setup",
+            element: <MhCurrentSetupPage />,
+          },
+          {
+            path: "/mhgame/user-setup",
+            element: <MhUserSetupPage />,
+          },
+          {
+            path: "/dhgame/user",
+            element: <GameGuard gameType="dh"><DhUserGamePage /></GameGuard>,
+          },
+          {
+            path: "/dhgame/current-setup",
+            element: <DhCurrentSetupPage />,
+          },
+          {
+            path: "/dhgame/user-setup",
+            element: <DhUserSetupPage />,
+          },
+          {
             element: <ProtectedRoute adminOnly />,
             children: [
               {
@@ -170,6 +224,42 @@ const router = createBrowserRouter([
               {
                 path: "/ncgame/patterns",
                 element: <NcPatternPage />,
+              },
+              {
+                path: "/whgame",
+                element: <WhGamePage />,
+              },
+              {
+                path: "/whgame/setup",
+                element: <WhSetupPage />,
+              },
+              {
+                path: "/whgame/patterns",
+                element: <WhPatternPage />,
+              },
+              {
+                path: "/mhgame",
+                element: <MhGamePage />,
+              },
+              {
+                path: "/mhgame/setup",
+                element: <MhSetupPage />,
+              },
+              {
+                path: "/mhgame/patterns",
+                element: <MhPatternPage />,
+              },
+              {
+                path: "/dhgame",
+                element: <DhGamePage />,
+              },
+              {
+                path: "/dhgame/setup",
+                element: <DhSetupPage />,
+              },
+              {
+                path: "/dhgame/patterns",
+                element: <DhPatternPage />,
               },
             ],
           },

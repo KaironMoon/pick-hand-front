@@ -189,12 +189,15 @@ function MartinSection({ name, label, martin, onChange, disabled }) {
   );
 }
 
-const GAME_LABELS = { t9: "트리플나인", hb: "허니비", gh: "글로벌히트", nc: "나이스초이스" };
+const GAME_LABELS = { t9: "트리플나인", hb: "허니비", gh: "글로벌히트", nc: "나이스초이스", wh: "위너히트", mh: "메가히트", dh: "드림히트" };
 const GAME_BACK_PATHS = {
   t9: { admin: "/t9game", user: "/t9game/user" },
   hb: { admin: "/hbgame", user: "/hbgame/user" },
   gh: { admin: "/ghgame", user: "/ghgame/user" },
   nc: { admin: "/ncgame", user: "/ncgame/user" },
+  wh: { admin: "/whgame", user: "/whgame/user" },
+  mh: { admin: "/mhgame", user: "/mhgame/user" },
+  dh: { admin: "/dhgame", user: "/dhgame/user" },
 };
 
 const DEFAULT_MARTIN = {

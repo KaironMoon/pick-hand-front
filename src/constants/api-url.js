@@ -79,9 +79,63 @@ const NC_SETTINGS_API = {
   GAME_STATUS: "/api/v1/nc/settings/game/status",
 };
 
+const WH_GAMES_API = {
+  START: "/api/v1/wh/games/start",
+  ROUND: "/api/v1/wh/games/round",
+  ENDING: "/api/v1/wh/games/ending",
+  END: "/api/v1/wh/games/end",
+  NEXT: "/api/v1/wh/games/next",
+  LAST_ACTIVE: "/api/v1/wh/games/last-active",
+  LAST_ROUND: (id) => `/api/v1/wh/games/${id}/last-round`,
+  STATE: (id) => `/api/v1/wh/games/${id}/state`,
+};
+
+const WH_SETTINGS_API = {
+  BASE: "/api/v1/wh/settings",
+  GAME_PAUSE: "/api/v1/wh/settings/game/pause",
+  GAME_RESUME: "/api/v1/wh/settings/game/resume",
+  GAME_STATUS: "/api/v1/wh/settings/game/status",
+};
+
+const MH_GAMES_API = {
+  START: "/api/v1/mh/games/start",
+  ROUND: "/api/v1/mh/games/round",
+  ENDING: "/api/v1/mh/games/ending",
+  END: "/api/v1/mh/games/end",
+  NEXT: "/api/v1/mh/games/next",
+  LAST_ACTIVE: "/api/v1/mh/games/last-active",
+  LAST_ROUND: (id) => `/api/v1/mh/games/${id}/last-round`,
+  STATE: (id) => `/api/v1/mh/games/${id}/state`,
+};
+
+const MH_SETTINGS_API = {
+  BASE: "/api/v1/mh/settings",
+  GAME_PAUSE: "/api/v1/mh/settings/game/pause",
+  GAME_RESUME: "/api/v1/mh/settings/game/resume",
+  GAME_STATUS: "/api/v1/mh/settings/game/status",
+};
+
+const DH_GAMES_API = {
+  START: "/api/v1/dh/games/start",
+  ROUND: "/api/v1/dh/games/round",
+  ENDING: "/api/v1/dh/games/ending",
+  END: "/api/v1/dh/games/end",
+  NEXT: "/api/v1/dh/games/next",
+  LAST_ACTIVE: "/api/v1/dh/games/last-active",
+  LAST_ROUND: (id) => `/api/v1/dh/games/${id}/last-round`,
+  STATE: (id) => `/api/v1/dh/games/${id}/state`,
+};
+
+const DH_SETTINGS_API = {
+  BASE: "/api/v1/dh/settings",
+  GAME_PAUSE: "/api/v1/dh/settings/game/pause",
+  GAME_RESUME: "/api/v1/dh/settings/game/resume",
+  GAME_STATUS: "/api/v1/dh/settings/game/status",
+};
+
 const APP_SETTINGS_API = {
   BASE: "/api/v1/app-settings",
   BLOCKED_GAMES: "/api/v1/app-settings/blocked-games",
 };
 
-export { API_URL, AUTH_API, USERS_API, SETTINGS_API, HB_SETTINGS_API, HB_GAMES_API, GH_SETTINGS_API, GH_GAMES_API, NC_GAMES_API, NC_SETTINGS_API, USER_BET_SETTINGS_API, APP_SETTINGS_API };
+export { API_URL, AUTH_API, USERS_API, SETTINGS_API, HB_SETTINGS_API, HB_GAMES_API, GH_SETTINGS_API, GH_GAMES_API, NC_GAMES_API, NC_SETTINGS_API, WH_GAMES_API, WH_SETTINGS_API, MH_GAMES_API, MH_SETTINGS_API, DH_GAMES_API, DH_SETTINGS_API, USER_BET_SETTINGS_API, APP_SETTINGS_API };
