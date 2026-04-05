@@ -87,7 +87,112 @@ function ToggleCell({ active, label, onClick, disabled = false }) {
   );
 }
 
-function MartinSection({ name, label, martin, onChange, disabled }) {
+function FailSection({ martin, onChange }) {
+  const enabled = martin.enabled;
+  const failCount = martin.fail_count || 2;
+  const toggleFail = () => {
+    const next = failCount >= 5 ? 2 : failCount + 1;
+    onChange({ ...martin, fail_count: next });
+  };
+  const betType = (type) => { if (DISABLED_BET_TYPES.includes(type)) return; onChange({ ...martin, bet_type: type }); };
+  const amount = (idx, val) => {
+    const newAmounts = calcAmounts(martin.amounts || new Array(20).fill(0), idx, val, martin.bet_type, martin.step_min || 1, martin.step_max || 20);
+    onChange({ ...martin, amounts: newAmounts });
+  };
+
+  return (
+    <>
+      <tr>
+        <td colSpan={6} style={{ border: "none", padding: "0 0 6px 0" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box sx={{
+              backgroundColor: "#e65100", color: "#fff", fontWeight: "bold",
+              borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14,
+            }}>
+              fail
+            </Box>
+            <Box onClick={toggleFail} sx={{
+              backgroundColor: "#ff6d00", color: "#fff", fontWeight: "bold",
+              borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14, cursor: "pointer",
+              "&:hover": { backgroundColor: "#ff8f00" },
+            }}>
+              fail {failCount}
+            </Box>
+            {enabled ? (
+              <>
+                <Box onClick={() => {
+                  const val = prompt("설정 금액 (P)", String(martin.budget || 0));
+                  if (val !== null) {
+                    const num = parseInt(val.replace(/,/g, ""), 10);
+                    if (!isNaN(num)) onChange({ ...martin, budget: num });
+                  }
+                }} sx={{
+                  backgroundColor: GREEN, color: "#1b2e1b", fontWeight: "bold",
+                  borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14, cursor: "pointer",
+                }}>
+                  설정:{(martin.budget || 0).toLocaleString()}P
+                </Box>
+                <Box onClick={() => onChange({ ...martin, enabled: false })} sx={{
+                  backgroundColor: "#333", color: "#888",
+                  borderRadius: 1, px: 1, py: 0.5, fontSize: 12, cursor: "pointer",
+                  "&:hover": { backgroundColor: "#444" },
+                }}>
+                  OFF
+                </Box>
+              </>
+            ) : (
+              <Box onClick={() => onChange({ ...martin, enabled: true })} sx={{
+                backgroundColor: "#333", color: "#888",
+                borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14, cursor: "pointer",
+              }}>
+                사용안함
+              </Box>
+            )}
+          </Box>
+        </td>
+      </tr>
+      <tr>
+        <td style={labelCellStyle}>배팅종류</td>
+        {BET_TYPES.map((t) => (
+          <ToggleCell key={t} active={martin.bet_type === t} label={BET_TYPE_LABELS[t]}
+            onClick={() => betType(t)} disabled={DISABLED_BET_TYPES.includes(t)} />
+        ))}
+      </tr>
+      <tr>
+        <td style={labelCellStyle}>단계설정</td>
+        <td style={normalCell}>최저</td>
+        <EditableCell value={martin.step_min || 1} onChange={(v) => {
+          const upd = { ...martin, step_min: v };
+          if (v >= (martin.step_max || 20)) upd.step_max = v + 1;
+          onChange(upd);
+        }} suffix="단계" style={greenCell} />
+        <td style={normalCell}>최고</td>
+        <EditableCell value={martin.step_max || 20} onChange={(v) => {
+          const upd = { ...martin, step_max: v };
+          if (v <= (martin.step_min || 1)) upd.step_min = v - 1;
+          onChange(upd);
+        }} suffix="단계" style={greenCell} />
+        <td style={normalCell}></td>
+      </tr>
+      {[0, 1, 2, 3].map((rowIdx) => (
+        <tr key={`fail-amt-${rowIdx}`}>
+          {rowIdx === 0 && <td rowSpan={4} style={labelCellStyle}>금액설정</td>}
+          {(martin.amounts || new Array(20).fill(0)).slice(rowIdx * 5, rowIdx * 5 + 5).map((amt, i) => {
+            const idx = rowIdx * 5 + i;
+            const step = idx + 1;
+            const inRange = step >= (martin.step_min || 1) && step <= (martin.step_max || 20);
+            return (
+              <EditableCell key={idx} value={inRange ? amt : 0} onChange={(v) => amount(idx, v)}
+                prefix={`${step}:`} suffix="P" style={inRange ? editableCell : normalCell} disabled={!inRange} />
+            );
+          })}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp }) {
   const enabled = martin.enabled;
   const betType = (type) => { if (DISABLED_BET_TYPES.includes(type)) return; onChange({ ...martin, bet_type: type }); };
   const amount = (idx, val) => {
@@ -97,7 +202,7 @@ function MartinSection({ name, label, martin, onChange, disabled }) {
 
   const sectionDisabled = disabled || !enabled;
 
-  const labelColor = name === "martin_a" ? "#c62828" : "#1565c0";
+  const labelColor = labelColorProp || (name === "martin_a" ? "#c62828" : "#1565c0");
 
   return (
     <>
@@ -208,6 +313,10 @@ const DEFAULT_MARTIN = {
   step_max: 20,
   amounts: new Array(20).fill(0),
 };
+const DEFAULT_FAIL = {
+  ...DEFAULT_MARTIN,
+  fail_count: 2,
+};
 
 export default function UserSetupPage({ gameType }) {
   const navigate = useNavigate();
@@ -261,6 +370,9 @@ export default function UserSetupPage({ gameType }) {
 
   const martinA = config.martin_a || { ...DEFAULT_MARTIN, enabled: true };
   const martinZ = config.martin_z || { ...DEFAULT_MARTIN };
+  const allp = config.allp || { ...DEFAULT_MARTIN };
+  const allb = config.allb || { ...DEFAULT_MARTIN };
+  const fail = config.fail || { ...DEFAULT_FAIL };
 
   return (
     <Box sx={{ p: 2 }}>
@@ -282,6 +394,16 @@ export default function UserSetupPage({ gameType }) {
             <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={(m) => updateMartin("martin_a", m)} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={(m) => updateMartin("martin_z", m)} />
+            {gameType === "gh" && (
+              <>
+                <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+                <MartinSection name="allp" label="AllP" martin={allp} onChange={(m) => updateMartin("allp", m)} labelColor="#6a1b9a" />
+                <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+                <MartinSection name="allb" label="AllB" martin={allb} onChange={(m) => updateMartin("allb", m)} labelColor="#00695c" />
+                <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+                <FailSection martin={fail} onChange={(m) => updateMartin("fail", m)} />
+              </>
+            )}
           </tbody>
         </table>
       </Box>

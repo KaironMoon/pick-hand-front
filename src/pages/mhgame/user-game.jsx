@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
@@ -264,6 +264,8 @@ export default function MhUserGamePage() {
     }
     const newResults = [...results, { value: inputValue, status }];
     setResults(newResults);
+    setBetData(null);
+    setPickResult({ method: "wait", pick: null });
 
     try {
       const res = await apiCaller.post(MH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
@@ -513,7 +515,11 @@ export default function MhUserGamePage() {
         <Box sx={{ width: "1px", height: 28, backgroundColor: "rgba(255,255,255,0.2)", mx: 0.3 }} />
 
         {/* 픽이미지 A/Z 2개 */}
-        {(() => {
+        {processing ? (
+          <Box sx={{ width: isMobile ? 108 : 194, height: isMobile ? 52 : 95, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <CircularProgress size={isMobile ? 28 : 40} sx={{ color: "rgba(255,255,255,0.6)" }} />
+          </Box>
+        ) : (() => {
           const umA = userMartin?.martin_a;
           const umZ = userMartin?.martin_z;
           const pickA = umA?.direction || null;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
@@ -212,6 +212,8 @@ export default function HbUserGamePage() {
       status = pickResult.pick === inputValue ? "hit" : "miss";
     }
     setResults((prev) => [...prev, { value: inputValue, status }]);
+    setBetData(null);
+    setPickResult({ method: "wait", pick: null });
 
     try {
       const res = await apiCaller.post(HB_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
@@ -457,7 +459,11 @@ export default function HbUserGamePage() {
         </Box>
 
         {/* 픽이미지 A/Z 2개 */}
-        {(() => {
+        {processing ? (
+          <Box sx={{ width: isMobile ? 108 : 194, height: isMobile ? 52 : 95, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <CircularProgress size={isMobile ? 28 : 40} sx={{ color: "rgba(255,255,255,0.6)" }} />
+          </Box>
+        ) : (() => {
           const umA = betData?.user_martin?.martin_a;
           const umZ = betData?.user_martin?.martin_z;
           const pickA = umA?.direction || null;

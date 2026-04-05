@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
@@ -293,6 +293,8 @@ export default function GamePage() {
     const newResult = { value: inputValue, status };
     const newResults = [...results, newResult];
     setResults(newResults);
+    setBetData(null);
+    setPickResult({ method: "wait", pick: null });
 
     try {
       const res = await apiCaller.post("/api/v1/games/round", {
@@ -669,7 +671,11 @@ export default function GamePage() {
 
         {/* 픽이미지 + 턴 + P/B */}
         <Box sx={{ width: isMobile ? 52 : 95, height: isMobile ? 52 : 95, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <img src={pickImage} alt="pick" style={{ width: isMobile ? 46 : 85, height: isMobile ? 46 : 85, objectFit: "contain" }} />
+          {processing ? (
+            <CircularProgress size={isMobile ? 28 : 40} sx={{ color: "rgba(255,255,255,0.6)" }} />
+          ) : (
+            <img src={pickImage} alt="pick" style={{ width: isMobile ? 46 : 85, height: isMobile ? 46 : 85, objectFit: "contain" }} />
+          )}
         </Box>
         <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>

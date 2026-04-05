@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
@@ -89,7 +89,7 @@ export default function GhUserGamePage() {
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
-  const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0 });
+  const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 });
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [endingMode, setEndingMode] = useState(false);
@@ -144,7 +144,7 @@ export default function GhUserGamePage() {
     const isNew = searchParams.get("new");
     const urlGameId = searchParams.get("gameId");
     if (isNew) {
-      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
       startGame();
     } else if (urlGameId) {
@@ -173,7 +173,7 @@ export default function GhUserGamePage() {
       const data = res.data;
       setGameId(data.game_id);
       setConfig(data.config);
-      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0 });
+      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 });
       const seq = data.seq || "";
       const picks = data.round_picks || [];
       setResults(seq.split("").map((v, i) => {
@@ -206,6 +206,7 @@ export default function GhUserGamePage() {
       status = pick === inputValue ? "hit" : "miss";
     }
     setResults((prev) => [...prev, { value: inputValue, status }]);
+    setBetData(null);
 
     try {
       const res = await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
@@ -215,7 +216,7 @@ export default function GhUserGamePage() {
         window.location.reload();
         return;
       }
-      setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0 });
+      setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0 });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
@@ -244,7 +245,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
       setResults(results.slice(0, -1));
-      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0 });
+      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
@@ -272,9 +273,9 @@ export default function GhUserGamePage() {
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
-        setCumPnL({ gh: res.data.carry_pnl.gh || 0, user_a: res.data.carry_pnl.user_a || 0, user_z: res.data.carry_pnl.user_z || 0 });
+        setCumPnL({ gh: res.data.carry_pnl.gh || 0, user_a: res.data.carry_pnl.user_a || 0, user_z: res.data.carry_pnl.user_z || 0, allp: res.data.carry_pnl.allp || 0, allb: res.data.carry_pnl.allb || 0, fail: res.data.carry_pnl.fail || 0 });
       } else {
-        setCumPnL({ gh: 0, user_a: 0, user_z: 0 });
+        setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 });
       }
       if (res.data.status === "ending" && res.data.ending_snapshot) {
         setEndingMode(true); setEndingSnapshot(res.data.ending_snapshot);
@@ -346,7 +347,7 @@ export default function GhUserGamePage() {
       } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+    setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
     setGlobalhitData([]);
     setSearchParams({}, { replace: true });
     startGame();
@@ -363,7 +364,7 @@ export default function GhUserGamePage() {
         } catch {}
       }
       setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
       await startGame();
     } finally {
@@ -404,34 +405,39 @@ export default function GhUserGamePage() {
 
       {/* ===== 중단: 인터페이스 (한줄) ===== */}
       <Box sx={{ display: "flex", alignItems: "center", gap: isMobile ? 0.5 : 1, mb: 1, flexWrap: "wrap" }}>
-        {/* 좌: 마틴A/Z 2행 */}
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-          {/* 마틴A 행 */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
-              <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>마틴A</Typography>
-            </Box>
-            <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: "#4caf50" }}>
-                {betData?.user_martin?.martin_a?.amount ? `${betData.user_martin.martin_a.amount.toLocaleString()}${betData.user_martin.martin_a.direction || ""}` : "0"}
-              </Typography>
-            </Box>
-          </Box>
-          {/* 마틴Z 행 */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: "#c62828", display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
-              <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>마틴Z</Typography>
-            </Box>
-            <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: "#4caf50" }}>
-                {betData?.user_martin?.martin_z?.amount ? `${betData.user_martin.martin_z.amount.toLocaleString()}${betData.user_martin.martin_z.direction || ""}` : "0"}
-              </Typography>
-            </Box>
-          </Box>
+        {/* 좌: 배팅 5행 */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
+          {[
+            { key: "martin_a", label: "마틴A", bg: "#1565c0" },
+            { key: "martin_z", label: "마틴Z", bg: "#c62828" },
+            { key: "allp", label: "AllP", bg: "#6a1b9a" },
+            { key: "fail", label: `fail${userMartinDashboard?.fail?.fail_count || ""}`, bg: "#e65100" },
+            { key: "allb", label: "AllB", bg: "#00695c" },
+          ].map((t) => {
+            const td = betData?.user_martin?.[t.key];
+            const amt = td?.amount || 0;
+            const dir = td?.direction || "";
+            return (
+              <Box key={t.key} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: t.bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
+                  <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
+                </Box>
+                <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                  <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
+                    {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })}
         </Box>
 
         {/* 픽이미지 A/Z 2개 */}
-        {(() => {
+        {processing ? (
+          <Box sx={{ width: isMobile ? 108 : 194, height: isMobile ? 52 : 95, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <CircularProgress size={isMobile ? 28 : 40} sx={{ color: "rgba(255,255,255,0.6)" }} />
+          </Box>
+        ) : (() => {
           const umA = betData?.user_martin?.martin_a;
           const umZ = betData?.user_martin?.martin_z;
           const pickA = umA?.direction || null;
@@ -513,12 +519,15 @@ export default function GhUserGamePage() {
             {[
               { name: "마틴A", pnl: cumPnL.user_a },
               { name: "마틴Z", pnl: cumPnL.user_z },
+              { name: "AllP", pnl: cumPnL.allp },
+              { name: "AllB", pnl: cumPnL.allb },
+              { name: "fail", pnl: cumPnL.fail },
             ].map((item) => (
               <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
                 {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
               </Typography>
             ))}
-            {(() => { const t = cumPnL.user_a + cumPnL.user_z; return (
+            {(() => { const t = cumPnL.user_a + cumPnL.user_z + cumPnL.allp + cumPnL.allb + cumPnL.fail; return (
               <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
                 Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
               </Typography>
@@ -568,28 +577,44 @@ export default function GhUserGamePage() {
         </DialogActions>
       </Dialog>
 
-      {/* ===== 총금액 요약 (A그룹 / Z그룹) ===== */}
+      {/* ===== 총금액 요약 5칸 (MA|MZ|AllP|fail|AllB) ===== */}
       {(() => {
         const sA = userSummary?.martin_a;
         const sZ = userSummary?.martin_z;
+        const um = betData?.user_martin;
+        const dash = userMartinDashboard;
+
+        const pnlText = (v) => { const s = v > 0 ? "+" : ""; return `${s}${v.toLocaleString()}P`; };
+        const pnlColor = (v) => v > 0 ? "#4caf50" : v < 0 ? "#f44336" : "#fff";
 
         const formalADir = sA?.direction || "wait";
         const formalZDir = sZ?.direction || "wait";
         const formalAColor = formalADir === "P" ? "#1565c0" : formalADir === "B" ? "#f44336" : "#888";
         const formalZColor = formalZDir === "P" ? "#1565c0" : formalZDir === "B" ? "#f44336" : "#888";
-
         const martinPnlA = sA?.pnl || 0;
         const martinPnlZ = sZ?.pnl || 0;
-
         const martinActive = (sA?.bet_p || 0) + (sA?.bet_b || 0) > 0;
         const martinZActive = (sZ?.bet_p || 0) + (sZ?.bet_b || 0) > 0;
 
-        const pnlText = (v) => { const s = v > 0 ? "+" : ""; return `${s}${v.toLocaleString()}P`; };
-        const pnlColor = (v) => v > 0 ? "#4caf50" : v < 0 ? "#f44336" : "#fff";
+        const alwaysInfo = (key) => {
+          const trackData = um?.[key];
+          const dashData = dash?.[key];
+          const dir = trackData?.direction || "wait";
+          const amt = trackData?.amount || 0;
+          const step = dashData?.step || dashData?.step_min || 1;
+          const dirColor = dir === "P" ? "#1565c0" : dir === "B" ? "#f44336" : "#888";
+          const mActive = amt > 0;
+          const failExtra = key === "fail" && dashData ? `f${dashData.fail_count || 2}(${dashData.miss_streak || 0})` : "";
+          return { dir, amt, step, dirColor, mActive, failExtra };
+        };
+
+        const allpInfo = alwaysInfo("allp");
+        const failInfo = alwaysInfo("fail");
+        const allbInfo = alwaysInfo("allb");
 
         if (isMobile) {
           const rowSx = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5, borderRadius: 1, px: 0.8, py: 0.3, whiteSpace: "nowrap" };
-          const renderGroup = (label, fDir, fColor, martinPnl, mActive) => (
+          const renderMartin = (label, fDir, fColor, martinPnl, mActive) => (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
               <Box sx={{ ...rowSx, border: "1px solid rgba(255,255,255,0.3)" }}>
                 <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>formal</Typography>
@@ -605,15 +630,34 @@ export default function GhUserGamePage() {
               </Box>
             </Box>
           );
+          const renderAlways = (label, color, pnl, info) => (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
+              <Box sx={{ ...rowSx, border: `1px solid ${info.mActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
+                <Typography variant="caption" sx={{ fontSize: 9, color: color, fontWeight: "bold" }}>{label}{info.failExtra ? ` ${info.failExtra}` : ""}</Typography>
+                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: info.dirColor }}>{info.dir}</Typography>
+              </Box>
+              <Box sx={{ ...rowSx, border: `1px solid ${info.mActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
+                <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{info.amt > 0 ? `${info.amt.toLocaleString()}` : "—"} <span style={{ fontSize: 7 }}>{info.step}S</span></Typography>
+                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(pnl) }}>{pnlText(pnl)}</Typography>
+              </Box>
+              <Box sx={{ ...rowSx, backgroundColor: color }}>
+                <Typography variant="caption" sx={{ fontSize: 9, color: "#fff" }}>합계</Typography>
+                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnl < 0 ? "#ffcdd2" : "#fff" }}>{pnlText(pnl)}</Typography>
+              </Box>
+            </Box>
+          );
           return (
-            <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
-              {renderGroup("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
-              {renderGroup("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
+            <Box sx={{ display: "flex", gap: 0.5, mb: 1 }}>
+              {renderMartin("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
+              {renderMartin("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
+              {renderAlways("AllP", "#6a1b9a", cumPnL.allp, allpInfo)}
+              {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
+              {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
             </Box>
           );
         }
 
-        const renderGroup = (label, fDir, fColor, martinPnl, mActive) => (
+        const renderMartin = (label, fDir, fColor, martinPnl, mActive) => (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
             <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#888" }}>formal</Typography>
@@ -629,10 +673,29 @@ export default function GhUserGamePage() {
           </Box>
         );
 
+        const renderAlways = (label, color, pnl, info) => (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
+            <Box sx={{ border: `1px solid ${info.mActive ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: color }}>{label}{info.failExtra ? ` ${info.failExtra}` : ""}</Typography>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: info.dirColor }}>{info.dir}</Typography>
+            </Box>
+            <Box sx={{ border: `1px solid ${info.mActive ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>{info.amt > 0 ? `${info.amt.toLocaleString()}` : "—"} <span style={{ fontSize: 9 }}>{info.step}S</span></Typography>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(pnl) }}>{pnlText(pnl)}</Typography>
+            </Box>
+            <Box sx={{ backgroundColor: color, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnl < 0 ? "#ffcdd2" : "#fff" }}>{pnlText(pnl)}</Typography>
+            </Box>
+          </Box>
+        );
+
         return (
           <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
-            {renderGroup("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
-            {renderGroup("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
+            {renderMartin("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
+            {renderMartin("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
+            {renderAlways("AllP", "#6a1b9a", cumPnL.allp, allpInfo)}
+            {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
+            {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
           </Box>
         );
       })()}
@@ -954,12 +1017,15 @@ export default function GhUserGamePage() {
             {[
               { name: "마틴A", pnl: cumPnL.user_a },
               { name: "마틴Z", pnl: cumPnL.user_z },
+              { name: "AllP", pnl: cumPnL.allp },
+              { name: "AllB", pnl: cumPnL.allb },
+              { name: "fail", pnl: cumPnL.fail },
             ].map((item) => (
               <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
                 {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
               </Typography>
             ))}
-            {(() => { const t = cumPnL.user_a + cumPnL.user_z; return (
+            {(() => { const t = cumPnL.user_a + cumPnL.user_z + cumPnL.allp + cumPnL.allb + cumPnL.fail; return (
               <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
                 Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
               </Typography>
