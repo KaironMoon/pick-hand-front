@@ -97,6 +97,7 @@ export default function MhUserGamePage() {
   const [pickResult, setPickResult] = useState({ method: "wait", pick: null });
   const [selectedGridCell, setSelectedGridCell] = useState(null);
   const [globalhitData, setGlobalhitData] = useState([]);
+  const [ghActiveSteps, setGhActiveSteps] = useState({});
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [refGameSeq, setRefGameSeq] = useState(null);
@@ -126,8 +127,8 @@ export default function MhUserGamePage() {
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
 
-  // 유저 배팅: user_martin.combined 기준
-  const umCombined = userMartin?.combined;
+  // 유저 배팅: user_martin.combined → bet.combined fallback
+  const umCombined = userMartin?.combined || betData?.combined;
   const displayPick = umCombined?.direction && umCombined.direction !== "wait" ? umCombined.direction : null;
   const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
@@ -149,6 +150,7 @@ export default function MhUserGamePage() {
     if (data.method !== undefined) setPickResult({ method: data.method, pick: data.pick || null, prev_picks: data.prev_picks, nickname: data.nickname, code1: data.code1, code2: data.code2 });
     if (data.mh_grids) setMhGrids(data.mh_grids);
     setGlobalhitData(data.globalhit || []);
+    setGhActiveSteps(data.gh_active_steps || {});
     setBetData(data.bet || null);
     if (data.user_martin !== undefined) setUserMartin(data.user_martin || null);
     if (data.user_summary !== undefined) setUserSummary(data.user_summary || null);
@@ -158,7 +160,7 @@ export default function MhUserGamePage() {
   const resetAll = () => {
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
     setResults([]); setCumPnL({ mh: 0, gh: 0, user_a: 0, user_z: 0 }); setCarryPnL({ mh: 0, gh: 0 });
-    setBetData(null); setUserMartin(null); setPickResult({ method: "wait", pick: null }); setGlobalhitData([]);
+    setBetData(null); setUserMartin(null); setPickResult({ method: "wait", pick: null }); setGlobalhitData([]); setGhActiveSteps({});
     setUserSummary(null); setUserMartinDashboard(null);
   };
 
@@ -176,6 +178,7 @@ export default function MhUserGamePage() {
       setRefShoes(data.ref_shoes || "");
       setMhGrids(data.mh_grids || null);
       setGlobalhitData(data.globalhit || []);
+      setGhActiveSteps(data.gh_active_steps || {});
       setBetData(data.bet || null);
       setUserMartin(data.user_martin || null);
       setUserSummary(data.user_summary || null);
@@ -199,6 +202,7 @@ export default function MhUserGamePage() {
       setRefShoes(data.ref_shoes || "");
       setMhGrids(data.mh_grids || null);
       setGlobalhitData(data.globalhit || []);
+      setGhActiveSteps(data.gh_active_steps || {});
       setBetData(data.bet || null);
       setUserMartin(data.user_martin || null);
       setUserSummary(data.user_summary || null);
@@ -273,6 +277,7 @@ export default function MhUserGamePage() {
       setPickResult({ method: data.method, pick: data.pick, prev_picks: data.prev_picks, nickname: data.nickname, code1: data.code1, code2: data.code2 });
       if (data.mh_grids) setMhGrids(data.mh_grids);
       setGlobalhitData(data.globalhit || []);
+      setGhActiveSteps(data.gh_active_steps || {});
       setBetData(data.bet || null);
       setUserMartin(data.user_martin || null);
       setUserSummary(data.user_summary || null);
@@ -309,6 +314,7 @@ export default function MhUserGamePage() {
       setPickResult({ method: data.method, pick: data.pick, prev_picks: data.prev_picks, nickname: data.nickname, code1: data.code1, code2: data.code2 });
       if (data.mh_grids) setMhGrids(data.mh_grids);
       setGlobalhitData(data.globalhit || []);
+      setGhActiveSteps(data.gh_active_steps || {});
       setBetData(data.bet || null);
       setUserMartin(data.user_martin || null);
       setUserSummary(data.user_summary || null);
@@ -326,19 +332,13 @@ export default function MhUserGamePage() {
   const handleEndingMode = async () => {
     if (endingMode || !betData) return;
 
-    const nc = betData.megahit;
-    const gh = betData.globalhit;
+    // 유저: 서버가 내려준 요약 데이터로 snapshot 구성
+    const mhStep = betData.megahit?.step ?? betData.mh_step ?? 1;
+    const ghSteps = ghActiveSteps || {};
     const snapshot = { nc: false, gh: new Set(), pinch: new Set() };
 
-    if (nc && nc.step > 1) snapshot.nc = true;
-
-    if (globalhitData) {
-      globalhitData.forEach((pat) => {
-        pat.groups.forEach((g) => {
-          if (g.step > 1) snapshot.gh.add(`${pat.pattern}-${g.group + 1}`);
-        });
-      });
-    }
+    if (mhStep > 1) snapshot.nc = true;
+    Object.keys(ghSteps).forEach((key) => { if (ghSteps[key] > 1) snapshot.gh.add(key); });
 
     if (!snapshot.nc && snapshot.gh.size === 0) {
       try {
@@ -357,6 +357,7 @@ export default function MhUserGamePage() {
       setPickResult({ method: data.method, pick: data.pick, prev_picks: data.prev_picks, nickname: data.nickname, code1: data.code1, code2: data.code2 });
       if (data.mh_grids) setMhGrids(data.mh_grids);
       setGlobalhitData(data.globalhit || []);
+      setGhActiveSteps(data.gh_active_steps || {});
       setBetData(data.bet || null);
     } catch (err) { console.error("Failed to start ending:", err); }
 
@@ -367,11 +368,16 @@ export default function MhUserGamePage() {
   // 종료 완료 체크
   const checkEndingComplete = (data) => {
     if (!endingSnapshot) return false;
-    const nc = data.bet?.megahit;
-    const gh = data.bet?.globalhit;
 
-    if (endingSnapshot.nc && nc && nc.step > 1) return false;
+    // 어드민: bet.megahit 사용, 유저: bet.mh_step 사용
+    const mhStep = data.bet?.megahit?.step ?? data.bet?.mh_step ?? 1;
+    if (endingSnapshot.nc && mhStep > 1) return false;
 
+    // 어드민: globalhit 상세, 유저: gh_active_steps 요약
+    const activeSteps = data.gh_active_steps || {};
+    for (const key of endingSnapshot.gh) {
+      if (activeSteps[key] && activeSteps[key] > 1) return false;
+    }
     if (data.globalhit) {
       for (const key of endingSnapshot.gh) {
         const [pat, grp] = key.split("-");
@@ -584,7 +590,7 @@ export default function MhUserGamePage() {
 
       {/* 상단 PnL 요약 바 (마틴A/Z) */}
       {(() => {
-        const gh = betData?.globalhit;
+        const gh = betData?.gh_summary || betData?.globalhit;
         const ghHasBet = (gh?.P || 0) + (gh?.B || 0) > 0;
         const umA = userMartin?.martin_a;
         const umZ = userMartin?.martin_z;
