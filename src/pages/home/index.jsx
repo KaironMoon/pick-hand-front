@@ -10,6 +10,12 @@ const games = [
   { name: "허니비", key: "hb", img: "/honeybee.png", adminPath: "/hbgame", userPath: "/hbgame/user" },
   { name: "글로벌히트", key: "gh", img: "/globalhit.png", adminPath: "/ghgame", userPath: "/ghgame/user" },
   { name: "나이스초이스", key: "nc", img: "/nicechoice.png", adminPath: "/ncgame", userPath: "/ncgame/user" },
+  { name: "위너히트", key: "wh", img: "/winnerhit.png", adminPath: "/whgame", userPath: "/whgame/user" },
+  { name: "메가히트", key: "mh", img: "/megahit.png", adminPath: "/mhgame", userPath: "/mhgame/user" },
+  { name: "드림히트", key: "dh", img: "/dreamhit.png", adminPath: "/dhgame", userPath: "/dhgame/user" },
+  { name: "페가서스", key: "pegasus", img: "/pegasus.png", comingSoon: true },
+  { name: "AI369", key: "ai369", img: "/ai369.png", comingSoon: true },
+  { name: "프라다OK", key: "pradaok", img: "/pradaok.png", comingSoon: true },
 ];
 
 const Home = () => {
@@ -24,6 +30,10 @@ const Home = () => {
   }, [fetchBlocked]);
 
   const handleClick = (g) => {
+    if (g.comingSoon) {
+      setPopupOpen(true);
+      return;
+    }
     if (user?.role === "admin") {
       navigate(g.adminPath);
     } else if (blockedGames.includes(g.key)) {
