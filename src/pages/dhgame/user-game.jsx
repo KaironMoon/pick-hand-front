@@ -441,6 +441,7 @@ export default function DhUserGamePage() {
       setUserMartin(d.user_martin || null);
       setUserSummary(d.user_summary || null);
       setUserMartinDashboard(d.user_martin_dashboard || null);
+      setGhActiveSteps(d.gh_active_steps || {});
       if (d.carry_pnl) { setCumPnL({ ...d.carry_pnl, user_a: d.carry_pnl.user_a || 0, user_z: d.carry_pnl.user_z || 0 }); setCarryPnL(d.carry_pnl); }
       else { setCumPnL({ dh: 0, gh: 0, user_a: 0, user_z: 0 }); setCarryPnL({ dh: 0, gh: 0 }); }
       if (d.status === "ending" && d.ending_snapshot) {

@@ -441,6 +441,7 @@ export default function WhUserGamePage() {
       setUserMartin(d.user_martin || null);
       setUserSummary(d.user_summary || null);
       setUserMartinDashboard(d.user_martin_dashboard || null);
+      setGhActiveSteps(d.gh_active_steps || {});
       if (d.carry_pnl) { setCumPnL({ ...d.carry_pnl, user_a: d.carry_pnl.user_a || 0, user_z: d.carry_pnl.user_z || 0 }); setCarryPnL(d.carry_pnl); }
       else { setCumPnL({ nc: 0, gh: 0, user_a: 0, user_z: 0 }); setCarryPnL({ nc: 0, gh: 0 }); }
       if (d.status === "ending" && d.ending_snapshot) {
@@ -651,9 +652,9 @@ export default function WhUserGamePage() {
             return (
           <table style={{ borderCollapse: "collapse", width: "fit-content", marginBottom: 12, filter: anyBet ? "none" : "grayscale(100%)", opacity: anyBet ? 1 : 0.8 }}>
             <tbody>
-              {/* 0행: NC 단계 */}
+              {/* 0행: WH 단계 */}
               <tr>
-                <td style={{ ...dcB, color: "#ff9800" }}>NC단계</td>
+                <td style={{ ...dcB, color: "#ff9800" }}>WH단계</td>
                 <td style={{ ...dcB, color: (nc?.step || 0) > 1 ? "#f44336" : "#fff" }}>{`M${nc?.step || 0}`}</td>
                 <td colSpan={10} style={dc}></td>
               </tr>
