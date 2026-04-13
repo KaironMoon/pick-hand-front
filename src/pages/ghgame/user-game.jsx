@@ -410,7 +410,7 @@ export default function GhUserGamePage() {
 
       {/* ===== 중단: 인터페이스 (한줄) ===== */}
       <Box sx={{ display: "flex", alignItems: "center", gap: isMobile ? 0.5 : 1, mb: 1, flexWrap: "wrap" }}>
-        {/* 좌: 배팅 8행 (2열x4행) + 총배팅 */}
+        {/* 좌: 배팅 8행 (2열x4행) + 총배팅(A제외) */}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
           <Box sx={{ display: "flex", gap: isMobile ? 0.5 : 1 }}>
             {/* 왼쪽 4행 */}
@@ -466,7 +466,7 @@ export default function GhUserGamePage() {
               })}
             </Box>
           </Box>
-          {/* 총배팅 */}
+          {/* 총배팅(A제외) */}
           {(() => {
             const total = betData?.user_martin?.total;
             const tAmt = total?.amount || 0;
@@ -476,7 +476,7 @@ export default function GhUserGamePage() {
             return (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.3 }}>
                 <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: "#37474f", display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
-                  <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>총배팅</Typography>
+                  <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>총배팅(A제외)</Typography>
                 </Box>
                 <Box sx={{ border: "1px solid rgba(255,255,255,0.5)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5, backgroundColor: "rgba(255,255,255,0.05)", flex: 1 }}>
                   <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: tDir === "P" ? "#42a5f5" : tDir === "B" ? "#ef5350" : "#666" }}>
