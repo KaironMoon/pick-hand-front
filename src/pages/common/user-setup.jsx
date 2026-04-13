@@ -408,9 +408,7 @@ export default function UserSetupPage({ gameType }) {
                 <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
                 <MartinSection name="hnh" label="HnH" martin={hnh} onChange={(m) => updateMartin("hnh", m)} labelColor="#558b2f" />
                 <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-                <MartinSection name="one" label="ONE" martin={one} onChange={(m) => updateMartin("one", m)} labelColor="#00838f" />
-                <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-                <MartinSection name="two" label="TWO" martin={two} onChange={(m) => updateMartin("two", m)} labelColor="#4527a0" />
+                <MartinSection name="one" label="ONE/TWO" martin={one} onChange={(m) => { updateMartin("one", m); updateMartin("two", m); }} labelColor="#00838f" />
               </>
             )}
           </tbody>

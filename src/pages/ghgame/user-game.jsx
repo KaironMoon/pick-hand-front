@@ -444,12 +444,20 @@ export default function GhUserGamePage() {
               {[
                 { key: "allb", label: "AllB", bg: "#00695c" },
                 { key: "hnh", label: "HnH", bg: "#558b2f" },
-                { key: "one", label: "ONE", bg: "#00838f" },
-                { key: "two", label: "TWO", bg: "#4527a0" },
+                { key: "_onetwo", label: "1-2", bg: "#00838f" },
               ].map((t) => {
-                const td = betData?.user_martin?.[t.key];
-                const amt = td?.amount || 0;
-                const dir = td?.direction || "";
+                let td, amt, dir;
+                if (t.key === "_onetwo") {
+                  const o = betData?.user_martin?.one;
+                  const tw = betData?.user_martin?.two;
+                  td = (o?.direction && o.direction !== "wait") ? o : (tw?.direction && tw.direction !== "wait") ? tw : (o || tw || {});
+                  amt = td?.amount || 0;
+                  dir = td?.direction || "";
+                } else {
+                  td = betData?.user_martin?.[t.key];
+                  amt = td?.amount || 0;
+                  dir = td?.direction || "";
+                }
                 return (
                   <Box key={t.key} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                     <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: t.bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
@@ -594,8 +602,7 @@ export default function GhUserGamePage() {
               { name: "AllB", pnl: cumPnL.allb },
               { name: "fail", pnl: cumPnL.fail },
               { name: "HnH", pnl: cumPnL.hnh },
-              { name: "ONE", pnl: cumPnL.one },
-              { name: "TWO", pnl: cumPnL.two },
+              { name: isMobile ? "1-2" : "one-two", pnl: (cumPnL.one || 0) + (cumPnL.two || 0) },
             ].map((item) => (
               <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
                 {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
@@ -723,8 +730,7 @@ export default function GhUserGamePage() {
               {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
               {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
               {renderAlways("HnH", "#558b2f", cumPnL.hnh, hnhInfo)}
-              {renderAlways("ONE", "#00838f", cumPnL.one, oneInfo)}
-              {renderAlways("TWO", "#4527a0", cumPnL.two, twoInfo)}
+              {renderAlways(isMobile ? "1-2" : "one-two", "#00838f", (cumPnL.one || 0) + (cumPnL.two || 0), oneInfo.mActive || twoInfo.mActive ? { ...oneInfo, ...(twoInfo.mActive ? twoInfo : {}), mActive: true } : oneInfo)}
             </Box>
           );
         }
@@ -761,8 +767,7 @@ export default function GhUserGamePage() {
             {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
             {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
             {renderAlways("HnH", "#558b2f", cumPnL.hnh, hnhInfo)}
-            {renderAlways("ONE", "#00838f", cumPnL.one, oneInfo)}
-            {renderAlways("TWO", "#4527a0", cumPnL.two, twoInfo)}
+            {renderAlways(isMobile ? "1-2" : "one-two", "#00838f", (cumPnL.one || 0) + (cumPnL.two || 0), oneInfo.mActive || twoInfo.mActive ? { ...oneInfo, ...(twoInfo.mActive ? twoInfo : {}), mActive: true } : oneInfo)}
           </Box>
         );
       })()}
@@ -1080,8 +1085,7 @@ export default function GhUserGamePage() {
               { name: "AllB", pnl: cumPnL.allb },
               { name: "fail", pnl: cumPnL.fail },
               { name: "HnH", pnl: cumPnL.hnh },
-              { name: "ONE", pnl: cumPnL.one },
-              { name: "TWO", pnl: cumPnL.two },
+              { name: isMobile ? "1-2" : "one-two", pnl: (cumPnL.one || 0) + (cumPnL.two || 0) },
             ].map((item) => (
               <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
                 {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
