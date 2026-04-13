@@ -89,7 +89,7 @@ export default function GhUserGamePage() {
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
-  const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 });
+  const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [endingMode, setEndingMode] = useState(false);
@@ -144,7 +144,7 @@ export default function GhUserGamePage() {
     const isNew = searchParams.get("new");
     const urlGameId = searchParams.get("gameId");
     if (isNew) {
-      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
       startGame();
     } else if (urlGameId) {
@@ -173,7 +173,7 @@ export default function GhUserGamePage() {
       const data = res.data;
       setGameId(data.game_id);
       setConfig(data.config);
-      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 });
+      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       const seq = data.seq || "";
       const picks = data.round_picks || [];
       setResults(seq.split("").map((v, i) => {
@@ -216,7 +216,7 @@ export default function GhUserGamePage() {
         window.location.reload();
         return;
       }
-      setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0 });
+      setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0 });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
@@ -230,6 +230,11 @@ export default function GhUserGamePage() {
     } catch (err) {
       console.error("Failed to record round:", err);
       setResults((prev) => prev.slice(0, -1));
+      if (err.response?.status === 404) {
+        alert("게임이 종료되었거나 존재하지 않습니다.");
+        navigate("/");
+        return;
+      }
       alert("서버 오류로 입력이 반영되지 않았습니다. 다시 시도해주세요.");
     } finally {
       processingRef.current = false;
@@ -245,7 +250,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
       setResults(results.slice(0, -1));
-      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 });
+      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
@@ -273,9 +278,9 @@ export default function GhUserGamePage() {
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
-        setCumPnL({ gh: res.data.carry_pnl.gh || 0, user_a: res.data.carry_pnl.user_a || 0, user_z: res.data.carry_pnl.user_z || 0, allp: res.data.carry_pnl.allp || 0, allb: res.data.carry_pnl.allb || 0, fail: res.data.carry_pnl.fail || 0 });
+        setCumPnL({ gh: res.data.carry_pnl.gh || 0, user_a: res.data.carry_pnl.user_a || 0, user_z: res.data.carry_pnl.user_z || 0, allp: res.data.carry_pnl.allp || 0, allb: res.data.carry_pnl.allb || 0, fail: res.data.carry_pnl.fail || 0, hnh: res.data.carry_pnl.hnh || 0, one: res.data.carry_pnl.one || 0, two: res.data.carry_pnl.two || 0 });
       } else {
-        setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 });
+        setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       }
       if (res.data.status === "ending" && res.data.ending_snapshot) {
         setEndingMode(true); setEndingSnapshot(res.data.ending_snapshot);
@@ -347,7 +352,7 @@ export default function GhUserGamePage() {
       } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+    setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
     setGlobalhitData([]);
     setSearchParams({}, { replace: true });
     startGame();
@@ -364,7 +369,7 @@ export default function GhUserGamePage() {
         } catch {}
       }
       setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
       await startGame();
     } finally {
@@ -405,31 +410,83 @@ export default function GhUserGamePage() {
 
       {/* ===== 중단: 인터페이스 (한줄) ===== */}
       <Box sx={{ display: "flex", alignItems: "center", gap: isMobile ? 0.5 : 1, mb: 1, flexWrap: "wrap" }}>
-        {/* 좌: 배팅 5행 */}
+        {/* 좌: 배팅 8행 (2열x4행) + 총배팅 */}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
-          {[
-            { key: "martin_a", label: "마틴A", bg: "#1565c0" },
-            { key: "martin_z", label: "마틴Z", bg: "#c62828" },
-            { key: "allp", label: "AllP", bg: "#6a1b9a" },
-            { key: "fail", label: `fail${userMartinDashboard?.fail?.fail_count || ""}`, bg: "#e65100" },
-            { key: "allb", label: "AllB", bg: "#00695c" },
-          ].map((t) => {
-            const td = betData?.user_martin?.[t.key];
-            const amt = td?.amount || 0;
-            const dir = td?.direction || "";
+          <Box sx={{ display: "flex", gap: isMobile ? 0.5 : 1 }}>
+            {/* 왼쪽 4행 */}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
+              {[
+                { key: "martin_a", label: "마틴A", bg: "#1565c0" },
+                { key: "martin_z", label: "마틴Z", bg: "#c62828" },
+                { key: "allp", label: "AllP", bg: "#6a1b9a" },
+                { key: "fail", label: `fail${userMartinDashboard?.fail?.fail_count || ""}`, bg: "#e65100" },
+              ].map((t) => {
+                const td = betData?.user_martin?.[t.key];
+                const amt = td?.amount || 0;
+                const dir = td?.direction || "";
+                return (
+                  <Box key={t.key} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: t.bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
+                      <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
+                    </Box>
+                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
+                      <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 10, color: "#888" }}>{td?.step || 1}S</Typography>
+                      <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
+                        {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+            {/* 오른쪽 4행 */}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
+              {[
+                { key: "allb", label: "AllB", bg: "#00695c" },
+                { key: "hnh", label: "HnH", bg: "#558b2f" },
+                { key: "one", label: "ONE", bg: "#00838f" },
+                { key: "two", label: "TWO", bg: "#4527a0" },
+              ].map((t) => {
+                const td = betData?.user_martin?.[t.key];
+                const amt = td?.amount || 0;
+                const dir = td?.direction || "";
+                return (
+                  <Box key={t.key} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: t.bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
+                      <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
+                    </Box>
+                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
+                      <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 10, color: "#888" }}>{td?.step || 1}S</Typography>
+                      <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
+                        {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+          {/* 총배팅 */}
+          {(() => {
+            const total = betData?.user_martin?.total;
+            const tAmt = total?.amount || 0;
+            const tDir = total?.direction || "";
+            const tP = total?.total_P || 0;
+            const tB = total?.total_B || 0;
             return (
-              <Box key={t.key} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: t.bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
-                  <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.3 }}>
+                <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: "#37474f", display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
+                  <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>총배팅</Typography>
                 </Box>
-                <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-                  <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
-                    {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
+                <Box sx={{ border: "1px solid rgba(255,255,255,0.5)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5, backgroundColor: "rgba(255,255,255,0.05)", flex: 1 }}>
+                  <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: tDir === "P" ? "#42a5f5" : tDir === "B" ? "#ef5350" : "#666" }}>
+                    {tAmt > 0 ? `${tAmt.toLocaleString()}${tDir}` : "0"}
                   </Typography>
+                  {(tP > 0 || tB > 0) && <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#aaa" }}>({tP.toLocaleString()}P, {tB.toLocaleString()}B)</Typography>}
                 </Box>
               </Box>
             );
-          })}
+          })()}
         </Box>
 
         {/* 픽이미지 A/Z 2개 */}
@@ -453,8 +510,22 @@ export default function GhUserGamePage() {
                 <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, color: "#1565c0", fontWeight: "bold" }}>A</Typography>
               </Box>
               <Box sx={{ width: boxSz, height: boxSz, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                <img src={imgZ} alt="pickZ" style={{ width: sz, height: sz, objectFit: "contain" }} />
-                <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, color: "#c62828", fontWeight: "bold" }}>Z</Typography>
+                {(() => {
+                  const oneDir = betData?.user_martin?.one?.direction;
+                  const twoDir = betData?.user_martin?.two?.direction;
+                  const hasOne = oneDir && oneDir !== "wait";
+                  const hasTwo = twoDir && twoDir !== "wait";
+                  const label = hasOne ? "ONE" : hasTwo ? "TWO" : "wait";
+                  const dir = hasOne ? oneDir : hasTwo ? twoDir : null;
+                  const labelColor = hasOne ? "#00838f" : hasTwo ? "#4527a0" : "#888";
+                  const img = dir === "P" ? "/player.png" : dir === "B" ? "/banker.png" : "/wait.png";
+                  return (
+                    <>
+                      <img src={img} alt="pick" style={{ width: sz, height: sz, objectFit: "contain" }} />
+                      <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, fontWeight: "bold", color: "#fff", backgroundColor: labelColor, px: 0.4, borderRadius: 0.5, lineHeight: 1.2 }}>{label}</Typography>
+                    </>
+                  );
+                })()}
               </Box>
             </Box>
           );
@@ -522,12 +593,15 @@ export default function GhUserGamePage() {
               { name: "AllP", pnl: cumPnL.allp },
               { name: "AllB", pnl: cumPnL.allb },
               { name: "fail", pnl: cumPnL.fail },
+              { name: "HnH", pnl: cumPnL.hnh },
+              { name: "ONE", pnl: cumPnL.one },
+              { name: "TWO", pnl: cumPnL.two },
             ].map((item) => (
               <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
                 {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
               </Typography>
             ))}
-            {(() => { const t = cumPnL.user_a + cumPnL.user_z + cumPnL.allp + cumPnL.allb + cumPnL.fail; return (
+            {(() => { const t = cumPnL.user_a + cumPnL.user_z + cumPnL.allp + cumPnL.allb + cumPnL.fail + cumPnL.hnh + cumPnL.one + cumPnL.two; return (
               <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
                 Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
               </Typography>
@@ -611,18 +685,17 @@ export default function GhUserGamePage() {
         const allpInfo = alwaysInfo("allp");
         const failInfo = alwaysInfo("fail");
         const allbInfo = alwaysInfo("allb");
+        const hnhInfo = alwaysInfo("hnh");
+        const oneInfo = alwaysInfo("one");
+        const twoInfo = alwaysInfo("two");
 
         if (isMobile) {
           const rowSx = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5, borderRadius: 1, px: 0.8, py: 0.3, whiteSpace: "nowrap" };
           const renderMartin = (label, fDir, fColor, martinPnl, mActive) => (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
-              <Box sx={{ ...rowSx, border: "1px solid rgba(255,255,255,0.3)" }}>
-                <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>formal</Typography>
-                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{fDir}</Typography>
-              </Box>
               <Box sx={{ ...rowSx, border: `1px solid ${mActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
                 <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{label}</Typography>
-                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(martinPnl) }}>{pnlText(martinPnl)}</Typography>
+                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{fDir}</Typography>
               </Box>
               <Box sx={{ ...rowSx, backgroundColor: "#00bcd4" }}>
                 <Typography variant="caption" sx={{ fontSize: 9, color: "#000" }}>합계</Typography>
@@ -633,12 +706,8 @@ export default function GhUserGamePage() {
           const renderAlways = (label, color, pnl, info) => (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
               <Box sx={{ ...rowSx, border: `1px solid ${info.mActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
-                <Typography variant="caption" sx={{ fontSize: 9, color: color, fontWeight: "bold" }}>{label}{info.failExtra ? ` ${info.failExtra}` : ""}</Typography>
+                <Typography variant="caption" sx={{ fontSize: 9, color: color, fontWeight: "bold" }}>{label}{info.failExtra ? ` ${info.failExtra}` : ""} <span style={{ color: "#888", fontWeight: "normal" }}>{info.step}S</span></Typography>
                 <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: info.dirColor }}>{info.dir}</Typography>
-              </Box>
-              <Box sx={{ ...rowSx, border: `1px solid ${info.mActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
-                <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{info.amt > 0 ? `${info.amt.toLocaleString()}` : "—"} <span style={{ fontSize: 7 }}>{info.step}S</span></Typography>
-                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(pnl) }}>{pnlText(pnl)}</Typography>
               </Box>
               <Box sx={{ ...rowSx, backgroundColor: color }}>
                 <Typography variant="caption" sx={{ fontSize: 9, color: "#fff" }}>합계</Typography>
@@ -647,25 +716,24 @@ export default function GhUserGamePage() {
             </Box>
           );
           return (
-            <Box sx={{ display: "flex", gap: 0.5, mb: 1 }}>
+            <Box sx={{ display: "flex", gap: 0.5, mb: 1, flexWrap: "wrap" }}>
               {renderMartin("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
               {renderMartin("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
               {renderAlways("AllP", "#6a1b9a", cumPnL.allp, allpInfo)}
               {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
               {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
+              {renderAlways("HnH", "#558b2f", cumPnL.hnh, hnhInfo)}
+              {renderAlways("ONE", "#00838f", cumPnL.one, oneInfo)}
+              {renderAlways("TWO", "#4527a0", cumPnL.two, twoInfo)}
             </Box>
           );
         }
 
         const renderMartin = (label, fDir, fColor, martinPnl, mActive) => (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
-            <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#888" }}>formal</Typography>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{fDir}</Typography>
-            </Box>
             <Box sx={{ border: `1px solid ${mActive ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{label}</Typography>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(martinPnl) }}>{pnlText(martinPnl)}</Typography>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{fDir}</Typography>
             </Box>
             <Box sx={{ backgroundColor: "#00bcd4", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: martinPnl < 0 ? "#f44336" : "#000" }}>{pnlText(martinPnl)}</Typography>
@@ -676,12 +744,8 @@ export default function GhUserGamePage() {
         const renderAlways = (label, color, pnl, info) => (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
             <Box sx={{ border: `1px solid ${info.mActive ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: color }}>{label}{info.failExtra ? ` ${info.failExtra}` : ""}</Typography>
+              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: color }}>{label}{info.failExtra ? ` ${info.failExtra}` : ""} <span style={{ color: "#888", fontWeight: "normal" }}>{info.step}S</span></Typography>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: info.dirColor }}>{info.dir}</Typography>
-            </Box>
-            <Box sx={{ border: `1px solid ${info.mActive ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>{info.amt > 0 ? `${info.amt.toLocaleString()}` : "—"} <span style={{ fontSize: 9 }}>{info.step}S</span></Typography>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlColor(pnl) }}>{pnlText(pnl)}</Typography>
             </Box>
             <Box sx={{ backgroundColor: color, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
               <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnl < 0 ? "#ffcdd2" : "#fff" }}>{pnlText(pnl)}</Typography>
@@ -690,12 +754,15 @@ export default function GhUserGamePage() {
         );
 
         return (
-          <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
+          <Box sx={{ display: "flex", gap: 1, mb: 1, flexWrap: "wrap" }}>
             {renderMartin("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
             {renderMartin("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
             {renderAlways("AllP", "#6a1b9a", cumPnL.allp, allpInfo)}
             {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
             {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
+            {renderAlways("HnH", "#558b2f", cumPnL.hnh, hnhInfo)}
+            {renderAlways("ONE", "#00838f", cumPnL.one, oneInfo)}
+            {renderAlways("TWO", "#4527a0", cumPnL.two, twoInfo)}
           </Box>
         );
       })()}
@@ -732,24 +799,16 @@ export default function GhUserGamePage() {
               const umAHasBet = (umA?.amount || 0) > 0;
               const umZHasBet = (umZ?.amount || 0) > 0;
               const barSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1 };
-              const renderBar = (label, fDir, fColor, martinPnl, martinActive) => (
-                <Box sx={{ display: "flex", gap: 0.5, flex: 1 }}>
-                  <Box sx={{ ...barSx, minWidth: 0, justifyContent: "center" }}>
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{`formal(${fDir})`}</Typography>
-                  </Box>
-                  <Box sx={{ ...barSx, border: `1px solid ${martinActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{label}</Typography>
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlClr(martinPnl) }}>{pnlText(martinPnl)}</Typography>
-                  </Box>
-                  <Box sx={{ backgroundColor: "#00bcd4", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end", minWidth: 80 }}>
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: martinPnl < 0 ? "#f44336" : "#000" }}>{pnlText(martinPnl)}</Typography>
-                  </Box>
-                </Box>
-              );
+              const totalPnl = (cumPnL.user_a || 0) + (cumPnL.user_z || 0) + (cumPnL.allp || 0) + (cumPnL.allb || 0) + (cumPnL.fail || 0) + (cumPnL.hnh || 0) + (cumPnL.one || 0) + (cumPnL.two || 0);
               return (
-                <Box sx={{ display: "flex", gap: 1, mb: 0.5 }}>
-                  {renderBar("마틴A", fADir, fAColor, cumPnL.user_a, umAHasBet)}
-                  {renderBar("마틴Z", fZDir, fZColor, cumPnL.user_z, umZHasBet)}
+                <Box sx={{ display: "flex", gap: 0.5, mb: 0.5 }}>
+                  <Box sx={{ ...barSx, minWidth: 0, justifyContent: "center" }}>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fAColor }}>{`formal(${fADir})`}</Typography>
+                  </Box>
+                  <Box sx={{ ...barSx }}>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>합계</Typography>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlClr(totalPnl) }}>{pnlText(totalPnl)}</Typography>
+                  </Box>
                 </Box>
               );
             })()}
@@ -1020,12 +1079,15 @@ export default function GhUserGamePage() {
               { name: "AllP", pnl: cumPnL.allp },
               { name: "AllB", pnl: cumPnL.allb },
               { name: "fail", pnl: cumPnL.fail },
+              { name: "HnH", pnl: cumPnL.hnh },
+              { name: "ONE", pnl: cumPnL.one },
+              { name: "TWO", pnl: cumPnL.two },
             ].map((item) => (
               <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
                 {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
               </Typography>
             ))}
-            {(() => { const t = cumPnL.user_a + cumPnL.user_z + cumPnL.allp + cumPnL.allb + cumPnL.fail; return (
+            {(() => { const t = cumPnL.user_a + cumPnL.user_z + cumPnL.allp + cumPnL.allb + cumPnL.fail + cumPnL.hnh + cumPnL.one + cumPnL.two; return (
               <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
                 Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
               </Typography>

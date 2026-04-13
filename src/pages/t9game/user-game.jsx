@@ -336,6 +336,11 @@ export default function GamePage() {
     } catch (err) {
       console.error("Failed to record round:", err);
       setResults((prev) => prev.slice(0, -1));
+      if (err.response?.status === 404) {
+        alert("게임이 종료되었거나 존재하지 않습니다.");
+        navigate("/");
+        return;
+      }
       alert("서버 오류로 입력이 반영되지 않았습니다. 다시 시도해주세요.");
     } finally {
       processingRef.current = false;

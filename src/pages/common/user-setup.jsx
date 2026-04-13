@@ -373,6 +373,9 @@ export default function UserSetupPage({ gameType }) {
   const allp = config.allp || { ...DEFAULT_MARTIN };
   const allb = config.allb || { ...DEFAULT_MARTIN };
   const fail = config.fail || { ...DEFAULT_FAIL };
+  const hnh = config.hnh || { ...DEFAULT_MARTIN };
+  const one = config.one || { ...DEFAULT_MARTIN };
+  const two = config.two || { ...DEFAULT_MARTIN };
 
   return (
     <Box sx={{ p: 2 }}>
@@ -402,6 +405,12 @@ export default function UserSetupPage({ gameType }) {
                 <MartinSection name="allb" label="AllB" martin={allb} onChange={(m) => updateMartin("allb", m)} labelColor="#00695c" />
                 <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
                 <FailSection martin={fail} onChange={(m) => updateMartin("fail", m)} />
+                <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+                <MartinSection name="hnh" label="HnH" martin={hnh} onChange={(m) => updateMartin("hnh", m)} labelColor="#558b2f" />
+                <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+                <MartinSection name="one" label="ONE" martin={one} onChange={(m) => updateMartin("one", m)} labelColor="#00838f" />
+                <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+                <MartinSection name="two" label="TWO" martin={two} onChange={(m) => updateMartin("two", m)} labelColor="#4527a0" />
               </>
             )}
           </tbody>

@@ -214,6 +214,11 @@ export default function HbGamePage() {
       }
     } catch (err) {
       console.error("Failed to record round:", err);
+      if (err.response?.status === 404) {
+        alert("게임이 종료되었거나 존재하지 않습니다.");
+        navigate("/");
+        return;
+      }
     } finally {
       processingRef.current = false;
       setProcessing(false);
