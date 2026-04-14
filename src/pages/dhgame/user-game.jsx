@@ -4,7 +4,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
-import { DH_GAMES_API } from "@/constants/api-url";
+import { DH_GAMES_API, LINKED_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
+import useLinkedGame from "@/hooks/useLinkedGame";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -120,6 +121,26 @@ export default function DhUserGamePage() {
   const goalAlertedRef = useRef({ a: false, z: false });
   const [goalDialog, setGoalDialog] = useState({ open: false, msgs: [] });
 
+  // 연동게임
+  const handleLinkedUpdate = useCallback(() => {
+    if (gameId) {
+      apiCaller.get(DH_GAMES_API.STATE(gameId) + "?mode=user").then((res) => {
+        const data = res.data;
+        setResults(data.results || []);
+        setCumPnL(data.cum_pnl || { dh: 0, gh: 0, user_a: 0, user_z: 0 });
+        setPickResult({ method: data.method, pick: data.pick, prev_picks: data.prev_picks, nickname: data.nickname, code1: data.code1, code2: data.code2 });
+        if (data.dh_grids) setDhGrids(data.dh_grids);
+        setGlobalhitData(data.globalhit || []);
+        setGhActiveSteps(data.gh_active_steps || {});
+        setBetData(data.bet || null);
+        setUserMartin(data.user_martin || null);
+        setUserSummary(data.user_summary || null);
+        setUserMartinDashboard(data.user_martin_dashboard || null);
+      }).catch(() => {});
+    }
+  }, [gameId]);
+  const { isLinked, linkedRound, linkedNext, linkedEnd, linkedDeleteLastRound } = useLinkedGame("dh", gameId, results.length, handleLinkedUpdate);
+
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [resumeGame, setResumeGame] = useState(null);
@@ -167,9 +188,22 @@ export default function DhUserGamePage() {
   // 게임 시작
   const startGame = useCallback(async (refSeq) => {
     try {
-      const params = new URLSearchParams({ mode: "user" });
-      if (refSeq) params.set("ref_game_seq", refSeq);
-      const res = await apiCaller.post(DH_GAMES_API.START + "?" + params.toString());
+      // 연동 설정 직접 확인
+      let useLinked = isLinked;
+      if (!useLinked) {
+        try {
+          const lc = await apiCaller.get(USER_BET_SETTINGS_API.GET("common"));
+          useLinked = (lc.data.config?.linked_games || []).length > 0;
+        } catch {}
+      }
+      let res;
+      if (useLinked) {
+        res = await apiCaller.post(LINKED_GAMES_API.START, { game_type: "dh" });
+      } else {
+        const params = new URLSearchParams({ mode: "user" });
+        if (refSeq) params.set("ref_game_seq", refSeq);
+        res = await apiCaller.post(DH_GAMES_API.START + "?" + params.toString());
+      }
       const data = res.data;
       setGameId(data.game_id);
       setSearchParams({ gameId: data.game_id }, { replace: true });
@@ -268,7 +302,9 @@ export default function DhUserGamePage() {
     setPickResult({ method: "wait", pick: null });
 
     try {
-      const res = await apiCaller.post(DH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
+      const res = isLinked
+        ? await apiCaller.post(LINKED_GAMES_API.ROUND, { game_type: "dh", game_id: gameId, actual: inputValue })
+        : await apiCaller.post(DH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
       const data = res.data;
       if (data.round_num !== undefined && data.round_num !== results.length + 1) {
         alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
@@ -314,7 +350,9 @@ export default function DhUserGamePage() {
     processingRef.current = true;
     setProcessing(true);
     try {
-      const res = await apiCaller.delete(DH_GAMES_API.LAST_ROUND(gameId));
+      const res = isLinked
+        ? await apiCaller.delete(LINKED_GAMES_API.LAST_ROUND, { params: { game_type: "dh", game_id: gameId } })
+        : await apiCaller.delete(DH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
       setResults(results.slice(0, -1));
       setCumPnL({ dh: data.cum_pnl.dh, gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0 });
@@ -434,7 +472,9 @@ export default function DhUserGamePage() {
     if (!gameId) return;
     setProcessing(true);
     try {
-      const res = await apiCaller.post(DH_GAMES_API.NEXT, null, { params: { game_id: gameId } });
+      const res = isLinked
+        ? await apiCaller.post(LINKED_GAMES_API.NEXT, { game_type: "dh", game_id: gameId })
+        : await apiCaller.post(DH_GAMES_API.NEXT, null, { params: { game_id: gameId } });
       setEndingDone(false); setResults([]);
       const d = res.data;
       setGameId(d.game_id);
@@ -547,8 +587,11 @@ export default function DhUserGamePage() {
           );
         })()}
         {/* 턴 */}
-        <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.2 }}>
+          <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: `2px solid ${isLinked ? "#ff9800" : "rgba(255,255,255,0.3)"}`, borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
+          </Box>
+          {isLinked && <Typography variant="caption" sx={{ fontSize: 7, color: "#ff9800", fontWeight: "bold" }}>연동</Typography>}
         </Box>
         {/* P 버튼 */}
         <Box

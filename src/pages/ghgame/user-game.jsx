@@ -4,7 +4,8 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
-import { GH_GAMES_API } from "@/constants/api-url";
+import { GH_GAMES_API, LINKED_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
+import useLinkedGame from "@/hooks/useLinkedGame";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -101,6 +102,22 @@ export default function GhUserGamePage() {
   const processingRef = useRef(false);
   const [processing, setProcessing] = useState(false);
   const goalAlertedRef = useRef({ a: false, z: false });
+
+  // 연동게임
+  const handleLinkedUpdate = useCallback(() => {
+    if (gameId) {
+      apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user").then((res) => {
+        const data = res.data;
+        setResults(data.seq ? data.seq.split("").map((v, i) => ({ value: v, status: data.round_picks?.[i] ? (data.round_picks[i] === v ? "hit" : "miss") : "wait" })) : []);
+        setCumPnL({ gh: data.cum_pnl?.gh || 0, user_a: data.cum_pnl?.user_a || 0, user_z: data.cum_pnl?.user_z || 0, allp: data.cum_pnl?.allp || 0, allb: data.cum_pnl?.allb || 0, fail: data.cum_pnl?.fail || 0, hnh: data.cum_pnl?.hnh || 0, one: data.cum_pnl?.one || 0, two: data.cum_pnl?.two || 0 });
+        setGlobalhitData(data.globalhit || []);
+        setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+        setUserSummary(data.user_summary || null);
+        setUserMartinDashboard(data.user_martin_dashboard || null);
+      }).catch(() => {});
+    }
+  }, [gameId]);
+  const { isLinked, linkedRound, linkedNext, linkedEnd, linkedDeleteLastRound } = useLinkedGame("gh", gameId, results.length, handleLinkedUpdate);
   const [goalDialog, setGoalDialog] = useState({ open: false, msgs: [] });
 
   const currentTurn = results.length + 1;
@@ -129,13 +146,28 @@ export default function GhUserGamePage() {
 
   const startGame = useCallback(async () => {
     try {
-      const res = await apiCaller.post(GH_GAMES_API.START + "?mode=user");
+      // 연동 설정 직접 확인
+      let useLinked = isLinked;
+      if (!useLinked) {
+        try {
+          const lc = await apiCaller.get(USER_BET_SETTINGS_API.GET("common"));
+          useLinked = (lc.data.config?.linked_games || []).length > 0;
+        } catch {}
+      }
+      const res = useLinked
+        ? await apiCaller.post(LINKED_GAMES_API.START, { game_type: "gh" })
+        : await apiCaller.post(GH_GAMES_API.START + "?mode=user");
       setGameId(res.data.game_id);
       setConfig(res.data.config);
       setGlobalhitData(res.data.globalhit || []);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
     } catch (err) {
       console.error("Failed to start game:", err);
+      if (err.response?.status === 400) {
+        alert(err.response.data?.detail || "배팅 설정이 필요합니다.");
+        navigate("/ghgame/user-setup");
+        return;
+      }
     }
   }, []);
 
@@ -158,7 +190,7 @@ export default function GhUserGamePage() {
           setResumeGame(game);
         } else {
           if (game) {
-            try { await apiCaller.post(GH_GAMES_API.END, { game_id: game.game_id, actual: "P" }); } catch {}
+            try { await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: game.game_id } }); } catch {}
           }
           if (!cancelled) startGame();
         }
@@ -209,7 +241,9 @@ export default function GhUserGamePage() {
     setBetData(null);
 
     try {
-      const res = await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
+      const res = isLinked
+        ? await apiCaller.post(LINKED_GAMES_API.ROUND, { game_type: "gh", game_id: gameId, actual: inputValue })
+        : await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
       const data = res.data;
       if (data.round_num !== undefined && data.round_num !== results.length + 1) {
         alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
@@ -247,7 +281,9 @@ export default function GhUserGamePage() {
     processingRef.current = true;
     setProcessing(true);
     try {
-      const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
+      const res = isLinked
+        ? await apiCaller.delete(LINKED_GAMES_API.LAST_ROUND, { params: { game_type: "gh", game_id: gameId } })
+        : await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
       setResults(results.slice(0, -1));
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
@@ -272,7 +308,9 @@ export default function GhUserGamePage() {
     if (!gameId || results.length === 0) return;
     setProcessing(true);
     try {
-      const res = await apiCaller.post(GH_GAMES_API.NEXT, null, { params: { game_id: gameId } });
+      const res = isLinked
+        ? await apiCaller.post(LINKED_GAMES_API.NEXT, { game_type: "gh", game_id: gameId })
+        : await apiCaller.post(GH_GAMES_API.NEXT, null, { params: { game_id: gameId } });
       setResults([]); setBetData(null); setUserSummary(null);
       setGlobalhitData(res.data.globalhit || []);
       setGameId(res.data.game_id);
@@ -348,7 +386,7 @@ export default function GhUserGamePage() {
   const handleFinishGame = async () => {
     if (gameId) {
       try {
-        await apiCaller.post(GH_GAMES_API.END, { game_id: gameId, actual: "P" });
+        await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gameId } });
       } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
@@ -365,7 +403,7 @@ export default function GhUserGamePage() {
     try {
       if (gameId && results.length > 0) {
         try {
-          await apiCaller.post(GH_GAMES_API.END, { game_id: gameId, actual: "P" });
+          await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gameId } });
         } catch {}
       }
       setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
@@ -538,8 +576,11 @@ export default function GhUserGamePage() {
             </Box>
           );
         })()}
-        <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.2 }}>
+          <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: `2px solid ${isLinked ? "#ff9800" : "rgba(255,255,255,0.3)"}`, borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
+          </Box>
+          {isLinked && <Typography variant="caption" sx={{ fontSize: 7, color: "#ff9800", fontWeight: "bold" }}>연동</Typography>}
         </Box>
         <Box
           onClick={() => handleInput("P")}
@@ -622,14 +663,14 @@ export default function GhUserGamePage() {
 
       {/* 새 게임 확인 대화상자 */}
       {/* 이전 게임 복원 확인 */}
-      <Dialog open={!!resumeGame} onClose={async () => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) { try { await apiCaller.post(GH_GAMES_API.END, { game_id: gid, actual: "P" }); } catch {} } startGame(); }}>
+      <Dialog open={!!resumeGame} onClose={async () => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) { try { await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gid } }); } catch {} } startGame(); }}>
         <DialogTitle sx={{ fontWeight: "bold" }}>이전 게임 복원</DialogTitle>
         <DialogContent>
           <Typography>진행 중인 게임이 있습니다. (#{resumeGame?.game_id}, {resumeGame?.round_count}회차)</Typography>
           <Typography>이어서 하시겠습니까?</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={async () => { const gid = resumeGame.game_id; setResumeGame(null); try { await apiCaller.post(GH_GAMES_API.END, { game_id: gid, actual: "P" }); } catch {} startGame(); }}>새 게임</Button>
+          <Button onClick={async () => { const gid = resumeGame.game_id; setResumeGame(null); try { await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gid } }); } catch {} startGame(); }}>새 게임</Button>
           <Button onClick={() => { const gid = resumeGame.game_id; setResumeGame(null); restoreGame(gid); }} variant="contained">이어하기</Button>
         </DialogActions>
       </Dialog>

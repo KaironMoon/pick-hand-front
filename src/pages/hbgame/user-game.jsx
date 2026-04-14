@@ -4,7 +4,8 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
-import { HB_GAMES_API } from "@/constants/api-url";
+import { HB_GAMES_API, LINKED_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
+import useLinkedGame from "@/hooks/useLinkedGame";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -106,6 +107,30 @@ export default function HbUserGamePage() {
   const goalAlertedRef = useRef({ a: false, z: false });
   const [goalDialog, setGoalDialog] = useState({ open: false, msgs: [] });
 
+  // 연동게임
+  const handleLinkedUpdate = useCallback(() => {
+    if (gameId) {
+      apiCaller.get(HB_GAMES_API.STATE(gameId) + "?mode=user").then((res) => {
+        const data = res.data;
+        const seq = data.seq || "";
+        const picks = data.round_picks || [];
+        setResults(seq.split("").map((v, i) => {
+          const pick = picks[i];
+          const status = pick ? (pick === v ? "hit" : "miss") : "wait";
+          return { value: v, status };
+        }));
+        setCumPnL(data.cum_pnl || { hb: 0, gh: 0, user_a: 0, user_z: 0 });
+        setPickResult({ method: data.method, pick: data.pick, nickname: data.nickname });
+        setHbPatterns(data.hb_patterns || {});
+        setGlobalhitData(data.globalhit || []);
+        setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+        setUserSummary(data.user_summary || null);
+        setUserMartinDashboard(data.user_martin_dashboard || null);
+      }).catch(() => {});
+    }
+  }, [gameId]);
+  const { isLinked, linkedRound, linkedNext, linkedEnd, linkedDeleteLastRound } = useLinkedGame("hb", gameId, results.length, handleLinkedUpdate);
+
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
 
@@ -133,7 +158,17 @@ export default function HbUserGamePage() {
 
   const startGame = useCallback(async () => {
     try {
-      const res = await apiCaller.post(HB_GAMES_API.START + "?mode=user");
+      // 연동 설정 직접 확인
+      let useLinked = isLinked;
+      if (!useLinked) {
+        try {
+          const lc = await apiCaller.get(USER_BET_SETTINGS_API.GET("common"));
+          useLinked = (lc.data.config?.linked_games || []).length > 0;
+        } catch {}
+      }
+      const res = useLinked
+        ? await apiCaller.post(LINKED_GAMES_API.START, { game_type: "hb" })
+        : await apiCaller.post(HB_GAMES_API.START + "?mode=user");
       setGameId(res.data.game_id);
       setConfig(res.data.config);
       setGlobalhitData(res.data.globalhit || []);
@@ -163,7 +198,7 @@ export default function HbUserGamePage() {
           setResumeGame(game);
         } else {
           if (game) {
-            try { await apiCaller.post(HB_GAMES_API.END, { game_id: game.game_id, actual: "P" }); } catch {}
+            try { await apiCaller.post(HB_GAMES_API.END, null, { params: { game_id: game.game_id } }); } catch {}
           }
           if (!cancelled) startGame();
         }
@@ -216,7 +251,9 @@ export default function HbUserGamePage() {
     setPickResult({ method: "wait", pick: null });
 
     try {
-      const res = await apiCaller.post(HB_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
+      const res = isLinked
+        ? await apiCaller.post(LINKED_GAMES_API.ROUND, { game_type: "hb", game_id: gameId, actual: inputValue })
+        : await apiCaller.post(HB_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
       const data = res.data;
       if (data.round_num !== undefined && data.round_num !== results.length + 1) {
         alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
@@ -256,7 +293,9 @@ export default function HbUserGamePage() {
     processingRef.current = true;
     setProcessing(true);
     try {
-      const res = await apiCaller.delete(HB_GAMES_API.LAST_ROUND(gameId));
+      const res = isLinked
+        ? await apiCaller.delete(LINKED_GAMES_API.LAST_ROUND, { params: { game_type: "hb", game_id: gameId } })
+        : await apiCaller.delete(HB_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
       setResults(results.slice(0, -1));
       setCumPnL(data.cum_pnl || { hb: 0, gh: 0, user_a: 0, user_z: 0 });
@@ -283,7 +322,9 @@ export default function HbUserGamePage() {
     if (!gameId || results.length === 0) return;
     setProcessing(true);
     try {
-      const res = await apiCaller.post(HB_GAMES_API.NEXT, null, { params: { game_id: gameId } });
+      const res = isLinked
+        ? await apiCaller.post(LINKED_GAMES_API.NEXT, { game_type: "hb", game_id: gameId })
+        : await apiCaller.post(HB_GAMES_API.NEXT, null, { params: { game_id: gameId } });
       setResults([]); setBetData(null);
       setPickResult({ method: "wait", pick: null, nickname: null });
       setHbPatterns({});
@@ -371,7 +412,7 @@ export default function HbUserGamePage() {
   const handleFinishGame = async () => {
     if (gameId) {
       try {
-        await apiCaller.post(HB_GAMES_API.END, { game_id: gameId, actual: "P" });
+        await apiCaller.post(HB_GAMES_API.END, null, { params: { game_id: gameId } });
       } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
@@ -389,7 +430,7 @@ export default function HbUserGamePage() {
     try {
       if (gameId && results.length > 0) {
         try {
-          await apiCaller.post(HB_GAMES_API.END, { game_id: gameId, actual: "P" });
+          await apiCaller.post(HB_GAMES_API.END, null, { params: { game_id: gameId } });
         } catch {}
       }
       setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
@@ -490,8 +531,11 @@ export default function HbUserGamePage() {
             </Box>
           );
         })()}
-        <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.2 }}>
+          <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: `2px solid ${isLinked ? "#ff9800" : "rgba(255,255,255,0.3)"}`, borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
+          </Box>
+          {isLinked && <Typography variant="caption" sx={{ fontSize: 7, color: "#ff9800", fontWeight: "bold" }}>연동</Typography>}
         </Box>
         <Box
           onClick={() => handleInput("P")}
@@ -568,14 +612,14 @@ export default function HbUserGamePage() {
 
       {/* 새 게임 확인 대화상자 */}
       {/* 이전 게임 복원 확인 */}
-      <Dialog open={!!resumeGame} onClose={async () => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) { try { await apiCaller.post(HB_GAMES_API.END, { game_id: gid, actual: "P" }); } catch {} } startGame(); }}>
+      <Dialog open={!!resumeGame} onClose={async () => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) { try { await apiCaller.post(HB_GAMES_API.END, null, { params: { game_id: gid } }); } catch {} } startGame(); }}>
         <DialogTitle sx={{ fontWeight: "bold" }}>이전 게임 복원</DialogTitle>
         <DialogContent>
           <Typography>진행 중인 게임이 있습니다. (#{resumeGame?.game_id}, {resumeGame?.round_count}회차)</Typography>
           <Typography>이어서 하시겠습니까?</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={async () => { const gid = resumeGame.game_id; setResumeGame(null); try { await apiCaller.post(HB_GAMES_API.END, { game_id: gid, actual: "P" }); } catch {} startGame(); }}>새 게임</Button>
+          <Button onClick={async () => { const gid = resumeGame.game_id; setResumeGame(null); try { await apiCaller.post(HB_GAMES_API.END, null, { params: { game_id: gid } }); } catch {} startGame(); }}>새 게임</Button>
           <Button onClick={() => { const gid = resumeGame.game_id; setResumeGame(null); restoreGame(gid); }} variant="contained">이어하기</Button>
         </DialogActions>
       </Dialog>

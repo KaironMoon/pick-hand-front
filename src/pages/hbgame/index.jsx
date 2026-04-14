@@ -143,7 +143,7 @@ export default function HbGamePage() {
           setResumeGame(game);
         } else {
           if (game) {
-            try { await apiCaller.post(HB_GAMES_API.END, { game_id: game.game_id, actual: "P" }); } catch {}
+            try { await apiCaller.post(HB_GAMES_API.END, null, { params: { game_id: game.game_id } }); } catch {}
           }
           if (!cancelled) startGame();
         }
@@ -287,7 +287,7 @@ export default function HbGamePage() {
   const handleFinishGame = async () => {
     if (gameId) {
       try {
-        await apiCaller.post(HB_GAMES_API.END, { game_id: gameId, actual: "P" });
+        await apiCaller.post(HB_GAMES_API.END, null, { params: { game_id: gameId } });
       } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
@@ -365,7 +365,7 @@ export default function HbGamePage() {
     setProcessing(true);
     try {
       if (gameId && results.length > 0) {
-        try { await apiCaller.post(HB_GAMES_API.END, { game_id: gameId, actual: "P" }); } catch {}
+        try { await apiCaller.post(HB_GAMES_API.END, null, { params: { game_id: gameId } }); } catch {}
       }
       setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
       setResults([]); setCumPnL({ hb: 0, gh: 0 }); setBetData(null);
@@ -901,14 +901,14 @@ export default function HbGamePage() {
       </Dialog>
 
       {/* 이전 게임 복원 확인 */}
-      <Dialog open={!!resumeGame} onClose={async () => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) { try { await apiCaller.post(HB_GAMES_API.END, { game_id: gid, actual: "P" }); } catch {} } startGame(); }}>
+      <Dialog open={!!resumeGame} onClose={async () => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) { try { await apiCaller.post(HB_GAMES_API.END, null, { params: { game_id: gid } }); } catch {} } startGame(); }}>
         <DialogTitle sx={{ fontWeight: "bold" }}>이전 게임 복원</DialogTitle>
         <DialogContent>
           <Typography>진행 중인 게임이 있습니다. (#{resumeGame?.game_id}, {resumeGame?.round_count}회차)</Typography>
           <Typography>이어서 하시겠습니까?</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={async () => { const gid = resumeGame.game_id; setResumeGame(null); try { await apiCaller.post(HB_GAMES_API.END, { game_id: gid, actual: "P" }); } catch {} startGame(); }}>새 게임</Button>
+          <Button onClick={async () => { const gid = resumeGame.game_id; setResumeGame(null); try { await apiCaller.post(HB_GAMES_API.END, null, { params: { game_id: gid } }); } catch {} startGame(); }}>새 게임</Button>
           <Button onClick={() => { const gid = resumeGame.game_id; setResumeGame(null); restoreGame(gid); }} variant="contained">이어하기</Button>
         </DialogActions>
       </Dialog>

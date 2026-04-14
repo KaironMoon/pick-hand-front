@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
+import { LINKED_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
+import useLinkedGame from "@/hooks/useLinkedGame";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -183,6 +185,24 @@ export default function GamePage() {
   const isAdmin = user?.role === "admin";
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
 
+  // 연동게임
+  const handleLinkedUpdate = useCallback(() => {
+    if (gameId) {
+      apiCaller.get(`/api/v1/games/${gameId}/state?mode=user`).then((res) => {
+        const data = res.data;
+        setResults(data.results || []);
+        setCumPnL(data.cum_pnl || { tn: 0, gh: 0, pinch: 0, user_a: 0, user_z: 0 });
+        const { globalhit, bet, user_martin, user_summary, user_martin_dashboard, results: _, cum_pnl: __, game_id: ___, config: ____, status, ending_snapshot: snap, ...pick } = data;
+        setPickResult({ method: pick.method, pick: pick.pick, match_start: pick.match_start, match_end: pick.match_end, matches: pick.matches, order: pick.order });
+        setGlobalhitData(globalhit || []);
+        setBetData(bet ? { ...bet, user_martin } : null);
+        setUserSummary(user_summary || null);
+        setUserMartinDashboard(user_martin_dashboard || null);
+      }).catch(() => {});
+    }
+  }, [gameId]);
+  const { isLinked, linkedRound, linkedNext, linkedEnd, linkedDeleteLastRound } = useLinkedGame("t9", gameId, results.length, handleLinkedUpdate);
+
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
 
@@ -207,7 +227,17 @@ export default function GamePage() {
   // 게임 시작
   const startGame = useCallback(async () => {
     try {
-      const res = await apiCaller.post("/api/v1/games/start?mode=user");
+      // 연동 설정 직접 확인
+      let useLinked = isLinked;
+      if (!useLinked) {
+        try {
+          const lc = await apiCaller.get(USER_BET_SETTINGS_API.GET("common"));
+          useLinked = (lc.data.config?.linked_games || []).length > 0;
+        } catch {}
+      }
+      const res = useLinked
+        ? await apiCaller.post(LINKED_GAMES_API.START, { game_type: "t9" })
+        : await apiCaller.post("/api/v1/games/start?mode=user");
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       // 초기 픽 조회
@@ -297,10 +327,9 @@ export default function GamePage() {
     setPickResult({ method: "wait", pick: null });
 
     try {
-      const res = await apiCaller.post("/api/v1/games/round", {
-        game_id: gameId,
-        actual: inputValue,
-      });
+      const res = isLinked
+        ? await apiCaller.post(LINKED_GAMES_API.ROUND, { game_type: "t9", game_id: gameId, actual: inputValue })
+        : await apiCaller.post("/api/v1/games/round", { game_id: gameId, actual: inputValue });
       const data = res.data;
       if (data.round_num !== undefined && data.round_num !== results.length + 1) {
         alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
@@ -355,7 +384,9 @@ export default function GamePage() {
     setProcessing(true);
 
     try {
-      const res = await apiCaller.delete(`/api/v1/games/${gameId}/last-round`);
+      const res = isLinked
+        ? await apiCaller.delete(LINKED_GAMES_API.LAST_ROUND, { params: { game_type: "t9", game_id: gameId } })
+        : await apiCaller.delete(`/api/v1/games/${gameId}/last-round`);
       const data = res.data;
 
       setResults(results.slice(0, -1));
@@ -544,7 +575,9 @@ export default function GamePage() {
     setProcessing(true);
 
     try {
-      const res = await apiCaller.post("/api/v1/games/next", null, { params: { game_id: gameId } });
+      const res = isLinked
+        ? await apiCaller.post(LINKED_GAMES_API.NEXT, { game_type: "t9", game_id: gameId })
+        : await apiCaller.post("/api/v1/games/next", null, { params: { game_id: gameId } });
 
       // 상태 초기화
       setEndingDone(false);
@@ -682,8 +715,11 @@ export default function GamePage() {
             <img src={pickImage} alt="pick" style={{ width: isMobile ? 46 : 85, height: isMobile ? 46 : 85, objectFit: "contain" }} />
           )}
         </Box>
-        <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.2 }}>
+          <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: `2px solid ${isLinked ? "#ff9800" : "rgba(255,255,255,0.3)"}`, borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
+          </Box>
+          {isLinked && <Typography variant="caption" sx={{ fontSize: 7, color: "#ff9800", fontWeight: "bold" }}>연동</Typography>}
         </Box>
         <Box
           onClick={() => handleInput("P")}
