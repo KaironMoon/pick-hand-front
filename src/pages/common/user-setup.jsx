@@ -323,7 +323,7 @@ const DEFAULT_FAIL = {
 const ALL_GAMES = ["t9", "hb", "gh", "nc", "wh", "mh", "dh"];
 const LINKED_COLORS = { t9: "#ff9800", hb: "#e91e63", gh: "#4caf50", nc: "#2196f3", wh: "#9c27b0", mh: "#f44336", dh: "#00bcd4" };
 
-function LinkedGameSection({ linkedGames, onChange, blockedGames, isAdmin }) {
+function LinkedGameSection({ linkedGames, onChange, blockedGames = [], isAdmin }) {
   const toggle = (gt) => {
     const next = linkedGames.includes(gt) ? linkedGames.filter((g) => g !== gt) : [...linkedGames, gt];
     onChange(next);
@@ -386,7 +386,7 @@ export default function UserSetupPage({ gameType }) {
     }).catch(() => {});
     // 차단 게임 로드
     apiCaller.get(APP_SETTINGS_API.BLOCKED_GAMES).then((res) => {
-      setBlockedGames(res.data || []);
+      setBlockedGames(Array.isArray(res.data) ? res.data : res.data?.blocked_games || []);
     }).catch(() => {});
   }, [gameType]);
 
