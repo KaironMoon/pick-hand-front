@@ -93,7 +93,7 @@ function FailSection({ martin, onChange }) {
   const enabled = martin.enabled;
   const failCount = martin.fail_count || 2;
   const toggleFail = () => {
-    const next = failCount >= 5 ? 2 : failCount + 1;
+    const next = failCount >= 8 ? 2 : failCount + 1;
     onChange({ ...martin, fail_count: next });
   };
   const betType = (type) => { if (DISABLED_BET_TYPES.includes(type)) return; onChange({ ...martin, bet_type: type }); };
@@ -439,6 +439,7 @@ export default function UserSetupPage({ gameType }) {
 
   const martinA = config.martin_a || { ...DEFAULT_MARTIN, enabled: true };
   const martinZ = config.martin_z || { ...DEFAULT_MARTIN };
+  const martinS = config.martin_s || { ...DEFAULT_MARTIN };
   const allp = config.allp || { ...DEFAULT_MARTIN };
   const allb = config.allb || { ...DEFAULT_MARTIN };
   const fail = config.fail || { ...DEFAULT_FAIL };
@@ -469,6 +470,12 @@ export default function UserSetupPage({ gameType }) {
             <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={(m) => updateMartin("martin_a", m)} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={(m) => updateMartin("martin_z", m)} />
+            {gameType === "gh" && (
+              <>
+                <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+                <MartinSection name="martin_s" label="마틴S" martin={martinS} onChange={(m) => updateMartin("martin_s", m)} labelColor="#795548" />
+              </>
+            )}
             {gameType === "gh" && (
               <>
                 <tr><td colSpan={6} style={{ height: 12 }}></td></tr>

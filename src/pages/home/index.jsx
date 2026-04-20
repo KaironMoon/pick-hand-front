@@ -29,18 +29,34 @@ const Home = () => {
     fetchBlocked();
   }, [fetchBlocked]);
 
+  // 일반유저: 글로벌히트 배경으로 바로 이동
+  if (user?.role !== "admin") {
+    return (
+      <Box
+        onClick={() => navigate("/ghgame/user")}
+        sx={{
+          width: "100%",
+          height: "100vh",
+          cursor: "pointer",
+          backgroundImage: "url(/globalhit_background.png)",
+          backgroundSize: "120%",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundColor: "#0f1214",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      />
+    );
+  }
+
   const handleClick = (g) => {
     if (g.comingSoon) {
       setPopupOpen(true);
       return;
     }
-    if (user?.role === "admin") {
-      navigate(g.adminPath);
-    } else if (blockedGames.includes(g.key)) {
-      setPopupOpen(true);
-    } else {
-      navigate(g.userPath);
-    }
+    navigate(g.adminPath);
   };
 
   return (

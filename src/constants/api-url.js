@@ -34,7 +34,7 @@ const HB_GAMES_API = {
   NEXT: "/api/v1/hb/games/next",
   LAST_ACTIVE: "/api/v1/hb/games/last-active",
   LAST_ROUND: (id) => `/api/v1/hb/games/${id}/last-round`,
-  STATE: (id) => `/api/v1/hb/games/state/${id}`,
+  STATE: (id) => `/api/v1/hb/games/${id}/state`,
   NICKNAMES: "/api/v1/hb/games/nicknames",
 };
 
@@ -53,7 +53,7 @@ const GH_GAMES_API = {
   NEXT: "/api/v1/gh/games/next",
   LAST_ACTIVE: "/api/v1/gh/games/last-active",
   LAST_ROUND: (id) => `/api/v1/gh/games/${id}/last-round`,
-  STATE: (id) => `/api/v1/gh/games/state/${id}`,
+  STATE: (id) => `/api/v1/gh/games/${id}/state`,
 };
 
 const USER_BET_SETTINGS_API = {

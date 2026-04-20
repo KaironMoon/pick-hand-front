@@ -39,14 +39,6 @@ export default function useLinkedGame(gameType, gameId, roundNum, onUpdate) {
             { signal: abortRef.current.signal, timeout: 35000 },
           );
           if (res.data?.changed && pollingRef.current) {
-            const serverRound = res.data.round_num;
-            if (serverRound !== undefined && serverRound !== roundNum) {
-              if (serverRound < roundNum) {
-                alert("연동게임 회차 불일치가 감지되었습니다. 페이지를 리로드합니다.");
-                window.location.reload();
-                return;
-              }
-            }
             onUpdate?.();
           }
         } catch (err) {

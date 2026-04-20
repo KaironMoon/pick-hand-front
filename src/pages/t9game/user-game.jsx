@@ -385,7 +385,7 @@ export default function GamePage() {
 
     try {
       const res = isLinked
-        ? await apiCaller.delete(LINKED_GAMES_API.LAST_ROUND, { params: { game_type: "t9", game_id: gameId } })
+        ? await apiCaller.delete(LINKED_GAMES_API.LAST_ROUND, { game_type: "t9", game_id: gameId })
         : await apiCaller.delete(`/api/v1/games/${gameId}/last-round`);
       const data = res.data;
 

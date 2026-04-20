@@ -4,7 +4,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
-import { GH_GAMES_API, LINKED_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
+import { GH_GAMES_API, LINKED_GAMES_API, USER_BET_SETTINGS_API, WH_GAMES_API, DH_GAMES_API, MH_GAMES_API, HB_GAMES_API } from "@/constants/api-url";
 import useLinkedGame from "@/hooks/useLinkedGame";
 
 const GRID_ROWS = 6;
@@ -90,7 +90,9 @@ export default function GhUserGamePage() {
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
-  const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
+  const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
+  const [activeScorecards, setActiveScorecards] = useState([]); // ["wh","dh","mh"]
+  const [subGames, setSubGames] = useState({}); // round/state 응답의 sub_games
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [endingMode, setEndingMode] = useState(false);
@@ -109,16 +111,20 @@ export default function GhUserGamePage() {
       apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user").then((res) => {
         const data = res.data;
         setResults(data.seq ? data.seq.split("").map((v, i) => ({ value: v, status: data.round_picks?.[i] ? (data.round_picks[i] === v ? "hit" : "miss") : "wait" })) : []);
-        setCumPnL({ gh: data.cum_pnl?.gh || 0, user_a: data.cum_pnl?.user_a || 0, user_z: data.cum_pnl?.user_z || 0, allp: data.cum_pnl?.allp || 0, allb: data.cum_pnl?.allb || 0, fail: data.cum_pnl?.fail || 0, hnh: data.cum_pnl?.hnh || 0, one: data.cum_pnl?.one || 0, two: data.cum_pnl?.two || 0 });
+        setCumPnL({ gh: data.cum_pnl?.gh || 0, user_a: data.cum_pnl?.user_a || 0, user_z: data.cum_pnl?.user_z || 0, user_s: data.cum_pnl?.user_s || 0, allp: data.cum_pnl?.allp || 0, allb: data.cum_pnl?.allb || 0, fail: data.cum_pnl?.fail || 0, hnh: data.cum_pnl?.hnh || 0, one: data.cum_pnl?.one || 0, two: data.cum_pnl?.two || 0 });
         setGlobalhitData(data.globalhit || []);
         setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
         setUserSummary(data.user_summary || null);
-        setUserMartinDashboard(data.user_martin_dashboard || null);
+        setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
       }).catch(() => {});
     }
   }, [gameId]);
   const { isLinked, linkedRound, linkedNext, linkedEnd, linkedDeleteLastRound } = useLinkedGame("gh", gameId, results.length, handleLinkedUpdate);
   const [goalDialog, setGoalDialog] = useState({ open: false, msgs: [] });
+
+  const toggleScorecard = (type) => {
+    setActiveScorecards((prev) => prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]);
+  };
 
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
@@ -146,17 +152,7 @@ export default function GhUserGamePage() {
 
   const startGame = useCallback(async () => {
     try {
-      // 연동 설정 직접 확인
-      let useLinked = isLinked;
-      if (!useLinked) {
-        try {
-          const lc = await apiCaller.get(USER_BET_SETTINGS_API.GET("common"));
-          useLinked = (lc.data.config?.linked_games || []).length > 0;
-        } catch {}
-      }
-      const res = useLinked
-        ? await apiCaller.post(LINKED_GAMES_API.START, { game_type: "gh" })
-        : await apiCaller.post(GH_GAMES_API.START + "?mode=user");
+      const res = await apiCaller.post(LINKED_GAMES_API.START, { game_type: "gh" });
       setGameId(res.data.game_id);
       setConfig(res.data.config);
       setGlobalhitData(res.data.globalhit || []);
@@ -176,7 +172,7 @@ export default function GhUserGamePage() {
     const isNew = searchParams.get("new");
     const urlGameId = searchParams.get("gameId");
     if (isNew) {
-      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
       startGame();
     } else if (urlGameId) {
@@ -205,7 +201,7 @@ export default function GhUserGamePage() {
       const data = res.data;
       setGameId(data.game_id);
       setConfig(data.config);
-      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
+      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       const seq = data.seq || "";
       const picks = data.round_picks || [];
       setResults(seq.split("").map((v, i) => {
@@ -216,7 +212,7 @@ export default function GhUserGamePage() {
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
-      setUserMartinDashboard(data.user_martin_dashboard || null);
+      setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
       if (data.status === "ending" && data.ending_snapshot) {
         setEndingMode(true);
         setEndingSnapshot(data.ending_snapshot);
@@ -241,20 +237,18 @@ export default function GhUserGamePage() {
     setBetData(null);
 
     try {
-      const res = isLinked
-        ? await apiCaller.post(LINKED_GAMES_API.ROUND, { game_type: "gh", game_id: gameId, actual: inputValue })
-        : await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
+      const res = await apiCaller.post(LINKED_GAMES_API.ROUND, { game_type: "gh", game_id: gameId, actual: inputValue });
       const data = res.data;
       if (data.round_num !== undefined && data.round_num !== results.length + 1) {
         alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
         window.location.reload();
         return;
       }
-      setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0 });
+      setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0 });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
-      setUserMartinDashboard(data.user_martin_dashboard || null);
+      setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
       checkGoalAlert(data.user_summary);
 
       if (endingMode && endingSnapshot && checkEndingComplete(data)) {
@@ -281,16 +275,14 @@ export default function GhUserGamePage() {
     processingRef.current = true;
     setProcessing(true);
     try {
-      const res = isLinked
-        ? await apiCaller.delete(LINKED_GAMES_API.LAST_ROUND, { params: { game_type: "gh", game_id: gameId } })
-        : await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
+      const res = await apiCaller.delete(LINKED_GAMES_API.LAST_ROUND, { game_type: "gh", game_id: gameId });
       const data = res.data;
       setResults(results.slice(0, -1));
-      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
+      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
-      setUserMartinDashboard(data.user_martin_dashboard || null);
+      setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
       if (data.status === "ending" && data.ending_snapshot) {
         setEndingMode(true); setEndingSnapshot(data.ending_snapshot);
       } else {
@@ -308,17 +300,15 @@ export default function GhUserGamePage() {
     if (!gameId || results.length === 0) return;
     setProcessing(true);
     try {
-      const res = isLinked
-        ? await apiCaller.post(LINKED_GAMES_API.NEXT, { game_type: "gh", game_id: gameId })
-        : await apiCaller.post(GH_GAMES_API.NEXT, null, { params: { game_id: gameId } });
+      const res = await apiCaller.post(LINKED_GAMES_API.NEXT, { game_type: "gh", game_id: gameId });
       setResults([]); setBetData(null); setUserSummary(null);
       setGlobalhitData(res.data.globalhit || []);
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
-        setCumPnL({ gh: res.data.carry_pnl.gh || 0, user_a: res.data.carry_pnl.user_a || 0, user_z: res.data.carry_pnl.user_z || 0, allp: res.data.carry_pnl.allp || 0, allb: res.data.carry_pnl.allb || 0, fail: res.data.carry_pnl.fail || 0, hnh: res.data.carry_pnl.hnh || 0, one: res.data.carry_pnl.one || 0, two: res.data.carry_pnl.two || 0 });
+        setCumPnL({ gh: res.data.carry_pnl.gh || 0, user_a: res.data.carry_pnl.user_a || 0, user_z: res.data.carry_pnl.user_z || 0, user_s: res.data.carry_pnl.user_s || 0, allp: res.data.carry_pnl.allp || 0, allb: res.data.carry_pnl.allb || 0, fail: res.data.carry_pnl.fail || 0, hnh: res.data.carry_pnl.hnh || 0, one: res.data.carry_pnl.one || 0, two: res.data.carry_pnl.two || 0 });
       } else {
-        setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
+        setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       }
       if (res.data.status === "ending" && res.data.ending_snapshot) {
         setEndingMode(true); setEndingSnapshot(res.data.ending_snapshot);
@@ -358,7 +348,7 @@ export default function GhUserGamePage() {
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
-      setUserMartinDashboard(data.user_martin_dashboard || null);
+      setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
     } catch (err) {
       console.error("Failed to start ending:", err);
     }
@@ -390,7 +380,7 @@ export default function GhUserGamePage() {
       } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+    setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
     setGlobalhitData([]);
     setSearchParams({}, { replace: true });
     startGame();
@@ -407,7 +397,7 @@ export default function GhUserGamePage() {
         } catch {}
       }
       setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
       await startGame();
     } finally {
@@ -483,6 +473,7 @@ export default function GhUserGamePage() {
                 { key: "allb", label: "AllB", bg: "#00695c" },
                 { key: "hnh", label: "HnH", bg: "#558b2f" },
                 { key: "_onetwo", label: "1-2", bg: "#00838f" },
+                { key: "martin_s", label: "마틴S", bg: "#795548" },
               ].map((t) => {
                 let td, amt, dir;
                 if (t.key === "_onetwo") {
@@ -534,6 +525,11 @@ export default function GhUserGamePage() {
             );
           })()}
         </Box>
+
+        {/* 우측: 상하 분리 */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+          {/* 상: 픽+회차+P/B+del/next/new/셋업 */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: isMobile ? 0.5 : 1, flexWrap: "wrap" }}>
 
         {/* 픽이미지 A/Z 2개 */}
         {processing ? (
@@ -628,6 +624,45 @@ export default function GhUserGamePage() {
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
         </Box>
+          </Box>
+          {/* 하: 보조 버튼 */}
+          <Box sx={{ display: "flex", gap: 0.3, flexWrap: "wrap" }}>
+            {(() => {
+              const getStreak = (type) => {
+                const sg = subGames[type];
+                if (!sg) return { label: "—", pickColor: "#888" };
+                const label = sg.streak || "—";
+                const pickColor = sg.streak_pick === "P" ? "#42a5f5" : sg.streak_pick === "B" ? "#ef5350" : "#888";
+                return { label, pickColor };
+              };
+              const whStreak = getStreak("wh");
+              const dhStreak = getStreak("dh");
+              const mhStreak = getStreak("mh");
+              const hbStreak = getStreak("hb");
+              const buttons = [
+                { label: "asist", bg: "#6698fa", color: "#fff", fixed: true },
+                { label: "WH", bg: "#000", color: "#fff", border: "#017332", sc: "wh" },
+                { label: whStreak.label, bg: "#000", color: whStreak.pickColor, border: "#017332" },
+                { label: "DH", bg: "#000", color: "#fff", border: "#933701", sc: "dh" },
+                { label: dhStreak.label, bg: "#000", color: dhStreak.pickColor, border: "#933701" },
+                { label: "MH", bg: "#000", color: "#fff", border: "#02358d", sc: "mh" },
+                { label: mhStreak.label, bg: "#000", color: mhStreak.pickColor, border: "#02358d" },
+                { label: "HB", bg: "#000", color: "#fff", border: "#a39f10", sc: "hb" },
+                { label: hbStreak.label, bg: "#000", color: hbStreak.pickColor, border: "#a39f10" },
+                { label: "A", bg: "#000", color: "#fff", border: "#365490" },
+                { label: "B", bg: "#000", color: "#fff", border: "#365490" },
+                { label: "C", bg: "#000", color: "#fff", border: "#365490" },
+                { label: "D", bg: "#000", color: "#fff", border: "#365490" },
+              ];
+              return buttons.map((btn, i) => (
+                <Box key={`${btn.label}-${i}`} onClick={() => btn.sc ? toggleScorecard(btn.sc) : null}
+                  sx={{ px: isMobile ? 0.6 : 1.2, py: 0.3, borderRadius: 1, backgroundColor: btn.sc && activeScorecards.includes(btn.sc) ? btn.border || btn.bg : btn.bg, cursor: "pointer", border: `2px solid ${btn.border || "rgba(255,255,255,0.2)"}`, "&:hover": { opacity: 0.8 } }}>
+                  <Typography variant="caption" sx={{ fontSize: isMobile ? 8 : 11, fontWeight: "bold", color: btn.sc && activeScorecards.includes(btn.sc) ? "#fff" : btn.color }}>{btn.label}</Typography>
+                </Box>
+              ));
+            })()}
+          </Box>
+        </Box>
       </Box>
 
       {/* 종료 다이얼로그 */}
@@ -644,12 +679,13 @@ export default function GhUserGamePage() {
               { name: "fail", pnl: cumPnL.fail },
               { name: "HnH", pnl: cumPnL.hnh },
               { name: isMobile ? "1-2" : "one-two", pnl: (cumPnL.one || 0) + (cumPnL.two || 0) },
+              { name: "마틴S", pnl: cumPnL.user_s || 0 },
             ].map((item) => (
               <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
                 {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
               </Typography>
             ))}
-            {(() => { const t = cumPnL.user_a + cumPnL.user_z + cumPnL.allp + cumPnL.allb + cumPnL.fail + cumPnL.hnh + cumPnL.one + cumPnL.two; return (
+            {(() => { const t = cumPnL.user_a + cumPnL.user_z + (cumPnL.user_s || 0) + cumPnL.allp + cumPnL.allb + cumPnL.fail + cumPnL.hnh + cumPnL.one + cumPnL.two; return (
               <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
                 Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
               </Typography>
@@ -764,14 +800,19 @@ export default function GhUserGamePage() {
             </Box>
           );
           return (
-            <Box sx={{ display: "flex", gap: 0.5, mb: 1, flexWrap: "wrap" }}>
-              {renderMartin("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
-              {renderMartin("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
-              {renderAlways("AllP", "#6a1b9a", cumPnL.allp, allpInfo)}
-              {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
-              {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
-              {renderAlways("HnH", "#558b2f", cumPnL.hnh, hnhInfo)}
-              {renderAlways(isMobile ? "1-2" : "one-two", "#00838f", (cumPnL.one || 0) + (cumPnL.two || 0), oneInfo.mActive || twoInfo.mActive ? { ...oneInfo, ...(twoInfo.mActive ? twoInfo : {}), mActive: true } : oneInfo)}
+            <Box sx={{ mb: 1 }}>
+              <Box sx={{ display: "flex", gap: 0.5 }}>
+                {renderMartin("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
+                {renderMartin("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
+                {renderAlways("AllP", "#6a1b9a", cumPnL.allp, allpInfo)}
+                {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
+              </Box>
+              <Box sx={{ display: "flex", gap: 0.5, mt: 0.5 }}>
+                {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
+                {renderAlways("HnH", "#558b2f", cumPnL.hnh, hnhInfo)}
+                {renderAlways(isMobile ? "1-2" : "one-two", "#00838f", (cumPnL.one || 0) + (cumPnL.two || 0), oneInfo.mActive || twoInfo.mActive ? { ...oneInfo, ...(twoInfo.mActive ? twoInfo : {}), mActive: true } : oneInfo)}
+                {renderMartin("마틴S", formalZDir, formalZColor, cumPnL.user_s || 0, (betData?.user_martin?.martin_s?.amount || 0) > 0)}
+              </Box>
             </Box>
           );
         }
@@ -801,14 +842,19 @@ export default function GhUserGamePage() {
         );
 
         return (
-          <Box sx={{ display: "flex", gap: 1, mb: 1, flexWrap: "wrap" }}>
-            {renderMartin("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
-            {renderMartin("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
-            {renderAlways("AllP", "#6a1b9a", cumPnL.allp, allpInfo)}
-            {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
-            {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
-            {renderAlways("HnH", "#558b2f", cumPnL.hnh, hnhInfo)}
-            {renderAlways(isMobile ? "1-2" : "one-two", "#00838f", (cumPnL.one || 0) + (cumPnL.two || 0), oneInfo.mActive || twoInfo.mActive ? { ...oneInfo, ...(twoInfo.mActive ? twoInfo : {}), mActive: true } : oneInfo)}
+          <Box sx={{ mb: 1 }}>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              {renderMartin("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
+              {renderMartin("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
+              {renderAlways("AllP", "#6a1b9a", cumPnL.allp, allpInfo)}
+              {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
+            </Box>
+            <Box sx={{ display: "flex", gap: 1, mt: 0.5 }}>
+              {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
+              {renderAlways("HnH", "#558b2f", cumPnL.hnh, hnhInfo)}
+              {renderAlways("one-two", "#00838f", (cumPnL.one || 0) + (cumPnL.two || 0), oneInfo.mActive || twoInfo.mActive ? { ...oneInfo, ...(twoInfo.mActive ? twoInfo : {}), mActive: true } : oneInfo)}
+              {renderMartin("마틴S", formalZDir, formalZColor, cumPnL.user_s || 0, (betData?.user_martin?.martin_s?.amount || 0) > 0)}
+            </Box>
           </Box>
         );
       })()}
@@ -845,7 +891,7 @@ export default function GhUserGamePage() {
               const umAHasBet = (umA?.amount || 0) > 0;
               const umZHasBet = (umZ?.amount || 0) > 0;
               const barSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1 };
-              const totalPnl = (cumPnL.user_a || 0) + (cumPnL.user_z || 0) + (cumPnL.allp || 0) + (cumPnL.allb || 0) + (cumPnL.fail || 0) + (cumPnL.hnh || 0) + (cumPnL.one || 0) + (cumPnL.two || 0);
+              const totalPnl = (cumPnL.user_a || 0) + (cumPnL.user_z || 0) + (cumPnL.user_s || 0) + (cumPnL.allp || 0) + (cumPnL.allb || 0) + (cumPnL.fail || 0) + (cumPnL.hnh || 0) + (cumPnL.one || 0) + (cumPnL.two || 0);
               return (
                 <Box sx={{ display: "flex", gap: 0.5, mb: 0.5 }}>
                   <Box sx={{ ...barSx, minWidth: 0, justifyContent: "center" }}>
@@ -858,6 +904,50 @@ export default function GhUserGamePage() {
                 </Box>
               );
             })()}
+
+            {/* ===== 스코어카드 격자 (WH/DH/MH/HB) ===== */}
+            {activeScorecards.map((type) => {
+              const sg = subGames[type];
+              if (!sg || !sg.grids) return null;
+              const COLORS = { wh: { formal: "#f44336", reverse: "#1565c0" }, dh: { formal: "#f44336", reverse: "#1565c0" }, mh: { formal: "#f44336", reverse: "#1565c0" }, hb: { formal: "#e91e63", reverse: "#9c27b0" } };
+              const colors = COLORS[type] || COLORS.wh;
+              const formalData = sg.grids.formal || [];
+              const reverseData = sg.grids.reverse || [];
+              const cellSz = isMobile ? 16 : 26;
+              const COLS = 30;
+              const method = sg.method || "formal";
+              const predCircle = (bg) => ({ width: cellSz - 4, height: cellSz - 4, borderRadius: "50%", backgroundColor: bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 7 : 9, color: "#fff", fontWeight: "bold" });
+              const renderGrid = (label, data, gridColor) => {
+                const isActive = method === label;
+                return (
+                  <Box sx={{ mb: 0.5 }}>
+                    <Box sx={{ border: `2px solid ${isActive ? "#4caf50" : "rgba(255,255,255,0.3)"}`, borderRadius: 1, px: 1, py: 0.1, display: "inline-flex", mb: 0.3, backgroundColor: isActive ? "rgba(76,175,80,0.15)" : "transparent" }}>
+                      <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, color: isActive ? "#4caf50" : "#666", fontWeight: isActive ? "bold" : "normal" }}>{label}</Typography>
+                    </Box>
+                    <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${COLS}, ${cellSz}px)`, gridTemplateRows: `repeat(2, ${cellSz}px)`, gap: "1px", backgroundColor: gridColor, border: `1px solid ${gridColor}`, width: "fit-content" }}>
+                      {[0, 1].flatMap((ri) =>
+                        Array.from({ length: COLS }, (_, ci) => {
+                          const idx = ri * COLS + ci;
+                          const d = data[idx];
+                          return (
+                            <Box key={`${ri}-${ci}`} sx={{ width: cellSz, height: cellSz, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: d?.status === "hit" ? "#00e676" : d?.status === "miss" ? "#ffeb3b" : "background.default" }}>
+                              {d && d.dir ? <Box sx={predCircle(d.dir === "P" ? "#1565c0" : "#f44336")}>{d.num || ""}</Box> : null}
+                            </Box>
+                          );
+                        })
+                      )}
+                    </Box>
+                  </Box>
+                );
+              };
+              return (
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: "#fff", mb: 0.5, display: "block" }}>{type.toUpperCase()} 스코어카드</Typography>
+                  {renderGrid("formal", formalData, colors.formal)}
+                  {type !== "hb" && renderGrid("reverse", reverseData, colors.reverse)}
+                </Box>
+              );
+            })}
 
             {/* 배팅 상황판 — 마틴A / 마틴Z 각각 독립 테이블 (유저 마틴 대시보드 데이터) */}
             {(() => {
@@ -1127,12 +1217,13 @@ export default function GhUserGamePage() {
               { name: "fail", pnl: cumPnL.fail },
               { name: "HnH", pnl: cumPnL.hnh },
               { name: isMobile ? "1-2" : "one-two", pnl: (cumPnL.one || 0) + (cumPnL.two || 0) },
+              { name: "마틴S", pnl: cumPnL.user_s || 0 },
             ].map((item) => (
               <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
                 {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
               </Typography>
             ))}
-            {(() => { const t = cumPnL.user_a + cumPnL.user_z + cumPnL.allp + cumPnL.allb + cumPnL.fail + cumPnL.hnh + cumPnL.one + cumPnL.two; return (
+            {(() => { const t = cumPnL.user_a + cumPnL.user_z + (cumPnL.user_s || 0) + cumPnL.allp + cumPnL.allb + cumPnL.fail + cumPnL.hnh + cumPnL.one + cumPnL.two; return (
               <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
                 Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
               </Typography>

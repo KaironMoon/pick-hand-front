@@ -351,7 +351,7 @@ export default function WhUserGamePage() {
     setProcessing(true);
     try {
       const res = isLinked
-        ? await apiCaller.delete(LINKED_GAMES_API.LAST_ROUND, { params: { game_type: "wh", game_id: gameId } })
+        ? await apiCaller.delete(LINKED_GAMES_API.LAST_ROUND, { game_type: "wh", game_id: gameId })
         : await apiCaller.delete(WH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
       setResults(results.slice(0, -1));
