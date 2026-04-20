@@ -4,6 +4,15 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
 import { GH_GAMES_API } from "@/constants/api-url";
 
+// blink 애니메이션
+const blinkKeyframes = `@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }`;
+if (typeof document !== "undefined" && !document.getElementById("gh-admin-blink-style")) {
+  const style = document.createElement("style");
+  style.id = "gh-admin-blink-style";
+  style.textContent = blinkKeyframes;
+  document.head.appendChild(style);
+}
+
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
 
@@ -618,6 +627,18 @@ export default function GhGamePage() {
       })()}
 
       {/* ===== 하단: GlobalHit 패턴별 상세 ===== */}
+      {(() => {
+        // 전체에서 가장 높은 단계 셀 찾기 (동율 포함)
+        const topKeys = new Set();
+        let topStep = 1;
+        globalhitData.forEach((pd) => {
+          pd.groups.forEach((g, gi) => {
+            const s = g.step ?? 1;
+            if (s > topStep) { topStep = s; topKeys.clear(); topKeys.add(`${pd.pattern}-${gi + 1}`); }
+            else if (s === topStep && s > 1) { topKeys.add(`${pd.pattern}-${gi + 1}`); }
+          });
+        });
+        return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
         {globalhitData.map((patData) => {
           const pat = patData.pattern;
@@ -662,7 +683,7 @@ export default function GhGamePage() {
                 {patData.groups.map((g, gi) => (
                   <Box key={gi} sx={{ display: "flex", gap: 0.3, ml: gi > 0 ? 1 : 0 }}>
                     <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.6, py: 0.2 }}>
-                      <Typography variant="caption" sx={{ fontSize: 10 }}>SC{gi + 1}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: 10, ...(topKeys.has(`${pat}-${gi + 1}`) && { color: "#ffeb3b", fontWeight: "bold", animation: "blink 1s infinite" }) }}>SC{gi + 1}</Typography>
                     </Box>
                     <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.6, py: 0.2 }}>
                       <Typography variant="caption" sx={{ fontSize: 10, ...((g.step ?? 0) !== 1 && { color: "#f44336", fontWeight: "bold" }) }}>{g.step ?? 0}S</Typography>
@@ -732,6 +753,8 @@ export default function GhGamePage() {
           );
         })}
       </Box>
+        );
+      })()}
 
       {/* 종료 다이얼로그 */}
       <Dialog open={endingDone} onClose={() => {}}>

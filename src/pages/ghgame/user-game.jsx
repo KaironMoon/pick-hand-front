@@ -7,6 +7,15 @@ import apiCaller from "@/services/api-caller";
 import { GH_GAMES_API, LINKED_GAMES_API, USER_BET_SETTINGS_API, WH_GAMES_API, DH_GAMES_API, MH_GAMES_API, HB_GAMES_API } from "@/constants/api-url";
 import useLinkedGame from "@/hooks/useLinkedGame";
 
+// blink 애니메이션
+const blinkKeyframes = `@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }`;
+if (typeof document !== "undefined" && !document.getElementById("gh-blink-style")) {
+  const style = document.createElement("style");
+  style.id = "gh-blink-style";
+  style.textContent = blinkKeyframes;
+  document.head.appendChild(style);
+}
+
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
 
@@ -978,6 +987,17 @@ export default function GhUserGamePage() {
                   const predict = detail?.direction || null;
                   return { step, amt, predict };
                 };
+                // 전체에서 가장 높은 단계 셀 찾기
+                let maxStepKey = null;
+                let maxStepVal = stepMin;
+                if (!isUnified && ghPatterns) {
+                  ghPatterns.forEach((pat) => {
+                    [0, 1, 2].forEach((sec) => {
+                      const { step } = getStepAmt(pat, sec);
+                      if (step > maxStepVal) { maxStepVal = step; maxStepKey = `${pat}-${sec + 1}`; }
+                    });
+                  });
+                }
                 return (
                   <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 0.5 }}>
                   <Box>
@@ -1096,7 +1116,17 @@ export default function GhUserGamePage() {
                 return { step: 0, amt: 0, stepMin: 0 };
               };
 
-              const renderPatternBlock = (label, labelColor, dash, isUnified) => (
+              const renderPatternBlock = (label, labelColor, dash, isUnified) => {
+                // 전체에서 가장 높은 단계 셀 찾기 (동율 포함)
+                const topKeys = new Set();
+                let topStep = dash?.step_min || 1;
+                if (!isUnified && dash?.steps) {
+                  Object.entries(dash.steps).forEach(([k, v]) => {
+                    if (v > topStep) { topStep = v; topKeys.clear(); topKeys.add(k); }
+                    else if (v === topStep && v > (dash?.step_min || 1)) { topKeys.add(k); }
+                  });
+                }
+                return (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                   <Box sx={{ backgroundColor: labelColor, borderRadius: 1, px: 1, py: 0.3, width: "fit-content" }}>
                     <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{label}</Typography>
@@ -1138,7 +1168,7 @@ export default function GhUserGamePage() {
                             return (
                               <Box key={gi} sx={{ display: "flex", gap: 0.3, ml: gi > 0 ? 1 : 0 }}>
                                 <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.6, py: 0.2 }}>
-                                  <Typography variant="caption" sx={{ fontSize: 10 }}>SC{gi + 1}</Typography>
+                                  <Typography variant="caption" sx={{ fontSize: 10, ...(topKeys.has(`${pat}-${gi + 1}`) && { color: "#ffeb3b", fontWeight: "bold", animation: "blink 1s infinite" }) }}>SC{gi + 1}</Typography>
                                 </Box>
                                 <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", px: 0.6, py: 0.2 }}>
                                   <Typography variant="caption" sx={{ fontSize: 10, ...(isActive && { color: "#f44336", fontWeight: "bold" }) }}>{step}S</Typography>
@@ -1193,6 +1223,7 @@ export default function GhUserGamePage() {
                   })}
                 </Box>
               );
+              };
 
               return (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
