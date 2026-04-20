@@ -1009,35 +1009,37 @@ export default function GhUserGamePage() {
                         <td style={{ ...dc, color: "#1565c0", ...mDimStyle }}>{`${mP.toLocaleString()}P`}</td>
                         <td style={{ ...dc, color: "#f44336", ...mDimStyle }}>{`${mB.toLocaleString()}P`}</td>
                         <td style={{ ...dcB, color: "#fff" }}>{currentTurn}</td>
-                        {Array.from({ length: 11 }, (_, i) => <td key={i} style={{ ...dc }}></td>)}
+                        {Array.from({ length: 8 }, (_, i) => <td key={i} style={{ ...dc }}></td>)}
                       </tr>
                       {dash && [[ghPatterns[0], ghPatterns[1]], [ghPatterns[2], ghPatterns[3]], [ghPatterns[4], ghPatterns[5]], [ghPatterns[6], ghPatterns[7]]].map((pair, ri) => (
                         <tr key={`gh-${ri}`}>
-                          {pair.map((pat) =>
-                            [0, 1, 2].map((sec) => {
-                              const { step, amt, predict } = getStepAmt(pat, sec);
-                              const isActive = step > stepMin;
-                              const isBetting = !!predict;
-                              const dimStyle = isBetting ? {} : { filter: "grayscale(100%)", opacity: 0.5 };
-                              const predictColor = predict === "P" ? "#1565c0" : predict === "B" ? "#f44336" : "#888";
-                              return (
-                                <React.Fragment key={`${pat}-${sec}`}>
-                                  <td style={{ ...dc, ...dimStyle }}>
-                                    {pat.split("").map((c, ci) => (
-                                      <span key={ci} style={{ color: c === "P" ? "#1565c0" : "#f44336", fontWeight: "bold" }}>{c}</span>
-                                    ))}
-                                    <span style={{ fontSize: 9 }}>({sec + 1}sc)</span>
-                                  </td>
-                                  <td style={{ ...dc, ...dimStyle, ...(isActive && isBetting && { color: "#ffeb3b", fontWeight: "bold" }) }}>
-                                    {predict && <span style={{ color: predictColor, fontWeight: "bold", marginRight: 2 }}>{predict}</span>}
-                                    {`${amt.toLocaleString()}P`}
-                                    {isActive && <span style={{ fontSize: 8, marginLeft: 2 }}>{step}S</span>}
-                                  </td>
-                                </React.Fragment>
-                              );
-                            })
-                          )}
-                          {Array.from({ length: 4 }, (_, i) => <td key={`pad-${i}`} style={{ ...dc }}></td>)}
+                          {pair.map((pat, pi) => (
+                            <React.Fragment key={pat}>
+                              {pi > 0 && <td style={{ ...dc, width: 8 }}></td>}
+                              {[0, 1, 2].map((sec) => {
+                                const { step, amt, predict } = getStepAmt(pat, sec);
+                                const isActive = step > stepMin;
+                                const isBetting = !!predict;
+                                const dimStyle = isBetting ? {} : { filter: "grayscale(100%)", opacity: 0.5 };
+                                const predictColor = predict === "P" ? "#1565c0" : predict === "B" ? "#f44336" : "#888";
+                                return (
+                                  <React.Fragment key={`${pat}-${sec}`}>
+                                    <td style={{ ...dc, ...dimStyle }}>
+                                      {pat.split("").map((c, ci) => (
+                                        <span key={ci} style={{ color: c === "P" ? "#1565c0" : "#f44336", fontWeight: "bold" }}>{c}</span>
+                                      ))}
+                                      <span style={{ fontSize: 9 }}>({sec + 1}sc)</span>
+                                    </td>
+                                    <td style={{ ...dc, ...dimStyle, ...(isActive && isBetting && { color: "#ffeb3b", fontWeight: "bold" }) }}>
+                                      {predict && <span style={{ color: predictColor, fontWeight: "bold", marginRight: 2 }}>{predict}</span>}
+                                      {`${amt.toLocaleString()}P`}
+                                      {isActive && <span style={{ fontSize: 8, marginLeft: 2 }}>{step}S</span>}
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              })}
+                            </React.Fragment>
+                          ))}
                         </tr>
                       ))}
                     </tbody>

@@ -542,7 +542,7 @@ export default function GhGamePage() {
                     <td style={{ ...dcB, color: "#fff" }}>{currentTurn}</td>
                     <td style={{ ...dc, color: "#1565c0" }}>{`${(gh?.P || 0).toLocaleString()}P`}</td>
                     <td style={{ ...dc, color: "#f44336" }}>{`${(gh?.B || 0).toLocaleString()}P`}</td>
-                    {Array.from({ length: 10 }, (_, i) => (
+                    {Array.from({ length: 7 }, (_, i) => (
                       <td key={i} style={{ ...dc }}></td>
                     ))}
                   </tr>
@@ -552,27 +552,26 @@ export default function GhGamePage() {
               {/* 2~5행: GH 패턴별 */}
               {[[ghPatterns[0], ghPatterns[1]], [ghPatterns[2], ghPatterns[3]], [ghPatterns[4], ghPatterns[5]], [ghPatterns[6], ghPatterns[7]]].map((pair, ri) => (
                 <tr key={`gh-${ri}`}>
-                  {pair.map((pat) =>
-                    [0, 1, 2].map((sec) => {
-                      const amt = getPatSec(pat, sec);
-                      const hasBet = amt > 0;
-                      const dimStyle = hasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
-                      return (
-                        <React.Fragment key={`${pat}-${sec}`}>
-                          <td style={{ ...dc, ...dimStyle }}>
-                            {pat.split("").map((c, ci) => (
-                              <span key={ci} style={{ color: c === "P" ? "#1565c0" : "#f44336", fontWeight: "bold" }}>{c}</span>
-                            ))}
-                            <span style={{ fontSize: 9 }}>({sec + 1}sc)</span>
-                          </td>
-                          <td style={{ ...dc, ...dimStyle }}>{`${amt.toLocaleString()}P`}</td>
-                        </React.Fragment>
-                      );
-                    })
-                  )}
-                  {/* GH 행은 12열 -> 나머지 4열 빈칸 */}
-                  {Array.from({ length: 4 }, (_, i) => (
-                    <td key={`pad-${i}`} style={{ ...dc }}></td>
+                  {pair.map((pat, pi) => (
+                    <React.Fragment key={pat}>
+                      {pi > 0 && <td style={{ ...dc, width: 8 }}></td>}
+                      {[0, 1, 2].map((sec) => {
+                        const amt = getPatSec(pat, sec);
+                        const hasBet = amt > 0;
+                        const dimStyle = hasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
+                        return (
+                          <React.Fragment key={`${pat}-${sec}`}>
+                            <td style={{ ...dc, ...dimStyle }}>
+                              {pat.split("").map((c, ci) => (
+                                <span key={ci} style={{ color: c === "P" ? "#1565c0" : "#f44336", fontWeight: "bold" }}>{c}</span>
+                              ))}
+                              <span style={{ fontSize: 9 }}>({sec + 1}sc)</span>
+                            </td>
+                            <td style={{ ...dc, ...dimStyle }}>{`${amt.toLocaleString()}P`}</td>
+                          </React.Fragment>
+                        );
+                      })}
+                    </React.Fragment>
                   ))}
                 </tr>
               ))}
