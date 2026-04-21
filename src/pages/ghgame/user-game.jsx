@@ -1095,10 +1095,10 @@ export default function GhUserGamePage() {
               const cellSize = 20;
               const colsPerRow = 30;
               const totalCols = colsPerRow + 2;
-              const GH_CELL_BG = { hit: "#00e676", miss: "#ffeb3b", wait: "#555" };
+              const GH_CELL_BG = { hit: "#00e676", miss: "#ffeb3b", wait: "#fff" };
               const tdStyleFn = (status) => ({
                 width: cellSize, height: cellSize, border: "1px solid #555", padding: 0, textAlign: "center",
-                backgroundColor: status ? (GH_CELL_BG[status] || "#333") : "#333",
+                backgroundColor: status ? (GH_CELL_BG[status] || "#fff") : "#333",
               });
 
               const dashA = userMartinDashboard?.martin_a;
