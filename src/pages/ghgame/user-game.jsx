@@ -96,6 +96,8 @@ export default function GhUserGamePage() {
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const [results, setResults] = useState([]);
   const [globalhitData, setGlobalhitData] = useState([]);
+  const [topGhSections, setTopGhSections] = useState([]);
+  const [topNextRound, setTopNextRound] = useState(null);
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
@@ -122,6 +124,7 @@ export default function GhUserGamePage() {
         setResults(data.seq ? data.seq.split("").map((v, i) => ({ value: v, status: data.round_picks?.[i] ? (data.round_picks[i] === v ? "hit" : "miss") : "wait" })) : []);
         setCumPnL({ gh: data.cum_pnl?.gh || 0, user_a: data.cum_pnl?.user_a || 0, user_z: data.cum_pnl?.user_z || 0, user_s: data.cum_pnl?.user_s || 0, allp: data.cum_pnl?.allp || 0, allb: data.cum_pnl?.allb || 0, fail: data.cum_pnl?.fail || 0, hnh: data.cum_pnl?.hnh || 0, one: data.cum_pnl?.one || 0, two: data.cum_pnl?.two || 0 });
         setGlobalhitData(data.globalhit || []);
+        setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null);
         setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
         setUserSummary(data.user_summary || null);
         setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -165,6 +168,7 @@ export default function GhUserGamePage() {
       setGameId(res.data.game_id);
       setConfig(res.data.config);
       setGlobalhitData(res.data.globalhit || []);
+      setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
     } catch (err) {
       console.error("Failed to start game:", err);
@@ -183,6 +187,7 @@ export default function GhUserGamePage() {
     if (isNew) {
       setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
+      setTopGhSections([]); setTopNextRound(null);
       startGame();
     } else if (urlGameId) {
       restoreGame(parseInt(urlGameId));
@@ -219,6 +224,7 @@ export default function GhUserGamePage() {
         return { value: v, status };
       }));
       setGlobalhitData(data.globalhit || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -255,6 +261,7 @@ export default function GhUserGamePage() {
       }
       setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0 });
       setGlobalhitData(data.globalhit || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -289,6 +296,7 @@ export default function GhUserGamePage() {
       setResults(results.slice(0, -1));
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       setGlobalhitData(data.globalhit || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -312,6 +320,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.post(LINKED_GAMES_API.NEXT, { game_type: "gh", game_id: gameId });
       setResults([]); setBetData(null); setUserSummary(null);
       setGlobalhitData(res.data.globalhit || []);
+      setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null);
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
@@ -355,6 +364,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
       const data = res.data;
       setGlobalhitData(data.globalhit || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -391,6 +401,7 @@ export default function GhUserGamePage() {
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
     setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
     setGlobalhitData([]);
+    setTopGhSections([]); setTopNextRound(null);
     setSearchParams({}, { replace: true });
     startGame();
   };
@@ -408,6 +419,7 @@ export default function GhUserGamePage() {
       setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
       setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
+      setTopGhSections([]); setTopNextRound(null);
       await startGame();
     } finally {
       setProcessing(false);
@@ -466,7 +478,7 @@ export default function GhUserGamePage() {
                     <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: t.bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
                     </Box>
-                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
+                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 60 : 100, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 10, color: "#888" }}>{td?.step || 1}S</Typography>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
                         {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
@@ -501,7 +513,7 @@ export default function GhUserGamePage() {
                     <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: t.bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
                     </Box>
-                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
+                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 60 : 100, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 10, color: "#888" }}>{td?.step || 1}S</Typography>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
                         {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
@@ -634,42 +646,49 @@ export default function GhUserGamePage() {
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
         </Box>
           </Box>
-          {/* 하: 보조 버튼 */}
-          <Box sx={{ display: "flex", gap: 0.3, flexWrap: "wrap" }}>
+          {/* 하: 슈 넘버 + 라벨 */}
+          <Box>
             {(() => {
-              const getStreak = (type) => {
-                const sg = subGames[type];
-                if (!sg) return { label: "—", pickColor: "#888" };
-                const label = sg.streak || "—";
-                const pickColor = sg.streak_pick === "P" ? "#42a5f5" : sg.streak_pick === "B" ? "#ef5350" : "#888";
-                return { label, pickColor };
-              };
-              const whStreak = getStreak("wh");
-              const dhStreak = getStreak("dh");
-              const mhStreak = getStreak("mh");
-              const hbStreak = getStreak("hb");
-              const buttons = [
-                { label: "asist", bg: "#6698fa", color: "#fff", fixed: true },
-                { label: "WH", bg: "#000", color: "#fff", border: "#017332", sc: "wh" },
-                { label: whStreak.label, bg: "#000", color: whStreak.pickColor, border: "#017332" },
-                { label: "DH", bg: "#000", color: "#fff", border: "#933701", sc: "dh" },
-                { label: dhStreak.label, bg: "#000", color: dhStreak.pickColor, border: "#933701" },
-                { label: "MH", bg: "#000", color: "#fff", border: "#02358d", sc: "mh" },
-                { label: mhStreak.label, bg: "#000", color: mhStreak.pickColor, border: "#02358d" },
-                { label: "HB", bg: "#000", color: "#fff", border: "#a39f10", sc: "hb" },
-                { label: hbStreak.label, bg: "#000", color: hbStreak.pickColor, border: "#a39f10" },
-                { label: "A", bg: "#000", color: "#fff", border: "#365490" },
-                { label: "B", bg: "#000", color: "#fff", border: "#365490" },
-                { label: "C", bg: "#000", color: "#fff", border: "#365490" },
-                { label: "D", bg: "#000", color: "#fff", border: "#365490" },
-              ];
-              return buttons.map((btn, i) => (
-                <Box key={`${btn.label}-${i}`} onClick={() => btn.sc ? toggleScorecard(btn.sc) : null}
-                  sx={{ px: isMobile ? 0.6 : 1.2, py: 0.3, borderRadius: 1, backgroundColor: btn.sc && activeScorecards.includes(btn.sc) ? btn.border || btn.bg : btn.bg, cursor: "pointer", border: `2px solid ${btn.border || "rgba(255,255,255,0.2)"}`, "&:hover": { opacity: 0.8 } }}>
-                  <Typography variant="caption" sx={{ fontSize: isMobile ? 8 : 11, fontWeight: "bold", color: btn.sc && activeScorecards.includes(btn.sc) ? "#fff" : btn.color }}>{btn.label}</Typography>
+              // top section 단일이면 해당 섹션의 gi(1,2,3) 기반으로 세트 첫회차 나열
+              let gi = 0;
+              let topPat = null;
+              if (topGhSections.length === 1) {
+                const parts = topGhSections[0].split("-");
+                topPat = parts[0];
+                gi = parseInt(parts[1]) - 1;
+              }
+              const start = 1 + gi;
+              const nums = Array.from({ length: 20 }, (_, i) => start + i * 3);
+              const activeColor = topPat === "PPP" ? "#0066fe" : topPat === "BBB" ? "#ff2d04" : null;
+              return (
+                <Box sx={{ display: "flex", gap: "2px", flexWrap: "wrap", mb: "2px" }}>
+                  {nums.map((num, i) => {
+                    const isNext = activeColor && topNextRound === num;
+                    return (
+                      <Box key={i} sx={{ width: isMobile ? 22 : 28, height: isMobile ? 22 : 28, border: "1px solid #555", borderRadius: 0.5, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: isNext ? activeColor : "#1a1a2e" }}>
+                        <Typography sx={{ fontSize: isMobile ? 8 : 10, color: isNext ? "#fff" : "#90caf9", fontWeight: "bold" }}>{num}</Typography>
+                      </Box>
+                    );
+                  })}
                 </Box>
-              ));
+              );
             })()}
+            <Box sx={{ display: "flex", gap: "2px", flexWrap: "wrap" }}>
+              {["Triple", "S1", "S2", "S3", "Nine", "S1", "S2", "S3"].map((label, i) => {
+                const isPPP = i >= 1 && i <= 3;
+                const isBBB = i >= 5 && i <= 7;
+                const secKey = isPPP ? `PPP-${i}` : isBBB ? `BBB-${i - 4}` : null;
+                const isTop = secKey && topGhSections.includes(secKey);
+                const bg = label === "Triple" || (isPPP && isTop) ? "#0066fe"
+                  : label === "Nine" || (isBBB && isTop) ? "#ff2d04"
+                  : "#1a1a2e";
+                return (
+                  <Box key={`lbl-${i}`} sx={{ px: isMobile ? 0.5 : 1, py: 0.2, border: "1px solid #555", borderRadius: 0.5, backgroundColor: bg }}>
+                    <Typography sx={{ fontSize: isMobile ? 8 : 10, color: "#fff", fontWeight: "bold" }}>{label}</Typography>
+                  </Box>
+                );
+              })}
+            </Box>
           </Box>
         </Box>
       </Box>
@@ -1133,6 +1152,39 @@ export default function GhUserGamePage() {
                   <Box sx={{ backgroundColor: labelColor, borderRadius: 1, px: 1, py: 0.3, width: "fit-content" }}>
                     <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{label}</Typography>
                   </Box>
+                  {label === "마틴A" && (() => {
+                    const getStreak = (type) => {
+                      const sg = subGames[type];
+                      if (!sg) return { label: "—", pickColor: "#888" };
+                      return { label: sg.streak || "—", pickColor: sg.streak_pick === "P" ? "#42a5f5" : sg.streak_pick === "B" ? "#ef5350" : "#888" };
+                    };
+                    const whS = getStreak("wh"), dhS = getStreak("dh"), mhS = getStreak("mh"), hbS = getStreak("hb");
+                    const btns = [
+                      { label: "asist", bg: "#6698fa", color: "#fff" },
+                      { label: "WH", bg: "#000", color: "#fff", border: "#017332", sc: "wh" },
+                      { label: whS.label, bg: "#000", color: whS.pickColor, border: "#017332" },
+                      { label: "DH", bg: "#000", color: "#fff", border: "#933701", sc: "dh" },
+                      { label: dhS.label, bg: "#000", color: dhS.pickColor, border: "#933701" },
+                      { label: "MH", bg: "#000", color: "#fff", border: "#02358d", sc: "mh" },
+                      { label: mhS.label, bg: "#000", color: mhS.pickColor, border: "#02358d" },
+                      { label: "HB", bg: "#000", color: "#fff", border: "#a39f10", sc: "hb" },
+                      { label: hbS.label, bg: "#000", color: hbS.pickColor, border: "#a39f10" },
+                      { label: "A", bg: "#000", color: "#fff", border: "#365490" },
+                      { label: "B", bg: "#000", color: "#fff", border: "#365490" },
+                      { label: "C", bg: "#000", color: "#fff", border: "#365490" },
+                      { label: "D", bg: "#000", color: "#fff", border: "#365490" },
+                    ];
+                    return (
+                      <Box sx={{ display: "flex", gap: 0.3, flexWrap: "wrap", my: 0.5 }}>
+                        {btns.map((btn, i) => (
+                          <Box key={`${btn.label}-${i}`} onClick={() => btn.sc ? toggleScorecard(btn.sc) : null}
+                            sx={{ px: isMobile ? 0.6 : 1.2, py: 0.3, borderRadius: 1, backgroundColor: btn.sc && activeScorecards.includes(btn.sc) ? btn.border || btn.bg : btn.bg, cursor: "pointer", border: `2px solid ${btn.border || "rgba(255,255,255,0.2)"}`, "&:hover": { opacity: 0.8 } }}>
+                            <Typography variant="caption" sx={{ fontSize: isMobile ? 8 : 11, fontWeight: "bold", color: btn.sc && activeScorecards.includes(btn.sc) ? "#fff" : btn.color }}>{btn.label}</Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    );
+                  })()}
                   {globalhitData.map((patData) => {
                     const pat = patData.pattern;
                     const circleStyle = (charIdx) => ({
