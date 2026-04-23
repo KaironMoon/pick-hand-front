@@ -478,7 +478,7 @@ export default function GhUserGamePage() {
                     <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: t.bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
                     </Box>
-                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 60 : 100, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
+                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 10, color: "#888" }}>{td?.step || 1}S</Typography>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
                         {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
@@ -513,7 +513,7 @@ export default function GhUserGamePage() {
                     <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: t.bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
                     </Box>
-                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 60 : 100, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
+                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 10, color: "#888" }}>{td?.step || 1}S</Typography>
                       <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
                         {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
@@ -660,16 +660,22 @@ export default function GhUserGamePage() {
               const start = 1 + gi;
               const nums = Array.from({ length: 20 }, (_, i) => start + i * 3);
               const activeColor = topPat === "PPP" ? "#0066fe" : topPat === "BBB" ? "#ff2d04" : null;
-              return (
-                <Box sx={{ display: "flex", gap: "2px", flexWrap: "wrap", mb: "2px" }}>
-                  {nums.map((num, i) => {
+              const renderRow = (arr, keyPrefix) => (
+                <Box sx={{ display: "flex", gap: "2px", mb: "2px" }}>
+                  {arr.map((num, i) => {
                     const isNext = activeColor && topNextRound === num;
                     return (
-                      <Box key={i} sx={{ width: isMobile ? 22 : 28, height: isMobile ? 22 : 28, border: "1px solid #555", borderRadius: 0.5, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: isNext ? activeColor : "#1a1a2e" }}>
+                      <Box key={`${keyPrefix}-${i}`} sx={{ width: isMobile ? 22 : 28, height: isMobile ? 22 : 28, border: "1px solid #555", borderRadius: 0.5, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: isNext ? activeColor : "#1a1a2e" }}>
                         <Typography sx={{ fontSize: isMobile ? 8 : 10, color: isNext ? "#fff" : "#90caf9", fontWeight: "bold" }}>{num}</Typography>
                       </Box>
                     );
                   })}
+                </Box>
+              );
+              return (
+                <Box>
+                  {renderRow(nums.slice(0, 10), "r1")}
+                  {renderRow(nums.slice(10, 20), "r2")}
                 </Box>
               );
             })()}
