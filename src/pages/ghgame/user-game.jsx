@@ -50,8 +50,9 @@ const calculateCircleGrid = (results) => {
   for (let i = 0; i < results.length; i++) {
     const current = results[i].value;
     const status = results[i].status || "wait";
+    const pickChanged = !!results[i].pickChanged;
     if (prevValue === null) {
-      grid[row][col] = { type: current, status, idx: i };
+      grid[row][col] = { type: current, status, idx: i, pickChanged };
       verticalStartCol = col;
     } else if (current === prevValue) {
       if (isBent) { col++; }
@@ -59,14 +60,14 @@ const calculateCircleGrid = (results) => {
       else if (grid[row + 1][col]) { col++; isBent = true; }
       else { row++; }
       if (col >= GRID_COLS) break;
-      grid[row][col] = { type: current, status, idx: i };
+      grid[row][col] = { type: current, status, idx: i, pickChanged };
     } else {
       verticalStartCol++;
       col = verticalStartCol;
       row = 0;
       isBent = false;
       if (col >= GRID_COLS) break;
-      grid[row][col] = { type: current, status, idx: i };
+      grid[row][col] = { type: current, status, idx: i, pickChanged };
     }
     prevValue = current;
   }
@@ -122,7 +123,7 @@ export default function GhUserGamePage() {
     if (gameId) {
       apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user").then((res) => {
         const data = res.data;
-        setResults(data.seq ? data.seq.split("").map((v, i) => ({ value: v, status: data.round_picks?.[i] ? (data.round_picks[i] === v ? "hit" : "miss") : "wait" })) : []);
+        setResults(data.seq ? data.seq.split("").map((v, i) => ({ value: v, status: data.round_picks?.[i] ? (data.round_picks[i] === v ? "hit" : "miss") : "wait", pickChanged: !!(data.round_pick_change?.[i]) })) : []);
         setCumPnL({ gh: data.cum_pnl?.gh || 0, user_a: data.cum_pnl?.user_a || 0, user_z: data.cum_pnl?.user_z || 0, user_s: data.cum_pnl?.user_s || 0, allp: data.cum_pnl?.allp || 0, allb: data.cum_pnl?.allb || 0, fail: data.cum_pnl?.fail || 0, hnh: data.cum_pnl?.hnh || 0, one: data.cum_pnl?.one || 0, two: data.cum_pnl?.two || 0 });
         setGlobalhitData(data.globalhit || []);
         setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
@@ -219,10 +220,11 @@ export default function GhUserGamePage() {
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       const seq = data.seq || "";
       const picks = data.round_picks || [];
+      const pcMarks = data.round_pick_change || [];
       setResults(seq.split("").map((v, i) => {
         const pick = picks[i];
         const status = pick ? (pick === v ? "hit" : "miss") : "wait";
-        return { value: v, status };
+        return { value: v, status, pickChanged: !!pcMarks[i] };
       }));
       setGlobalhitData(data.globalhit || []);
       setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
@@ -245,11 +247,12 @@ export default function GhUserGamePage() {
     setProcessing(true);
 
     let status = "wait";
-    const pick = betData?.user_martin?.combined?.direction || betData?.combined?.direction;
-    if (pick && pick !== "wait") {
-      status = pick === inputValue ? "hit" : "miss";
+    const normalPick = betData?.user_martin?.combined?.direction || betData?.combined?.direction;
+    const effectivePick = pickChangePick || normalPick;
+    if (effectivePick && effectivePick !== "wait") {
+      status = effectivePick === inputValue ? "hit" : "miss";
     }
-    setResults((prev) => [...prev, { value: inputValue, status }]);
+    setResults((prev) => [...prev, { value: inputValue, status, pickChanged: !!pickChangePick }]);
     setBetData(null);
 
     try {
@@ -453,6 +456,7 @@ export default function GhUserGamePage() {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   backgroundColor: cell ? (CELL_BG[cell.status] || "background.default") : "background.default",
                   ...(isMiddleRow && { borderTop: "2px solid #87ceeb" }),
+                  ...(cell?.pickChanged && { boxShadow: "inset 0 0 0 2px #ab47bc" }),
                 }}
               >
                 {cell && <Circle type={cell.type} filled={true} size={isMobile ? 12 : 22} label={cell.idx + 1} />}
