@@ -444,17 +444,21 @@ export default function GhUserGamePage() {
         }}
       >
         {grid.map((row, rowIndex) =>
-          row.map((cell, colIndex) => (
-            <Box
-              key={`${rowIndex}-${colIndex}`}
-              sx={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                backgroundColor: cell ? (CELL_BG[cell.status] || "background.default") : "background.default",
-              }}
-            >
-              {cell && <Circle type={cell.type} filled={true} size={isMobile ? 12 : 22} label={cell.idx + 1} />}
-            </Box>
-          ))
+          row.map((cell, colIndex) => {
+            const isMiddleRow = rowIndex === 3;  // 4번째 줄(0-index 3)
+            return (
+              <Box
+                key={`${rowIndex}-${colIndex}`}
+                sx={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  backgroundColor: cell ? (CELL_BG[cell.status] || "background.default") : "background.default",
+                  ...(isMiddleRow && { borderTop: "2px solid #87ceeb" }),
+                }}
+              >
+                {cell && <Circle type={cell.type} filled={true} size={isMobile ? 12 : 22} label={cell.idx + 1} />}
+              </Box>
+            );
+          })
         )}
       </Box>
 
