@@ -98,6 +98,7 @@ export default function GhUserGamePage() {
   const [globalhitData, setGlobalhitData] = useState([]);
   const [topGhSections, setTopGhSections] = useState([]);
   const [topNextRound, setTopNextRound] = useState(null);
+  const [pickChangePick, setPickChangePick] = useState(null);
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
@@ -124,7 +125,7 @@ export default function GhUserGamePage() {
         setResults(data.seq ? data.seq.split("").map((v, i) => ({ value: v, status: data.round_picks?.[i] ? (data.round_picks[i] === v ? "hit" : "miss") : "wait" })) : []);
         setCumPnL({ gh: data.cum_pnl?.gh || 0, user_a: data.cum_pnl?.user_a || 0, user_z: data.cum_pnl?.user_z || 0, user_s: data.cum_pnl?.user_s || 0, allp: data.cum_pnl?.allp || 0, allb: data.cum_pnl?.allb || 0, fail: data.cum_pnl?.fail || 0, hnh: data.cum_pnl?.hnh || 0, one: data.cum_pnl?.one || 0, two: data.cum_pnl?.two || 0 });
         setGlobalhitData(data.globalhit || []);
-        setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null);
+        setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
         setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
         setUserSummary(data.user_summary || null);
         setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -168,7 +169,7 @@ export default function GhUserGamePage() {
       setGameId(res.data.game_id);
       setConfig(res.data.config);
       setGlobalhitData(res.data.globalhit || []);
-      setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null);
+      setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null); setPickChangePick(res.data.pick_change_pick ?? null);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
     } catch (err) {
       console.error("Failed to start game:", err);
@@ -187,7 +188,7 @@ export default function GhUserGamePage() {
     if (isNew) {
       setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
-      setTopGhSections([]); setTopNextRound(null);
+      setTopGhSections([]); setTopNextRound(null); setPickChangePick(null);
       startGame();
     } else if (urlGameId) {
       restoreGame(parseInt(urlGameId));
@@ -224,7 +225,7 @@ export default function GhUserGamePage() {
         return { value: v, status };
       }));
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -261,7 +262,7 @@ export default function GhUserGamePage() {
       }
       setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -296,7 +297,7 @@ export default function GhUserGamePage() {
       setResults(results.slice(0, -1));
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -320,7 +321,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.post(LINKED_GAMES_API.NEXT, { game_type: "gh", game_id: gameId });
       setResults([]); setBetData(null); setUserSummary(null);
       setGlobalhitData(res.data.globalhit || []);
-      setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null);
+      setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null); setPickChangePick(res.data.pick_change_pick ?? null);
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
@@ -364,7 +365,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
       const data = res.data;
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -401,7 +402,7 @@ export default function GhUserGamePage() {
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
     setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
     setGlobalhitData([]);
-    setTopGhSections([]); setTopNextRound(null);
+    setTopGhSections([]); setTopNextRound(null); setPickChangePick(null);
     setSearchParams({}, { replace: true });
     startGame();
   };
@@ -419,7 +420,7 @@ export default function GhUserGamePage() {
       setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
       setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
-      setTopGhSections([]); setTopNextRound(null);
+      setTopGhSections([]); setTopNextRound(null); setPickChangePick(null);
       await startGame();
     } finally {
       setProcessing(false);
@@ -560,7 +561,8 @@ export default function GhUserGamePage() {
         ) : (() => {
           const umA = betData?.user_martin?.martin_a;
           const umZ = betData?.user_martin?.martin_z;
-          const pickA = umA?.direction || null;
+          // PICK Change 오버라이드: 정상 픽보다 우선
+          const pickA = pickChangePick || umA?.direction || null;
           const pickZ = umZ?.direction || null;
           const imgA = pickA === "P" ? "/player.png" : pickA === "B" ? "/banker.png" : "/wait.png";
           const imgZ = pickZ === "P" ? "/player.png" : pickZ === "B" ? "/banker.png" : "/wait.png";
@@ -568,9 +570,9 @@ export default function GhUserGamePage() {
           const boxSz = isMobile ? 52 : 95;
           return (
             <Box sx={{ display: "flex", gap: 0.5 }}>
-              <Box sx={{ width: boxSz, height: boxSz, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+              <Box sx={{ width: boxSz, height: boxSz, border: `2px solid ${pickChangePick ? "#ab47bc" : "rgba(255,255,255,0.3)"}`, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
                 <img src={imgA} alt="pickA" style={{ width: sz, height: sz, objectFit: "contain" }} />
-                <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, color: "#1565c0", fontWeight: "bold" }}>A</Typography>
+                <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, color: pickChangePick ? "#ab47bc" : "#1565c0", fontWeight: "bold" }}>{pickChangePick ? "PC" : "A"}</Typography>
               </Box>
               <Box sx={{ width: boxSz, height: boxSz, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
                 {(() => {
@@ -644,6 +646,12 @@ export default function GhUserGamePage() {
           sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ff9800" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
+        </Box>
+        <Box
+          onClick={() => navigate(`/ghgame/pick-change${gameId ? `?gameId=${gameId}` : ""}`)}
+          sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ab47bc" }}
+        >
+          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ab47bc", fontWeight: "bold" }}>픽체인지</Typography>
         </Box>
           </Box>
           {/* 하: 슈 넘버 + 라벨 */}
