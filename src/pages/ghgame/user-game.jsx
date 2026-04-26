@@ -622,36 +622,42 @@ export default function GhUserGamePage() {
           }}
         >B</Box>
 
-        {/* del/next/new/셋업 */}
-        <Box
-          onClick={results.length > 0 && !processing ? handleDeleteOne : undefined}
-          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto" }}
-        >
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
-        </Box>
-        <Box
-          onClick={results.length > 0 && !processing ? () => setShowNextConfirm(true) : undefined}
-          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto", border: "2px solid rgba(255,255,255,0.3)" }}
-        >
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
-        </Box>
-        <Box
-          onClick={!processing ? () => setShowNewConfirm(true) : undefined}
-          sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto", border: "2px solid #2196f3" }}
-        >
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
-        </Box>
-        <Box
-          onClick={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
-          sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ff9800" }}
-        >
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
-        </Box>
-        <Box
-          onClick={() => navigate(`/ghgame/pick-change${gameId ? `?gameId=${gameId}` : ""}`)}
-          sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ab47bc" }}
-        >
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ab47bc", fontWeight: "bold" }}>픽체인지</Typography>
+        {/* del/next/new + 셋업/픽체인지 — 2줄 */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
+          <Box sx={{ display: "flex", gap: isMobile ? 0.5 : 1 }}>
+            <Box
+              onClick={results.length > 0 && !processing ? handleDeleteOne : undefined}
+              sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto" }}
+            >
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
+            </Box>
+            <Box
+              onClick={results.length > 0 && !processing ? () => setShowNextConfirm(true) : undefined}
+              sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto", border: "2px solid rgba(255,255,255,0.3)" }}
+            >
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
+            </Box>
+            <Box
+              onClick={!processing ? () => setShowNewConfirm(true) : undefined}
+              sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto", border: "2px solid #2196f3" }}
+            >
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: "flex", gap: isMobile ? 0.5 : 1 }}>
+            <Box
+              onClick={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
+              sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ff9800" }}
+            >
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
+            </Box>
+            <Box
+              onClick={() => navigate(`/ghgame/pick-change${gameId ? `?gameId=${gameId}` : ""}`)}
+              sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ab47bc" }}
+            >
+              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ab47bc", fontWeight: "bold" }}>픽체인지</Typography>
+            </Box>
+          </Box>
         </Box>
           </Box>
           {/* 하: 슈 넘버 + 라벨 */}
