@@ -16,6 +16,9 @@ if (typeof document !== "undefined" && !document.getElementById("gh-blink-style"
   document.head.appendChild(style);
 }
 
+const PC_COLOR = "#e040fb";   // 픽체인지: 보라
+const LSC_COLOR = "#000000";  // LSC: 검정 (모든 배경에서 고대비)
+
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
 
@@ -33,7 +36,7 @@ const Circle = ({ type, filled = true, size = 24, label }) => {
       sx={{
         width: size, height: size, borderRadius: "50%",
         backgroundColor: filled ? colors[type] : "#fff",
-        border: "3px solid", borderColor: colors[type],
+        border: "1px solid", borderColor: colors[type],
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: label != null ? size * 0.4 : size * 0.5,
         fontWeight: "bold", color: filled ? "#fff" : colors[type],
@@ -100,6 +103,7 @@ export default function GhUserGamePage() {
   const [topGhSections, setTopGhSections] = useState([]);
   const [topNextRound, setTopNextRound] = useState(null);
   const [pickChangePick, setPickChangePick] = useState(null);
+  const [lscMatches, setLscMatches] = useState([]);
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
@@ -126,7 +130,7 @@ export default function GhUserGamePage() {
         setResults(data.seq ? data.seq.split("").map((v, i) => ({ value: v, status: data.round_picks?.[i] ? (data.round_picks[i] === v ? "hit" : "miss") : "wait", pickChanged: !!(data.round_pick_change?.[i]) })) : []);
         setCumPnL({ gh: data.cum_pnl?.gh || 0, user_a: data.cum_pnl?.user_a || 0, user_z: data.cum_pnl?.user_z || 0, user_s: data.cum_pnl?.user_s || 0, allp: data.cum_pnl?.allp || 0, allb: data.cum_pnl?.allb || 0, fail: data.cum_pnl?.fail || 0, hnh: data.cum_pnl?.hnh || 0, one: data.cum_pnl?.one || 0, two: data.cum_pnl?.two || 0 });
         setGlobalhitData(data.globalhit || []);
-        setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
+        setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []);
         setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
         setUserSummary(data.user_summary || null);
         setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -227,7 +231,7 @@ export default function GhUserGamePage() {
         return { value: v, status, pickChanged: !!pcMarks[i] };
       }));
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -265,7 +269,7 @@ export default function GhUserGamePage() {
       }
       setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -300,7 +304,7 @@ export default function GhUserGamePage() {
       setResults(results.slice(0, -1));
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -368,7 +372,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
       const data = res.data;
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null); if (data.sub_games) setSubGames(data.sub_games);
@@ -449,6 +453,10 @@ export default function GhUserGamePage() {
         {grid.map((row, rowIndex) =>
           row.map((cell, colIndex) => {
             const isMiddleRow = rowIndex === 3;  // 4번째 줄(0-index 3)
+            const isLscMatch = cell && Array.isArray(lscMatches) && lscMatches.some(
+              (m) => cell.idx >= m.start && cell.idx < m.end
+            );
+            const triSize = isMobile ? 7 : 10;
             return (
               <Box
                 key={`${rowIndex}-${colIndex}`}
@@ -456,9 +464,25 @@ export default function GhUserGamePage() {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   backgroundColor: cell ? (CELL_BG[cell.status] || "background.default") : "background.default",
                   ...(isMiddleRow && { borderTop: "2px solid #87ceeb" }),
-                  ...(cell?.pickChanged && { boxShadow: "inset 0 0 0 2px #ab47bc" }),
+                  position: "relative",
                 }}
               >
+                {cell?.pickChanged && (
+                  <Box sx={{
+                    position: "absolute", top: 0, right: 0,
+                    width: 0, height: 0,
+                    borderTop: `${triSize}px solid ${PC_COLOR}`,
+                    borderLeft: `${triSize}px solid transparent`,
+                  }} />
+                )}
+                {isLscMatch && (
+                  <Box sx={{
+                    position: "absolute", top: 0, left: 0,
+                    width: 0, height: 0,
+                    borderTop: `${triSize}px solid ${LSC_COLOR}`,
+                    borderRight: `${triSize}px solid transparent`,
+                  }} />
+                )}
                 {cell && <Circle type={cell.type} filled={true} size={isMobile ? 12 : 22} label={cell.idx + 1} />}
               </Box>
             );
