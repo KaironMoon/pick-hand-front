@@ -8,8 +8,8 @@ const GREEN = "#4caf50";
 const RED = "#f44336";
 const BLUE = "#1565c0";
 
-const PC_ROWS = 20;
-const PPC_ROWS = 10;
+const PC_ROWS = 100;
+const PPC_ROWS = 100;
 const PATTERN_LEN = 15;
 
 const newRow = () => ({ pattern: Array(PATTERN_LEN).fill(""), miss: null, pick: "P" });
@@ -97,7 +97,7 @@ const PickCell = ({ value, onClick }) => {
   );
 };
 
-function Section({ title, rows, setRows, missToggler, isPC }) {
+function Section({ title, rows, setRows, missToggler, isPC, dupes }) {
   const updateRow = (idx, patch) => {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   };
@@ -128,16 +128,20 @@ function Section({ title, rows, setRows, missToggler, isPC }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, idx) => (
-              <tr key={idx}>
-                <td style={{ textAlign: "center", color: "#888", fontSize: 11 }}>{idx + 1}</td>
-                {row.pattern.map((v, ci) => (
-                  <td key={ci}><PatternCell value={v} onClick={() => updatePattern(idx, ci)} /></td>
-                ))}
-                <td><MissCell value={row.miss} onClick={() => updateRow(idx, { miss: missToggler(row.miss) })} /></td>
-                <td><PickCell value={row.pick} onClick={() => updateRow(idx, { pick: togglePick(row.pick) })} /></td>
-              </tr>
-            ))}
+            {rows.map((row, idx) => {
+              const isDupe = dupes?.has(idx);
+              const dupCellSx = isDupe ? { outline: `2px solid ${RED}`, outlineOffset: "-2px" } : null;
+              return (
+                <tr key={idx}>
+                  <td style={{ textAlign: "center", color: isDupe ? RED : "#888", fontSize: 11, fontWeight: isDupe ? "bold" : "normal" }}>{idx + 1}</td>
+                  {row.pattern.map((v, ci) => (
+                    <td key={ci} style={dupCellSx}><PatternCell value={v} onClick={() => updatePattern(idx, ci)} /></td>
+                  ))}
+                  <td style={dupCellSx}><MissCell value={row.miss} onClick={() => updateRow(idx, { miss: missToggler(row.miss) })} /></td>
+                  <td style={dupCellSx}><PickCell value={row.pick} onClick={() => updateRow(idx, { pick: togglePick(row.pick) })} /></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </Box>
@@ -155,6 +159,8 @@ export default function GhPickChangePage() {
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
   const [exitDialog, setExitDialog] = useState(false);
+  const [pcDupes, setPcDupes] = useState(() => new Set());
+  const [ppcDupes, setPpcDupes] = useState(() => new Set());
 
   const blocker = useBlocker(dirty);
 
@@ -176,14 +182,16 @@ export default function GhPickChangePage() {
     }).catch(() => {});
   }, []);
 
-  // Wrap setters to track dirty
+  // Wrap setters to track dirty + 편집 시 중복 표시 초기화
   const updatePc = (next) => {
     setPcRows(next);
     setDirty(true);
+    if (pcDupes.size > 0) setPcDupes(new Set());
   };
   const updatePpc = (next) => {
     setPpcRows(next);
     setDirty(true);
+    if (ppcDupes.size > 0) setPpcDupes(new Set());
   };
 
   // 패턴 검증: P/B는 연속이어야 함 (중간 빈칸 금지)
@@ -202,12 +210,47 @@ export default function GhPickChangePage() {
     return null;
   };
 
+  // 중복 검사: 동일 (effective pattern + miss)인 모든 row index 집합. 비활성 행(miss=null 또는 빈 패턴)은 제외
+  const findDuplicates = (rows) => {
+    const seen = new Map(); // key "pattern|miss" → 첫 등장 row index
+    const dupes = new Set();
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (r.miss === null || r.miss === undefined) continue;
+      const eff = r.pattern.filter((c) => c === "P" || c === "B").join("");
+      if (eff.length === 0) continue;
+      const key = `${eff}|${r.miss}`;
+      if (seen.has(key)) {
+        dupes.add(seen.get(key));
+        dupes.add(i);
+      } else {
+        seen.set(key, i);
+      }
+    }
+    return dupes;
+  };
+
   const handleSave = async () => {
     if (!dirty || !config) return;
-    // 검증
-    const err = findInvalidRow(pcRows, "PICK Change") || findInvalidRow(ppcRows, "Pattern PICK Change");
-    if (err) {
-      setSnack({ open: true, message: err, severity: "error" });
+    // 패턴 연속성 검증
+    const invalidErr = findInvalidRow(pcRows, "PICK Change")
+      || findInvalidRow(ppcRows, "Pattern PICK Change");
+    if (invalidErr) {
+      setSnack({ open: true, message: invalidErr, severity: "error" });
+      return;
+    }
+    // 중복 검사 (저장 시점)
+    const pcDup = findDuplicates(pcRows);
+    const ppcDup = findDuplicates(ppcRows);
+    setPcDupes(pcDup);
+    setPpcDupes(ppcDup);
+    if (pcDup.size > 0 || ppcDup.size > 0) {
+      const pcRowNums = [...pcDup].map((i) => i + 1).sort((a, b) => a - b).join(", ");
+      const ppcRowNums = [...ppcDup].map((i) => i + 1).sort((a, b) => a - b).join(", ");
+      const parts = [];
+      if (pcRowNums) parts.push(`PICK Change ${pcRowNums}행`);
+      if (ppcRowNums) parts.push(`Pattern PICK Change ${ppcRowNums}행`);
+      setSnack({ open: true, message: `중복된 패턴/miss 행: ${parts.join(" / ")}`, severity: "error" });
       return;
     }
     setSaving(true);
@@ -265,8 +308,8 @@ export default function GhPickChangePage() {
         </Box>
       </Box>
 
-      <Section title="PICK Change" rows={pcRows} setRows={updatePc} missToggler={toggleMissPC} isPC />
-      <Section title="Pattern PICK Change" rows={ppcRows} setRows={updatePpc} missToggler={toggleMissPPC} />
+      <Section title="PICK Change" rows={pcRows} setRows={updatePc} missToggler={toggleMissPC} isPC dupes={pcDupes} />
+      <Section title="Pattern PICK Change" rows={ppcRows} setRows={updatePpc} missToggler={toggleMissPPC} dupes={ppcDupes} />
 
       <Snackbar open={snack.open} autoHideDuration={3000} onClose={() => setSnack({ ...snack, open: false })}>
         <Alert severity={snack.severity} onClose={() => setSnack({ ...snack, open: false })}>{snack.message}</Alert>
