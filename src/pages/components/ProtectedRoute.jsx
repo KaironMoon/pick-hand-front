@@ -25,11 +25,11 @@ function ProtectedRoute({ adminOnly = false }) {
     initialize();
   }, [initialize]);
 
-  // 1분마다 blocked_games 자동 갱신
+  // 10분마다 blocked_games 자동 갱신
   useEffect(() => {
     if (!isAuthenticated) return;
     fetchBlocked();
-    const id = setInterval(() => fetchBlocked(), 60 * 1000);
+    const id = setInterval(() => fetchBlocked(), 10 * 60 * 1000);
     return () => clearInterval(id);
   }, [isAuthenticated, fetchBlocked]);
 

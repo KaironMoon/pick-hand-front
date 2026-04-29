@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
 import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
-import { useAtomValue } from "jotai";
 import apiCaller from "@/services/api-caller";
-import { USER_BET_SETTINGS_API, APP_SETTINGS_API, LINKED_GAMES_API } from "@/constants/api-url";
-import { userAtom } from "@/store/auth-store";
+import { USER_BET_SETTINGS_API } from "@/constants/api-url";
 
 const GREEN = "#4caf50";
 const LABEL_COLOR = "#c62828";
@@ -296,7 +294,6 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
   );
 }
 
-const GAME_LABELS = { t9: "트리플나인", hb: "허니비", gh: "글로벌히트", nc: "나이스초이스", wh: "위너히트", mh: "메가히트", dh: "드림히트" };
 const GAME_BACK_PATHS = {
   t9: { admin: "/t9game", user: "/t9game/user" },
   hb: { admin: "/hbgame", user: "/hbgame/user" },
@@ -320,40 +317,6 @@ const DEFAULT_FAIL = {
   fail_count: 2,
 };
 
-const ALL_GAMES = ["t9", "hb", "gh", "nc", "wh", "mh", "dh"];
-const LINKED_COLORS = { t9: "#ff9800", hb: "#e91e63", gh: "#4caf50", nc: "#2196f3", wh: "#9c27b0", mh: "#f44336", dh: "#00bcd4" };
-
-function LinkedGameSection({ linkedGames, onChange, blockedGames = [], isAdmin }) {
-  const toggle = (gt) => {
-    const next = linkedGames.includes(gt) ? linkedGames.filter((g) => g !== gt) : [...linkedGames, gt];
-    onChange(next);
-  };
-  return (
-    <Box sx={{ mb: 2, p: 1.5, border: "1px solid rgba(255,255,255,0.2)", borderRadius: 2 }}>
-      <Typography variant="caption" sx={{ fontSize: 13, fontWeight: "bold", color: "#fff", mb: 1, display: "block" }}>연동게임</Typography>
-      <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-        {ALL_GAMES.map((gt) => {
-          const active = linkedGames.includes(gt);
-          const blocked = !isAdmin && blockedGames.includes(gt);
-          return (
-            <Box key={gt} onClick={() => !blocked && toggle(gt)}
-              sx={{
-                px: 1.5, py: 0.5, borderRadius: 1, cursor: blocked ? "not-allowed" : "pointer",
-                border: `1px solid ${active ? LINKED_COLORS[gt] : "#555"}`,
-                backgroundColor: active ? LINKED_COLORS[gt] : "transparent",
-                opacity: blocked ? 0.3 : 1,
-              }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: active ? "#fff" : "#888" }}>
-                {GAME_LABELS[gt]}
-              </Typography>
-            </Box>
-          );
-        })}
-      </Box>
-    </Box>
-  );
-}
-
 export default function UserSetupPage({ gameType }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -361,16 +324,11 @@ export default function UserSetupPage({ gameType }) {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
-  const [linkedGames, setLinkedGames] = useState([]);
-  const [linkedDirty, setLinkedDirty] = useState(false);
-  const [blockedGames, setBlockedGames] = useState([]);
-  const currentUser = useAtomValue(userAtom);
-  const isAdmin = currentUser?.role === "admin";
 
-  const blocker = useBlocker(dirty || linkedDirty);
+  const blocker = useBlocker(dirty);
 
   useEffect(() => {
-    if (!dirty && !linkedDirty) return;
+    if (!dirty) return;
     const handler = (e) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
@@ -380,54 +338,26 @@ export default function UserSetupPage({ gameType }) {
     apiCaller.get(USER_BET_SETTINGS_API.GET(gameType)).then((res) => {
       setConfig(res.data.config);
     });
-    // 연동게임 설정 로드
-    apiCaller.get(USER_BET_SETTINGS_API.GET("common")).then((res) => {
-      setLinkedGames(res.data.config?.linked_games || []);
-    }).catch(() => {});
-    // 차단 게임 로드
-    apiCaller.get(APP_SETTINGS_API.BLOCKED_GAMES).then((res) => {
-      setBlockedGames(Array.isArray(res.data) ? res.data : res.data?.blocked_games || []);
-    }).catch(() => {});
   }, [gameType]);
 
   const handleSave = async () => {
-    if (!dirty && !linkedDirty) return;
+    if (!dirty) return;
     setSaving(true);
     try {
-      if (dirty) {
-        const res = await apiCaller.put(USER_BET_SETTINGS_API.SAVE(gameType), { config });
-        setConfig(res.data.config);
-        setDirty(false);
-      }
-      if (linkedDirty) {
-        await apiCaller.put(USER_BET_SETTINGS_API.SAVE("common"), { config: { linked_games: linkedGames } });
-        setLinkedDirty(false);
-        setLinkedSaved(true);
-        // 연동 게임 즉시 새 게임 시작
-        if (linkedGames.length > 0) {
-          try {
-            await apiCaller.post(LINKED_GAMES_API.START, { game_type: gameType });
-          } catch (e) {
-            console.error("Linked start failed:", e);
-          }
-        }
-      }
+      const res = await apiCaller.put(USER_BET_SETTINGS_API.SAVE(gameType), { config });
+      setConfig(res.data.config);
+      setDirty(false);
       setSnack({ open: true, message: "설정이 저장되었습니다.", severity: "success" });
     } catch (err) {
       setSnack({ open: true, message: err?.response?.data?.detail || "저장 실패", severity: "error" });
     } finally { setSaving(false); }
   };
 
-  const [linkedSaved, setLinkedSaved] = useState(false);
   const handleBack = () => {
     const backPaths = GAME_BACK_PATHS[gameType];
     const path = backPaths.user;
-    if (linkedSaved) {
-      navigate(path);
-    } else {
-      const gid = searchParams.get("gameId");
-      navigate(gid ? `${path}?gameId=${gid}` : path);
-    }
+    const gid = searchParams.get("gameId");
+    navigate(gid ? `${path}?gameId=${gid}` : path);
   };
 
   const updateMartin = (key, martin) => {
@@ -456,13 +386,10 @@ export default function UserSetupPage({ gameType }) {
           <Typography variant="caption" sx={{ fontSize: 12 }}>&larr; 뒤로가기</Typography>
         </Box>
         <Box onClick={handleSave}
-          sx={{ display: "inline-flex", alignItems: "center", border: `1px solid ${(dirty || linkedDirty) ? GREEN : "rgba(255,255,255,0.2)"}`, borderRadius: 1, px: 1.5, py: 0.5, cursor: (dirty || linkedDirty) ? "pointer" : "default", backgroundColor: (dirty || linkedDirty) ? GREEN : "transparent", color: (dirty || linkedDirty) ? "#fff" : "#666", opacity: saving ? 0.5 : 1, "&:hover": (dirty || linkedDirty) ? { backgroundColor: "#388e3c" } : {} }}>
+          sx={{ display: "inline-flex", alignItems: "center", border: `1px solid ${dirty ? GREEN : "rgba(255,255,255,0.2)"}`, borderRadius: 1, px: 1.5, py: 0.5, cursor: dirty ? "pointer" : "default", backgroundColor: dirty ? GREEN : "transparent", color: dirty ? "#fff" : "#666", opacity: saving ? 0.5 : 1, "&:hover": dirty ? { backgroundColor: "#388e3c" } : {} }}>
           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold" }}>{saving ? "저장 중..." : "저장"}</Typography>
         </Box>
       </Box>
-
-      <LinkedGameSection linkedGames={linkedGames} onChange={(v) => { setLinkedGames(v); setLinkedDirty(true); }}
-        blockedGames={blockedGames} isAdmin={isAdmin} />
 
       <Box sx={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "fit-content" }}>
