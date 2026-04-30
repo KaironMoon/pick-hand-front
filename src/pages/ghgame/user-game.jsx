@@ -590,7 +590,7 @@ export default function GhUserGamePage() {
                 <img src={imgA} alt="pickA" style={{ width: sz, height: sz, objectFit: "contain" }} />
                 <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, color: pickChangePick ? "#ab47bc" : "#1565c0", fontWeight: "bold" }}>{pickChangePick ? "PC" : "A"}</Typography>
               </Box>
-              {[{ label: "데칼", pick: decalPick }, { label: "그림자", pick: shadowPick }].map(({ label, pick }) => {
+              {[{ label: "D", pick: decalPick }, { label: "G", pick: shadowPick }].map(({ label, pick }) => {
                 const dsImg = pick === "P" ? "/player.png" : pick === "B" ? "/banker.png" : "/wait.png";
                 return (
                   <Box key={label} sx={{ width: boxSz, height: boxSz, border: `2px solid ${pick ? DS_COLOR : "rgba(255,255,255,0.2)"}`, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
