@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress, Chip } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
@@ -17,6 +17,7 @@ if (typeof document !== "undefined" && !document.getElementById("gh-blink-style"
 
 const PC_COLOR = "#e040fb";   // 픽체인지: 보라
 const LSC_COLOR = "#000000";  // LSC: 검정 (모든 배경에서 고대비)
+const DS_COLOR = "#FF6600";   // 데칼/그림자: 형광 주황
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -53,8 +54,9 @@ const calculateCircleGrid = (results) => {
     const current = results[i].value;
     const status = results[i].status || "wait";
     const pickChanged = !!results[i].pickChanged;
+    const decalShadow = !!results[i].decalShadow;
     if (prevValue === null) {
-      grid[row][col] = { type: current, status, idx: i, pickChanged };
+      grid[row][col] = { type: current, status, idx: i, pickChanged, decalShadow };
       verticalStartCol = col;
     } else if (current === prevValue) {
       if (isBent) { col++; }
@@ -62,14 +64,14 @@ const calculateCircleGrid = (results) => {
       else if (grid[row + 1][col]) { col++; isBent = true; }
       else { row++; }
       if (col >= GRID_COLS) break;
-      grid[row][col] = { type: current, status, idx: i, pickChanged };
+      grid[row][col] = { type: current, status, idx: i, pickChanged, decalShadow };
     } else {
       verticalStartCol++;
       col = verticalStartCol;
       row = 0;
       isBent = false;
       if (col >= GRID_COLS) break;
-      grid[row][col] = { type: current, status, idx: i, pickChanged };
+      grid[row][col] = { type: current, status, idx: i, pickChanged, decalShadow };
     }
     prevValue = current;
   }
@@ -103,6 +105,10 @@ export default function GhUserGamePage() {
   const [topNextRound, setTopNextRound] = useState(null);
   const [pickChangePick, setPickChangePick] = useState(null);
   const [lscMatches, setLscMatches] = useState([]);
+  const [decalPick, setDecalPick] = useState(null);
+  const [shadowPick, setShadowPick] = useState(null);
+  const [decalAxis, setDecalAxis] = useState(null);
+  const [shadowAxis, setShadowAxis] = useState(null);
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
@@ -202,13 +208,14 @@ export default function GhUserGamePage() {
       const seq = data.seq || "";
       const picks = data.round_picks || [];
       const pcMarks = data.round_pick_change || [];
+      const dsMarks = data.round_decal_shadow || [];
       setResults(seq.split("").map((v, i) => {
         const pick = picks[i];
         const status = pick ? (pick === v ? "hit" : "miss") : "wait";
-        return { value: v, status, pickChanged: !!pcMarks[i] };
+        return { value: v, status, pickChanged: !!pcMarks[i], decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
       }));
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);      if (data.status === "ending" && data.ending_snapshot) {
@@ -232,7 +239,7 @@ export default function GhUserGamePage() {
     if (effectivePick && effectivePick !== "wait") {
       status = effectivePick === inputValue ? "hit" : "miss";
     }
-    setResults((prev) => [...prev, { value: inputValue, status, pickChanged: !!pickChangePick }]);
+    setResults((prev) => [...prev, { value: inputValue, status, pickChanged: !!pickChangePick, decalShadow: decalPick !== null || shadowPick !== null }]);
     setBetData(null);
 
     try {
@@ -245,7 +252,7 @@ export default function GhUserGamePage() {
       }
       setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);      checkGoalAlert(data.user_summary);
@@ -279,7 +286,7 @@ export default function GhUserGamePage() {
       setResults(results.slice(0, -1));
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);      if (data.status === "ending" && data.ending_snapshot) {
@@ -346,7 +353,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
       const data = res.data;
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);    } catch (err) {
@@ -425,9 +432,13 @@ export default function GhUserGamePage() {
       >
         {grid.map((row, rowIndex) =>
           row.map((cell, colIndex) => {
-            const isMiddleRow = rowIndex === 3;  // 4번째 줄(0-index 3)
+            const isMiddleRow = rowIndex === 3;
             const isLscMatch = cell && Array.isArray(lscMatches) && lscMatches.some(
               (m) => cell.idx >= m.start && cell.idx < m.end
+            );
+            const isAxis = cell && (
+              (decalAxis && cell.idx >= decalAxis[0] && cell.idx < decalAxis[1]) ||
+              (shadowAxis && cell.idx >= shadowAxis[0] && cell.idx < shadowAxis[1])
             );
             const triSize = isMobile ? 7 : 10;
             return (
@@ -448,11 +459,11 @@ export default function GhUserGamePage() {
                     borderLeft: `${triSize}px solid transparent`,
                   }} />
                 )}
-                {isLscMatch && (
+                {isAxis && (
                   <Box sx={{
-                    position: "absolute", top: 0, left: 0,
+                    position: "absolute", bottom: 0, left: 0,
                     width: 0, height: 0,
-                    borderTop: `${triSize}px solid ${LSC_COLOR}`,
+                    borderBottom: `${triSize}px solid ${DS_COLOR}`,
                     borderRight: `${triSize}px solid transparent`,
                   }} />
                 )}
@@ -579,24 +590,15 @@ export default function GhUserGamePage() {
                 <img src={imgA} alt="pickA" style={{ width: sz, height: sz, objectFit: "contain" }} />
                 <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, color: pickChangePick ? "#ab47bc" : "#1565c0", fontWeight: "bold" }}>{pickChangePick ? "PC" : "A"}</Typography>
               </Box>
-              <Box sx={{ width: boxSz, height: boxSz, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                {(() => {
-                  const oneDir = betData?.user_martin?.one?.direction;
-                  const twoDir = betData?.user_martin?.two?.direction;
-                  const hasOne = oneDir && oneDir !== "wait";
-                  const hasTwo = twoDir && twoDir !== "wait";
-                  const label = hasOne ? "ONE" : hasTwo ? "TWO" : "wait";
-                  const dir = hasOne ? oneDir : hasTwo ? twoDir : null;
-                  const labelColor = hasOne ? "#00838f" : hasTwo ? "#4527a0" : "#888";
-                  const img = dir === "P" ? "/player.png" : dir === "B" ? "/banker.png" : "/wait.png";
-                  return (
-                    <>
-                      <img src={img} alt="pick" style={{ width: sz, height: sz, objectFit: "contain" }} />
-                      <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, fontWeight: "bold", color: "#fff", backgroundColor: labelColor, px: 0.4, borderRadius: 0.5, lineHeight: 1.2 }}>{label}</Typography>
-                    </>
-                  );
-                })()}
-              </Box>
+              {[{ label: "데칼", pick: decalPick }, { label: "그림자", pick: shadowPick }].map(({ label, pick }) => {
+                const dsImg = pick === "P" ? "/player.png" : pick === "B" ? "/banker.png" : "/wait.png";
+                return (
+                  <Box key={label} sx={{ width: boxSz, height: boxSz, border: `2px solid ${pick ? DS_COLOR : "rgba(255,255,255,0.2)"}`, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                    <img src={dsImg} alt={label} style={{ width: sz, height: sz, objectFit: "contain" }} />
+                    <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, color: pick ? DS_COLOR : "#aaa", fontWeight: "bold" }}>{label}</Typography>
+                  </Box>
+                );
+              })}
             </Box>
           );
         })()}
