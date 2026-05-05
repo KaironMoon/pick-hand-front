@@ -36,18 +36,30 @@ const Home = () => {
         onClick={() => navigate("/ghgame/user")}
         sx={{
           width: "100%",
-          height: "100vh",
+          flex: 1,
+          minHeight: 0,
           cursor: "pointer",
-          backgroundImage: "url(/globalhit_background.png)",
-          backgroundSize: "120%",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
           backgroundColor: "#0f1214",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          overflow: "auto",
         }}
-      />
+      >
+        <Box
+          component="img"
+          src="/globalhit_background.png"
+          alt="globalhit"
+          sx={{
+            maxWidth: "100%",
+            maxHeight: "100%",
+            minWidth: 260,
+            minHeight: 260,
+            objectFit: "contain",
+            flexShrink: 0,
+          }}
+        />
+      </Box>
     );
   }
 

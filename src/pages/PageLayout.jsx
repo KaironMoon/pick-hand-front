@@ -63,6 +63,8 @@ function PageLayout() {
         <Box
           sx={{
             flexGrow: 1,
+            display: "flex",
+            flexDirection: "column",
             backgroundColor: theme.palette.background.default,
             overflow: "auto",
           }}
