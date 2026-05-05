@@ -459,6 +459,14 @@ export default function GhUserGamePage() {
                     borderLeft: `${triSize}px solid transparent`,
                   }} />
                 )}
+                {isLscMatch && (
+                  <Box sx={{
+                    position: "absolute", top: 0, left: 0,
+                    width: 0, height: 0,
+                    borderTop: `${triSize}px solid ${LSC_COLOR}`,
+                    borderRight: `${triSize}px solid transparent`,
+                  }} />
+                )}
                 {isAxis && (
                   <Box sx={{
                     position: "absolute", bottom: 0, left: 0,
