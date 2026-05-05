@@ -110,6 +110,7 @@ export default function GhUserGamePage() {
   const [decalAxis, setDecalAxis] = useState(null);
   const [shadowAxis, setShadowAxis] = useState(null);
   const [roundDsList, setRoundDsList] = useState([]);
+  const [batExpanded, setBatExpanded] = useState({}); // {`gi-ri`: true} — Bat 셀 전체 표시 토글
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
@@ -512,6 +513,335 @@ export default function GhUserGamePage() {
         )}
       </Box>
 
+      {/* ===== 새 레이아웃 (자리만, 정적 HTML — 기능 미연결) =====
+           [ 1 ][ 2 ]
+           [   3   ]
+      */}
+      {(() => {
+        // 2번: 픽 카드
+        const PICK_LIST = [
+          { label: "A",   img: "/banker.png", color: "#90caf9", streak: { count: 3, type: "hit" } },
+          { label: "D",   img: "/wait.png",   color: "#ce93d8", streak: { count: 1, type: "miss" } },
+          { label: "G",   img: "/wait.png",   color: "#ce93d8", streak: { count: 1, type: "miss" } },
+          { label: "TN",  img: "/wait.png",   color: "#aaa",    streak: null },
+          { label: "Ar",  img: "/wait.png",   color: "#aaa",    streak: null },
+          { label: "J",   img: "/wait.png",   color: "#aaa",    streak: null },
+          { label: "TWO", img: "/wait.png",   color: "#aaa",    streak: null },
+        ];
+        // 2번: 배팅 테이블 정적 데이터
+        const SEC_COLOR = "#5165f3";
+        const BET_GROUPS = [
+          [{ sec: "A" }, { sec: "D" }, { sec: "G" }],
+          [{ sec: "TN" }, { sec: "Ar" }, { sec: "J" }],
+          [{ sec: "HnH" }, { sec: "1" }, { sec: "2" }],
+        ];
+        // Bat 값(부호 있음): 양수=흑자(노랑), 음수=적자(빨강)
+        const BAT_VALS_NUM = [
+          [150000, 80000, 50000],
+          [150000, -80000, 50000],
+          [-150000, 80000, -50000],
+        ];
+        const STAT_VALS = ["30/15/10[3-2]", "30/15/10[3-2]", "30/15/10[3-2]"];
+        // 만 단위 표시(절대값 ≥ 100,000)는 어두운 톤, 그 외는 밝은 톤
+        const batColor = (v) => {
+          const isMan = Math.abs(v) >= 100000;
+          if (v < 0) return isMan ? "#c62828" : "#ff1744";
+          return isMan ? "#b8860b" : "#ffea00";
+        };
+        // 단축 표시: 10만 이상은 XX만, 그 미만은 그냥 숫자
+        const fmtBatShort = (v) => {
+          const n = Math.abs(v);
+          if (n >= 100000) {
+            return `${Math.floor(n / 10000)}만`;
+          }
+          return n.toLocaleString();
+        };
+        const tdCell = { border: "1px solid #555", padding: "1px 10px", fontSize: 11, lineHeight: 1.2, textAlign: "center", whiteSpace: "nowrap", color: "#e0e0e0", backgroundColor: "#0f1217" };
+        const tdCellBat = { ...tdCell, padding: "1px 6px", minWidth: 50 };
+        const tdCellNarrow = { ...tdCell, padding: "1px 4px" };
+        const thCell = { ...tdCell, color: "#9e9e9e", fontWeight: "bold", backgroundColor: "#161a20" };
+        const thCellBat = { ...thCell, padding: "1px 6px", minWidth: 50 };
+        const thCellNarrow = { ...thCell, padding: "1px 4px" };
+
+        // 3번: S1/S2/S3 78셀 그리드 (39열 × 2행 = 78셀, 1~39 / 40~78)
+        const COLS = 39;
+        const buildRow = (start) => Array.from({ length: COLS }, (_, k) => start + k);
+        // 정적 데이터: 픽(P/B) + 결과(hit/miss/wait)
+        const HIT_BG = "#01e676";   // 초록
+        const MISS_BG = "#ffeb3b";  // 노랑
+        const WAIT_BG = "#ffffff";  // 흰색
+        const FILLED_PICKS_S1 = ["P","P","P","B","B","B","P","B","P","B","B","P","B","P"];
+        const FILLED_PICKS_S2 = ["B","B","B","P","B","P","P","P","B","P","P","P"];
+        const FILLED_PICKS_S3 = ["P","B","P","B","P","P","B","P","B","P"];
+        const FILLED_RES_S1 = ["miss","hit","hit","hit","hit","hit","hit","hit","hit","hit","hit","hit","hit","wait"];
+        const FILLED_RES_S2 = ["hit","hit","hit","hit","hit","hit","hit","hit","hit","hit","hit","wait"];
+        const FILLED_RES_S3 = ["hit","hit","hit","hit","hit","hit","hit","hit","hit","hit"];
+        const resBg = (r) => r === "hit" ? HIT_BG : r === "miss" ? MISS_BG : WAIT_BG;
+        const SROWS = [
+          { label: "S1", filled: FILLED_PICKS_S1, bgPalette: FILLED_RES_S1.map(resBg) },
+          { label: "S2", filled: FILLED_PICKS_S2, bgPalette: FILLED_RES_S2.map(resBg) },
+          { label: "S3", filled: FILLED_PICKS_S3, bgPalette: FILLED_RES_S3.map(resBg) },
+        ];
+        const cellSz = 22;
+        const renderCell = (n, pick, bg) => (
+          <Box key={n} sx={{
+            width: cellSz, height: cellSz, border: "1px solid #333", display: "flex", alignItems: "center", justifyContent: "center",
+            backgroundColor: pick ? (bg || HIT_BG) : "#1c1f24",
+          }}>
+            {pick ? (
+              <Typography sx={{ fontSize: 11, fontWeight: "bold", color: pick === "P" ? "#1565c0" : "#f44336" }}>{pick}</Typography>
+            ) : (
+              <Typography sx={{ fontSize: 10, color: "#888" }}>{n}</Typography>
+            )}
+          </Box>
+        );
+
+        return (
+          <>
+          {/* 1|2 row */}
+          <Box sx={{ display: "flex", flexDirection: "row", gap: 2, alignItems: "flex-start", mb: 2 }}>
+
+          {/* ===== 1: 배팅부 (구 디자인 스타일에 맞춰 정적 자리만) ===== */}
+          {(() => {
+            // 구 디자인 토큰
+            const tagSx = (bg) => ({ borderRadius: 1, px: 0.5, py: 0, backgroundColor: bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: 44, height: 20 });
+            const fieldSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1, py: 0.2, minWidth: 90, height: 24, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 };
+            const turnBoxSx = { width: 46, height: 46, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" };
+            const pbBtnSx = (bg) => ({ width: 55, height: 55, borderRadius: 2, backgroundColor: bg, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 24, fontWeight: "bold" });
+            const ctrlBtnSx = (borderColor, fg) => ({ ...controlBtnSx, border: `2px solid ${borderColor}`, color: fg || "#fff", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 50 });
+            const uniBtnSx = (borderColor, fg) => ({ ...controlBtnSx, border: `2px solid ${borderColor}`, color: fg || "#fff", display: "flex", alignItems: "center", justifyContent: "center", width: 60, height: 32, minWidth: 60, px: 0, py: 0 });
+
+            return (
+              <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1, px: 0, py: 0.5 }}>
+                {/* 행1: 마틴A 태그 + 필드 + 마틴Z 태그 + 필드 */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
+                  <Box sx={tagSx("#1565c0")}>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>마틴A</Typography>
+                  </Box>
+                  <Box sx={fieldSx}>
+                    <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>1S</Typography>
+                    <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: "#666" }}>0</Typography>
+                  </Box>
+                  <Box sx={tagSx("#c62828")}>
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>마틴Z</Typography>
+                  </Box>
+                  <Box sx={fieldSx}>
+                    <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>1S</Typography>
+                    <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: "#666" }}>0</Typography>
+                  </Box>
+                </Box>
+
+                {/* 행2: 회차 + P + step+ + B + step+ + del */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={turnBoxSx}>
+                    <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 16 }}>1</Typography>
+                  </Box>
+                  <Box sx={pbBtnSx("#1565c0")}>P</Box>
+                  <Box sx={{ ...turnBoxSx, width: 38, height: 38 }}>
+                    <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>2</Typography>
+                  </Box>
+                  <Box sx={pbBtnSx("#f44336")}>B</Box>
+                  <Box sx={{ ...turnBoxSx, width: 38, height: 38 }}>
+                    <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>1</Typography>
+                  </Box>
+                  <Box sx={ctrlBtnSx("rgba(255,255,255,0.3)", "#666")}>
+                    <Typography variant="caption" sx={{ fontSize: 13 }}>del</Typography>
+                  </Box>
+                </Box>
+
+                {/* 행3: next + new + P 박스 + 1S 0 필드 */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={uniBtnSx("rgba(255,255,255,0.3)", "#666")}>
+                    <Typography variant="caption" sx={{ fontSize: 12 }}>next</Typography>
+                  </Box>
+                  <Box sx={uniBtnSx("#2196f3")}>
+                    <Typography variant="caption" sx={{ fontSize: 12, color: "#2196f3" }}>new</Typography>
+                  </Box>
+                  {(() => {
+                    // 가운데 P/B/W (하나만 노출 — 로직 추후, 일단 P)
+                    const center = "P";
+                    const centerColor = center === "P" ? "#1565c0" : center === "B" ? "#f44336" : "#fff";
+                    return (
+                      <Box sx={uniBtnSx("#67f431")}>
+                        <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 16, color: centerColor }}>{center}</Typography>
+                      </Box>
+                    );
+                  })()}
+                  <Box sx={{ ...fieldSx, width: 130, minWidth: 130, height: 32, border: "2px solid #67f431" }}>
+                    <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>1S</Typography>
+                    <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: "#fff" }}>0</Typography>
+                  </Box>
+                </Box>
+
+                {/* 행4: 셋업 + 픽체인지 + auto + HitPoint */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={uniBtnSx("#ff9800")}>
+                    <Typography variant="caption" sx={{ fontSize: 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
+                  </Box>
+                  <Box sx={uniBtnSx("#ab47bc")}>
+                    <Typography variant="caption" sx={{ fontSize: 12, color: "#ab47bc", fontWeight: "bold" }}>픽체인지</Typography>
+                  </Box>
+                  <Box sx={uniBtnSx("#cc3499")}>
+                    <Typography variant="caption" sx={{ fontSize: 12, color: "#cc3499", fontWeight: "bold" }}>auto</Typography>
+                  </Box>
+                  <Box sx={{ ...fieldSx, width: 130, minWidth: 130, justifyContent: "flex-start", height: 32, border: "2px solid #7f7f7f", whiteSpace: "nowrap", overflow: "hidden" }}>
+                    <Typography variant="caption" sx={{ fontSize: 11, color: "#fff", whiteSpace: "nowrap" }}>HitPoint:&nbsp;&nbsp;220000 P</Typography>
+                  </Box>
+                </Box>
+              </Box>
+            );
+          })()}
+
+          {/* ===== 2: 픽 정보부 (이미지15 정적 디자인) ===== */}
+          <Box sx={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: 1, p: 1, backgroundColor: "#0d1014", borderRadius: 1, overflowX: "auto" }}>
+            {/* 2-1: 7-픽 카드 + streak */}
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "nowrap" }}>
+              {PICK_LIST.map(({ label, img, color, streak }) => (
+                <Box key={label} sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
+                  <Box sx={{ width: 68, height: 68, border: "1px solid #4e4e4e", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", backgroundColor: "#0a0c10" }}>
+                    <img src={img} alt={label} style={{ width: 60, height: 60, objectFit: "contain" }} />
+                    <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: 10, color, fontWeight: "bold" }}>{label}</Typography>
+                  </Box>
+                  {streak ? (
+                    <Box sx={{ width: 40, height: 22, border: "1px solid #7f7f7f", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: streak.type === "hit" ? "#4caf50" : "#f44336" }}>
+                        {streak.count}{streak.type === "hit" ? "H" : "M"}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Box sx={{ width: 40, height: 22, border: "1px solid #7f7f7f", borderRadius: 1 }} />
+                  )}
+                </Box>
+              ))}
+            </Box>
+            {/* 2-2: 3그룹 배팅 테이블 (하나로 합침) */}
+            <Box>
+              <table style={{ borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    {BET_GROUPS.map((_, gi) => {
+                      const groupSep = gi > 0 ? { borderLeft: "2px solid #888" } : {};
+                      return (
+                        <React.Fragment key={`h-${gi}`}>
+                          <th style={{ ...thCellNarrow, ...groupSep }}>SEC</th>
+                          <th style={thCellBat}>Bat</th>
+                          <th style={thCellNarrow}>전/승/패[연승패]</th>
+                        </React.Fragment>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[0, 1, 2].map((ri) => (
+                    <tr key={ri}>
+                      {BET_GROUPS.map((group, gi) => {
+                        const sec = group[ri].sec;
+                        const batVal = BAT_VALS_NUM[gi][ri];
+                        const groupSep = gi > 0 ? { borderLeft: "2px solid #888" } : {};
+                        return (
+                          <React.Fragment key={`${gi}-${ri}`}>
+                            <td style={{ ...tdCellNarrow, color: SEC_COLOR, fontWeight: "bold", ...groupSep }}>{sec}</td>
+                            <td
+                              style={{ ...tdCellBat, color: batColor(batVal), fontWeight: "bold", cursor: "pointer" }}
+                              onClick={() => setBatExpanded((p) => ({ ...p, [`${gi}-${ri}`]: !p[`${gi}-${ri}`] }))}
+                              title="클릭하면 전체 숫자 표시"
+                            >
+                              {batExpanded[`${gi}-${ri}`] ? Math.abs(batVal).toLocaleString() : fmtBatShort(batVal)}
+                            </td>
+                            <td style={tdCellNarrow}>{STAT_VALS[ri]}</td>
+                          </React.Fragment>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Box>
+          </Box>
+
+          </Box>
+          {/* /1|2 row */}
+
+          {/* ===== 3: 나이스초이스 표 (실제 table) ===== */}
+          {(() => {
+            const cellTd = (extra = {}) => ({
+              width: cellSz, minWidth: cellSz, maxWidth: cellSz,
+              height: cellSz, minHeight: cellSz, maxHeight: cellSz,
+              padding: 0, textAlign: "center",
+              border: "1px solid #333", verticalAlign: "middle",
+              boxSizing: "border-box", lineHeight: 1,
+              ...extra,
+            });
+            const labelTd = {
+              width: 76, height: cellSz, padding: 0, textAlign: "center",
+              backgroundColor: "transparent", boxSizing: "border-box",
+            };
+            // 3칸마다 굵은 우측선: col index k (0~39), (k+1) % 3 === 0 이고 마지막은 제외
+            const isThickRight = (k) => k < COLS - 1 && (k + 1) % 3 === 0;
+            const renderTd = (key, n, pick, bg, k) => {
+              const extra = isThickRight(k) ? { borderRight: "2px solid #aaa" } : {};
+              return (
+                <td key={key} style={{ ...cellTd(extra) }}>
+                  <Box sx={{
+                    width: "100%", height: "100%",
+                    backgroundColor: pick ? (bg || HIT_BG) : "#1c1f24",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    {pick ? (
+                      <Typography sx={{ fontSize: 11, fontWeight: "bold", color: pick === "P" ? "#1565c0" : "#f44336" }}>{pick}</Typography>
+                    ) : (
+                      <Typography sx={{ fontSize: 10, color: "#888" }}>{n}</Typography>
+                    )}
+                  </Box>
+                </td>
+              );
+            };
+            return (
+              <Box sx={{ mb: 2 }}>
+                <table style={{ borderCollapse: "collapse", borderSpacing: 0 }}>
+                  <tbody>
+                    {SROWS.map((row, ri) => {
+                      const top = buildRow(1);
+                      const bottom = buildRow(40);
+                      const fill = row.filled;
+                      const palette = row.bgPalette;
+                      return (
+                        <React.Fragment key={row.label}>
+                          {/* 1행: S1 라벨 + top 셀 40개 */}
+                          <tr>
+                            <td style={labelTd}>
+                              <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: "#aaa", fontSize: 12, minWidth: 72, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>{row.label}</Box>
+                            </td>
+                            {top.map((n, k) => {
+                              const pick = fill[k];
+                              const bg = pick ? palette[k] : null;
+                              return renderTd(`${row.label}-t-${k}`, n, pick, bg, k);
+                            })}
+                          </tr>
+                          {/* 2행: 13 라벨 + bottom 셀 40개 */}
+                          <tr>
+                            <td style={labelTd}>
+                              <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: "#aaa", fontSize: 11, minWidth: 72, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>13</Box>
+                            </td>
+                            {bottom.map((n, k) => renderTd(`${row.label}-b-${k}`, n, null, null, k))}
+                          </tr>
+                          {/* SROWS 사이 간격 한 줄 */}
+                          {ri < SROWS.length - 1 && (
+                            <tr><td colSpan={COLS + 1} style={{ height: 6, border: "none", padding: 0 }} /></tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </Box>
+            );
+          })()}
+          </>
+        );
+      })()}
+
+      {/* ===== 배팅부: 마틴A/Z + P/B + next/new + 셋업/픽체인지 ===== */}
       {/* ===== 중단: 인터페이스 (한줄) ===== */}
       <Box sx={{ display: "flex", alignItems: "center", gap: isMobile ? 0.5 : 1, mb: 1, flexWrap: "wrap" }}>
         {/* 좌: 배팅 8행 (2열x4행) + 총배팅(A제외) */}
