@@ -631,7 +631,7 @@ export default function GhUserGamePage() {
         return (
           <>
           {/* 1|2 row */}
-          <Box sx={{ display: "flex", flexDirection: "row", gap: 2, alignItems: "flex-start", mb: 2 }}>
+          <Box sx={{ display: "flex", flexDirection: "row", gap: 1, alignItems: "flex-start", mb: 2 }}>
 
           {/* ===== 1: 배팅부 (구 디자인 스타일에 맞춰 정적 자리만) ===== */}
           {(() => {
@@ -771,8 +771,8 @@ export default function GhUserGamePage() {
             <Box sx={{ display: "flex", gap: 1, flexWrap: "nowrap" }}>
               {PICK_LIST.map(({ label, img, color, streak }) => (
                 <Box key={label} sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
-                  <Box sx={{ width: 68, height: 68, border: "1px solid #4e4e4e", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", backgroundColor: "#0a0c10" }}>
-                    <img src={img} alt={label} style={{ width: 60, height: 60, objectFit: "contain" }} />
+                  <Box sx={{ width: 60, height: 60, border: "1px solid #4e4e4e", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", backgroundColor: "#0a0c10" }}>
+                    <img src={img} alt={label} style={{ width: 52, height: 52, objectFit: "contain" }} />
                     <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: 10, color, fontWeight: "bold" }}>{label}</Typography>
                   </Box>
                   {streak ? (
