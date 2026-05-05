@@ -110,6 +110,11 @@ export default function GhUserGamePage() {
   const [decalAxis, setDecalAxis] = useState(null);
   const [shadowAxis, setShadowAxis] = useState(null);
   const [roundDsList, setRoundDsList] = useState([]);
+  const [lscPick, setLscPick] = useState(null);
+  const [roundLscList, setRoundLscList] = useState([]);
+  const [twoPick, setTwoPick] = useState(null);
+  const [roundTwoList, setRoundTwoList] = useState([]);
+  const [picksSnapshot, setPicksSnapshot] = useState(null);
   const [batExpanded, setBatExpanded] = useState({}); // {`gi-ri`: true} — Bat 셀 전체 표시 토글
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
@@ -159,6 +164,17 @@ export default function GhUserGamePage() {
   })();
   const streakD = calcStreak((i) => roundDsList[i]?.decal_pick || null);
   const streakG = calcStreak((i) => roundDsList[i]?.shadow_pick || null);
+  const streakTN = calcStreak((i) => roundLscList[i] || null);
+  const streakTWO = calcStreak((i) => roundTwoList[i] || null);
+
+  // 백엔드 picks_snapshot에서 AR, J, ONE 픽 정보 가져오기 (프론트 로직 제거됨)
+  const arPick = picksSnapshot?.next_picks?.AR || null;
+  const jPick = picksSnapshot?.next_picks?.J || null;
+  const onePick = picksSnapshot?.next_picks?.ONE || null;
+  const roundArList = picksSnapshot?.round_picks?.AR || [];
+  const roundJList = picksSnapshot?.round_picks?.J || [];
+  const streakAR = calcStreak((i) => roundArList[i] || null);
+  const streakJ = calcStreak((i) => roundJList[i] || null);
 
   const checkGoalAlert = useCallback((summary) => {
     if (!summary) return;
@@ -242,10 +258,10 @@ export default function GhUserGamePage() {
       setResults(seq.split("").map((v, i) => {
         const pick = picks[i];
         const status = pick ? (pick === v ? "hit" : "miss") : "wait";
-        return { value: v, status, pickChanged: !!pcMarks[i], decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
+        return { value: v, status, aPick: pick || null, pickChanged: !!pcMarks[i], decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
       }));
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);      if (data.status === "ending" && data.ending_snapshot) {
@@ -269,7 +285,7 @@ export default function GhUserGamePage() {
     if (effectivePick && effectivePick !== "wait") {
       status = effectivePick === inputValue ? "hit" : "miss";
     }
-    setResults((prev) => [...prev, { value: inputValue, status, pickChanged: !!pickChangePick, decalShadow: decalPick !== null || shadowPick !== null }]);
+    setResults((prev) => [...prev, { value: inputValue, status, aPick: effectivePick && effectivePick !== "wait" ? effectivePick : null, pickChanged: !!pickChangePick, decalShadow: decalPick !== null || shadowPick !== null }]);
     setBetData(null);
 
     try {
@@ -282,7 +298,7 @@ export default function GhUserGamePage() {
       }
       setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);      checkGoalAlert(data.user_summary);
@@ -316,7 +332,7 @@ export default function GhUserGamePage() {
       setResults(results.slice(0, -1));
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);      if (data.status === "ending" && data.ending_snapshot) {
@@ -384,7 +400,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
       const data = res.data;
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);    } catch (err) {
@@ -519,29 +535,45 @@ export default function GhUserGamePage() {
       */}
       {(() => {
         // 2번: 픽 카드
+        const pickImg = (p) => p === "P" ? "/player.png" : p === "B" ? "/banker.png" : "/wait.png";
+        const aPick = pickChangePick || betData?.user_martin?.martin_a?.direction || null;
         const PICK_LIST = [
-          { label: "A",   img: "/banker.png", color: "#90caf9", streak: { count: 3, type: "hit" } },
-          { label: "D",   img: "/wait.png",   color: "#ce93d8", streak: { count: 1, type: "miss" } },
-          { label: "G",   img: "/wait.png",   color: "#ce93d8", streak: { count: 1, type: "miss" } },
-          { label: "TN",  img: "/wait.png",   color: "#aaa",    streak: null },
-          { label: "Ar",  img: "/wait.png",   color: "#aaa",    streak: null },
-          { label: "J",   img: "/wait.png",   color: "#aaa",    streak: null },
-          { label: "TWO", img: "/wait.png",   color: "#aaa",    streak: null },
+          { label: "A",   img: pickImg(aPick),    color: aPick ? "#90caf9" : "#aaa", streak: streakA },
+          { label: "D",   img: pickImg(decalPick), color: decalPick ? "#ce93d8" : "#aaa", streak: streakD },
+          { label: "G",   img: pickImg(shadowPick), color: shadowPick ? "#ce93d8" : "#aaa", streak: streakG },
+          { label: "TN",  img: pickImg(lscPick),  color: lscPick ? "#90caf9" : "#aaa", streak: streakTN },
+          { label: "AR",  img: pickImg(arPick),   color: arPick ? "#ce93d8" : "#aaa", streak: streakAR },
+          { label: "J",   img: pickImg(jPick),    color: jPick ? "#90caf9" : "#aaa", streak: streakJ },
+          { label: "TWO", img: pickImg(twoPick),  color: twoPick ? "#90caf9" : "#aaa", streak: streakTWO },
         ];
         // 2번: 배팅 테이블 정적 데이터
         const SEC_COLOR = "#5165f3";
         const BET_GROUPS = [
           [{ sec: "A" }, { sec: "D" }, { sec: "G" }],
-          [{ sec: "TN" }, { sec: "Ar" }, { sec: "J" }],
+          [{ sec: "TN" }, { sec: "AR" }, { sec: "J" }],
           [{ sec: "HnH" }, { sec: "1" }, { sec: "2" }],
         ];
-        // Bat 값(부호 있음): 양수=흑자(노랑), 음수=적자(빨강)
-        const BAT_VALS_NUM = [
-          [150000, 80000, 50000],
-          [150000, -80000, 50000],
-          [-150000, 80000, -50000],
-        ];
-        const STAT_VALS = ["30/15/10[3-2]", "30/15/10[3-2]", "30/15/10[3-2]"];
+        // 1000원 마틴 9단계 (2배 진행, 9단계 cap)
+        const MARTIN_AMOUNTS = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 256000];
+        const calcBatBySec = (sec) => {
+          const SEC_TO_KEY = { "1": "ONE", "2": "TWO" };
+          const key = SEC_TO_KEY[sec] || sec;
+          const s = picksSnapshot?.stats?.[key];
+          if (!s) return 0;
+          let step = 1;
+          if (s.cur_streak_type === "miss") {
+            step = Math.min((s.cur_streak_count || 0) + 1, 9);
+          }
+          return MARTIN_AMOUNTS[step - 1];
+        };
+        // picks_snapshot.stats에서 가져옴 (없으면 0/0/0[0-0])
+        const SEC_TO_KEY = { "1": "ONE", "2": "TWO" };
+        const fmtStats = (sec) => {
+          const key = SEC_TO_KEY[sec] || sec;
+          const s = picksSnapshot?.stats?.[key];
+          if (!s) return "0/0/0[0-0]";
+          return `${s.total}/${s.hit}/${s.miss}[${s.max_hit_streak}-${s.max_miss_streak}]`;
+        };
         // 만 단위 표시(절대값 ≥ 100,000)는 어두운 톤, 그 외는 밝은 톤
         const batColor = (v) => {
           const isMan = Math.abs(v) >= 100000;
@@ -607,7 +639,15 @@ export default function GhUserGamePage() {
             const tagSx = (bg) => ({ borderRadius: 1, px: 0.5, py: 0, backgroundColor: bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: 44, height: 20 });
             const fieldSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1, py: 0.2, minWidth: 90, height: 24, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 };
             const turnBoxSx = { width: 46, height: 46, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" };
-            const pbBtnSx = (bg) => ({ width: 55, height: 55, borderRadius: 2, backgroundColor: bg, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 24, fontWeight: "bold" });
+            const pbBtnSx = (bg) => ({
+              width: 55, height: 55, borderRadius: 2, backgroundColor: bg,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", fontSize: 24, fontWeight: "bold",
+              cursor: processing ? "not-allowed" : "pointer",
+              opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
+              "&:hover": { opacity: processing ? 0.4 : 0.85 },
+              "&:active": { transform: "scale(0.95)" },
+            });
             const ctrlBtnSx = (borderColor, fg) => ({ ...controlBtnSx, border: `2px solid ${borderColor}`, color: fg || "#fff", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 50 });
             const uniBtnSx = (borderColor, fg) => ({ ...controlBtnSx, border: `2px solid ${borderColor}`, color: fg || "#fff", display: "flex", alignItems: "center", justifyContent: "center", width: 60, height: 32, minWidth: 60, px: 0, py: 0 });
 
@@ -615,46 +655,73 @@ export default function GhUserGamePage() {
               <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1, px: 0, py: 0.5 }}>
                 {/* 행1: 마틴A 태그 + 필드 + 마틴Z 태그 + 필드 */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                  <Box sx={tagSx("#1565c0")}>
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>마틴A</Typography>
-                  </Box>
-                  <Box sx={fieldSx}>
-                    <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>1S</Typography>
-                    <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: "#666" }}>0</Typography>
-                  </Box>
-                  <Box sx={tagSx("#c62828")}>
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>마틴Z</Typography>
-                  </Box>
-                  <Box sx={fieldSx}>
-                    <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>1S</Typography>
-                    <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: "#666" }}>0</Typography>
-                  </Box>
+                  {[
+                    { key: "martin_a", label: "마틴A", bg: "#1565c0" },
+                    { key: "martin_z", label: "마틴Z", bg: "#c62828" },
+                  ].map((t) => {
+                    const td = betData?.user_martin?.[t.key];
+                    const amt = td?.amount || 0;
+                    const dir = td?.direction || "";
+                    const step = td?.step || 1;
+                    return (
+                      <React.Fragment key={t.key}>
+                        <Box sx={tagSx(t.bg)}>
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
+                        </Box>
+                        <Box sx={fieldSx}>
+                          <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{step}S</Typography>
+                          <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
+                            {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
+                          </Typography>
+                        </Box>
+                      </React.Fragment>
+                    );
+                  })}
                 </Box>
 
                 {/* 행2: 회차 + P + step+ + B + step+ + del */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box sx={turnBoxSx}>
-                    <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 16 }}>1</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 16 }}>{currentTurn}</Typography>
                   </Box>
-                  <Box sx={pbBtnSx("#1565c0")}>P</Box>
+                  <Box sx={pbBtnSx("#1565c0")} onClick={() => handleInput("P")}>P</Box>
                   <Box sx={{ ...turnBoxSx, width: 38, height: 38 }}>
-                    <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>2</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{results.filter((r) => r.value === "P").length}</Typography>
                   </Box>
-                  <Box sx={pbBtnSx("#f44336")}>B</Box>
+                  <Box sx={pbBtnSx("#f44336")} onClick={() => handleInput("B")}>B</Box>
                   <Box sx={{ ...turnBoxSx, width: 38, height: 38 }}>
-                    <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>1</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{results.filter((r) => r.value === "B").length}</Typography>
                   </Box>
-                  <Box sx={ctrlBtnSx("rgba(255,255,255,0.3)", "#666")}>
-                    <Typography variant="caption" sx={{ fontSize: 13 }}>del</Typography>
-                  </Box>
+                  {(() => {
+                    const enabled = results.length > 0 && !processing;
+                    return (
+                      <Box
+                        onClick={enabled ? handleDeleteOne : undefined}
+                        sx={{ ...ctrlBtnSx("rgba(255,255,255,0.3)", "#666"), cursor: processing ? "not-allowed" : enabled ? "pointer" : "default", opacity: processing ? 0.4 : enabled ? 1 : 0.4, pointerEvents: processing ? "none" : "auto" }}
+                      >
+                        <Typography variant="caption" sx={{ fontSize: 13 }}>del</Typography>
+                      </Box>
+                    );
+                  })()}
                 </Box>
 
                 {/* 행3: next + new + P 박스 + 1S 0 필드 */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={uniBtnSx("rgba(255,255,255,0.3)", "#666")}>
-                    <Typography variant="caption" sx={{ fontSize: 12 }}>next</Typography>
-                  </Box>
-                  <Box sx={uniBtnSx("#2196f3")}>
+                  {(() => {
+                    const enabled = results.length > 0 && !processing;
+                    return (
+                      <Box
+                        onClick={enabled ? () => setShowNextConfirm(true) : undefined}
+                        sx={{ ...uniBtnSx("rgba(255,255,255,0.3)", "#666"), cursor: processing ? "not-allowed" : enabled ? "pointer" : "default", opacity: processing ? 0.4 : enabled ? 1 : 0.4, pointerEvents: processing ? "none" : "auto" }}
+                      >
+                        <Typography variant="caption" sx={{ fontSize: 12 }}>next</Typography>
+                      </Box>
+                    );
+                  })()}
+                  <Box
+                    onClick={!processing ? () => setShowNewConfirm(true) : undefined}
+                    sx={{ ...uniBtnSx("#2196f3"), cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto" }}
+                  >
                     <Typography variant="caption" sx={{ fontSize: 12, color: "#2196f3" }}>new</Typography>
                   </Box>
                   {(() => {
@@ -675,10 +742,16 @@ export default function GhUserGamePage() {
 
                 {/* 행4: 셋업 + 픽체인지 + auto + HitPoint */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={uniBtnSx("#ff9800")}>
+                  <Box
+                    onClick={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
+                    sx={{ ...uniBtnSx("#ff9800"), cursor: "pointer" }}
+                  >
                     <Typography variant="caption" sx={{ fontSize: 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
                   </Box>
-                  <Box sx={uniBtnSx("#ab47bc")}>
+                  <Box
+                    onClick={() => navigate(`/ghgame/pick-change${gameId ? `?gameId=${gameId}` : ""}`)}
+                    sx={{ ...uniBtnSx("#ab47bc"), cursor: "pointer" }}
+                  >
                     <Typography variant="caption" sx={{ fontSize: 12, color: "#ab47bc", fontWeight: "bold" }}>픽체인지</Typography>
                   </Box>
                   <Box sx={uniBtnSx("#cc3499")}>
@@ -714,7 +787,8 @@ export default function GhUserGamePage() {
                 </Box>
               ))}
             </Box>
-            {/* 2-2: 3그룹 배팅 테이블 (하나로 합침) */}
+            {/* 2-2: 3그룹 배팅 테이블 (하나로 합침) — admin 전용 */}
+            {isAdmin && (
             <Box>
               <table style={{ borderCollapse: "collapse" }}>
                 <thead>
@@ -736,7 +810,7 @@ export default function GhUserGamePage() {
                     <tr key={ri}>
                       {BET_GROUPS.map((group, gi) => {
                         const sec = group[ri].sec;
-                        const batVal = BAT_VALS_NUM[gi][ri];
+                        const batVal = calcBatBySec(sec);
                         const groupSep = gi > 0 ? { borderLeft: "2px solid #888" } : {};
                         return (
                           <React.Fragment key={`${gi}-${ri}`}>
@@ -748,7 +822,7 @@ export default function GhUserGamePage() {
                             >
                               {batExpanded[`${gi}-${ri}`] ? Math.abs(batVal).toLocaleString() : fmtBatShort(batVal)}
                             </td>
-                            <td style={tdCellNarrow}>{STAT_VALS[ri]}</td>
+                            <td style={tdCellNarrow}>{fmtStats(sec)}</td>
                           </React.Fragment>
                         );
                       })}
@@ -757,13 +831,14 @@ export default function GhUserGamePage() {
                 </tbody>
               </table>
             </Box>
+            )}
           </Box>
 
           </Box>
           {/* /1|2 row */}
 
-          {/* ===== 3: 나이스초이스 표 (실제 table) ===== */}
-          {(() => {
+          {/* ===== 3: 나이스초이스 표 (실제 table) — admin 전용 ===== */}
+          {isAdmin && (() => {
             const cellTd = (extra = {}) => ({
               width: cellSz, minWidth: cellSz, maxWidth: cellSz,
               height: cellSz, minHeight: cellSz, maxHeight: cellSz,
@@ -844,218 +919,11 @@ export default function GhUserGamePage() {
       {/* ===== 배팅부: 마틴A/Z + P/B + next/new + 셋업/픽체인지 ===== */}
       {/* ===== 중단: 인터페이스 (한줄) ===== */}
       <Box sx={{ display: "flex", alignItems: "center", gap: isMobile ? 0.5 : 1, mb: 1, flexWrap: "wrap" }}>
-        {/* 좌: 배팅 8행 (2열x4행) + 총배팅(A제외) */}
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
-          <Box sx={{ display: "flex", gap: isMobile ? 0.5 : 1 }}>
-            {/* 왼쪽 4행 */}
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
-              {[
-                { key: "martin_a", label: "마틴A", bg: "#1565c0" },
-                { key: "martin_z", label: "마틴Z", bg: "#c62828" },
-                { key: "allp", label: "AllP", bg: "#6a1b9a" },
-                { key: "fail", label: `fail${userMartinDashboard?.fail?.fail_count || ""}`, bg: "#e65100" },
-              ].map((t) => {
-                const td = betData?.user_martin?.[t.key];
-                const amt = td?.amount || 0;
-                const dir = td?.direction || "";
-                return (
-                  <Box key={t.key} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                    <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: t.bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
-                      <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
-                    </Box>
-                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
-                      <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 10, color: "#888" }}>{td?.step || 1}S</Typography>
-                      <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
-                        {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
-                      </Typography>
-                    </Box>
-                  </Box>
-                );
-              })}
-            </Box>
-            {/* 오른쪽 4행 */}
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
-              {[
-                { key: "allb", label: "AllB", bg: "#00695c" },
-                { key: "hnh", label: "HnH", bg: "#558b2f" },
-                { key: "_onetwo", label: "1-2", bg: "#00838f" },
-                { key: "martin_s", label: "마틴S", bg: "#795548" },
-              ].map((t) => {
-                let td, amt, dir;
-                if (t.key === "_onetwo") {
-                  const o = betData?.user_martin?.one;
-                  const tw = betData?.user_martin?.two;
-                  td = (o?.direction && o.direction !== "wait") ? o : (tw?.direction && tw.direction !== "wait") ? tw : (o || tw || {});
-                  amt = td?.amount || 0;
-                  dir = td?.direction || "";
-                } else {
-                  td = betData?.user_martin?.[t.key];
-                  amt = td?.amount || 0;
-                  dir = td?.direction || "";
-                }
-                return (
-                  <Box key={t.key} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                    <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: t.bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
-                      <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
-                    </Box>
-                    <Box sx={{ border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, minWidth: isMobile ? 80 : 140, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
-                      <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 10, color: "#888" }}>{td?.step || 1}S</Typography>
-                      <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
-                        {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
-                      </Typography>
-                    </Box>
-                  </Box>
-                );
-              })}
-            </Box>
-          </Box>
-          {/* 총배팅(A제외) */}
-          {(() => {
-            const total = betData?.user_martin?.total;
-            const tAmt = total?.amount || 0;
-            const tDir = total?.direction || "";
-            const tP = total?.total_P || 0;
-            const tB = total?.total_B || 0;
-            return (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.3 }}>
-                <Box sx={{ borderRadius: 1, px: isMobile ? 0.6 : 1, py: 0.2, backgroundColor: "#37474f", display: "flex", alignItems: "center", justifyContent: "center", minWidth: isMobile ? 36 : 48 }}>
-                  <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, fontWeight: "bold", color: "#fff" }}>총배팅(A제외)</Typography>
-                </Box>
-                <Box sx={{ border: "1px solid rgba(255,255,255,0.5)", borderRadius: 1, px: isMobile ? 1 : 2, py: 0.2, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5, backgroundColor: "rgba(255,255,255,0.05)", flex: 1 }}>
-                  <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, fontWeight: "bold", color: tDir === "P" ? "#42a5f5" : tDir === "B" ? "#ef5350" : "#666" }}>
-                    {tAmt > 0 ? `${tAmt.toLocaleString()}${tDir}` : "0"}
-                  </Typography>
-                  {(tP > 0 || tB > 0) && <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#aaa" }}>({tP.toLocaleString()}P, {tB.toLocaleString()}B)</Typography>}
-                </Box>
-              </Box>
-            );
-          })()}
-        </Box>
+        {/* 좌: 배팅 8행 + 총배팅 영역 제거됨 (새 2번 영역의 배팅 테이블이 대체) */}
 
         {/* 우측: 상하 분리 */}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-          {/* 상: 픽+회차+P/B+del/next/new/셋업 */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: isMobile ? 0.5 : 1, flexWrap: "wrap" }}>
-
-        {/* 픽이미지 A/Z 2개 */}
-        {processing ? (
-          <Box sx={{ width: isMobile ? 108 : 194, height: isMobile ? 52 : 95, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <CircularProgress size={isMobile ? 28 : 40} sx={{ color: "rgba(255,255,255,0.6)" }} />
-          </Box>
-        ) : (() => {
-          const umA = betData?.user_martin?.martin_a;
-          const umZ = betData?.user_martin?.martin_z;
-          // PICK Change 오버라이드: 정상 픽보다 우선
-          const pickA = pickChangePick || umA?.direction || null;
-          const pickZ = umZ?.direction || null;
-          const imgA = pickA === "P" ? "/player.png" : pickA === "B" ? "/banker.png" : "/wait.png";
-          const imgZ = pickZ === "P" ? "/player.png" : pickZ === "B" ? "/banker.png" : "/wait.png";
-          const sz = isMobile ? 46 : 85;
-          const boxSz = isMobile ? 52 : 95;
-          const StreakLabel = ({ streak }) => {
-            const labelH = isMobile ? 18 : 22;
-            const labelW = isMobile ? 32 : 44;
-            if (!streak) {
-              return (
-                <Box sx={{ width: labelW, height: labelH, border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1 }} />
-              );
-            }
-            const color = streak.type === "hit" ? "#4caf50" : "#f44336";
-            const text = `${streak.count}${streak.type === "hit" ? "H" : "M"}`;
-            return (
-              <Box sx={{ width: labelW, height: labelH, border: `1px solid ${color}`, borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Typography variant="caption" sx={{ fontSize: isMobile ? 11 : 14, fontWeight: "bold", color }}>{text}</Typography>
-              </Box>
-            );
-          };
-          return (
-            <Box sx={{ display: "flex", gap: 0.5 }}>
-              <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.3 }}>
-                <Box sx={{ width: boxSz, height: boxSz, border: `2px solid ${pickChangePick ? "#ab47bc" : "rgba(255,255,255,0.3)"}`, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                  <img src={imgA} alt="pickA" style={{ width: sz, height: sz, objectFit: "contain" }} />
-                  <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, color: pickChangePick ? "#ab47bc" : "#1565c0", fontWeight: "bold" }}>{pickChangePick ? "PC" : "A"}</Typography>
-                </Box>
-                <StreakLabel streak={streakA} />
-              </Box>
-              {[{ label: "D", pick: decalPick, streak: streakD }, { label: "G", pick: shadowPick, streak: streakG }].map(({ label, pick, streak }) => {
-                const dsImg = pick === "P" ? "/player.png" : pick === "B" ? "/banker.png" : "/wait.png";
-                return (
-                  <Box key={label} sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.3 }}>
-                    <Box sx={{ width: boxSz, height: boxSz, border: `2px solid ${pick ? DS_COLOR : "rgba(255,255,255,0.2)"}`, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                      <img src={dsImg} alt={label} style={{ width: sz, height: sz, objectFit: "contain" }} />
-                      <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: isMobile ? 8 : 10, color: pick ? DS_COLOR : "#aaa", fontWeight: "bold" }}>{label}</Typography>
-                    </Box>
-                    <StreakLabel streak={streak} />
-                  </Box>
-                );
-              })}
-            </Box>
-          );
-        })()}
-        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.2 }}>
-          <Box sx={{ width: isMobile ? 24 : 40, height: isMobile ? 24 : 40, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
-          </Box>
-        </Box>
-        <Box
-          onClick={() => handleInput("P")}
-          sx={{
-            width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
-            backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
-            cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
-            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
-          }}
-        >P</Box>
-        <Box
-          onClick={() => handleInput("B")}
-          sx={{
-            width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
-            backgroundColor: "#f44336", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
-            cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
-            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
-          }}
-        >B</Box>
-
-        {/* del/next/new + 셋업/픽체인지 — 2줄 */}
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
-          <Box sx={{ display: "flex", gap: isMobile ? 0.5 : 1 }}>
-            <Box
-              onClick={results.length > 0 && !processing ? handleDeleteOne : undefined}
-              sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto" }}
-            >
-              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 13 }}>del</Typography>
-            </Box>
-            <Box
-              onClick={results.length > 0 && !processing ? () => setShowNextConfirm(true) : undefined}
-              sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : results.length > 0 ? "pointer" : "default", opacity: processing ? 0.4 : results.length > 0 ? 1 : 0.4, pointerEvents: processing ? "none" : "auto", border: "2px solid rgba(255,255,255,0.3)" }}
-            >
-              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12 }}>next</Typography>
-            </Box>
-            <Box
-              onClick={!processing ? () => setShowNewConfirm(true) : undefined}
-              sx={{ ...controlBtnSx, cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto", border: "2px solid #2196f3" }}
-            >
-              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
-            </Box>
-          </Box>
-          <Box sx={{ display: "flex", gap: isMobile ? 0.5 : 1 }}>
-            <Box
-              onClick={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
-              sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ff9800" }}
-            >
-              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
-            </Box>
-            <Box
-              onClick={() => navigate(`/ghgame/pick-change${gameId ? `?gameId=${gameId}` : ""}`)}
-              sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ab47bc" }}
-            >
-              <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ab47bc", fontWeight: "bold" }}>픽체인지</Typography>
-            </Box>
-          </Box>
-        </Box>
-          </Box>
+          {/* 상: 회차/P/B/del/next/new/셋업/픽체인지/픽카드는 새 1·2번 영역으로 이동됨 */}
           {/* 하: 슈 넘버 + 라벨 */}
           <Box>
             {(() => {
