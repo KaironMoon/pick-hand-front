@@ -637,7 +637,7 @@ export default function GhUserGamePage() {
           {(() => {
             // 구 디자인 토큰
             const tagSx = (bg) => ({ borderRadius: 1, px: 0.5, py: 0, backgroundColor: bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: 44, height: 20 });
-            const fieldSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1, py: 0.2, minWidth: 70, height: 24, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 };
+            const fieldSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1, py: 0.2, minWidth: 102, height: 24, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 };
             const turnBoxSx = { width: 40, height: 40, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" };
             const pbBtnSx = (bg) => ({
               width: 48, height: 48, borderRadius: 2, backgroundColor: bg,
@@ -653,20 +653,18 @@ export default function GhUserGamePage() {
 
             return (
               <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1, px: 0, py: 0.5 }}>
-                {/* 행1: 마틴A 태그 + 필드 + 마틴Z 태그 + 필드 */}
+                {/* 행1: 마틴A + (마틴Z 또는 크루즈) */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                  {[
-                    { key: "martin_a", label: "마틴A", bg: "#1565c0" },
-                    { key: "martin_z", label: "마틴Z", bg: "#c62828" },
-                  ].map((t) => {
-                    const td = betData?.user_martin?.[t.key];
+                  {/* 마틴A */}
+                  {(() => {
+                    const td = betData?.user_martin?.martin_a;
                     const amt = td?.amount || 0;
                     const dir = td?.direction || "";
                     const step = td?.step || 1;
                     return (
-                      <React.Fragment key={t.key}>
-                        <Box sx={tagSx(t.bg)}>
-                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{t.label}</Typography>
+                      <React.Fragment>
+                        <Box sx={tagSx("#1565c0")}>
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>마틴A</Typography>
                         </Box>
                         <Box sx={fieldSx}>
                           <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{step}S</Typography>
@@ -676,7 +674,63 @@ export default function GhUserGamePage() {
                         </Box>
                       </React.Fragment>
                     );
-                  })}
+                  })()}
+                  {/* 크루즈 활성이면 마틴Z 대신 크루즈 표시 */}
+                  {betData?.user_martin?.cruise?.enabled ? (() => {
+                    const cr = betData.user_martin.cruise;
+                    const cStep = cr?.step || 1;
+                    const cAmt = cr?.amount || 0;
+                    const cruiseLabel = (idx) => {
+                      if (idx === 0) return "1";
+                      if (idx === 1) return "2";
+                      if (idx % 2 === 0) return `${idx / 2 + 1}-2`;
+                      return `${(idx + 1) / 2 + 1}`;
+                    };
+                    const handleCruiseClick = async () => {
+                      if (!gameId) return;
+                      if (!window.confirm("1단계로 돌아갑니까?")) return;
+                      try {
+                        await apiCaller.post(GH_GAMES_API.CRUISE_RESET(gameId));
+                        // state 새로 받기
+                        const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
+                        const data = res.data;
+                        setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+                      } catch (err) {
+                        console.error("Cruise reset failed:", err);
+                      }
+                    };
+                    return (
+                      <React.Fragment>
+                        <Box sx={tagSx("#0097a7")}>
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>크루즈</Typography>
+                        </Box>
+                        <Box sx={{ ...fieldSx, cursor: "pointer" }} onClick={handleCruiseClick} title="클릭하여 1단계로 리셋">
+                          <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{cruiseLabel(cStep - 1)}</Typography>
+                          <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: "#4caf50" }}>
+                            {cAmt.toLocaleString()}
+                          </Typography>
+                        </Box>
+                      </React.Fragment>
+                    );
+                  })() : (() => {
+                    const td = betData?.user_martin?.martin_z;
+                    const amt = td?.amount || 0;
+                    const dir = td?.direction || "";
+                    const step = td?.step || 1;
+                    return (
+                      <React.Fragment>
+                        <Box sx={tagSx("#c62828")}>
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>마틴Z</Typography>
+                        </Box>
+                        <Box sx={fieldSx}>
+                          <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{step}S</Typography>
+                          <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
+                            {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
+                          </Typography>
+                        </Box>
+                      </React.Fragment>
+                    );
+                  })()}
                 </Box>
 
                 {/* 행2: 회차 + P + step+ + B + step+ + del */}

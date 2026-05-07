@@ -119,27 +119,12 @@ function FailSection({ martin, onChange }) {
               fail {failCount}
             </Box>
             {enabled ? (
-              <>
-                <Box onClick={() => {
-                  const val = prompt("설정 금액 (P)", String(martin.budget || 0));
-                  if (val !== null) {
-                    const num = parseInt(val.replace(/,/g, ""), 10);
-                    if (!isNaN(num)) onChange({ ...martin, budget: num });
-                  }
-                }} sx={{
-                  backgroundColor: GREEN, color: "#1b2e1b", fontWeight: "bold",
-                  borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14, cursor: "pointer",
-                }}>
-                  설정:{(martin.budget || 0).toLocaleString()}P
-                </Box>
-                <Box onClick={() => onChange({ ...martin, enabled: false })} sx={{
-                  backgroundColor: "#333", color: "#888",
-                  borderRadius: 1, px: 1, py: 0.5, fontSize: 12, cursor: "pointer",
-                  "&:hover": { backgroundColor: "#444" },
-                }}>
-                  OFF
-                </Box>
-              </>
+              <Box onClick={() => onChange({ ...martin, enabled: false })} sx={{
+                backgroundColor: GREEN, color: "#1b2e1b", fontWeight: "bold",
+                borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14, cursor: "pointer",
+              }}>
+                사용함
+              </Box>
             ) : (
               <Box onClick={() => onChange({ ...martin, enabled: true })} sx={{
                 backgroundColor: "#333", color: "#888",
@@ -192,13 +177,46 @@ function FailSection({ martin, onChange }) {
   );
 }
 
+// 크루즈 단계 라벨: 0→"1", 1→"2", 2→"2-2", 3→"3", 4→"3-2", 5→"4", 6→"4-2", ...
+function cruiseStepLabel(idx) {
+  if (idx === 0) return "1";
+  if (idx === 1) return "2";
+  // idx >= 2
+  // 짝수 idx (2,4,6,...) → "2-2", "3-2", "4-2", ...
+  // 홀수 idx (3,5,7,...) → "3", "4", "5", ...
+  if (idx % 2 === 0) return `${idx / 2 + 1}-2`;
+  return `${(idx + 1) / 2 + 1}`;
+}
+
 function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp }) {
+  const isCruise = name === "cruise";
   const enabled = martin.enabled;
-  const betType = (type) => { if (DISABLED_BET_TYPES.includes(type)) return; onChange({ ...martin, bet_type: type }); };
+  // 크루즈는 29 단계(15-2까지)를 위해 6행×5칸 = 30칸 사용, 다른 섹션은 4행×5 = 20
+  const totalSteps = isCruise ? 30 : 20;
+  const totalRows = isCruise ? 6 : 4;
+  const defaultStepMax = isCruise ? 29 : 20;
+  // 크루즈 섹션은 cruise만 선택 가능, 다른 섹션은 cruise를 못 고름
+  const sectionDisabledBetTypes = isCruise
+    ? BET_TYPES.filter((t) => t !== "cruise")
+    : DISABLED_BET_TYPES;
+  const betType = (type) => { if (sectionDisabledBetTypes.includes(type)) return; onChange({ ...martin, bet_type: type }); };
   const amount = (idx, val) => {
-    const newAmounts = calcAmounts(martin.amounts || new Array(20).fill(0), idx, val, martin.bet_type, martin.step_min || 1, martin.step_max || 20);
+    const base = martin.amounts || [];
+    const padded = base.length >= totalSteps ? base : [...base, ...new Array(totalSteps - base.length).fill(0)];
+    const newAmounts = calcAmounts(padded, idx, val, martin.bet_type, martin.step_min || 1, martin.step_max || defaultStepMax);
     onChange({ ...martin, amounts: newAmounts });
   };
+  // 크루즈 섹션: bet_type=cruise + step_max=29 강제
+  useEffect(() => {
+    if (!isCruise) return;
+    const upd = {};
+    if (martin.bet_type !== "cruise") upd.bet_type = "cruise";
+    if ((martin.step_max || 0) < 29) upd.step_max = 29;
+    if (Object.keys(upd).length > 0) {
+      onChange({ ...martin, ...upd });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCruise, martin.bet_type, martin.step_max]);
 
   const sectionDisabled = disabled || !enabled;
 
@@ -217,27 +235,12 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
               {label}
             </Box>
             {enabled ? (
-              <>
-                <Box onClick={() => {
-                  const val = prompt("설정 금액 (P)", String(martin.budget || 0));
-                  if (val !== null) {
-                    const num = parseInt(val.replace(/,/g, ""), 10);
-                    if (!isNaN(num)) onChange({ ...martin, budget: num });
-                  }
-                }} sx={{
-                  backgroundColor: GREEN, color: "#1b2e1b", fontWeight: "bold",
-                  borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14, cursor: "pointer",
-                }}>
-                  설정:{(martin.budget || 0).toLocaleString()}P
-                </Box>
-                <Box onClick={() => onChange({ ...martin, enabled: false })} sx={{
-                  backgroundColor: "#333", color: "#888",
-                  borderRadius: 1, px: 1, py: 0.5, fontSize: 12, cursor: "pointer",
-                  "&:hover": { backgroundColor: "#444" },
-                }}>
-                  OFF
-                </Box>
-              </>
+              <Box onClick={() => onChange({ ...martin, enabled: false })} sx={{
+                backgroundColor: GREEN, color: "#1b2e1b", fontWeight: "bold",
+                borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14, cursor: "pointer",
+              }}>
+                사용함
+              </Box>
             ) : (
               <Box onClick={() => onChange({ ...martin, enabled: true })} sx={{
                 backgroundColor: "#333", color: "#888",
@@ -255,7 +258,7 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
         <td style={labelCellStyle}>배팅종류</td>
         {BET_TYPES.map((t) => (
           <ToggleCell key={t} active={martin.bet_type === t} label={BET_TYPE_LABELS[t]}
-            onClick={() => betType(t)} disabled={DISABLED_BET_TYPES.includes(t)} />
+            onClick={() => betType(t)} disabled={sectionDisabledBetTypes.includes(t)} />
         ))}
       </tr>
       {/* 단계설정 */}
@@ -264,11 +267,11 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
         <td style={normalCell}>최저</td>
         <EditableCell value={martin.step_min || 1} onChange={(v) => {
           const upd = { ...martin, step_min: v };
-          if (v >= (martin.step_max || 20)) upd.step_max = v + 1;
+          if (v >= (martin.step_max || defaultStepMax)) upd.step_max = v + 1;
           onChange(upd);
         }} suffix="단계" style={greenCell} />
         <td style={normalCell}>최고</td>
-        <EditableCell value={martin.step_max || 20} onChange={(v) => {
+        <EditableCell value={martin.step_max || defaultStepMax} onChange={(v) => {
           const upd = { ...martin, step_max: v };
           if (v <= (martin.step_min || 1)) upd.step_min = v - 1;
           onChange(upd);
@@ -276,20 +279,33 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
         <td style={normalCell}></td>
       </tr>
       {/* 금액설정 */}
-      {[0, 1, 2, 3].map((rowIdx) => (
-        <tr key={`${name}-amt-${rowIdx}`}>
-          {rowIdx === 0 && <td rowSpan={4} style={labelCellStyle}>금액설정</td>}
-          {(martin.amounts || new Array(20).fill(0)).slice(rowIdx * 5, rowIdx * 5 + 5).map((amt, i) => {
-            const idx = rowIdx * 5 + i;
-            const step = idx + 1;
-            const inRange = step >= (martin.step_min || 1) && step <= (martin.step_max || 20);
-            return (
-              <EditableCell key={idx} value={inRange ? amt : 0} onChange={(v) => amount(idx, v)}
-                prefix={`${step}:`} suffix="P" style={inRange ? editableCell : normalCell} disabled={!inRange} />
-            );
-          })}
-        </tr>
-      ))}
+      {(() => {
+        // amounts를 totalSteps 길이로 padding (기존 저장값이 20일 수 있음)
+        const baseAmounts = martin.amounts || [];
+        const paddedAmounts = baseAmounts.length >= totalSteps
+          ? baseAmounts
+          : [...baseAmounts, ...new Array(totalSteps - baseAmounts.length).fill(0)];
+        return Array.from({ length: totalRows }, (_, rowIdx) => rowIdx).map((rowIdx) => (
+          <tr key={`${name}-amt-${rowIdx}`}>
+            {rowIdx === 0 && <td rowSpan={totalRows} style={labelCellStyle}>금액설정</td>}
+            {Array.from({ length: 5 }, (_, i) => {
+              const idx = rowIdx * 5 + i;
+              const step = idx + 1;
+              const inRange = step >= (martin.step_min || 1) && step <= (martin.step_max || defaultStepMax) && idx < (isCruise ? 29 : 20);
+              const stepLabel = isCruise ? cruiseStepLabel(idx) : `${step}`;
+              // 크루즈는 idx 29(=30번째 칸) 이상은 안 보이게
+              if (isCruise && idx >= 29) {
+                return <td key={idx} style={normalCell}></td>;
+              }
+              const amt = paddedAmounts[idx] || 0;
+              return (
+                <EditableCell key={idx} value={inRange ? amt : 0} onChange={(v) => amount(idx, v)}
+                  prefix={`${stepLabel}:`} suffix="P" style={inRange ? editableCell : normalCell} disabled={!inRange} />
+              );
+            })}
+          </tr>
+        ));
+      })()}
     </>
   );
 }
@@ -369,6 +385,7 @@ export default function UserSetupPage({ gameType }) {
 
   const martinA = config.martin_a || { ...DEFAULT_MARTIN, enabled: true };
   const martinZ = config.martin_z || { ...DEFAULT_MARTIN };
+  const cruise = config.cruise || { ...DEFAULT_MARTIN };
   const martinS = config.martin_s || { ...DEFAULT_MARTIN };
   const allp = config.allp || { ...DEFAULT_MARTIN };
   const allb = config.allb || { ...DEFAULT_MARTIN };
@@ -399,6 +416,8 @@ export default function UserSetupPage({ gameType }) {
             <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={(m) => updateMartin("martin_z", m)} />
             {gameType === "gh" && (
               <>
+                <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+                <MartinSection name="cruise" label="크루즈" martin={cruise} onChange={(m) => updateMartin("cruise", m)} labelColor="#0097a7" />
                 <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
                 <MartinSection name="martin_s" label="마틴S" martin={martinS} onChange={(m) => updateMartin("martin_s", m)} labelColor="#795548" />
               </>
