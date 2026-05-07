@@ -637,10 +637,10 @@ export default function GhUserGamePage() {
           {(() => {
             // 구 디자인 토큰
             const tagSx = (bg) => ({ borderRadius: 1, px: 0.5, py: 0, backgroundColor: bg, display: "flex", alignItems: "center", justifyContent: "center", minWidth: 44, height: 20 });
-            const fieldSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1, py: 0.2, minWidth: 90, height: 24, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 };
-            const turnBoxSx = { width: 46, height: 46, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" };
+            const fieldSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1, py: 0.2, minWidth: 70, height: 24, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 };
+            const turnBoxSx = { width: 40, height: 40, border: "2px solid rgba(255,255,255,0.3)", borderRadius: 1, backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center" };
             const pbBtnSx = (bg) => ({
-              width: 55, height: 55, borderRadius: 2, backgroundColor: bg,
+              width: 48, height: 48, borderRadius: 2, backgroundColor: bg,
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "#fff", fontSize: 24, fontWeight: "bold",
               cursor: processing ? "not-allowed" : "pointer",
@@ -649,7 +649,7 @@ export default function GhUserGamePage() {
               "&:active": { transform: "scale(0.95)" },
             });
             const ctrlBtnSx = (borderColor, fg) => ({ ...controlBtnSx, border: `2px solid ${borderColor}`, color: fg || "#fff", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 50 });
-            const uniBtnSx = (borderColor, fg) => ({ ...controlBtnSx, border: `2px solid ${borderColor}`, color: fg || "#fff", display: "flex", alignItems: "center", justifyContent: "center", width: 60, height: 32, minWidth: 60, px: 0, py: 0 });
+            const uniBtnSx = (borderColor, fg) => ({ ...controlBtnSx, border: `2px solid ${borderColor}`, color: fg || "#fff", display: "flex", alignItems: "center", justifyContent: "center", width: 50, height: 32, minWidth: 50, px: 0, py: 0 });
 
             return (
               <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1, px: 0, py: 0.5 }}>
@@ -734,7 +734,7 @@ export default function GhUserGamePage() {
                       </Box>
                     );
                   })()}
-                  <Box sx={{ ...fieldSx, width: 130, minWidth: 130, height: 32, border: "2px solid #67f431" }}>
+                  <Box sx={{ ...fieldSx, width: 128, minWidth: 128, height: 32, border: "2px solid #67f431" }}>
                     <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>1S</Typography>
                     <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: "#fff" }}>0</Typography>
                   </Box>
@@ -757,8 +757,8 @@ export default function GhUserGamePage() {
                   <Box sx={uniBtnSx("#cc3499")}>
                     <Typography variant="caption" sx={{ fontSize: 12, color: "#cc3499", fontWeight: "bold" }}>auto</Typography>
                   </Box>
-                  <Box sx={{ ...fieldSx, width: 130, minWidth: 130, justifyContent: "flex-start", height: 32, border: "2px solid #7f7f7f", whiteSpace: "nowrap", overflow: "hidden" }}>
-                    <Typography variant="caption" sx={{ fontSize: 11, color: "#fff", whiteSpace: "nowrap" }}>HitPoint:&nbsp;&nbsp;220000 P</Typography>
+                  <Box sx={{ ...fieldSx, width: 128, minWidth: 128, justifyContent: "flex-start", height: 32, border: "2px solid #7f7f7f", whiteSpace: "nowrap", overflow: "hidden" }}>
+                    <Typography variant="caption" sx={{ fontSize: 11, color: "#fff", whiteSpace: "nowrap" }}>HP:&nbsp;&nbsp;220000 P</Typography>
                   </Box>
                 </Box>
               </Box>
@@ -766,9 +766,9 @@ export default function GhUserGamePage() {
           })()}
 
           {/* ===== 2: 픽 정보부 (이미지15 정적 디자인) ===== */}
-          <Box sx={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: 1, p: 1, backgroundColor: "#0d1014", borderRadius: 1, overflowX: "auto" }}>
+          <Box sx={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: 1, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1, overflowX: "auto" }}>
             {/* 2-1: 7-픽 카드 + streak */}
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "nowrap" }}>
+            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "nowrap" }}>
               {PICK_LIST.map(({ label, img, color, streak }) => (
                 <Box key={label} sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
                   <Box sx={{ width: 60, height: 60, border: "1px solid #4e4e4e", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", backgroundColor: "#0a0c10" }}>
