@@ -771,18 +771,18 @@ export default function GhUserGamePage() {
             <Box sx={{ display: "flex", gap: 0.5, flexWrap: "nowrap" }}>
               {PICK_LIST.map(({ label, img, color, streak }) => (
                 <Box key={label} sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
-                  <Box sx={{ width: 60, height: 60, border: "1px solid #4e4e4e", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", backgroundColor: "#0a0c10" }}>
-                    <img src={img} alt={label} style={{ width: 52, height: 52, objectFit: "contain" }} />
+                  <Box sx={{ width: 52, height: 52, border: "1px solid #4e4e4e", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", backgroundColor: "#0a0c10" }}>
+                    <img src={img} alt={label} style={{ width: 46, height: 46, objectFit: "contain" }} />
                     <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: 10, color, fontWeight: "bold" }}>{label}</Typography>
                   </Box>
                   {streak ? (
-                    <Box sx={{ width: 40, height: 22, border: "1px solid #7f7f7f", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Box sx={{ width: 36, height: 22, border: "1px solid #7f7f7f", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: streak.type === "hit" ? "#4caf50" : "#f44336" }}>
                         {streak.count}{streak.type === "hit" ? "H" : "M"}
                       </Typography>
                     </Box>
                   ) : (
-                    <Box sx={{ width: 40, height: 22, border: "1px solid #7f7f7f", borderRadius: 1 }} />
+                    <Box sx={{ width: 36, height: 22, border: "1px solid #7f7f7f", borderRadius: 1 }} />
                   )}
                 </Box>
               ))}
