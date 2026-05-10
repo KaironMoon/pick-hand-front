@@ -1010,7 +1010,12 @@ export default function GhUserGamePage() {
                             <td style={labelTd}>
                               <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: "#aaa", fontSize: 11, minWidth: 72, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>13</Box>
                             </td>
-                            {bottom.map((n, k) => renderTd(`${row.label}-b-${k}`, n, null, null, k, scoresAt[k + 39]))}
+                            {bottom.map((n, k) => {
+                              const idx = k + 39;
+                              const pick = fill[idx];
+                              const bg = pick ? palette[idx] : null;
+                              return renderTd(`${row.label}-b-${k}`, n, pick, bg, k, scoresAt[idx]);
+                            })}
                           </tr>
                           {/* SROWS 사이 간격 한 줄 */}
                           {ri < SROWS.length - 1 && (
