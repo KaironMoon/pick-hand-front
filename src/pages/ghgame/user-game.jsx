@@ -568,11 +568,38 @@ export default function GhUserGamePage() {
         };
         // picks_snapshot.stats에서 가져옴 (없으면 0/0/0[0-0])
         const SEC_TO_KEY = { "1": "ONE", "2": "TWO" };
+        // SEC 라벨 색상: 승률(hit/total) 상위 1~3등 강조
+        const ALL_SECS = ["A", "D", "G", "TN", "AR", "J", "HnH", "1", "2"];
+        const secWinRates = ALL_SECS.map((sec) => {
+          const key = SEC_TO_KEY[sec] || sec;
+          const s = picksSnapshot?.stats?.[key];
+          const total = s?.total ?? 0;
+          const hit = s?.hit ?? 0;
+          return { sec, total, hit, rate: total > 0 ? hit / total : -1 };
+        });
+        const ranked = secWinRates
+          .filter((x) => x.total > 0)
+          .sort((a, b) => b.rate - a.rate);
+        const secRankColor = (sec) => {
+          const idx = ranked.findIndex((x) => x.sec === sec);
+          if (idx === 0) return "#00e676"; // 1등 형광 초록
+          if (idx === 1) return "#ffeb3b"; // 2등 노랑
+          if (idx === 2) return "#ff9800"; // 3등 주황
+          return SEC_COLOR; // 기본 (#5165f3)
+        };
         const fmtStats = (sec) => {
           const key = SEC_TO_KEY[sec] || sec;
           const s = picksSnapshot?.stats?.[key];
-          if (!s) return "0/0/0[0-0]";
-          return `${s.total}/${s.hit}/${s.miss}[${s.max_hit_streak}-${s.max_miss_streak}]`;
+          const total = s?.total ?? 0;
+          const hit = s?.hit ?? 0;
+          const miss = s?.miss ?? 0;
+          const mh = s?.max_hit_streak ?? 0;
+          const mm = s?.max_miss_streak ?? 0;
+          return (
+            <>
+              {total}/<span style={{ color: HIT_BG }}>{hit}</span>/<span style={{ color: MISS_BG }}>{miss}</span>[<span style={{ color: HIT_BG }}>{mh}</span>-<span style={{ color: MISS_BG }}>{mm}</span>]
+            </>
+          );
         };
         // 만 단위 표시(절대값 ≥ 100,000)는 어두운 톤, 그 외는 밝은 톤
         const batColor = (v) => {
@@ -884,7 +911,6 @@ export default function GhUserGamePage() {
                       return (
                         <React.Fragment key={`h-${gi}`}>
                           <th style={{ ...thCellNarrow, ...groupSep }}>SEC</th>
-                          <th style={thCellBat}>Bat</th>
                           <th style={thCellNarrow}>전/승/패[연승패]</th>
                         </React.Fragment>
                       );
@@ -900,14 +926,7 @@ export default function GhUserGamePage() {
                         const groupSep = gi > 0 ? { borderLeft: "2px solid #888" } : {};
                         return (
                           <React.Fragment key={`${gi}-${ri}`}>
-                            <td style={{ ...tdCellNarrow, color: SEC_COLOR, fontWeight: "bold", ...groupSep }}>{sec}</td>
-                            <td
-                              style={{ ...tdCellBat, color: batColor(batVal), fontWeight: "bold", cursor: "pointer" }}
-                              onClick={() => setBatExpanded((p) => ({ ...p, [`${gi}-${ri}`]: !p[`${gi}-${ri}`] }))}
-                              title="클릭하면 전체 숫자 표시"
-                            >
-                              {batExpanded[`${gi}-${ri}`] ? Math.abs(batVal).toLocaleString() : fmtBatShort(batVal)}
-                            </td>
+                            <td style={{ ...tdCellNarrow, color: secRankColor(sec), fontWeight: "bold", ...groupSep }}>{sec}</td>
                             <td style={tdCellNarrow}>{fmtStats(sec)}</td>
                           </React.Fragment>
                         );
