@@ -542,7 +542,7 @@ export default function GhUserGamePage() {
           { label: "D",   img: pickImg(decalPick), color: decalPick ? "#ce93d8" : "#aaa", streak: streakD },
           { label: "G",   img: pickImg(shadowPick), color: shadowPick ? "#ce93d8" : "#aaa", streak: streakG },
           { label: "TN",  img: pickImg(lscPick),  color: lscPick ? "#90caf9" : "#aaa", streak: streakTN },
-          { label: "AR",  img: pickImg(arPick),   color: arPick ? "#ce93d8" : "#aaa", streak: streakAR },
+          { label: "AR",  img: pickImg(arPick),   color: arPick ? "#ce93d8" : "#aaa", streak: streakAR, badge: picksSnapshot?.modes?.AR === "reverse" ? "R" : null },
           { label: "J",   img: pickImg(jPick),    color: jPick ? "#90caf9" : "#aaa", streak: streakJ },
           { label: "TWO", img: pickImg(twoPick),  color: twoPick ? "#90caf9" : "#aaa", streak: streakTWO },
         ];
@@ -837,11 +837,14 @@ export default function GhUserGamePage() {
           <Box sx={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: 1, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1, overflowX: "auto" }}>
             {/* 2-1: 7-픽 카드 + streak */}
             <Box sx={{ display: "flex", gap: 0.5, flexWrap: "nowrap" }}>
-              {PICK_LIST.map(({ label, img, color, streak }) => (
+              {PICK_LIST.map(({ label, img, color, streak, badge }) => (
                 <Box key={label} sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
                   <Box sx={{ width: 52, height: 52, border: "1px solid #4e4e4e", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", backgroundColor: "#0a0c10" }}>
                     <img src={img} alt={label} style={{ width: 46, height: 46, objectFit: "contain" }} />
                     <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: 10, color, fontWeight: "bold" }}>{label}</Typography>
+                    {badge && (
+                      <Typography variant="caption" sx={{ position: "absolute", top: 2, right: 4, fontSize: 10, color: "#ff5722", fontWeight: "bold" }}>{badge}</Typography>
+                    )}
                   </Box>
                   {streak ? (
                     <Box sx={{ width: 36, height: 22, border: "1px solid #7f7f7f", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
