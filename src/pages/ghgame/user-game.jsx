@@ -680,33 +680,47 @@ export default function GhUserGamePage() {
                     const cr = betData.user_martin.cruise;
                     const cStep = cr?.step || 1;
                     const cAmt = cr?.amount || 0;
+                    const cPaused = !!cr?.paused;
                     const cruiseLabel = (idx) => {
                       if (idx === 0) return "1";
                       if (idx === 1) return "2";
                       if (idx % 2 === 0) return `${idx / 2 + 1}-2`;
                       return `${(idx + 1) / 2 + 1}`;
                     };
-                    const handleCruiseClick = async () => {
+                    const refreshState = async () => {
+                      const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
+                      const data = res.data;
+                      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+                    };
+                    const handleResetClick = async () => {
                       if (!gameId) return;
                       if (!window.confirm("1단계로 돌아갑니까?")) return;
                       try {
                         await apiCaller.post(GH_GAMES_API.CRUISE_RESET(gameId));
-                        // state 새로 받기
-                        const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
-                        const data = res.data;
-                        setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+                        await refreshState();
                       } catch (err) {
                         console.error("Cruise reset failed:", err);
                       }
                     };
+                    const handlePauseToggle = async () => {
+                      if (!gameId) return;
+                      try {
+                        await apiCaller.post(GH_GAMES_API.CRUISE_PAUSE_TOGGLE(gameId));
+                        await refreshState();
+                      } catch (err) {
+                        console.error("Cruise pause toggle failed:", err);
+                      }
+                    };
+                    const tagBg = cPaused ? "#555" : "#0097a7";
+                    const amtColor = cPaused ? "#666" : "#4caf50";
                     return (
                       <React.Fragment>
-                        <Box sx={tagSx("#0097a7")}>
+                        <Box sx={{ ...tagSx(tagBg), cursor: "pointer" }} onClick={handlePauseToggle} title={cPaused ? "다시 활성화" : "단계 증가 일시정지"}>
                           <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>크루즈</Typography>
                         </Box>
-                        <Box sx={{ ...fieldSx, cursor: "pointer" }} onClick={handleCruiseClick} title="클릭하여 1단계로 리셋">
+                        <Box sx={{ ...fieldSx, cursor: "pointer", opacity: cPaused ? 0.5 : 1 }} onClick={handleResetClick} title="클릭하여 1단계로 리셋">
                           <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{cruiseLabel(cStep - 1)}</Typography>
-                          <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: "#4caf50" }}>
+                          <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: amtColor }}>
                             {cAmt.toLocaleString()}
                           </Typography>
                         </Box>

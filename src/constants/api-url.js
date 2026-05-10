@@ -55,6 +55,7 @@ const GH_GAMES_API = {
   LAST_ROUND: (id) => `/api/v1/gh/games/${id}/last-round`,
   STATE: (id) => `/api/v1/gh/games/${id}/state`,
   CRUISE_RESET: (id) => `/api/v1/gh/games/${id}/cruise-reset`,
+  CRUISE_PAUSE_TOGGLE: (id) => `/api/v1/gh/games/${id}/cruise-pause-toggle`,
 };
 
 const USER_BET_SETTINGS_API = {
