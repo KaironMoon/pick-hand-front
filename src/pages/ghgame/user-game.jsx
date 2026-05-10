@@ -539,10 +539,10 @@ export default function GhUserGamePage() {
         const aPick = pickChangePick || betData?.user_martin?.martin_a?.direction || null;
         const PICK_LIST = [
           { label: "A",   img: pickImg(aPick),    color: aPick ? "#90caf9" : "#aaa", streak: streakA },
+          { label: "AR",  img: pickImg(arPick),   color: arPick ? "#ce93d8" : "#aaa", streak: streakAR, badge: picksSnapshot?.modes?.AR === "reverse" ? "⇄" : null },
           { label: "D",   img: pickImg(decalPick), color: decalPick ? "#ce93d8" : "#aaa", streak: streakD },
           { label: "G",   img: pickImg(shadowPick), color: shadowPick ? "#ce93d8" : "#aaa", streak: streakG },
           { label: "TN",  img: pickImg(lscPick),  color: lscPick ? "#90caf9" : "#aaa", streak: streakTN },
-          { label: "AR",  img: pickImg(arPick),   color: arPick ? "#ce93d8" : "#aaa", streak: streakAR, badge: picksSnapshot?.modes?.AR === "reverse" ? "⇄" : null },
           { label: "J",   img: pickImg(jPick),    color: jPick ? "#90caf9" : "#aaa", streak: streakJ },
           { label: "TWO", img: pickImg(twoPick),  color: twoPick ? "#90caf9" : "#aaa", streak: streakTWO },
         ];
