@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress, Chip } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress, Chip, Tooltip } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
@@ -542,7 +542,7 @@ export default function GhUserGamePage() {
           { label: "D",   img: pickImg(decalPick), color: decalPick ? "#ce93d8" : "#aaa", streak: streakD },
           { label: "G",   img: pickImg(shadowPick), color: shadowPick ? "#ce93d8" : "#aaa", streak: streakG },
           { label: "TN",  img: pickImg(lscPick),  color: lscPick ? "#90caf9" : "#aaa", streak: streakTN },
-          { label: "AR",  img: pickImg(arPick),   color: arPick ? "#ce93d8" : "#aaa", streak: streakAR, badge: picksSnapshot?.modes?.AR === "reverse" ? "R" : null },
+          { label: "AR",  img: pickImg(arPick),   color: arPick ? "#ce93d8" : "#aaa", streak: streakAR, badge: picksSnapshot?.modes?.AR === "reverse" ? "⇄" : null },
           { label: "J",   img: pickImg(jPick),    color: jPick ? "#90caf9" : "#aaa", streak: streakJ },
           { label: "TWO", img: pickImg(twoPick),  color: twoPick ? "#90caf9" : "#aaa", streak: streakTWO },
         ];
@@ -598,21 +598,36 @@ export default function GhUserGamePage() {
         // 3번: S1/S2/S3 78셀 그리드 (39열 × 2행 = 78셀, 1~39 / 40~78)
         const COLS = 39;
         const buildRow = (start) => Array.from({ length: COLS }, (_, k) => start + k);
-        // 정적 데이터: 픽(P/B) + 결과(hit/miss/wait)
         const HIT_BG = "#01e676";   // 초록
         const MISS_BG = "#ffeb3b";  // 노랑
-        const WAIT_BG = "#ffffff";  // 흰색
-        const FILLED_PICKS_S1 = ["P","P","P","B","B","B","P","B","P","B","B","P","B","P"];
-        const FILLED_PICKS_S2 = ["B","B","B","P","B","P","P","P","B","P","P","P"];
-        const FILLED_PICKS_S3 = ["P","B","P","B","P","P","B","P","B","P"];
-        const FILLED_RES_S1 = ["miss","hit","hit","hit","hit","hit","hit","hit","hit","hit","hit","hit","hit","wait"];
-        const FILLED_RES_S2 = ["hit","hit","hit","hit","hit","hit","hit","hit","hit","hit","hit","wait"];
-        const FILLED_RES_S3 = ["hit","hit","hit","hit","hit","hit","hit","hit","hit","hit"];
+        const WAIT_BG = "#ffffff";  // 흰색 (현재 회차)
         const resBg = (r) => r === "hit" ? HIT_BG : r === "miss" ? MISS_BG : WAIT_BG;
+
+        // gh_tracks 데이터로 SROWS 구성 (sc1/sc2/sc3)
+        // 셀 인덱스 k에 표시되는 라운드 = startRound + k (sc1=1, sc2=2, sc3=3)
+        const ghTracks = picksSnapshot?.gh_tracks?.tracks;
+        const buildSrow = (key, label, startRound) => {
+          const t = ghTracks?.[key];
+          const filled = new Array(78).fill(null);
+          const bgPalette = new Array(78).fill(null);
+          const scoresAt = new Array(78).fill(null);  // 셀 인덱스별 그 시점 8 패턴 점수
+          if (!t) return { label, filled, bgPalette, scoresAt, startRound };
+          for (const r of (t.round_data || [])) {
+            const idx = r.round - startRound; // 셀 인덱스
+            if (idx < 0 || idx >= 78) continue;
+            filled[idx] = r.predict || null;
+            if (r.status === "hit") bgPalette[idx] = HIT_BG;
+            else if (r.status === "miss") bgPalette[idx] = MISS_BG;
+            else if (r.status === "current") bgPalette[idx] = WAIT_BG;  // 현재 라운드 = 흰색
+            else if (r.status === "future") bgPalette[idx] = "#1c1f25"; // 현재 묶음의 다른 미진행 = 어두운 회색
+            scoresAt[idx] = r.pattern_scores || null;
+          }
+          return { label, filled, bgPalette, scoresAt, startRound };
+        };
         const SROWS = [
-          { label: "S1", filled: FILLED_PICKS_S1, bgPalette: FILLED_RES_S1.map(resBg) },
-          { label: "S2", filled: FILLED_PICKS_S2, bgPalette: FILLED_RES_S2.map(resBg) },
-          { label: "S3", filled: FILLED_PICKS_S3, bgPalette: FILLED_RES_S3.map(resBg) },
+          buildSrow("sc1", "S1", 1),
+          buildSrow("sc2", "S2", 2),
+          buildSrow("sc3", "S3", 3),
         ];
         const cellSz = 22;
         const renderCell = (n, pick, bg) => (
@@ -843,7 +858,7 @@ export default function GhUserGamePage() {
                     <img src={img} alt={label} style={{ width: 46, height: 46, objectFit: "contain" }} />
                     <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: 10, color, fontWeight: "bold" }}>{label}</Typography>
                     {badge && (
-                      <Typography variant="caption" sx={{ position: "absolute", top: 2, right: 4, fontSize: 10, color: "#ff5722", fontWeight: "bold" }}>{badge}</Typography>
+                      <Typography variant="caption" sx={{ position: "absolute", top: 1, right: 3, fontSize: 14, lineHeight: 1, color: "#ffeb3b", fontWeight: 900, textShadow: "0 0 2px #000, 0 0 2px #000" }}>{badge}</Typography>
                     )}
                   </Box>
                   {streak ? (
@@ -924,14 +939,33 @@ export default function GhUserGamePage() {
             };
             // 3칸마다 굵은 우측선: col index k (0~39), (k+1) % 3 === 0 이고 마지막은 제외
             const isThickRight = (k) => k < COLS - 1 && (k + 1) % 3 === 0;
-            const renderTd = (key, n, pick, bg, k) => {
-              const extra = isThickRight(k) ? { borderRight: "2px solid #aaa" } : {};
+            const PATTERNS_ORDER = ["PPP", "BBB", "PBP", "BPB", "PPB", "BBP", "PBB", "BPP"];
+            const buildScoreTooltip = (n, scores) => {
+              if (!scores) return null;
+              const max = Math.max(...Object.values(scores));
               return (
+                <Box sx={{ p: 0.5 }}>
+                  <Typography variant="caption" sx={{ display: "block", fontWeight: "bold", mb: 0.5 }}>R{n} 패턴별 누적 점수</Typography>
+                  {PATTERNS_ORDER.map((pat) => (
+                    <Box key={pat} sx={{ display: "flex", justifyContent: "space-between", gap: 2, fontSize: 11 }}>
+                      <span>{pat}</span>
+                      <span style={{ fontWeight: "bold", color: (scores[pat] ?? 0) === max ? "#4caf50" : "#fff" }}>
+                        {scores[pat] ?? 0}
+                      </span>
+                    </Box>
+                  ))}
+                </Box>
+              );
+            };
+            const renderTd = (key, n, pick, bg, k, scores) => {
+              const extra = isThickRight(k) ? { borderRight: "2px solid #aaa" } : {};
+              const cell = (
                 <td key={key} style={{ ...cellTd(extra) }}>
                   <Box sx={{
                     width: "100%", height: "100%",
                     backgroundColor: pick ? (bg || HIT_BG) : "#1c1f24",
                     display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: scores ? "help" : "default",
                   }}>
                     {pick ? (
                       <Typography sx={{ fontSize: 11, fontWeight: "bold", color: pick === "P" ? "#1565c0" : "#f44336" }}>{pick}</Typography>
@@ -941,16 +975,23 @@ export default function GhUserGamePage() {
                   </Box>
                 </td>
               );
+              if (!scores) return cell;
+              return (
+                <Tooltip key={key} title={buildScoreTooltip(n, scores)} arrow placement="top">
+                  {cell}
+                </Tooltip>
+              );
             };
             return (
               <Box sx={{ mb: 2 }}>
                 <table style={{ borderCollapse: "collapse", borderSpacing: 0 }}>
                   <tbody>
                     {SROWS.map((row, ri) => {
-                      const top = buildRow(1);
-                      const bottom = buildRow(40);
+                      const top = buildRow(row.startRound);
+                      const bottom = buildRow(row.startRound + 39);
                       const fill = row.filled;
                       const palette = row.bgPalette;
+                      const scoresAt = row.scoresAt || [];
                       return (
                         <React.Fragment key={row.label}>
                           {/* 1행: S1 라벨 + top 셀 40개 */}
@@ -961,7 +1002,7 @@ export default function GhUserGamePage() {
                             {top.map((n, k) => {
                               const pick = fill[k];
                               const bg = pick ? palette[k] : null;
-                              return renderTd(`${row.label}-t-${k}`, n, pick, bg, k);
+                              return renderTd(`${row.label}-t-${k}`, n, pick, bg, k, scoresAt[k]);
                             })}
                           </tr>
                           {/* 2행: 13 라벨 + bottom 셀 40개 */}
@@ -969,7 +1010,7 @@ export default function GhUserGamePage() {
                             <td style={labelTd}>
                               <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: "#aaa", fontSize: 11, minWidth: 72, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>13</Box>
                             </td>
-                            {bottom.map((n, k) => renderTd(`${row.label}-b-${k}`, n, null, null, k))}
+                            {bottom.map((n, k) => renderTd(`${row.label}-b-${k}`, n, null, null, k, scoresAt[k + 39]))}
                           </tr>
                           {/* SROWS 사이 간격 한 줄 */}
                           {ri < SROWS.length - 1 && (
