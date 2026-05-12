@@ -549,8 +549,8 @@ export default function GhUserGamePage() {
         // 2번: 배팅 테이블 정적 데이터
         const SEC_COLOR = "#5165f3";
         const BET_GROUPS = [
-          [{ sec: "A" }, { sec: "D" }, { sec: "G" }],
-          [{ sec: "TN" }, { sec: "AR" }, { sec: "J" }],
+          [{ sec: "A" }, { sec: "AR" }, { sec: "D" }],
+          [{ sec: "G" }, { sec: "TN" }, { sec: "J" }],
           [{ sec: "HnH" }, { sec: "1" }, { sec: "2" }],
         ];
         // 1000원 마틴 9단계 (2배 진행, 9단계 cap)
@@ -580,12 +580,12 @@ export default function GhUserGamePage() {
         const ranked = secWinRates
           .filter((x) => x.total > 0)
           .sort((a, b) => b.rate - a.rate);
-        const secRankColor = (sec) => {
+        const secRankBg = (sec) => {
           const idx = ranked.findIndex((x) => x.sec === sec);
           if (idx === 0) return "#00e676"; // 1등 형광 초록
-          if (idx === 1) return "#ffeb3b"; // 2등 노랑
-          if (idx === 2) return "#ff9800"; // 3등 주황
-          return SEC_COLOR; // 기본 (#5165f3)
+          if (idx === 1) return "#ff9800"; // 2등 주황
+          if (idx === 2) return "#ffeb3b"; // 3등 노랑
+          return null;
         };
         const fmtStats = (sec) => {
           const key = SEC_TO_KEY[sec] || sec;
@@ -926,7 +926,7 @@ export default function GhUserGamePage() {
                         const groupSep = gi > 0 ? { borderLeft: "2px solid #888" } : {};
                         return (
                           <React.Fragment key={`${gi}-${ri}`}>
-                            <td style={{ ...tdCellNarrow, color: secRankColor(sec), fontWeight: "bold", ...groupSep }}>{sec}</td>
+                            <td style={{ ...tdCellNarrow, color: SEC_COLOR, fontWeight: "bold", ...groupSep, ...(secRankBg(sec) ? { backgroundColor: secRankBg(sec), color: "#000" } : {}) }}>{sec}</td>
                             <td style={tdCellNarrow}>{fmtStats(sec)}</td>
                           </React.Fragment>
                         );
@@ -953,7 +953,7 @@ export default function GhUserGamePage() {
               ...extra,
             });
             const labelTd = {
-              width: 76, height: cellSz, padding: 0, textAlign: "center",
+              width: 44, height: cellSz, padding: 0, textAlign: "center",
               backgroundColor: "transparent", boxSizing: "border-box",
             };
             // 3칸마다 굵은 우측선: col index k (0~39), (k+1) % 3 === 0 이고 마지막은 제외
@@ -1011,24 +1011,68 @@ export default function GhUserGamePage() {
                       const fill = row.filled;
                       const palette = row.bgPalette;
                       const scoresAt = row.scoresAt || [];
+                      // 트랙 현재 연승/연패 + 총 승/패 산출
+                      const sckey = row.label === "S1" ? "sc1" : row.label === "S2" ? "sc2" : "sc3";
+                      const rd = (ghTracks?.[sckey]?.round_data) || [];
+                      let trackStreak = null;
+                      let totalHit = 0;
+                      let totalMiss = 0;
+                      for (let i = rd.length - 1; i >= 0; i--) {
+                        const st = rd[i].status;
+                        if (st !== "hit" && st !== "miss") continue;
+                        if (!trackStreak) { trackStreak = { type: st, count: 1 }; }
+                        else if (trackStreak.type === st) { trackStreak.count++; }
+                        // streak는 다른 결과 만나면 break (총합은 계속 카운트)
+                      }
+                      for (const r of rd) {
+                        if (r.status === "hit") totalHit++;
+                        else if (r.status === "miss") totalMiss++;
+                      }
+                      // streak는 마지막부터 같은 결과 연속만 카운트해야 하므로 다시 산출
+                      trackStreak = null;
+                      for (let i = rd.length - 1; i >= 0; i--) {
+                        const st = rd[i].status;
+                        if (st !== "hit" && st !== "miss") continue;
+                        if (!trackStreak) { trackStreak = { type: st, count: 1 }; }
+                        else if (trackStreak.type === st) { trackStreak.count++; }
+                        else break;
+                      }
+                      const streakColor = trackStreak ? (trackStreak.type === "hit" ? "#4caf50" : "#f44336") : null;
+                      const streakText = trackStreak ? `${trackStreak.count}${trackStreak.type === "hit" ? "H" : "M"}` : "";
+                      const streakCell = (
+                        <td style={labelTd}>
+                          <Box sx={{ px: 0.5, py: 0, borderRadius: 1, border: `1px solid ${streakColor || "#555"}`, color: streakColor || "#666", fontSize: 11, fontWeight: "bold", minWidth: 28, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>{streakText}</Box>
+                        </td>
+                      );
+                      const totalCell = (
+                        <td style={labelTd}>
+                          <Box sx={{ px: 0.5, py: 0, borderRadius: 1, border: "1px solid #555", fontSize: 10, fontWeight: "bold", minWidth: 28, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>
+                            <span style={{ color: "#01e676" }}>{totalHit}</span>
+                            <span style={{ color: "#aaa" }}>/</span>
+                            <span style={{ color: "#ffeb3b" }}>{totalMiss}</span>
+                          </Box>
+                        </td>
+                      );
                       return (
                         <React.Fragment key={row.label}>
-                          {/* 1행: S1 라벨 + top 셀 40개 */}
+                          {/* 1행: S1 라벨 + 연승연패 + top 셀 40개 */}
                           <tr>
                             <td style={labelTd}>
-                              <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: "#aaa", fontSize: 12, minWidth: 72, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>{row.label}</Box>
+                              <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: "#aaa", fontSize: 12, minWidth: 40, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>{row.label}</Box>
                             </td>
+                            {streakCell}
                             {top.map((n, k) => {
                               const pick = fill[k];
                               const bg = pick ? palette[k] : null;
                               return renderTd(`${row.label}-t-${k}`, n, pick, bg, k, scoresAt[k]);
                             })}
                           </tr>
-                          {/* 2행: 13 라벨 + bottom 셀 40개 */}
+                          {/* 2행: 13 라벨 + 총 승/패 + bottom 셀 40개 */}
                           <tr>
                             <td style={labelTd}>
-                              <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: "#aaa", fontSize: 11, minWidth: 72, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>13</Box>
+                              <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: "#aaa", fontSize: 11, minWidth: 40, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>13</Box>
                             </td>
+                            {totalCell}
                             {bottom.map((n, k) => {
                               const idx = k + 39;
                               const pick = fill[idx];
@@ -1036,9 +1080,8 @@ export default function GhUserGamePage() {
                               return renderTd(`${row.label}-b-${k}`, n, pick, bg, k, scoresAt[idx]);
                             })}
                           </tr>
-                          {/* SROWS 사이 간격 한 줄 */}
                           {ri < SROWS.length - 1 && (
-                            <tr><td colSpan={COLS + 1} style={{ height: 6, border: "none", padding: 0 }} /></tr>
+                            <tr><td colSpan={COLS + 2} style={{ height: 6, border: "none", padding: 0 }} /></tr>
                           )}
                         </React.Fragment>
                       );
