@@ -116,6 +116,8 @@ export default function GhUserGamePage() {
   const [roundTwoList, setRoundTwoList] = useState([]);
   const [picksSnapshot, setPicksSnapshot] = useState(null);
   const [batExpanded, setBatExpanded] = useState({}); // {`gi-ri`: true} — Bat 셀 전체 표시 토글
+  const [trackStreakHidden, setTrackStreakHidden] = useState({}); // {sckey: true} — 트랙 연승/연패 셀 숨김 토글
+  const [chipStreakHidden, setChipStreakHidden] = useState({}); // {chipLabel: true} — 칩 연승/연패 라벨 숨김 토글
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
@@ -587,7 +589,13 @@ export default function GhUserGamePage() {
           if (idx === 2) return "#ffeb3b"; // 3등 노랑
           return null;
         };
+        // sec → 칩 라벨 매핑 (이 sec를 가리는 칩)
+        const SEC_TO_CHIP = { A: "A", D: "D", G: "G", TN: "TN", AR: "AR", J: "J", "1": "TWO", "2": "TWO" };
         const fmtStats = (sec) => {
+          const chipKey = SEC_TO_CHIP[sec];
+          if (chipKey && chipStreakHidden[chipKey]) {
+            return null; // 칩 toggle 숨김 상태면 통계도 숨김
+          }
           const key = SEC_TO_KEY[sec] || sec;
           const s = picksSnapshot?.stats?.[key];
           const total = s?.total ?? 0;
@@ -888,15 +896,28 @@ export default function GhUserGamePage() {
                       <Typography variant="caption" sx={{ position: "absolute", top: 1, right: 3, fontSize: 14, lineHeight: 1, color: "#ffeb3b", fontWeight: 900, textShadow: "0 0 2px #000, 0 0 2px #000" }}>{badge}</Typography>
                     )}
                   </Box>
-                  {streak ? (
-                    <Box sx={{ width: 36, height: 22, border: "1px solid #7f7f7f", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: streak.type === "hit" ? "#4caf50" : "#f44336" }}>
-                        {streak.count}{streak.type === "hit" ? "H" : "M"}
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <Box sx={{ width: 36, height: 22, border: "1px solid #7f7f7f", borderRadius: 1 }} />
-                  )}
+                  {(() => {
+                    const chipHidden = !!chipStreakHidden[label];
+                    const onChipToggle = () => setChipStreakHidden((p) => ({ ...p, [label]: !p[label] }));
+                    if (!streak || chipHidden) {
+                      return (
+                        <Box
+                          onClick={streak ? onChipToggle : undefined}
+                          sx={{ width: 36, height: 22, border: "1px solid #7f7f7f", borderRadius: 1, cursor: streak ? "pointer" : "default" }}
+                        />
+                      );
+                    }
+                    return (
+                      <Box
+                        onClick={onChipToggle}
+                        sx={{ width: 36, height: 22, border: "1px solid #7f7f7f", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", "&:hover": { opacity: 0.8 } }}
+                      >
+                        <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: streak.type === "hit" ? "#4caf50" : "#f44336" }}>
+                          {streak.count}{streak.type === "hit" ? "H" : "M"}
+                        </Typography>
+                      </Box>
+                    );
+                  })()}
                 </Box>
               ))}
             </Box>
@@ -1039,18 +1060,27 @@ export default function GhUserGamePage() {
                       }
                       const streakColor = trackStreak ? (trackStreak.type === "hit" ? "#4caf50" : "#f44336") : null;
                       const streakText = trackStreak ? `${trackStreak.count}${trackStreak.type === "hit" ? "H" : "M"}` : "";
+                      const hidden = !!trackStreakHidden[sckey];
+                      const onToggle = () => setTrackStreakHidden((p) => ({ ...p, [sckey]: !p[sckey] }));
                       const streakCell = (
                         <td style={labelTd}>
-                          <Box sx={{ px: 0.5, py: 0, borderRadius: 1, border: `1px solid ${streakColor || "#555"}`, color: streakColor || "#666", fontSize: 11, fontWeight: "bold", minWidth: 28, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>{streakText}</Box>
+                          <Box
+                            onClick={onToggle}
+                            sx={{ px: 0.5, py: 0, borderRadius: 1, border: `1px solid ${hidden ? "#555" : (streakColor || "#555")}`, color: hidden ? "transparent" : (streakColor || "#666"), fontSize: 11, fontWeight: "bold", minWidth: 28, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", cursor: "pointer", "&:hover": { opacity: 0.8 } }}
+                          >{hidden ? "" : streakText}</Box>
                         </td>
                       );
                       const totalCell = (
                         <td style={labelTd}>
-                          <Box sx={{ px: 0.5, py: 0, borderRadius: 1, border: "1px solid #555", fontSize: 10, fontWeight: "bold", minWidth: 28, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>
-                            <span style={{ color: "#01e676" }}>{totalHit}</span>
-                            <span style={{ color: "#aaa" }}>/</span>
-                            <span style={{ color: "#ffeb3b" }}>{totalMiss}</span>
-                          </Box>
+                          {hidden ? (
+                            <Box sx={{ px: 0.5, py: 0, borderRadius: 1, border: "1px solid #555", minWidth: 28, height: cellSz, boxSizing: "border-box" }} />
+                          ) : (
+                            <Box sx={{ px: 0.5, py: 0, borderRadius: 1, border: "1px solid #555", fontSize: 10, fontWeight: "bold", minWidth: 28, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>
+                              <span style={{ color: "#01e676" }}>{totalHit}</span>
+                              <span style={{ color: "#aaa" }}>/</span>
+                              <span style={{ color: "#ffeb3b" }}>{totalMiss}</span>
+                            </Box>
+                          )}
                         </td>
                       );
                       return (
