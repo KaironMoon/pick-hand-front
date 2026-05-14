@@ -121,7 +121,7 @@ export default function GhUserGamePage() {
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
-  const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
+  const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [endingMode, setEndingMode] = useState(false);
@@ -130,6 +130,7 @@ export default function GhUserGamePage() {
   const [resumeGame, setResumeGame] = useState(null);
   const [userSummary, setUserSummary] = useState(null);
   const [userMartinDashboard, setUserMartinDashboard] = useState(null);
+  const [labSeqOpen, setLabSeqOpen] = useState(false);
   const processingRef = useRef(false);
   const [processing, setProcessing] = useState(false);
   const goalAlertedRef = useRef({ a: false, z: false });
@@ -222,7 +223,7 @@ export default function GhUserGamePage() {
     const isNew = searchParams.get("new");
     const urlGameId = searchParams.get("gameId");
     if (isNew) {
-      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
       setTopGhSections([]); setTopNextRound(null); setPickChangePick(null);
       startGame();
@@ -252,7 +253,7 @@ export default function GhUserGamePage() {
       const data = res.data;
       setGameId(data.game_id);
       setConfig(data.config);
-      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
+      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
       const seq = data.seq || "";
       const picks = data.round_picks || [];
       const pcMarks = data.round_pick_change || [];
@@ -298,7 +299,7 @@ export default function GhUserGamePage() {
         window.location.reload();
         return;
       }
-      setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0 });
+      setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0, labouchere: data.cum_pnl.labouchere || 0 });
       setGlobalhitData(data.globalhit || []);
       setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
@@ -332,7 +333,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
       setResults(results.slice(0, -1));
-      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
+      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
       setGlobalhitData(data.globalhit || []);
       setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
@@ -362,9 +363,9 @@ export default function GhUserGamePage() {
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
-        setCumPnL({ gh: res.data.carry_pnl.gh || 0, user_a: res.data.carry_pnl.user_a || 0, user_z: res.data.carry_pnl.user_z || 0, user_s: res.data.carry_pnl.user_s || 0, allp: res.data.carry_pnl.allp || 0, allb: res.data.carry_pnl.allb || 0, fail: res.data.carry_pnl.fail || 0, hnh: res.data.carry_pnl.hnh || 0, one: res.data.carry_pnl.one || 0, two: res.data.carry_pnl.two || 0 });
+        setCumPnL({ gh: res.data.carry_pnl.gh || 0, user_a: res.data.carry_pnl.user_a || 0, user_z: res.data.carry_pnl.user_z || 0, user_s: res.data.carry_pnl.user_s || 0, allp: res.data.carry_pnl.allp || 0, allb: res.data.carry_pnl.allb || 0, fail: res.data.carry_pnl.fail || 0, hnh: res.data.carry_pnl.hnh || 0, one: res.data.carry_pnl.one || 0, two: res.data.carry_pnl.two || 0, labouchere: res.data.carry_pnl.labouchere || 0 });
       } else {
-        setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 });
+        setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
       }
       if (res.data.status === "ending" && res.data.ending_snapshot) {
         setEndingMode(true); setEndingSnapshot(res.data.ending_snapshot);
@@ -436,7 +437,7 @@ export default function GhUserGamePage() {
       } catch {}
     }
     setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+    setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
     setGlobalhitData([]);
     setTopGhSections([]); setTopNextRound(null); setPickChangePick(null);
     setSearchParams({}, { replace: true });
@@ -454,7 +455,7 @@ export default function GhUserGamePage() {
         } catch {}
       }
       setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
+      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
       setTopGhSections([]); setTopNextRound(null); setPickChangePick(null);
       await startGame();
@@ -739,8 +740,58 @@ export default function GhUserGamePage() {
                       </React.Fragment>
                     );
                   })()}
-                  {/* 크루즈 활성이면 마틴Z 대신 크루즈 표시 */}
-                  {betData?.user_martin?.cruise?.enabled ? (() => {
+                  {/* 라보쉐르 활성이면 크루즈/마틴Z 대신 라보쉐르 표시 */}
+                  {betData?.user_martin?.labouchere?.enabled ? (() => {
+                    const lb = betData.user_martin.labouchere;
+                    const lbAmt = lb?.amount || 0;
+                    const lbPaused = !!lb?.paused;
+                    const lbSeq = Array.isArray(lb?.sequence) ? lb.sequence : [];
+                    const refreshState = async () => {
+                      const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
+                      const data = res.data;
+                      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+                    };
+                    const handleResetClick = async () => {
+                      if (!gameId) return;
+                      if (!window.confirm("초기 시퀀스로 리셋합니까?")) return;
+                      try {
+                        await apiCaller.post(GH_GAMES_API.LABOUCHERE_RESET(gameId));
+                        await refreshState();
+                      } catch (err) {
+                        console.error("Labouchere reset failed:", err);
+                      }
+                    };
+                    const handlePauseToggle = async () => {
+                      if (!gameId) return;
+                      try {
+                        await apiCaller.post(GH_GAMES_API.LABOUCHERE_PAUSE_TOGGLE(gameId));
+                        await refreshState();
+                      } catch (err) {
+                        console.error("Labouchere pause toggle failed:", err);
+                      }
+                    };
+                    const tagBg = lbPaused ? "#555" : "#8e24aa";
+                    const amtColor = lbPaused ? "#666" : "#4caf50";
+                    return (
+                      <React.Fragment>
+                        <Box sx={{ ...tagSx(tagBg), cursor: "pointer" }} onClick={handlePauseToggle} title={lbPaused ? "다시 활성화" : "라보쉐르 일시정지"}>
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>라보</Typography>
+                        </Box>
+                        <Box sx={{ ...fieldSx, cursor: "pointer", opacity: lbPaused ? 0.5 : 1, minWidth: 70 }} onClick={handleResetClick} title="클릭하여 초기 시퀀스로 리셋">
+                          <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: amtColor }}>
+                            {lbAmt.toLocaleString()}
+                          </Typography>
+                        </Box>
+                        <Box
+                          onClick={() => setLabSeqOpen(true)}
+                          sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 0.6, py: 0.3, cursor: "pointer", "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}
+                          title="전체 시퀀스 보기"
+                        >
+                          <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb" }}>≡{lbSeq.length}</Typography>
+                        </Box>
+                      </React.Fragment>
+                    );
+                  })() : betData?.user_martin?.cruise?.enabled ? (() => {
                     const cr = betData.user_martin.cruise;
                     const cStep = cr?.step || 1;
                     const cAmt = cr?.amount || 0;
@@ -1840,6 +1891,49 @@ export default function GhUserGamePage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setGoalDialog({ open: false, msgs: [] })} variant="contained">확인</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={labSeqOpen} onClose={() => setLabSeqOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: "bold" }}>라보쉐르 시퀀스</DialogTitle>
+        <DialogContent>
+          {(() => {
+            const lb = betData?.user_martin?.labouchere;
+            const seq = Array.isArray(lb?.sequence) ? lb.sequence : [];
+            const sum = seq.reduce((a, b) => a + (b || 0), 0);
+            const cumLab = cumPnL?.labouchere || 0;
+            const bet = lb?.amount || 0;
+            return (
+              <Box>
+                <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 1.5 }}>
+                  <Typography sx={{ fontSize: 13 }}>남은 항목: <b>{seq.length}</b></Typography>
+                  <Typography sx={{ fontSize: 13 }}>남은 합: <b>{sum.toLocaleString()}</b></Typography>
+                  <Typography sx={{ fontSize: 13 }}>현재 베팅: <b>{bet.toLocaleString()}</b></Typography>
+                  <Typography sx={{ fontSize: 13, color: cumLab >= 0 ? "#4caf50" : "#f44336" }}>
+                    누적 PnL: {cumLab > 0 ? "+" : ""}{cumLab.toLocaleString()}P
+                  </Typography>
+                </Box>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {seq.length === 0 ? (
+                    <Typography sx={{ fontSize: 13, color: "#888" }}>시퀀스가 비어있습니다 (목표 달성).</Typography>
+                  ) : seq.map((v, i) => (
+                    <Box key={i} sx={{
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      borderRadius: 1, px: 0.8, py: 0.3, fontSize: 12,
+                      backgroundColor: (i === 0 || i === seq.length - 1) ? "rgba(142,36,170,0.25)" : "transparent",
+                      color: (i === 0 || i === seq.length - 1) ? "#ce93d8" : "#ccc",
+                      fontWeight: (i === 0 || i === seq.length - 1) ? "bold" : "normal",
+                    }}>
+                      {v}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            );
+          })()}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLabSeqOpen(false)}>닫기</Button>
         </DialogActions>
       </Dialog>
     </Box>

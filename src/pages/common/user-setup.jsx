@@ -310,6 +310,165 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
   );
 }
 
+const DIST_MODES = ["even", "asc", "desc"];
+const DIST_LABELS = { even: "균등", asc: "증가", desc: "감소" };
+
+function generateLabouchereSequence(target, count, mode) {
+  if (!target || target <= 0 || !count || count <= 0) return [];
+  if (mode === "even") {
+    const base = Math.floor(target / count);
+    const rem = target - base * count;
+    return Array.from({ length: count }, (_, i) => base + (i < rem ? 1 : 0));
+  }
+  // asc/desc: 선형 분배
+  // 1+2+...+count = count*(count+1)/2 = S, scale = target / S
+  // 각 셀 = round(i * scale), 마지막 셀에서 합 보정
+  const S = (count * (count + 1)) / 2;
+  const weights = mode === "asc"
+    ? Array.from({ length: count }, (_, i) => i + 1)
+    : Array.from({ length: count }, (_, i) => count - i);
+  const seq = weights.map((w) => Math.max(1, Math.round((w * target) / S)));
+  // 합 보정
+  const sum = seq.reduce((a, b) => a + b, 0);
+  const diff = target - sum;
+  if (diff !== 0) {
+    // 마지막(asc)/첫(desc) 셀에 차이 반영
+    const adjIdx = mode === "asc" ? count - 1 : 0;
+    seq[adjIdx] = Math.max(1, seq[adjIdx] + diff);
+  }
+  return seq;
+}
+
+function LabouchereCell({ value, onChange, style }) {
+  const [editing, setEditing] = useState(false);
+  const [tempVal, setTempVal] = useState(String(value));
+  const handleClick = () => { setTempVal(String(value)); setEditing(true); };
+  const handleBlur = () => {
+    setEditing(false);
+    const num = parseInt(tempVal, 10);
+    if (!isNaN(num) && num !== value) onChange(num);
+  };
+  const handleKeyDown = (e) => { if (e.key === "Enter") e.target.blur(); else if (e.key === "Escape") setEditing(false); };
+  if (editing) {
+    return (
+      <td style={style}>
+        <input autoFocus value={tempVal} onChange={(e) => setTempVal(e.target.value)} onBlur={handleBlur} onKeyDown={handleKeyDown}
+          size={Math.max(tempVal.length, 1)}
+          style={{
+            width: `${Math.max(tempVal.length, 1)}ch`, boxSizing: "content-box", padding: 0, margin: 0,
+            background: "transparent", border: "none", borderBottom: "1px solid #4caf50",
+            color: "#fff", textAlign: "center", fontSize: 13, outline: "none",
+          }}
+        />
+      </td>
+    );
+  }
+  return (
+    <td style={style} onClick={handleClick}>
+      {(value || 0).toLocaleString()}P
+    </td>
+  );
+}
+
+function LabouchereSection({ labouchere, onChange }) {
+  const enabled = labouchere.enabled;
+  const target = labouchere.target || 0;
+  const count = labouchere.count || 10;
+  const mode = labouchere.mode || "even";
+  const sequence = labouchere.sequence || [];
+
+  const regenerate = (nextTarget = target, nextCount = count, nextMode = mode) => {
+    const seq = generateLabouchereSequence(nextTarget, nextCount, nextMode);
+    onChange({ ...labouchere, target: nextTarget, count: nextCount, mode: nextMode, sequence: seq });
+  };
+
+  const editCell = (idx, val) => {
+    const next = [...(sequence.length === count ? sequence : new Array(count).fill(0))];
+    next[idx] = Math.max(0, val);
+    onChange({ ...labouchere, sequence: next });
+  };
+
+  const sumDisplay = (sequence || []).reduce((a, b) => a + (b || 0), 0);
+  const sumOk = sumDisplay === target;
+
+  // 한 행에 5칸씩 표시
+  const COLS = 5;
+  const rows = Math.max(1, Math.ceil(count / COLS));
+
+  return (
+    <>
+      <tr>
+        <td colSpan={6} style={{ border: "none", padding: "0 0 6px 0" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box sx={{
+              backgroundColor: "#8e24aa", color: "#fff", fontWeight: "bold",
+              borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14,
+            }}>
+              라보쉐르
+            </Box>
+            {enabled ? (
+              <Box onClick={() => onChange({ ...labouchere, enabled: false })} sx={{
+                backgroundColor: GREEN, color: "#1b2e1b", fontWeight: "bold",
+                borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14, cursor: "pointer",
+              }}>
+                사용함
+              </Box>
+            ) : (
+              <Box onClick={() => onChange({ ...labouchere, enabled: true })} sx={{
+                backgroundColor: "#333", color: "#888",
+                borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14, cursor: "pointer",
+              }}>
+                사용안함
+              </Box>
+            )}
+            <Box sx={{
+              backgroundColor: sumOk ? "rgba(76,175,80,0.15)" : "rgba(255,152,0,0.15)",
+              color: sumOk ? "#81c784" : "#ffb74d",
+              borderRadius: 1, px: 1, py: 0.3, fontSize: 12,
+            }}>
+              합계 {sumDisplay} / 목표 {target}
+            </Box>
+          </Box>
+        </td>
+      </tr>
+      <tr>
+        <td style={labelCellStyle}>목표/갯수</td>
+        <td style={normalCell}>목표</td>
+        <EditableCell value={target} onChange={(v) => regenerate(v, count, mode)} suffix="P" style={greenCell} />
+        <td style={normalCell}>갯수</td>
+        <EditableCell value={count} onChange={(v) => regenerate(target, Math.max(2, Math.min(50, v)), mode)} suffix="개" style={greenCell} />
+        <td style={normalCell}></td>
+      </tr>
+      <tr>
+        <td style={labelCellStyle}>분배방식</td>
+        {DIST_MODES.map((m) => (
+          <ToggleCell key={m} active={mode === m} label={DIST_LABELS[m]} onClick={() => regenerate(target, count, m)} />
+        ))}
+        <td style={normalCell}></td>
+        <td style={normalCell}></td>
+      </tr>
+      {Array.from({ length: rows }, (_, rowIdx) => (
+        <tr key={`lab-seq-${rowIdx}`}>
+          {rowIdx === 0 && <td rowSpan={rows} style={labelCellStyle}>시퀀스</td>}
+          {Array.from({ length: COLS }, (_, i) => {
+            const idx = rowIdx * COLS + i;
+            if (idx >= count) return <td key={i} style={{ ...normalCell, minWidth: 40, color: "#555" }}>0P</td>;
+            const v = sequence[idx] || 0;
+            return (
+              <LabouchereCell
+                key={i}
+                value={v}
+                onChange={(nv) => editCell(idx, nv)}
+                style={{ ...editableCell, minWidth: 40, padding: "3px 4px" }}
+              />
+            );
+          })}
+        </tr>
+      ))}
+    </>
+  );
+}
+
 const GAME_BACK_PATHS = {
   t9: { admin: "/t9game", user: "/t9game/user" },
   hb: { admin: "/hbgame", user: "/hbgame/user" },
@@ -393,6 +552,7 @@ export default function UserSetupPage({ gameType }) {
   const hnh = config.hnh || { ...DEFAULT_MARTIN };
   const one = config.one || { ...DEFAULT_MARTIN };
   const two = config.two || { ...DEFAULT_MARTIN };
+  const labouchere = config.labouchere || { enabled: false, target: 0, count: 10, mode: "even", sequence: [] };
 
   return (
     <Box sx={{ p: 2 }}>
@@ -416,6 +576,8 @@ export default function UserSetupPage({ gameType }) {
             <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={(m) => updateMartin("martin_z", m)} />
             {gameType === "gh" && (
               <>
+                <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+                <LabouchereSection labouchere={labouchere} onChange={(m) => updateMartin("labouchere", m)} />
                 <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
                 <MartinSection name="cruise" label="크루즈" martin={cruise} onChange={(m) => updateMartin("cruise", m)} labelColor="#0097a7" />
                 <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
