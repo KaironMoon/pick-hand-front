@@ -551,9 +551,9 @@ export default function GhUserGamePage() {
         // 2번: 배팅 테이블 정적 데이터
         const SEC_COLOR = "#5165f3";
         const BET_GROUPS = [
-          [{ sec: "A" }, { sec: "AR" }, { sec: "D" }],
-          [{ sec: "G" }, { sec: "TN" }, { sec: "J" }],
-          [{ sec: "HnH" }, { sec: "1" }, { sec: "2" }],
+          [{ sec: "A" }, { sec: "AR" }, { sec: "AR_RATE" }],
+          [{ sec: "D" }, { sec: "G" }, { sec: "TN" }],
+          [{ sec: "J" }, { sec: "1" }, { sec: "2" }],
         ];
         // 1000원 마틴 9단계 (2배 진행, 9단계 cap)
         const MARTIN_AMOUNTS = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 256000];
@@ -571,7 +571,7 @@ export default function GhUserGamePage() {
         // picks_snapshot.stats에서 가져옴 (없으면 0/0/0[0-0])
         const SEC_TO_KEY = { "1": "ONE", "2": "TWO" };
         // SEC 라벨 색상: 승률(hit/total) 상위 1~3등 강조
-        const ALL_SECS = ["A", "D", "G", "TN", "AR", "J", "HnH", "1", "2"];
+        const ALL_SECS = ["A", "D", "G", "TN", "AR", "J", "1", "2"];
         const secWinRates = ALL_SECS.map((sec) => {
           const key = SEC_TO_KEY[sec] || sec;
           const s = picksSnapshot?.stats?.[key];
@@ -583,10 +583,24 @@ export default function GhUserGamePage() {
           .filter((x) => x.total > 0)
           .sort((a, b) => b.rate - a.rate);
         const secRankBg = (sec) => {
-          const idx = ranked.findIndex((x) => x.sec === sec);
-          if (idx === 0) return "#00e676"; // 1등 형광 초록
-          if (idx === 1) return "#ff9800"; // 2등 주황
-          if (idx === 2) return "#ffeb3b"; // 3등 노랑
+          // D, G, TN: 3개 비교 1/2/3등
+          const DGTN_SECS = ["D", "G", "TN"];
+          if (DGTN_SECS.includes(sec)) {
+            const dgtnRanked = secWinRates
+              .filter((x) => DGTN_SECS.includes(x.sec) && x.total > 0)
+              .sort((a, b) => b.rate - a.rate);
+            const idx = dgtnRanked.findIndex((x) => x.sec === sec);
+            if (idx === 0) return "#00e676";
+            if (idx === 1) return "#ff9800";
+            if (idx === 2) return "#ffeb3b";
+          }
+          // A/AR: 두 개만 비교 — 높은 쪽 형광
+          if (sec === "A" || sec === "AR") {
+            const aRate = secWinRates.find((x) => x.sec === "A")?.rate ?? -1;
+            const arRate = secWinRates.find((x) => x.sec === "AR")?.rate ?? -1;
+            if (sec === "A" && aRate > arRate && aRate >= 0) return "#00e676";
+            if (sec === "AR" && arRate > aRate && arRate >= 0) return "#00e676";
+          }
           return null;
         };
         // sec → 칩 라벨 매핑 (이 sec를 가리는 칩)
@@ -802,14 +816,26 @@ export default function GhUserGamePage() {
                   <Box sx={turnBoxSx}>
                     <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 16 }}>{currentTurn}</Typography>
                   </Box>
-                  <Box sx={pbBtnSx("#1565c0")} onClick={() => handleInput("P")}>P</Box>
-                  <Box sx={{ ...turnBoxSx, width: 38, height: 38 }}>
-                    <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{results.filter((r) => r.value === "P").length}</Typography>
-                  </Box>
-                  <Box sx={pbBtnSx("#f44336")} onClick={() => handleInput("B")}>B</Box>
-                  <Box sx={{ ...turnBoxSx, width: 38, height: 38 }}>
-                    <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{results.filter((r) => r.value === "B").length}</Typography>
-                  </Box>
+                  {(() => {
+                    const pCount = results.filter((r) => r.value === "P").length;
+                    const bCount = results.filter((r) => r.value === "B").length;
+                    const tot = pCount + bCount;
+                    const pBlink = tot > 0 && pCount / tot >= 0.6;
+                    const bBlink = tot > 0 && bCount / tot >= 0.6;
+                    const blinkSx = { animation: "pbBlink 0.8s infinite", "@keyframes pbBlink": { "0%, 100%": { opacity: 1 }, "50%": { opacity: 0.3 } } };
+                    return (
+                      <>
+                        <Box sx={pbBtnSx("#1565c0")} onClick={() => handleInput("P")}>P</Box>
+                        <Box sx={{ ...turnBoxSx, width: 38, height: 38, ...(pBlink ? blinkSx : {}) }}>
+                          <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{pCount}</Typography>
+                        </Box>
+                        <Box sx={pbBtnSx("#f44336")} onClick={() => handleInput("B")}>B</Box>
+                        <Box sx={{ ...turnBoxSx, width: 38, height: 38, ...(bBlink ? blinkSx : {}) }}>
+                          <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{bCount}</Typography>
+                        </Box>
+                      </>
+                    );
+                  })()}
                   {(() => {
                     const enabled = results.length > 0 && !processing;
                     return (
@@ -943,8 +969,49 @@ export default function GhUserGamePage() {
                     <tr key={ri}>
                       {BET_GROUPS.map((group, gi) => {
                         const sec = group[ri].sec;
-                        const batVal = calcBatBySec(sec);
                         const groupSep = gi > 0 ? { borderLeft: "2px solid #888" } : {};
+                        // AR_RATE 특수 셀: A와 AR 승률 % 표시, 통계 셀은 빈 칸
+                        if (sec === "AR_RATE") {
+                          const aStats = picksSnapshot?.stats?.A;
+                          const arStats = picksSnapshot?.stats?.AR;
+                          const aRate = aStats?.total > 0 ? (aStats.hit / aStats.total * 100).toFixed(1) : "-";
+                          const arRate = arStats?.total > 0 ? (arStats.hit / arStats.total * 100).toFixed(1) : "-";
+                          return (
+                            <React.Fragment key={`${gi}-${ri}`}>
+                              <td colSpan={2} style={{ ...tdCellNarrow, ...groupSep, fontWeight: "bold", fontSize: 11 }}>
+                                <span style={{ color: "#01e676" }}>[A]</span>
+                                <span style={{ color: "#fff" }}>{aRate}%</span>
+                                <span style={{ color: "#aaa" }}> </span>
+                                <span style={{ color: "#ff9800" }}>[R]</span>
+                                <span style={{ color: "#fff" }}>{arRate}%</span>
+                              </td>
+                            </React.Fragment>
+                          );
+                        }
+                        // J 승률 ≥ 60% 점멸
+                        let jBlink = false;
+                        if (sec === "J") {
+                          const jStats = picksSnapshot?.stats?.J;
+                          if (jStats?.total > 0 && jStats.hit / jStats.total >= 0.6) jBlink = true;
+                        }
+                        if (jBlink) {
+                          return (
+                            <React.Fragment key={`${gi}-${ri}`}>
+                              <Box
+                                component="td"
+                                sx={{
+                                  ...tdCellNarrow, fontWeight: "bold", ...groupSep,
+                                  animation: "jSecBlink 0.8s infinite",
+                                  "@keyframes jSecBlink": {
+                                    "0%, 100%": { backgroundColor: "#00e676", color: "#000" },
+                                    "50%": { backgroundColor: "transparent", color: SEC_COLOR },
+                                  },
+                                }}
+                              >{sec}</Box>
+                              <td style={tdCellNarrow}>{fmtStats(sec)}</td>
+                            </React.Fragment>
+                          );
+                        }
                         return (
                           <React.Fragment key={`${gi}-${ri}`}>
                             <td style={{ ...tdCellNarrow, color: SEC_COLOR, fontWeight: "bold", ...groupSep, ...(secRankBg(sec) ? { backgroundColor: secRankBg(sec), color: "#000" } : {}) }}>{sec}</td>
@@ -1026,7 +1093,30 @@ export default function GhUserGamePage() {
               <Box sx={{ mb: 2 }}>
                 <table style={{ borderCollapse: "collapse", borderSpacing: 0 }}>
                   <tbody>
-                    {SROWS.map((row, ri) => {
+                    {(() => {
+                      // 3 트랙 승률 산출 → 1/2/3등 배경색 매핑
+                      const computeRate = (key) => {
+                        const r = (ghTracks?.[key]?.round_data) || [];
+                        let h = 0, m = 0;
+                        for (const x of r) {
+                          if (x.status === "hit") h++;
+                          else if (x.status === "miss") m++;
+                        }
+                        return (h + m) > 0 ? h / (h + m) : -1;
+                      };
+                      const trackRates = [
+                        { key: "sc1", rate: computeRate("sc1") },
+                        { key: "sc2", rate: computeRate("sc2") },
+                        { key: "sc3", rate: computeRate("sc3") },
+                      ].filter((x) => x.rate >= 0).sort((a, b) => b.rate - a.rate);
+                      const rateBgByKey = (key) => {
+                        const idx = trackRates.findIndex((x) => x.key === key);
+                        if (idx === 0) return "#00e676";
+                        if (idx === 1) return "#ff9800";
+                        if (idx === 2) return "#ffeb3b";
+                        return null;
+                      };
+                      return SROWS.map((row, ri) => {
                       const top = buildRow(row.startRound);
                       const bottom = buildRow(row.startRound + 39);
                       const fill = row.filled;
@@ -1097,10 +1187,19 @@ export default function GhUserGamePage() {
                               return renderTd(`${row.label}-t-${k}`, n, pick, bg, k, scoresAt[k]);
                             })}
                           </tr>
-                          {/* 2행: 13 라벨 + 총 승/패 + bottom 셀 40개 */}
+                          {/* 2행: 승률 라벨 + 총 승/패 + bottom 셀 40개 */}
                           <tr>
                             <td style={labelTd}>
-                              <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: "#aaa", fontSize: 11, minWidth: 40, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>13</Box>
+                              {(() => {
+                                const tot = totalHit + totalMiss;
+                                const rate = tot > 0 ? (totalHit / tot * 100).toFixed(1) : null;
+                                const bg = rateBgByKey(sckey);
+                                return (
+                                  <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: bg ? "#000" : "#aaa", fontSize: 11, fontWeight: "bold", minWidth: 40, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", ...(bg ? { backgroundColor: bg } : {}) }}>
+                                    {rate ? `${rate}%` : "-"}
+                                  </Box>
+                                );
+                              })()}
                             </td>
                             {totalCell}
                             {bottom.map((n, k) => {
@@ -1115,7 +1214,8 @@ export default function GhUserGamePage() {
                           )}
                         </React.Fragment>
                       );
-                    })}
+                    });
+                    })()}
                   </tbody>
                 </table>
               </Box>
