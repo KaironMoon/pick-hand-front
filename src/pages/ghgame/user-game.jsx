@@ -725,17 +725,14 @@ export default function GhUserGamePage() {
                   {(() => {
                     const td = betData?.user_martin?.martin_a;
                     const amt = td?.amount || 0;
-                    const dir = td?.direction || "";
-                    const step = td?.step || 1;
                     return (
                       <React.Fragment>
                         <Box sx={tagSx("#1565c0")}>
                           <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>마틴A</Typography>
                         </Box>
-                        <Box sx={{ ...fieldSx, minWidth: 78 }}>
-                          <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{step}S</Typography>
+                        <Box sx={{ ...fieldSx, minWidth: 55 }}>
                           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
-                            {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
+                            {amt > 0 ? amt.toLocaleString() : "0"}
                           </Typography>
                         </Box>
                       </React.Fragment>
@@ -816,7 +813,7 @@ export default function GhUserGamePage() {
                         <Box sx={{ ...tagSx(tagBg), cursor: "pointer" }} onClick={handlePauseToggle} title={lbPaused ? "다시 활성화" : "라보쉐르 일시정지"}>
                           <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>라보</Typography>
                         </Box>
-                        <Box sx={{ ...fieldSx, cursor: "pointer", opacity: lbPaused ? 0.5 : 1, minWidth: 70 }} onClick={handleResetClick} title="클릭하여 초기 시퀀스로 리셋">
+                        <Box sx={{ ...fieldSx, cursor: "pointer", opacity: lbPaused ? 0.5 : 1, minWidth: 55 }} onClick={handleResetClick} title="클릭하여 초기 시퀀스로 리셋">
                           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: amtColor }}>
                             {lbAmt.toLocaleString()}
                           </Typography>
@@ -825,7 +822,7 @@ export default function GhUserGamePage() {
                         <Box sx={hmBtnSx("#c62828", "M")} onClick={handleMiss} title="라보 M: 끝 추가, PnL -베팅액">M</Box>
                         <Box
                           onClick={() => setLabSeqOpen(true)}
-                          sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 0.6, py: 0.3, cursor: "pointer", "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}
+                          sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 33, height: 24, border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 0.6, py: 0.3, cursor: "pointer", "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}
                           title="전체 시퀀스 보기"
                         >
                           <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb" }}>≡{lbSeq.length}</Typography>
