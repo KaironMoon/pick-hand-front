@@ -131,6 +131,7 @@ export default function GhUserGamePage() {
   const [userSummary, setUserSummary] = useState(null);
   const [userMartinDashboard, setUserMartinDashboard] = useState(null);
   const [labSeqOpen, setLabSeqOpen] = useState(false);
+  const [labHmPressed, setLabHmPressed] = useState(null); // "H" | "M" | null
   const processingRef = useRef(false);
   const [processing, setProcessing] = useState(false);
   const goalAlertedRef = useRef({ a: false, z: false });
@@ -731,7 +732,7 @@ export default function GhUserGamePage() {
                         <Box sx={tagSx("#1565c0")}>
                           <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>마틴A</Typography>
                         </Box>
-                        <Box sx={fieldSx}>
+                        <Box sx={{ ...fieldSx, minWidth: 78 }}>
                           <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{step}S</Typography>
                           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
                             {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
@@ -750,6 +751,9 @@ export default function GhUserGamePage() {
                       const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
                       const data = res.data;
                       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+                      if (data.cum_pnl) {
+                        setCumPnL((prev) => ({ ...prev, ...data.cum_pnl }));
+                      }
                     };
                     const handleResetClick = async () => {
                       if (!gameId) return;
@@ -772,6 +776,41 @@ export default function GhUserGamePage() {
                     };
                     const tagBg = lbPaused ? "#555" : "#8e24aa";
                     const amtColor = lbPaused ? "#666" : "#4caf50";
+                    const hmBusy = labHmPressed !== null;
+                    const hmDisabled = lbPaused || lbSeq.length === 0 || lbAmt <= 0 || processing || hmBusy;
+                    const trigger = async (which, url) => {
+                      console.log(`[LAB ${which}] click gameId=${gameId} disabled=${hmDisabled} amt=${lbAmt} paused=${lbPaused} seqLen=${lbSeq.length} processing=${processing} busy=${hmBusy}`);
+                      if (!gameId || hmDisabled) return;
+                      setLabHmPressed(which);
+                      try {
+                        const res = await apiCaller.post(url);
+                        console.log(`[LAB ${which}] response`, res.data);
+                        await refreshState();
+                      } catch (err) {
+                        console.error(`Labouchere ${which} failed:`, err);
+                      } finally {
+                        setTimeout(() => setLabHmPressed(null), 500);
+                      }
+                    };
+                    const handleHit = () => trigger("H", GH_GAMES_API.LABOUCHERE_HIT(gameId));
+                    const handleMiss = () => trigger("M", GH_GAMES_API.LABOUCHERE_MISS(gameId));
+                    const hmBtnSx = (bg, which) => {
+                      const pressed = labHmPressed === which;
+                      return {
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        minWidth: 26, height: 24, borderRadius: 1,
+                        backgroundColor: pressed ? "#ffeb3b" : bg,
+                        color: pressed ? "#1b1b1b" : "#fff",
+                        boxShadow: pressed ? "0 0 8px #ffeb3b, 0 0 16px rgba(255,235,59,0.6)" : "none",
+                        transform: pressed ? "scale(0.95)" : "none",
+                        transition: "background-color 0.15s, box-shadow 0.15s, transform 0.15s, color 0.15s",
+                        fontSize: 12, fontWeight: "bold",
+                        cursor: hmDisabled ? "not-allowed" : "pointer",
+                        opacity: hmDisabled && !pressed ? 0.4 : 1,
+                        pointerEvents: hmDisabled ? "none" : "auto",
+                        "&:hover": { opacity: hmDisabled ? 0.4 : 0.85 },
+                      };
+                    };
                     return (
                       <React.Fragment>
                         <Box sx={{ ...tagSx(tagBg), cursor: "pointer" }} onClick={handlePauseToggle} title={lbPaused ? "다시 활성화" : "라보쉐르 일시정지"}>
@@ -782,6 +821,8 @@ export default function GhUserGamePage() {
                             {lbAmt.toLocaleString()}
                           </Typography>
                         </Box>
+                        <Box sx={hmBtnSx("#2e7d32", "H")} onClick={handleHit} title="라보 H: 양끝 제거, PnL +베팅액">H</Box>
+                        <Box sx={hmBtnSx("#c62828", "M")} onClick={handleMiss} title="라보 M: 끝 추가, PnL -베팅액">M</Box>
                         <Box
                           onClick={() => setLabSeqOpen(true)}
                           sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 0.6, py: 0.3, cursor: "pointer", "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}
@@ -806,6 +847,9 @@ export default function GhUserGamePage() {
                       const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
                       const data = res.data;
                       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+                      if (data.cum_pnl) {
+                        setCumPnL((prev) => ({ ...prev, ...data.cum_pnl }));
+                      }
                     };
                     const handleResetClick = async () => {
                       if (!gameId) return;

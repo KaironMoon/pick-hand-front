@@ -58,6 +58,8 @@ const GH_GAMES_API = {
   CRUISE_PAUSE_TOGGLE: (id) => `/api/v1/gh/games/${id}/cruise-pause-toggle`,
   LABOUCHERE_RESET: (id) => `/api/v1/gh/games/${id}/labouchere-reset`,
   LABOUCHERE_PAUSE_TOGGLE: (id) => `/api/v1/gh/games/${id}/labouchere-pause-toggle`,
+  LABOUCHERE_HIT: (id) => `/api/v1/gh/games/${id}/labouchere-hit`,
+  LABOUCHERE_MISS: (id) => `/api/v1/gh/games/${id}/labouchere-miss`,
 };
 
 const USER_BET_SETTINGS_API = {
