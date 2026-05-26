@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
+import autoService from "@/services/auto-service";
+import AutoStartDialog from "./components/AutoStartDialog";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -171,6 +173,12 @@ export default function GamePage() {
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const processingRef = useRef(false); // API 호출 중 잠금 (연타 방지)
   const [processing, setProcessing] = useState(false);
+
+  // Auto 모드 — mvp-aboo-integration.md §5.1
+  const [autoDialogOpen, setAutoDialogOpen] = useState(false);
+  const [autoStatus, setAutoStatus] = useState({ running: false, autoSessionId: null });
+  const [myPragmaticId, setMyPragmaticId] = useState(null);
+  const [autoFeatureAvailable, setAutoFeatureAvailable] = useState(true);
 
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
@@ -358,6 +366,61 @@ export default function GamePage() {
       setProcessing(false);
     }
   }, [results, gameId]);
+
+  // ─── Auto 모드 (pick-aboo 통합) ───
+  // 프로필 로드 — pragmatic_id 확인
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await apiCaller.get("/api/v1/auth/me");
+        if (!cancelled) setMyPragmaticId(me?.data?.user?.pragmatic_id || null);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Auto 상태 폴링 (1초) — Auto running 중일 때만
+  useEffect(() => {
+    if (!gameId || !autoFeatureAvailable) return undefined;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const st = await autoService.getAutoStatus(gameId);
+        if (!cancelled) {
+          setAutoStatus({
+            running: !!st.running,
+            autoSessionId: st.auto_session_id || null,
+            lastEventAt: st.last_event_at,
+            betsAttempted: st.bets_attempted,
+            betsSucceeded: st.bets_succeeded,
+            betsFailed: st.bets_failed,
+          });
+        }
+      } catch (e) {
+        if (e?.response?.status === 503) {
+          setAutoFeatureAvailable(false);
+        }
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [gameId, autoFeatureAvailable]);
+
+  const handleAutoToggle = async () => {
+    if (!autoFeatureAvailable) return;
+    if (autoStatus.running && autoStatus.autoSessionId) {
+      try {
+        await autoService.stopAuto(autoStatus.autoSessionId);
+        setAutoStatus({ running: false, autoSessionId: null });
+      } catch (e) {
+        console.warn("auto stop failed", e);
+      }
+    } else {
+      setAutoDialogOpen(true);
+    }
+  };
 
   // ED: 종료 모드 진입
   const handleEndingMode = async () => {
@@ -700,6 +763,24 @@ export default function GamePage() {
             {endingMode ? "ED..." : "ED"}
           </Typography>
         </Box>
+        {/* Auto 버튼 — mvp-aboo-integration.md §5.1 */}
+        {autoFeatureAvailable && (
+          <Box
+            onClick={handleAutoToggle}
+            sx={{
+              ...toggleBtnSx,
+              backgroundColor: autoStatus.running ? "#2e7d32" : "#455a64",
+              borderRadius: 2,
+              border: autoStatus.running ? "2px solid #66bb6a" : "none",
+              px: isMobile ? 1 : 1.5,
+              cursor: "pointer",
+            }}
+          >
+            <Typography variant="caption" sx={{ fontSize: isMobile ? 11 : 13, fontWeight: "bold", color: "#fff" }}>
+              {autoStatus.running ? "AUTO ●" : "AUTO"}
+            </Typography>
+          </Box>
+        )}
         <Box sx={{ ...toggleBtnSx, backgroundColor: "#1565c0", borderRadius: 2, border: "none", px: isMobile ? 1 : 1.5 }}>
           <Typography variant="caption" sx={{ fontSize: isMobile ? 11 : 13, fontWeight: "bold", color: "#fff" }}>BT</Typography>
         </Box>
@@ -1228,6 +1309,15 @@ export default function GamePage() {
           <Button onClick={handleNewGameConfirm} variant="contained">확인</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Auto 베팅 시작 모달 — §5.1 */}
+      <AutoStartDialog
+        open={autoDialogOpen}
+        onClose={() => setAutoDialogOpen(false)}
+        onStarted={(resp) => setAutoStatus({ running: true, autoSessionId: resp.auto_session_id })}
+        gameId={gameId}
+        pragmaticId={myPragmaticId}
+      />
     </Box>
   );
 }

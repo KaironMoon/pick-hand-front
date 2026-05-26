@@ -11,5 +11,6 @@ export default defineConfig({
   },
   server: {
     port: 9031,
+    host: true,   // 모든 인터페이스 listen (휴대폰/외부 디바이스 접근 허용)
   },
 });
