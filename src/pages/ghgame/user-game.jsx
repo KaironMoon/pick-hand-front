@@ -118,6 +118,7 @@ export default function GhUserGamePage() {
   const [batExpanded, setBatExpanded] = useState({}); // {`gi-ri`: true} — Bat 셀 전체 표시 토글
   const [trackStreakHidden, setTrackStreakHidden] = useState({}); // {sckey: true} — 트랙 연승/연패 셀 숨김 토글
   const [chipStreakHidden, setChipStreakHidden] = useState({}); // {chipLabel: true} — 칩 연승/연패 라벨 숨김 토글
+  const [chartGroup, setChartGroup] = useState("S123"); // 누적 step 그래프 표시 그룹
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
@@ -170,6 +171,8 @@ export default function GhUserGamePage() {
   const streakG = calcStreak((i) => roundDsList[i]?.shadow_pick || null);
   const streakTN = calcStreak((i) => roundLscList[i] || null);
   const streakTWO = calcStreak((i) => roundTwoList[i] || null);
+  // ONE armed streak (picksSnapshot.round_picks.ONE 사용 — 백엔드 _calc_round_one_two_picks 결과)
+  const streakONE = calcStreak((i) => picksSnapshot?.round_picks?.ONE?.[i] || null);
 
   // 백엔드 picks_snapshot에서 AR, J, ONE 픽 정보 가져오기 (프론트 로직 제거됨)
   const arPick = picksSnapshot?.next_picks?.AR || null;
@@ -548,7 +551,10 @@ export default function GhUserGamePage() {
           { label: "G",   img: pickImg(shadowPick), color: shadowPick ? "#ce93d8" : "#aaa", streak: streakG },
           { label: "TN",  img: pickImg(lscPick),  color: lscPick ? "#90caf9" : "#aaa", streak: streakTN },
           { label: "J",   img: pickImg(jPick),    color: jPick ? "#90caf9" : "#aaa", streak: streakJ },
-          { label: "TWO", img: pickImg(twoPick),  color: twoPick ? "#90caf9" : "#aaa", streak: streakTWO },
+          // 7번째 카드: armed에 따라 ONE / TWO 동적 표시 (260527)
+          (onePick && !twoPick
+            ? { label: "ONE", img: pickImg(onePick), color: "#90caf9", streak: streakONE }
+            : { label: "TWO", img: pickImg(twoPick), color: twoPick ? "#90caf9" : "#aaa", streak: streakTWO }),
         ];
         // 2번: 배팅 테이블 정적 데이터
         const SEC_COLOR = "#5165f3";
@@ -1039,84 +1045,74 @@ export default function GhUserGamePage() {
                 </Box>
               ))}
             </Box>
-            {/* 2-2: 3그룹 배팅 테이블 (하나로 합침) — admin 전용 */}
-            {isAdmin && (
-            <Box>
-              <table style={{ borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    {BET_GROUPS.map((_, gi) => {
-                      const groupSep = gi > 0 ? { borderLeft: "2px solid #888" } : {};
-                      return (
-                        <React.Fragment key={`h-${gi}`}>
-                          <th style={{ ...thCellNarrow, ...groupSep }}>SEC</th>
-                          <th style={thCellNarrow}>전/승/패[연승패]</th>
-                        </React.Fragment>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[0, 1, 2].map((ri) => (
-                    <tr key={ri}>
-                      {BET_GROUPS.map((group, gi) => {
-                        const sec = group[ri].sec;
-                        const groupSep = gi > 0 ? { borderLeft: "2px solid #888" } : {};
-                        // AR_RATE 특수 셀: A와 AR 승률 % 표시, 통계 셀은 빈 칸
-                        if (sec === "AR_RATE") {
-                          const aStats = picksSnapshot?.stats?.A;
-                          const arStats = picksSnapshot?.stats?.AR;
-                          const aRate = aStats?.total > 0 ? (aStats.hit / aStats.total * 100).toFixed(1) : "-";
-                          const arRate = arStats?.total > 0 ? (arStats.hit / arStats.total * 100).toFixed(1) : "-";
-                          return (
-                            <React.Fragment key={`${gi}-${ri}`}>
-                              <td colSpan={2} style={{ ...tdCellNarrow, ...groupSep, fontWeight: "bold", fontSize: 11 }}>
-                                <span style={{ color: "#01e676" }}>[A]</span>
-                                <span style={{ color: "#fff" }}>{aRate}%</span>
-                                <span style={{ color: "#aaa" }}> </span>
-                                <span style={{ color: "#ff9800" }}>[R]</span>
-                                <span style={{ color: "#fff" }}>{arRate}%</span>
-                              </td>
-                            </React.Fragment>
-                          );
-                        }
-                        // J 승률 ≥ 60% 점멸
-                        let jBlink = false;
-                        if (sec === "J") {
-                          const jStats = picksSnapshot?.stats?.J;
-                          if (jStats?.total > 0 && jStats.hit / jStats.total >= 0.6) jBlink = true;
-                        }
-                        if (jBlink) {
-                          return (
-                            <React.Fragment key={`${gi}-${ri}`}>
-                              <Box
-                                component="td"
-                                sx={{
-                                  ...tdCellNarrow, fontWeight: "bold", ...groupSep,
-                                  animation: "jSecBlink 0.8s infinite",
-                                  "@keyframes jSecBlink": {
-                                    "0%, 100%": { backgroundColor: "#00e676", color: "#000" },
-                                    "50%": { backgroundColor: "transparent", color: SEC_COLOR },
-                                  },
-                                }}
-                              >{sec}</Box>
-                              <td style={tdCellNarrow}>{fmtStats(sec)}</td>
-                            </React.Fragment>
-                          );
-                        }
-                        return (
-                          <React.Fragment key={`${gi}-${ri}`}>
-                            <td style={{ ...tdCellNarrow, color: SEC_COLOR, fontWeight: "bold", ...groupSep, ...(secRankBg(sec) ? { backgroundColor: secRankBg(sec), color: "#000" } : {}) }}>{sec}</td>
-                            <td style={tdCellNarrow}>{fmtStats(sec)}</td>
-                          </React.Fragment>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Box>
-            )}
+            {/* 2-1.5: NEW SEC 7개 미니 테이블 (260527) — 위 픽 카드와 컬럼 정렬, A/AR/D/G/TN/J/(1or2) */}
+            {(() => {
+              const SEC_TO_KEY_NEW = { "1": "ONE", "2": "TWO" };
+              const NEW_SECS_BASE = ["A", "AR", "D", "G", "TN", "J"];
+              // 마지막 컬럼: 현재 ONE/TWO 픽 중 활성된 쪽 라벨 (없으면 "2" 기본)
+              const _onePresent = picksSnapshot?.next_picks?.ONE != null;
+              const _twoPresent = picksSnapshot?.next_picks?.TWO != null;
+              const lastSec = _onePresent && !_twoPresent ? "1" : "2";
+              const NEW_SECS_7 = [...NEW_SECS_BASE, lastSec];
+              const getStat7 = (sec) => {
+                const k = SEC_TO_KEY_NEW[sec] || sec;
+                return picksSnapshot?.stats?.[k] || { total: 0, hit: 0, miss: 0, max_hit_streak: 0, max_miss_streak: 0 };
+              };
+              const rates7 = NEW_SECS_7.map((sec) => {
+                const s = getStat7(sec);
+                return { sec, total: s.total ?? 0, hit: s.hit ?? 0, rate: (s.total ?? 0) > 0 ? (s.hit ?? 0) / s.total : -1 };
+              });
+              const bgFor7 = (sec) => {
+                // A/AR: 둘 중 1등(높은 쪽) 형광 그린
+                if (sec === "A" || sec === "AR") {
+                  const a = rates7.find((x) => x.sec === "A")?.rate ?? -1;
+                  const ar = rates7.find((x) => x.sec === "AR")?.rate ?? -1;
+                  if (sec === "A" && a > ar && a >= 0) return "#00e676";
+                  if (sec === "AR" && ar > a && ar >= 0) return "#00e676";
+                  return null;
+                }
+                // D/G/TN: 1등 초록 / 2등 주황 / 3등 노랑
+                const DGTN = ["D", "G", "TN"];
+                if (DGTN.includes(sec)) {
+                  const sorted = rates7.filter((x) => DGTN.includes(x.sec) && x.total > 0).sort((a, b) => b.rate - a.rate);
+                  const idx = sorted.findIndex((x) => x.sec === sec);
+                  if (idx === 0) return "#00e676";
+                  if (idx === 1) return "#ff9800";
+                  if (idx === 2) return "#ffeb3b";
+                }
+                return null;
+              };
+              const cellBase7 = { border: "1px solid #444", padding: "1px 2px", textAlign: "center", fontSize: 11, color: "#fff", lineHeight: 1.3 };
+              // 픽 카드와 동일한 flex 레이아웃(gap 0.5, flexShrink 0, width 52) → 컬럼 정렬
+              return (
+                <Box sx={{ display: "flex", gap: 0.5, flexWrap: "nowrap" }}>
+                  {NEW_SECS_7.map((sec) => {
+                    const s = getStat7(sec);
+                    const r = rates7.find((x) => x.sec === sec);
+                    const rate = r && r.rate >= 0 ? (r.rate * 100).toFixed(1) : null;
+                    const bg = bgFor7(sec);
+                    return (
+                      <Box key={`sec-mini-${sec}`} sx={{ flexShrink: 0, width: 52 }}>
+                        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+                          <tbody>
+                            <tr><td style={cellBase7}>{s.total ?? 0}</td></tr>
+                            <tr><td style={cellBase7}>
+                              <span style={{ color: HIT_BG }}>{s.hit ?? 0}</span>/<span style={{ color: MISS_BG }}>{s.miss ?? 0}</span>
+                            </td></tr>
+                            <tr><td style={{ ...cellBase7, backgroundColor: bg || "transparent", color: bg ? "#000" : "#fff", fontWeight: "bold" }}>
+                              {rate !== null ? `${rate}%` : "-"}
+                            </td></tr>
+                            <tr><td style={cellBase7}>
+                              <span style={{ color: HIT_BG }}>{s.max_hit_streak ?? 0}</span>-<span style={{ color: MISS_BG }}>{s.max_miss_streak ?? 0}</span>
+                            </td></tr>
+                          </tbody>
+                        </table>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              );
+            })()}
           </Box>
 
           </Box>
@@ -1186,21 +1182,26 @@ export default function GhUserGamePage() {
                 <table style={{ borderCollapse: "collapse", borderSpacing: 0 }}>
                   <tbody>
                     {(() => {
-                      // 3 트랙 승률 산출 → 1/2/3등 배경색 매핑
-                      const computeRate = (key) => {
-                        const r = (ghTracks?.[key]?.round_data) || [];
+                      // 1/2/3등 배경색 매핑 (260525):
+                      //  - Point 회차단위 적용 시(point_applied) → 회차 점수(total_score) 기준 "적중 많은 트랙=1등"
+                      //  - 미적용(기본/복원) → 옛날처럼 승률 기준
+                      const pointApplied = !!picksSnapshot?.gh_tracks?.point_applied;
+                      const metric = (key) => {
+                        const t = ghTracks?.[key];
+                        if (!t) return null;
                         let h = 0, m = 0;
-                        for (const x of r) {
+                        for (const x of (t.round_data || [])) {
                           if (x.status === "hit") h++;
                           else if (x.status === "miss") m++;
                         }
-                        return (h + m) > 0 ? h / (h + m) : -1;
+                        if (h + m === 0) return null;
+                        return pointApplied ? (t.total_score ?? 0) : h / (h + m);
                       };
                       const trackRates = [
-                        { key: "sc1", rate: computeRate("sc1") },
-                        { key: "sc2", rate: computeRate("sc2") },
-                        { key: "sc3", rate: computeRate("sc3") },
-                      ].filter((x) => x.rate >= 0).sort((a, b) => b.rate - a.rate);
+                        { key: "sc1", rate: metric("sc1") },
+                        { key: "sc2", rate: metric("sc2") },
+                        { key: "sc3", rate: metric("sc3") },
+                      ].filter((x) => x.rate !== null).sort((a, b) => b.rate - a.rate);
                       const rateBgByKey = (key) => {
                         const idx = trackRates.findIndex((x) => x.key === key);
                         if (idx === 0) return "#00e676";
@@ -1327,53 +1328,104 @@ export default function GhUserGamePage() {
           {/* 상: 회차/P/B/del/next/new/셋업/픽체인지/픽카드는 새 1·2번 영역으로 이동됨 */}
           {/* 하: 슈 넘버 + 라벨 */}
           <Box>
+            {/* 누적 step 그래프 (260527) — 회차별 적중=+1 / 미적=-1 / wait=0 누적 */}
             {(() => {
-              // top section 단일이면 해당 섹션의 gi(1,2,3) 기반으로 세트 첫회차 나열
-              let gi = 0;
-              let topPat = null;
-              if (topGhSections.length === 1) {
-                const parts = topGhSections[0].split("-");
-                topPat = parts[0];
-                gi = parseInt(parts[1]) - 1;
-              }
-              const start = 1 + gi;
-              const nums = Array.from({ length: 20 }, (_, i) => start + i * 3);
-              const activeColor = topPat === "PPP" ? "#0066fe" : topPat === "BBB" ? "#ff2d04" : null;
-              const renderRow = (arr, keyPrefix) => (
-                <Box sx={{ display: "flex", gap: "2px", mb: "2px" }}>
-                  {arr.map((num, i) => {
-                    const isNext = activeColor && topNextRound === num;
-                    return (
-                      <Box key={`${keyPrefix}-${i}`} sx={{ width: isMobile ? 22 : 28, height: isMobile ? 22 : 28, border: "1px solid #555", borderRadius: 0.5, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: isNext ? activeColor : "#1a1a2e" }}>
-                        <Typography sx={{ fontSize: isMobile ? 8 : 10, color: isNext ? "#fff" : "#90caf9", fontWeight: "bold" }}>{num}</Typography>
-                      </Box>
-                    );
-                  })}
-                </Box>
-              );
+              // 통일된 3색: 빨강 / 파랑 / 흰색 순
+              const CHART_GROUPS = {
+                S123: { S1: "#f44336", S2: "#2196f3", S3: "#ffffff" },
+                AAR:  { A: "#f44336", AR: "#2196f3" },
+                DGT:  { D: "#f44336", G: "#2196f3", TN: "#ffffff" },
+                "1-2": { ONE: "#f44336", TWO: "#2196f3" },
+              };
+              const N = results.length;
+              const tracks = picksSnapshot?.gh_tracks?.tracks || {};
+              const seriesFor = (key) => {
+                // S1/S2/S3 → gh_tracks round_data 사용
+                if (key === "S1" || key === "S2" || key === "S3") {
+                  const sckey = key === "S1" ? "sc1" : key === "S2" ? "sc2" : "sc3";
+                  const rd = tracks[sckey]?.round_data || [];
+                  const arr = new Array(N).fill(null);
+                  for (const r of rd) {
+                    const idx = (r.round || 0) - 1;
+                    if (idx >= 0 && idx < N) {
+                      if (r.status === "hit") arr[idx] = "hit";
+                      else if (r.status === "miss") arr[idx] = "miss";
+                    }
+                  }
+                  return arr;
+                }
+                // 나머지: round_picks[key] vs results[i].value
+                const picks = picksSnapshot?.round_picks?.[key] || [];
+                return results.map((r, i) => {
+                  const pick = picks[i];
+                  if (!pick || pick === "wait") return null;
+                  return pick === r.value ? "hit" : "miss";
+                });
+              };
+              const cumulativeFor = (key) => {
+                const series = seriesFor(key);
+                let sum = 0;
+                return series.map((s) => {
+                  if (s === "hit") sum += 1;
+                  else if (s === "miss") sum -= 1;
+                  return sum;
+                });
+              };
+              const colors = CHART_GROUPS[chartGroup] || CHART_GROUPS.S123;
+              const lines = Object.entries(colors).map(([key, color]) => ({ key, color, data: cumulativeFor(key) }));
+              // SVG 차트 영역
+              const W = 800, H = 160, padL = 22, padR = 8, padT = 8, padB = 22;
+              const innerW = W - padL - padR;
+              const innerH = H - padT - padB;
+              const maxRound = Math.max(65, N);
+              const allVals = lines.flatMap((l) => l.data).filter((v) => v !== null && v !== undefined);
+              const minY = Math.min(0, ...(allVals.length ? allVals : [0]));
+              const maxY = Math.max(0, ...(allVals.length ? allVals : [0]));
+              const yRange = Math.max(1, maxY - minY);
+              const xOf = (i) => padL + (i / Math.max(1, maxRound - 1)) * innerW;
+              const yOf = (v) => padT + (1 - (v - minY) / yRange) * innerH;
               return (
-                <Box>
-                  {renderRow(nums.slice(0, 10), "r1")}
-                  {renderRow(nums.slice(10, 20), "r2")}
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                  {/* 그룹 토글 */}
+                  <Box sx={{ display: "flex", gap: 0.5 }}>
+                    {Object.keys(CHART_GROUPS).map((g) => (
+                      <Box
+                        key={g}
+                        onClick={() => setChartGroup(g)}
+                        sx={{
+                          px: 1.5, py: 0.3, border: "1px solid #555", borderRadius: 0.5,
+                          cursor: "pointer", fontSize: 11, fontWeight: "bold",
+                          backgroundColor: chartGroup === g ? "#00e676" : "#1a1a2e",
+                          color: chartGroup === g ? "#000" : "#90caf9",
+                          userSelect: "none",
+                        }}
+                      >{g}</Box>
+                    ))}
+                  </Box>
+                  {/* SVG 차트 */}
+                  <Box sx={{ overflowX: "auto" }}>
+                    <svg width={W} height={H} style={{ backgroundColor: "#0a0c10", display: "block" }}>
+                      {/* X 라벨 (회차 번호) */}
+                      {Array.from({ length: maxRound }, (_, i) => i + 1).map((n) => (
+                        <text key={`xl-${n}`} x={xOf(n - 1)} y={H - 6} fontSize={8} fill="#666" textAnchor="middle">{n}</text>
+                      ))}
+                      {/* 0 기준선 */}
+                      <line x1={padL} y1={yOf(0)} x2={W - padR} y2={yOf(0)} stroke="#555" strokeDasharray="2 2" strokeWidth={1} />
+                      {/* 라인들 */}
+                      {lines.map((l) => {
+                        const points = l.data
+                          .map((v, i) => (v !== null && v !== undefined) ? `${xOf(i)},${yOf(v)}` : null)
+                          .filter(Boolean)
+                          .join(" ");
+                        return points ? (
+                          <polyline key={`line-${l.key}`} points={points} fill="none" stroke={l.color} strokeWidth={1.5} />
+                        ) : null;
+                      })}
+                    </svg>
+                  </Box>
                 </Box>
               );
             })()}
-            <Box sx={{ display: "flex", gap: "2px", flexWrap: "wrap" }}>
-              {["Triple", "S1", "S2", "S3", "Nine", "S1", "S2", "S3"].map((label, i) => {
-                const isPPP = i >= 1 && i <= 3;
-                const isBBB = i >= 5 && i <= 7;
-                const secKey = isPPP ? `PPP-${i}` : isBBB ? `BBB-${i - 4}` : null;
-                const isTop = secKey && topGhSections.includes(secKey);
-                const bg = label === "Triple" || (isPPP && isTop) ? "#0066fe"
-                  : label === "Nine" || (isBBB && isTop) ? "#ff2d04"
-                  : "#1a1a2e";
-                return (
-                  <Box key={`lbl-${i}`} sx={{ px: isMobile ? 0.5 : 1, py: 0.2, border: "1px solid #555", borderRadius: 0.5, backgroundColor: bg }}>
-                    <Typography sx={{ fontSize: isMobile ? 8 : 10, color: "#fff", fontWeight: "bold" }}>{label}</Typography>
-                  </Box>
-                );
-              })}
-            </Box>
           </Box>
         </Box>
       </Box>

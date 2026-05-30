@@ -469,6 +469,118 @@ function LabouchereSection({ labouchere, onChange }) {
   );
 }
 
+// ─── 글로벌히트 Point/복원 표 (260525 요청) ───
+const GH_POINT_PATTERNS = ["PPP", "BBB", "PPB", "BBP", "PBP", "BPB", "PBB", "BPP"];
+// 표시 전용 원안 승점 (3라운드1조). 편집 불가 · 복원 기준.
+const GH_ORIG_POINTS = [
+  { key: "1shit", val: "3P" },
+  { key: "2shit", val: "2P" },
+  { key: "3shit", val: "1P" },
+  { key: "3miss", val: "-6P" },
+];
+// 3연적중 발동 조건 (제목 토글): 3연적중(=3연승)~10연승 + 2연패~10연패 (사용안함 없음)
+const GH_TRIGGER_OPTS = [
+  "3연적중", "4연승", "5연승", "6연승", "7연승", "8연승", "9연승", "10연승",
+  "2연패", "3연패", "4연패", "5연패", "6연패", "7연패", "8연패", "9연패", "10연패",
+];
+// 강제 픽 (셀 토글): 사용안함 + 자기 자신 제외한 7패턴 (행마다 다름 — PointSection 내 forceOptsFor 사용)
+// 회차적중 1~5P / 회차미적 0~−5P 토글
+const GH_HIT_OPTS = [1, 2, 3, 4, 5];
+const GH_MISS_OPTS = [0, -1, -2, -3, -4, -5];
+
+function defaultGhPoint() {
+  const patterns = {};
+  GH_POINT_PATTERNS.forEach((p) => {
+    patterns[p] = { inout: "IN", force_pick: null };  // IN/OUT·3연적중은 패턴별
+  });
+  // 회차적중/회차미적은 전역(모든 패턴 공통)
+  return { hit_point: 1, miss_point: 0, applied: false, force_trigger: "3연적중", patterns };
+}
+
+function PatLabel({ pat }) {
+  return (
+    <span style={{ fontWeight: "bold" }}>
+      {pat.split("").map((c, i) => (
+        <span key={i} style={{ color: c === "P" ? "#5b9bd5" : "#e06666" }}>{c}</span>
+      ))}
+    </span>
+  );
+}
+
+function PointSection({ ghPoint, onChange, onRestore }) {
+  const pts = ghPoint?.patterns || {};
+  const get = (pat) => pts[pat] || { inout: "IN", force_pick: null };
+  const setPat = (pat, upd) => onChange({ ...ghPoint, patterns: { ...pts, [pat]: { ...get(pat), ...upd } } });
+  // 회차적중/회차미적 = 전역 (모든 패턴 공통). IN/OUT·3연적중만 패턴별.
+  const hitPoint = ghPoint?.hit_point ?? 1;
+  const missPoint = ghPoint?.miss_point ?? 0;
+  // "회차단위 적용" = 헤더 클릭으로 토글되는 명시적 플래그 (마스터 enable/disable).
+  // 셀 값 변경은 파라미터 조정일 뿐 자동 켜지지 않음 — 켜야 회차단위 점수, 끄면 옛날 3라운드1조 승점.
+  const applied = !!ghPoint?.applied;
+  const toggleApplied = () => onChange({ ...ghPoint, applied: !applied });
+  const trigger = ghPoint?.force_trigger ?? GH_TRIGGER_OPTS[0];
+  const cycleTrigger = () => {
+    const i = GH_TRIGGER_OPTS.indexOf(trigger);
+    onChange({ ...ghPoint, force_trigger: GH_TRIGGER_OPTS[(i + 1) % GH_TRIGGER_OPTS.length] });
+  };
+  const cycleForce = (pat) => {
+    // 자기 자신 제외한 7패턴 + 사용안함
+    const opts = [null, ...GH_POINT_PATTERNS.filter((p) => p !== pat)];
+    const cur = get(pat).force_pick ?? null;
+    const i = opts.indexOf(cur);
+    setPat(pat, { force_pick: opts[(i + 1) % opts.length] });
+  };
+  const toggleInout = (pat) => setPat(pat, { inout: get(pat).inout === "OUT" ? "IN" : "OUT" });
+
+  const dispHeader = { ...headerStyle, opacity: 0.5 };
+  const indHeader = (on) => ({ ...headerStyle, backgroundColor: on ? "rgba(76,175,80,0.4)" : headerStyle.backgroundColor });
+  const outCell = { ...cellStyle, backgroundColor: "rgba(198,40,40,0.25)", color: "#e57373", cursor: "pointer", fontWeight: "bold" };
+
+  return (
+    <table style={{ borderCollapse: "collapse", width: "fit-content" }}>
+      <tbody>
+        <tr>
+          <td colSpan={9} style={{ border: "none", padding: "0 0 6px 0" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Box sx={{ backgroundColor: GREEN, color: "#1b2e1b", fontWeight: "bold", borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14 }}>point</Box>
+              <Box onClick={onRestore} sx={{ backgroundColor: "#333", color: "#ccc", fontWeight: "bold", borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14, cursor: "pointer", "&:hover": { backgroundColor: "#444" } }}>복원</Box>
+            </Box>
+          </td>
+        </tr>
+        <tr>
+          <td style={headerStyle}></td>
+          <td style={dispHeader}>1shit</td>
+          <td style={dispHeader}>2shit</td>
+          <td style={dispHeader}>3shit</td>
+          <td style={dispHeader}>3miss</td>
+          <td style={headerStyle}>IN/OUT</td>
+          <td style={{ ...indHeader(applied), cursor: "pointer" }} onClick={toggleApplied} title="회차단위 적용 토글">회차적중</td>
+          <td style={{ ...indHeader(applied), cursor: "pointer" }} onClick={toggleApplied} title="회차단위 적용 토글">회차미적</td>
+          <td style={{ ...headerStyle, cursor: "pointer" }} onClick={cycleTrigger} title="발동조건: 클릭으로 변경 (3연적중~10연승 / 2연패~10연패)">{trigger}</td>
+        </tr>
+        {GH_POINT_PATTERNS.map((pat) => {
+          const c = get(pat);
+          const out = c.inout === "OUT";
+          return (
+            <tr key={pat}>
+              <td style={labelCellStyle}><PatLabel pat={pat} /></td>
+              {GH_ORIG_POINTS.map((o) => (
+                <td key={o.key} style={{ ...normalCell, color: "#888" }}>{o.val}</td>
+              ))}
+              <td style={out ? outCell : greenCell} onClick={() => toggleInout(pat)}>{out ? "OUT" : "IN"}</td>
+              <td style={editableCell} onClick={() => onChange({ ...ghPoint, hit_point: GH_HIT_OPTS[(GH_HIT_OPTS.indexOf(hitPoint) + 1) % GH_HIT_OPTS.length] })}>{hitPoint}P</td>
+              <td style={editableCell} onClick={() => onChange({ ...ghPoint, miss_point: GH_MISS_OPTS[(GH_MISS_OPTS.indexOf(missPoint) + 1) % GH_MISS_OPTS.length] })}>{missPoint}P</td>
+              <td style={editableCell} onClick={() => cycleForce(pat)}>
+                {c.force_pick ? <PatLabel pat={c.force_pick} /> : <span style={{ color: "#777" }}>사용안함</span>}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 const GAME_BACK_PATHS = {
   t9: { admin: "/t9game", user: "/t9game/user" },
   hb: { admin: "/hbgame", user: "/hbgame/user" },
@@ -540,6 +652,20 @@ export default function UserSetupPage({ gameType }) {
     setDirty(true);
   };
 
+  // Point 복원: IN/OUT→IN, 회차적중→1, 회차미적→0. 3연적중(force_trigger/force_pick)은 유지.
+  const restoreGhPoint = () => {
+    setConfig((prev) => {
+      const cur = (prev && prev.gh_point) || defaultGhPoint();
+      const patterns = { ...(cur.patterns || {}) };
+      GH_POINT_PATTERNS.forEach((p) => {
+        patterns[p] = { ...(patterns[p] || {}), inout: "IN" };  // force_pick 유지
+      });
+      // 회차점수(전역) 1/0 복원 + 명시적 applied 해제 → 옛날 3라운드1조 승점으로. force_trigger 유지.
+      return { ...prev, gh_point: { ...cur, hit_point: 1, miss_point: 0, applied: false, patterns } };
+    });
+    setDirty(true);
+  };
+
   if (!config) return <Box sx={{ p: 2, color: "#888" }}>불러오는 중...</Box>;
 
   const martinA = config.martin_a || { ...DEFAULT_MARTIN, enabled: true };
@@ -553,6 +679,7 @@ export default function UserSetupPage({ gameType }) {
   const one = config.one || { ...DEFAULT_MARTIN };
   const two = config.two || { ...DEFAULT_MARTIN };
   const labouchere = config.labouchere || { enabled: false, target: 0, count: 10, mode: "even", sequence: [] };
+  const ghPoint = config.gh_point || defaultGhPoint();
 
   return (
     <Box sx={{ p: 2 }}>
@@ -601,6 +728,12 @@ export default function UserSetupPage({ gameType }) {
           </tbody>
         </table>
       </Box>
+
+      {gameType === "gh" && (
+        <Box sx={{ overflowX: "auto", mt: 3 }}>
+          <PointSection ghPoint={ghPoint} onChange={(v) => updateMartin("gh_point", v)} onRestore={restoreGhPoint} />
+        </Box>
+      )}
 
       {/* 이탈 경고 */}
       <Dialog open={blocker.state === "blocked"}
