@@ -967,8 +967,20 @@ export default function GhUserGamePage() {
                     <Typography variant="caption" sx={{ fontSize: 12, color: "#2196f3" }}>new</Typography>
                   </Box>
                   {(() => {
-                    // 가운데 P/B/W (하나만 노출 — 로직 추후, 일단 P)
-                    const center = "P";
+                    // A/AR 연승·연패 비교 → 더 좋은 쪽 픽
+                    // hit > miss, 같은 type이면 hit는 큰 streak, miss는 작은 streak이 우위
+                    const pickBetter = () => {
+                      const aHit = streakA?.type === "hit";
+                      const arHit = streakAR?.type === "hit";
+                      if (streakA && !streakAR) return aPick;
+                      if (!streakA && streakAR) return arPick;
+                      if (!streakA && !streakAR) return aPick || arPick || null;
+                      if (aHit && !arHit) return aPick;
+                      if (!aHit && arHit) return arPick;
+                      if (aHit && arHit) return streakA.count >= streakAR.count ? aPick : arPick;
+                      return streakA.count <= streakAR.count ? aPick : arPick; // 둘 다 miss → 연패가 적은 쪽
+                    };
+                    const center = pickBetter() || "W";
                     const centerColor = center === "P" ? "#1565c0" : center === "B" ? "#f44336" : "#fff";
                     return (
                       <Box sx={uniBtnSx("#67f431")}>
@@ -976,10 +988,20 @@ export default function GhUserGamePage() {
                       </Box>
                     );
                   })()}
-                  <Box sx={{ ...fieldSx, width: 128, minWidth: 128, height: 32, border: "2px solid #67f431" }}>
-                    <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>1S</Typography>
-                    <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: "#fff" }}>0</Typography>
-                  </Box>
+                  {(() => {
+                    const mz = betData?.user_martin?.martin_z;
+                    // raw_amount: 라보/크루즈 활성, 방향 없음 등과 무관한 단계별 원본 금액
+                    const mzAmt = mz?.raw_amount ?? mz?.amount ?? 0;
+                    const mzStep = mz?.step || 1;
+                    return (
+                      <Box sx={{ ...fieldSx, width: 128, minWidth: 128, height: 32, border: "2px solid #67f431" }}>
+                        <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{mzStep}S</Typography>
+                        <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: mzAmt > 0 ? "#4caf50" : "#666" }}>
+                          {mzAmt > 0 ? mzAmt.toLocaleString() : "0"}
+                        </Typography>
+                      </Box>
+                    );
+                  })()}
                 </Box>
 
                 {/* 행4: 셋업 + 픽체인지 + auto + HitPoint */}
