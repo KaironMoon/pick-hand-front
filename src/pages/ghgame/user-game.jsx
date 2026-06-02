@@ -4,6 +4,8 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
+import autoService from "@/services/auto-service";
+import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 
 // blink 애니메이션
@@ -138,6 +140,12 @@ export default function GhUserGamePage() {
   const goalAlertedRef = useRef({ a: false, z: false });
 
   const [goalDialog, setGoalDialog] = useState({ open: false, msgs: [] });
+
+  // Auto 모드 (pick-aboo 통합) — t9game/index.jsx에서 포팅
+  const [autoFeatureAvailable, setAutoFeatureAvailable] = useState(true);
+  const [autoDialogOpen, setAutoDialogOpen] = useState(false);
+  const [autoStatus, setAutoStatus] = useState({ running: false, autoSessionId: null });
+  const [myPragmaticId, setMyPragmaticId] = useState(null);
 
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
@@ -278,6 +286,55 @@ export default function GhUserGamePage() {
     } catch (err) {
       console.error("Failed to restore, starting new:", err);
       startGame();
+    }
+  };
+
+  // ─── Auto 모드 (pick-aboo 통합) — t9game/index.jsx 패턴 동일 ───
+  // pragmatic_id: userAtom에서 직접. fallback으로 username 사용
+  // (auth-store.js가 로그인 시 username을 pragmatic_id로 자동 등록한다는 가정)
+  useEffect(() => {
+    setMyPragmaticId(user?.pragmatic_id || user?.username || null);
+  }, [user]);
+
+  // Auto 상태 폴링 (1초)
+  useEffect(() => {
+    if (!gameId || !autoFeatureAvailable) return undefined;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const st = await autoService.getAutoStatus(gameId);
+        if (!cancelled) {
+          setAutoStatus({
+            running: !!st.running,
+            autoSessionId: st.auto_session_id || null,
+            lastEventAt: st.last_event_at,
+            betsAttempted: st.bets_attempted,
+            betsSucceeded: st.bets_succeeded,
+            betsFailed: st.bets_failed,
+          });
+        }
+      } catch (e) {
+        if (e?.response?.status === 503) {
+          setAutoFeatureAvailable(false);
+        }
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [gameId, autoFeatureAvailable]);
+
+  const handleAutoToggle = async () => {
+    if (!autoFeatureAvailable) return;
+    if (autoStatus.running && autoStatus.autoSessionId) {
+      try {
+        await autoService.stopAuto(autoStatus.autoSessionId);
+        setAutoStatus({ running: false, autoSessionId: null });
+      } catch (e) {
+        console.warn("auto stop failed", e);
+      }
+    } else {
+      setAutoDialogOpen(true);
     }
   };
 
@@ -1018,9 +1075,23 @@ export default function GhUserGamePage() {
                   >
                     <Typography variant="caption" sx={{ fontSize: 12, color: "#ab47bc", fontWeight: "bold" }}>픽체인지</Typography>
                   </Box>
-                  <Box sx={uniBtnSx("#cc3499")}>
-                    <Typography variant="caption" sx={{ fontSize: 12, color: "#cc3499", fontWeight: "bold" }}>auto</Typography>
-                  </Box>
+                  {autoFeatureAvailable && (
+                    <Box
+                      onClick={handleAutoToggle}
+                      sx={{
+                        ...uniBtnSx(autoStatus.running ? "#66bb6a" : "#cc3499"),
+                        cursor: "pointer",
+                        backgroundColor: autoStatus.running ? "#2e7d32" : undefined,
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{ fontSize: 12, color: autoStatus.running ? "#fff" : "#cc3499", fontWeight: "bold" }}
+                      >
+                        {autoStatus.running ? "auto●" : "auto"}
+                      </Typography>
+                    </Box>
+                  )}
                   <Box sx={{ ...fieldSx, width: 128, minWidth: 128, justifyContent: "flex-start", height: 32, border: "2px solid #7f7f7f", whiteSpace: "nowrap", overflow: "hidden" }}>
                     <Typography variant="caption" sx={{ fontSize: 11, color: "#fff", whiteSpace: "nowrap" }}>HP:&nbsp;&nbsp;220000 P</Typography>
                   </Box>
@@ -2051,6 +2122,15 @@ export default function GhUserGamePage() {
           <Button onClick={() => setLabSeqOpen(false)}>닫기</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Auto 베팅 시작 모달 — mvp-aboo-integration.md §5.1 */}
+      <AutoStartDialog
+        open={autoDialogOpen}
+        onClose={() => setAutoDialogOpen(false)}
+        onStarted={(resp) => setAutoStatus({ running: true, autoSessionId: resp.auto_session_id })}
+        gameId={gameId}
+        pragmaticId={myPragmaticId}
+      />
     </Box>
   );
 }

@@ -11,15 +11,25 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import autoService from "@/services/auto-service";
+
+// 서버 옵션: gs1 ~ gs29 + (자동탐지) 빈값
+const SERVER_OPTIONS = ["", ...Array.from({ length: 29 }, (_, i) => `gs${i + 1}`)];
 
 const formatAge = (sec) => {
   if (sec == null) return "";
@@ -35,6 +45,57 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId }) => {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [featureDisabled, setFeatureDisabled] = useState(false);
+
+  // 테이블 목록 (pick-aboo /tables/discover 프록시)
+  const [tables, setTables] = useState([]);
+  const [tablesLoading, setTablesLoading] = useState(false);
+  const [tablesError, setTablesError] = useState(null);
+
+  // 모달 열림 + 캡처 OK 시 테이블 목록 자동 로드
+  useEffect(() => {
+    if (!open || !pragmaticId) return undefined;
+    if (!sessionInfo || sessionInfo.status !== "fresh") return undefined;
+    let cancelled = false;
+    (async () => {
+      setTablesLoading(true);
+      setTablesError(null);
+      try {
+        const res = await autoService.discoverTables(pragmaticId);
+        if (cancelled) return;
+        const list = Array.isArray(res?.tables) ? res.tables : [];
+        setTables(list);
+      } catch (e) {
+        if (cancelled) return;
+        const detail = e?.response?.data?.detail;
+        setTablesError(
+          typeof detail === "string"
+            ? detail
+            : detail?.error || "테이블 목록 조회 실패"
+        );
+        setTables([]);
+      } finally {
+        if (!cancelled) setTablesLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, pragmaticId, sessionInfo]);
+
+  const refreshTables = async () => {
+    if (!pragmaticId) return;
+    setTablesLoading(true);
+    setTablesError(null);
+    try {
+      const res = await autoService.discoverTables(pragmaticId, true);
+      setTables(Array.isArray(res?.tables) ? res.tables : []);
+    } catch (e) {
+      const detail = e?.response?.data?.detail;
+      setTablesError(
+        typeof detail === "string" ? detail : detail?.error || "재조회 실패"
+      );
+    } finally {
+      setTablesLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) {
@@ -123,21 +184,72 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId }) => {
           </Stack>
         )}
         <Stack spacing={2}>
-          <TextField
-            label="table_id"
-            value={tableId}
-            onChange={(e) => setTableId(e.target.value)}
-            disabled={!isCaptureOk || busy}
-            size="small"
-            autoFocus
-          />
-          <TextField
-            label="server (선택)"
-            value={server}
-            onChange={(e) => setServer(e.target.value)}
-            disabled={!isCaptureOk || busy}
-            size="small"
-          />
+          {/* 서버 먼저 선택 — 비워두면 pick-aboo 자동탐지 (find_working_server) */}
+          <FormControl size="small" disabled={!isCaptureOk || busy} fullWidth>
+            <InputLabel id="server-select-label">server</InputLabel>
+            <Select
+              labelId="server-select-label"
+              label="server"
+              value={server}
+              onChange={(e) => setServer(e.target.value)}
+            >
+              <MenuItem value="">
+                <em>(자동탐지)</em>
+              </MenuItem>
+              {SERVER_OPTIONS.filter((s) => s).map((s) => (
+                <MenuItem key={s} value={s}>{s}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* 테이블은 pick-aboo /tables/discover로 동적 조회. 직접 입력 불가. */}
+          <Stack direction="row" spacing={1} alignItems="center">
+            <FormControl
+              size="small"
+              disabled={!isCaptureOk || busy || tablesLoading || tables.length === 0}
+              fullWidth
+            >
+              <InputLabel id="table-select-label">table_id</InputLabel>
+              <Select
+                labelId="table-select-label"
+                label="table_id"
+                value={tableId}
+                onChange={(e) => setTableId(e.target.value)}
+                renderValue={(val) => {
+                  const t = tables.find((x) => (x.table_id || x.id) === val);
+                  if (!t) return val;
+                  const name = t.name || t.title || t.description;
+                  return name ? `${val} — ${name}` : val;
+                }}
+              >
+                {tables.map((t) => {
+                  const id = t.table_id || t.id;
+                  const name = t.name || t.title || t.description;
+                  return (
+                    <MenuItem key={id} value={id}>
+                      {name ? `${id} — ${name}` : id}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </FormControl>
+            <IconButton
+              size="small"
+              onClick={refreshTables}
+              disabled={!isCaptureOk || busy || tablesLoading}
+              title="재조회"
+            >
+              {tablesLoading ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
+            </IconButton>
+          </Stack>
+          {tablesError && (
+            <Alert severity="error" sx={{ mt: 0 }}>{tablesError}</Alert>
+          )}
+          {isCaptureOk && !tablesLoading && !tablesError && tables.length === 0 && (
+            <Alert severity="info" sx={{ mt: 0 }}>
+              테이블 목록을 가져오려면 새로고침 버튼을 누르세요
+            </Alert>
+          )}
         </Stack>
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>

@@ -37,6 +37,14 @@ const autoService = {
     const resp = await apiCaller.get(ABOO_API.AUTO_STATUS, { game_id: gameId });
     return resp.data;
   },
+
+  async discoverTables(pragmaticId, refresh = false) {
+    const resp = await apiCaller.get(ABOO_API.DISCOVER_TABLES, {
+      pragmatic_id: pragmaticId,
+      refresh,
+    });
+    return resp.data; // { tables: [...], count, refresh_cooldown }
+  },
 };
 
 export default autoService;
