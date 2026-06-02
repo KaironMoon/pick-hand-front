@@ -152,44 +152,28 @@ export default function GhUserGamePage() {
 
   // 마지막 hit/miss 라운드부터 거꾸로 같은 결과가 몇 번 연속되었는지 카운트.
   // pickAt(i): i번째 라운드의 픽 (없으면 null), seq[i]와 비교해 hit/miss 판정.
-  const calcStreak = (pickAt) => {
-    let last = null, count = 0;
-    for (let i = results.length - 1; i >= 0; i--) {
-      const pick = pickAt(i);
-      if (!pick) continue;
-      const status = pick === results[i].value ? "hit" : "miss";
-      if (last === null) { last = status; count = 1; }
-      else if (status === last) { count++; }
-      else break;
-    }
-    return last ? { type: last, count } : null;
+  // 연승/연패 streak은 서버가 계산한 picks_snapshot.stats[key]를 그대로 사용 (프론트 자체 계산 제거).
+  // 서버 _calc_pick_stats가 round_picks vs seq로 cur_streak_type/cur_streak_count 산출 → {type, count}로 변환.
+  const streakOf = (key) => {
+    const s = picksSnapshot?.stats?.[key];
+    if (!s || !s.cur_streak_type || !s.cur_streak_count) return null;
+    return { type: s.cur_streak_type, count: s.cur_streak_count };
   };
-  const streakA = (() => {
-    let last = null, count = 0;
-    for (let i = results.length - 1; i >= 0; i--) {
-      const st = results[i].status;
-      if (st !== "hit" && st !== "miss") continue;
-      if (last === null) { last = st; count = 1; }
-      else if (st === last) { count++; }
-      else break;
-    }
-    return last ? { type: last, count } : null;
-  })();
-  const streakD = calcStreak((i) => roundDsList[i]?.decal_pick || null);
-  const streakG = calcStreak((i) => roundDsList[i]?.shadow_pick || null);
-  const streakTN = calcStreak((i) => roundLscList[i] || null);
-  const streakTWO = calcStreak((i) => roundTwoList[i] || null);
-  // ONE armed streak (picksSnapshot.round_picks.ONE 사용 — 백엔드 _calc_round_one_two_picks 결과)
-  const streakONE = calcStreak((i) => picksSnapshot?.round_picks?.ONE?.[i] || null);
+  const streakA = streakOf("A");
+  const streakD = streakOf("D");
+  const streakG = streakOf("G");
+  const streakTN = streakOf("TN");
+  const streakTWO = streakOf("TWO");
+  const streakONE = streakOf("ONE");
+  const streakAR = streakOf("AR");
+  const streakJ = streakOf("J");
 
-  // 백엔드 picks_snapshot에서 AR, J, ONE 픽 정보 가져오기 (프론트 로직 제거됨)
+  // 백엔드 picks_snapshot에서 픽 정보 가져오기 (프론트 로직 제거됨)
   const arPick = picksSnapshot?.next_picks?.AR || null;
   const jPick = picksSnapshot?.next_picks?.J || null;
   const onePick = picksSnapshot?.next_picks?.ONE || null;
   const roundArList = picksSnapshot?.round_picks?.AR || [];
   const roundJList = picksSnapshot?.round_picks?.J || [];
-  const streakAR = calcStreak((i) => roundArList[i] || null);
-  const streakJ = calcStreak((i) => roundJList[i] || null);
 
   const checkGoalAlert = useCallback((summary) => {
     if (!summary) return;
@@ -268,11 +252,13 @@ export default function GhUserGamePage() {
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
       const seq = data.seq || "";
       const picks = data.round_picks || [];
+      const statuses = data.round_status || [];
       const pcMarks = data.round_pick_change || [];
       const dsMarks = data.round_decal_shadow || [];
       setResults(seq.split("").map((v, i) => {
         const pick = picks[i];
-        const status = pick ? (pick === v ? "hit" : "miss") : "wait";
+        // hit/miss 여부는 서버가 내려준 round_status를 그대로 사용 (프론트는 색상만 결정)
+        const status = statuses[i] || "wait";
         return { value: v, status, aPick: pick || null, pickChanged: !!pcMarks[i], decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
       }));
       setGlobalhitData(data.globalhit || []);
@@ -320,7 +306,7 @@ export default function GhUserGamePage() {
       }
     };
     tick();
-    const id = setInterval(tick, 1000);
+    const id = setInterval(tick, 5000);  // auto-status 폴링 1s → 5s로 완화 (호출량 감소 260603)
     return () => { cancelled = true; clearInterval(id); };
   }, [gameId, autoFeatureAvailable]);
 
@@ -343,13 +329,10 @@ export default function GhUserGamePage() {
     processingRef.current = true;
     setProcessing(true);
 
-    let status = "wait";
+    // hit/miss 여부는 서버가 판정해 내려준다(응답의 round_status_current). 입력 직후엔 미정(wait)으로 낙관적 추가 후 응답으로 확정.
     const normalPick = betData?.user_martin?.combined?.direction || betData?.combined?.direction;
     const effectivePick = pickChangePick || normalPick;
-    if (effectivePick && effectivePick !== "wait") {
-      status = effectivePick === inputValue ? "hit" : "miss";
-    }
-    setResults((prev) => [...prev, { value: inputValue, status, aPick: effectivePick && effectivePick !== "wait" ? effectivePick : null, pickChanged: !!pickChangePick, decalShadow: decalPick !== null || shadowPick !== null }]);
+    setResults((prev) => [...prev, { value: inputValue, status: "wait", aPick: effectivePick && effectivePick !== "wait" ? effectivePick : null, pickChanged: !!pickChangePick, decalShadow: decalPick !== null || shadowPick !== null }]);
     setBetData(null);
 
     try {
@@ -359,6 +342,10 @@ export default function GhUserGamePage() {
         alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
         window.location.reload();
         return;
+      }
+      // 방금 입력한 라운드의 hit/miss를 서버 판정값으로 확정 (프론트 자체 계산 안 함)
+      if (data.round_status_current) {
+        setResults((prev) => prev.map((r, i) => (i === prev.length - 1 ? { ...r, status: data.round_status_current } : r)));
       }
       setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0, labouchere: data.cum_pnl.labouchere || 0 });
       setGlobalhitData(data.globalhit || []);
@@ -637,36 +624,12 @@ export default function GhUserGamePage() {
         const SEC_TO_KEY = { "1": "ONE", "2": "TWO" };
         // SEC 라벨 색상: 승률(hit/total) 상위 1~3등 강조
         const ALL_SECS = ["A", "D", "G", "TN", "AR", "J", "1", "2"];
-        const secWinRates = ALL_SECS.map((sec) => {
-          const key = SEC_TO_KEY[sec] || sec;
-          const s = picksSnapshot?.stats?.[key];
-          const total = s?.total ?? 0;
-          const hit = s?.hit ?? 0;
-          return { sec, total, hit, rate: total > 0 ? hit / total : -1 };
-        });
-        const ranked = secWinRates
-          .filter((x) => x.total > 0)
-          .sort((a, b) => b.rate - a.rate);
+        // 순위(rank)는 서버가 stats[key].rank로 내려줌(로직). 색 매핑만 프론트 (260602)
+        const RANK_BG = { 1: "#00e676", 2: "#ff9800", 3: "#ffeb3b" };
         const secRankBg = (sec) => {
-          // D, G, TN: 3개 비교 1/2/3등
-          const DGTN_SECS = ["D", "G", "TN"];
-          if (DGTN_SECS.includes(sec)) {
-            const dgtnRanked = secWinRates
-              .filter((x) => DGTN_SECS.includes(x.sec) && x.total > 0)
-              .sort((a, b) => b.rate - a.rate);
-            const idx = dgtnRanked.findIndex((x) => x.sec === sec);
-            if (idx === 0) return "#00e676";
-            if (idx === 1) return "#ff9800";
-            if (idx === 2) return "#ffeb3b";
-          }
-          // A/AR: 두 개만 비교 — 높은 쪽 형광
-          if (sec === "A" || sec === "AR") {
-            const aRate = secWinRates.find((x) => x.sec === "A")?.rate ?? -1;
-            const arRate = secWinRates.find((x) => x.sec === "AR")?.rate ?? -1;
-            if (sec === "A" && aRate > arRate && aRate >= 0) return "#00e676";
-            if (sec === "AR" && arRate > aRate && arRate >= 0) return "#00e676";
-          }
-          return null;
+          const key = SEC_TO_KEY[sec] || sec;
+          const rank = picksSnapshot?.stats?.[key]?.rank;
+          return rank ? (RANK_BG[rank] || null) : null;
         };
         // sec → 칩 라벨 매핑 (이 sec를 가리는 칩)
         const SEC_TO_CHIP = { A: "A", D: "D", G: "G", TN: "TN", AR: "AR", J: "J", "1": "TWO", "2": "TWO" };
@@ -1024,20 +987,8 @@ export default function GhUserGamePage() {
                     <Typography variant="caption" sx={{ fontSize: 12, color: "#2196f3" }}>new</Typography>
                   </Box>
                   {(() => {
-                    // A/AR 연승·연패 비교 → 더 좋은 쪽 픽
-                    // hit > miss, 같은 type이면 hit는 큰 streak, miss는 작은 streak이 우위
-                    const pickBetter = () => {
-                      const aHit = streakA?.type === "hit";
-                      const arHit = streakAR?.type === "hit";
-                      if (streakA && !streakAR) return aPick;
-                      if (!streakA && streakAR) return arPick;
-                      if (!streakA && !streakAR) return aPick || arPick || null;
-                      if (aHit && !arHit) return aPick;
-                      if (!aHit && arHit) return arPick;
-                      if (aHit && arHit) return streakA.count >= streakAR.count ? aPick : arPick;
-                      return streakA.count <= streakAR.count ? aPick : arPick; // 둘 다 miss → 연패가 적은 쪽
-                    };
-                    const center = pickBetter() || "W";
+                    // A/AR 비교 추천픽은 서버가 계산(picks_snapshot.center_pick). 프론트는 표시만.
+                    const center = picksSnapshot?.center_pick || "W";
                     const centerColor = center === "P" ? "#1565c0" : center === "B" ? "#f44336" : "#fff";
                     return (
                       <Box sx={uniBtnSx("#67f431")}>
@@ -1155,25 +1106,12 @@ export default function GhUserGamePage() {
                 const s = getStat7(sec);
                 return { sec, total: s.total ?? 0, hit: s.hit ?? 0, rate: (s.total ?? 0) > 0 ? (s.hit ?? 0) / s.total : -1 };
               });
+              // 순위(rank)는 서버가 stats[key].rank로 내려줌(로직). 색 매핑만 프론트 (260602)
+              const RANK_BG_7 = { 1: "#00e676", 2: "#ff9800", 3: "#ffeb3b" };
               const bgFor7 = (sec) => {
-                // A/AR: 둘 중 1등(높은 쪽) 형광 그린
-                if (sec === "A" || sec === "AR") {
-                  const a = rates7.find((x) => x.sec === "A")?.rate ?? -1;
-                  const ar = rates7.find((x) => x.sec === "AR")?.rate ?? -1;
-                  if (sec === "A" && a > ar && a >= 0) return "#00e676";
-                  if (sec === "AR" && ar > a && ar >= 0) return "#00e676";
-                  return null;
-                }
-                // D/G/TN: 1등 초록 / 2등 주황 / 3등 노랑
-                const DGTN = ["D", "G", "TN"];
-                if (DGTN.includes(sec)) {
-                  const sorted = rates7.filter((x) => DGTN.includes(x.sec) && x.total > 0).sort((a, b) => b.rate - a.rate);
-                  const idx = sorted.findIndex((x) => x.sec === sec);
-                  if (idx === 0) return "#00e676";
-                  if (idx === 1) return "#ff9800";
-                  if (idx === 2) return "#ffeb3b";
-                }
-                return null;
+                const k = SEC_TO_KEY_NEW[sec] || sec;
+                const rank = picksSnapshot?.stats?.[k]?.rank;
+                return rank ? (RANK_BG_7[rank] || null) : null;
               };
               const cellBase7 = { border: "1px solid #444", padding: "1px 2px", textAlign: "center", fontSize: 11, color: "#fff", lineHeight: 1.3 };
               // 픽 카드와 동일한 flex 레이아웃(gap 0.5, flexShrink 0, width 52) → 컬럼 정렬
@@ -1282,13 +1220,10 @@ export default function GhUserGamePage() {
                       const metric = (key) => {
                         const t = ghTracks?.[key];
                         if (!t) return null;
-                        let h = 0, m = 0;
-                        for (const x of (t.round_data || [])) {
-                          if (x.status === "hit") h++;
-                          else if (x.status === "miss") m++;
-                        }
-                        if (h + m === 0) return null;
-                        return pointApplied ? (t.total_score ?? 0) : h / (h + m);
+                        const sm = t.summary || {};
+                        const tot = (sm.total_hit ?? 0) + (sm.total_miss ?? 0);
+                        if (tot === 0) return null;
+                        return pointApplied ? (t.total_score ?? 0) : (sm.rate ?? 0);
                       };
                       const trackRates = [
                         { key: "sc1", rate: metric("sc1") },
@@ -1310,30 +1245,11 @@ export default function GhUserGamePage() {
                       const scoresAt = row.scoresAt || [];
                       // 트랙 현재 연승/연패 + 총 승/패 산출
                       const sckey = row.label === "S1" ? "sc1" : row.label === "S2" ? "sc2" : "sc3";
-                      const rd = (ghTracks?.[sckey]?.round_data) || [];
-                      let trackStreak = null;
-                      let totalHit = 0;
-                      let totalMiss = 0;
-                      for (let i = rd.length - 1; i >= 0; i--) {
-                        const st = rd[i].status;
-                        if (st !== "hit" && st !== "miss") continue;
-                        if (!trackStreak) { trackStreak = { type: st, count: 1 }; }
-                        else if (trackStreak.type === st) { trackStreak.count++; }
-                        // streak는 다른 결과 만나면 break (총합은 계속 카운트)
-                      }
-                      for (const r of rd) {
-                        if (r.status === "hit") totalHit++;
-                        else if (r.status === "miss") totalMiss++;
-                      }
-                      // streak는 마지막부터 같은 결과 연속만 카운트해야 하므로 다시 산출
-                      trackStreak = null;
-                      for (let i = rd.length - 1; i >= 0; i--) {
-                        const st = rd[i].status;
-                        if (st !== "hit" && st !== "miss") continue;
-                        if (!trackStreak) { trackStreak = { type: st, count: 1 }; }
-                        else if (trackStreak.type === st) { trackStreak.count++; }
-                        else break;
-                      }
+                      // 트랙 통계는 서버 summary 사용 (프론트 루프 계산 제거 260602)
+                      const sm = ghTracks?.[sckey]?.summary || {};
+                      const totalHit = sm.total_hit ?? 0;
+                      const totalMiss = sm.total_miss ?? 0;
+                      const trackStreak = sm.cur_streak || null;
                       const streakColor = trackStreak ? (trackStreak.type === "hit" ? "#4caf50" : "#f44336") : null;
                       const streakText = trackStreak ? `${trackStreak.count}${trackStreak.type === "hit" ? "H" : "M"}` : "";
                       const hidden = !!trackStreakHidden[sckey];
@@ -1447,13 +1363,10 @@ export default function GhUserGamePage() {
                   }
                   return arr;
                 }
-                // 나머지: round_picks[key] vs results[i].value
-                const picks = picksSnapshot?.round_picks?.[key] || [];
-                return results.map((r, i) => {
-                  const pick = picks[i];
-                  if (!pick || pick === "wait") return null;
-                  return pick === r.value ? "hit" : "miss";
-                });
+                // 나머지 키: 서버 stats[key].series 사용 (프론트 hit/miss 재판정 제거 260602)
+                const SEC_TO_STATKEY = { "1": "ONE", "2": "TWO" };
+                const sk = SEC_TO_STATKEY[key] || key;
+                return picksSnapshot?.stats?.[sk]?.series || [];
               };
               const cumulativeFor = (key) => {
                 const series = seriesFor(key);
@@ -1603,7 +1516,8 @@ export default function GhUserGamePage() {
         const pnlText = (v) => { const s = v > 0 ? "+" : ""; return `${s}${v.toLocaleString()}P`; };
         const pnlColor = (v) => v > 0 ? "#4caf50" : v < 0 ? "#f44336" : "#fff";
 
-        const formalADir = sA?.direction || "wait";
+        // pick_change가 발동하면 마틴A 실제 베팅 방향은 pickChangePick으로 덮어써짐 (A 칩과 일치)
+        const formalADir = pickChangePick || sA?.direction || "wait";
         const formalZDir = sZ?.direction || "wait";
         const formalAColor = formalADir === "P" ? "#1565c0" : formalADir === "B" ? "#f44336" : "#888";
         const formalZColor = formalZDir === "P" ? "#1565c0" : formalZDir === "B" ? "#f44336" : "#888";
@@ -1770,11 +1684,14 @@ export default function GhUserGamePage() {
               const dashA = userMartinDashboard?.martin_a;
               const dashZ = userMartinDashboard?.martin_z;
               const martinTable = (label, um, labelColor, dash, isUnified) => {
-                const mDir = um?.direction || "wait";
+                // 마틴A는 pick_change 발동 시 실제 베팅 방향이 pickChangePick으로 덮어써짐 (A 칩과 일치). 마틴Z는 미적용.
+                const isMartinA = label === "마틴A";
+                const mDir = (isMartinA && pickChangePick) || um?.direction || "wait";
                 const mAmt = um?.amount || 0;
                 const mP = mDir === "P" ? mAmt : 0;
                 const mB = mDir === "B" ? mAmt : 0;
-                const fDir = mP > mB ? "P" : mB > mP ? "B" : "wait";
+                // 방향은 서버가 내려준 mDir 그대로 사용 (프론트 금액비교 제거)
+                const fDir = mDir;
                 const fColor = fDir === "P" ? "#1565c0" : fDir === "B" ? "#f44336" : "#888";
                 const mHasBet = mAmt > 0;
                 const mDimStyle = mHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
@@ -1860,7 +1777,8 @@ export default function GhUserGamePage() {
                 const mAmt = umZ?.amount || 0;
                 const mP = mDir === "P" ? mAmt : 0;
                 const mB = mDir === "B" ? mAmt : 0;
-                const fDir = mP > mB ? "P" : mB > mP ? "B" : "wait";
+                // 방향은 서버가 내려준 mDir 그대로 사용 (프론트 금액비교 제거)
+                const fDir = mDir;
                 const fColor = fDir === "P" ? "#1565c0" : fDir === "B" ? "#f44336" : "#888";
                 const mHasBet = mAmt > 0;
                 const mDimStyle = mHasBet ? {} : { filter: "grayscale(100%)", opacity: 0.7 };
