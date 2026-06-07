@@ -695,6 +695,63 @@ export default function UserSetupPage({ gameType }) {
         </Box>
       </Box>
 
+      {gameType === "gh" && (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2, p: 1, border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1 }}>
+          <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>오토 운영 옵션</Typography>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>목표액 (원)</Typography>
+            <input
+              type="number"
+              value={config.auto_goal_amount ?? 0}
+              onChange={(e) => {
+                const v = parseInt(e.target.value || "0", 10) || 0;
+                setConfig((prev) => ({ ...prev, auto_goal_amount: v }));
+                setDirty(true);
+              }}
+              style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
+              0이면 무제한. 누적 PnL이 이 값 이상이면 자동 종료.
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>종료 회차</Typography>
+            <input
+              type="number"
+              value={config.auto_end_round ?? 0}
+              onChange={(e) => {
+                const v = parseInt(e.target.value || "0", 10) || 0;
+                setConfig((prev) => ({ ...prev, auto_end_round: v }));
+                setDirty(true);
+              }}
+              style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
+              0이면 무제한. 베팅 시작 후 이 회차에 도달하면 종료.
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>단계 해소</Typography>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={!!config.auto_clear_stage}
+                onChange={(e) => {
+                  setConfig((prev) => ({ ...prev, auto_clear_stage: e.target.checked }));
+                  setDirty(true);
+                }}
+              />
+              <Typography variant="caption" sx={{ fontSize: 12, color: "#ddd" }}>
+                종료회차 도달 시 단계가 1단계 아니면 적중까지 연장
+              </Typography>
+            </label>
+          </Box>
+        </Box>
+      )}
+
       <Box sx={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "fit-content" }}>
           <tbody>

@@ -11,12 +11,14 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
@@ -31,6 +33,34 @@ import autoService from "@/services/auto-service";
 // 서버 옵션: gs1 ~ gs29 + (자동탐지) 빈값
 const SERVER_OPTIONS = ["", ...Array.from({ length: 29 }, (_, i) => `gs${i + 1}`)];
 
+// 테이블 limits에서 min bet 추출 (구조 변형 대응)
+const extractMinBet = (t) => {
+  const l = t?.limits || {};
+  return (
+    l.minBet ??
+    l.min_bet ??
+    l.player?.minBet ?? l.player?.min_bet ?? l.player?.min ??
+    l.banker?.minBet ?? l.banker?.min_bet ?? l.banker?.min ??
+    l.all?.minBet ?? l.all?.min_bet ?? l.all?.min ??
+    l.min ??
+    null
+  );
+};
+
+const extractMaxBet = (t) => {
+  const l = t?.limits || {};
+  return (
+    l.maxBet ??
+    l.max_bet ??
+    l.player?.maxBet ?? l.player?.max_bet ?? l.player?.max ??
+    l.all?.maxBet ?? l.all?.max_bet ?? l.all?.max ??
+    l.max ??
+    null
+  );
+};
+
+const MIN_BET_TARGET = 1000;
+
 const formatAge = (sec) => {
   if (sec == null) return "";
   if (sec < 60) return `${sec}초 전`;
@@ -38,7 +68,7 @@ const formatAge = (sec) => {
   return `${Math.floor(sec / 3600)}시간 전`;
 };
 
-const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId }) => {
+const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId, gameType = "gh" }) => {
   const [sessionInfo, setSessionInfo] = useState(null);
   const [tableId, setTableId] = useState("");
   const [server, setServer] = useState("");
@@ -50,6 +80,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId }) => {
   const [tables, setTables] = useState([]);
   const [tablesLoading, setTablesLoading] = useState(false);
   const [tablesError, setTablesError] = useState(null);
+  const [filterMin1000, setFilterMin1000] = useState(true);  // 기본: 최소 1000원만
 
   // 모달 열림 + 캡처 OK 시 테이블 목록 자동 로드
   useEffect(() => {
@@ -134,6 +165,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId }) => {
         pragmaticId,
         tableId: tableId.trim(),
         server: server.trim() || null,
+        gameType,
       });
       onStarted?.(resp);
       onClose?.();
@@ -203,53 +235,86 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId }) => {
           </FormControl>
 
           {/* 테이블은 pick-aboo /tables/discover로 동적 조회. 직접 입력 불가. */}
-          <Stack direction="row" spacing={1} alignItems="center">
-            <FormControl
-              size="small"
-              disabled={!isCaptureOk || busy || tablesLoading || tables.length === 0}
-              fullWidth
-            >
-              <InputLabel id="table-select-label">table_id</InputLabel>
-              <Select
-                labelId="table-select-label"
-                label="table_id"
-                value={tableId}
-                onChange={(e) => setTableId(e.target.value)}
-                renderValue={(val) => {
-                  const t = tables.find((x) => (x.table_id || x.id) === val);
-                  if (!t) return val;
-                  const name = t.name || t.title || t.description;
-                  return name ? `${val} — ${name}` : val;
-                }}
-              >
-                {tables.map((t) => {
-                  const id = t.table_id || t.id;
-                  const name = t.name || t.title || t.description;
-                  return (
-                    <MenuItem key={id} value={id}>
-                      {name ? `${id} — ${name}` : id}
-                    </MenuItem>
-                  );
-                })}
-              </Select>
-            </FormControl>
-            <IconButton
-              size="small"
-              onClick={refreshTables}
-              disabled={!isCaptureOk || busy || tablesLoading}
-              title="재조회"
-            >
-              {tablesLoading ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
-            </IconButton>
-          </Stack>
-          {tablesError && (
-            <Alert severity="error" sx={{ mt: 0 }}>{tablesError}</Alert>
-          )}
-          {isCaptureOk && !tablesLoading && !tablesError && tables.length === 0 && (
-            <Alert severity="info" sx={{ mt: 0 }}>
-              테이블 목록을 가져오려면 새로고침 버튼을 누르세요
-            </Alert>
-          )}
+          {(() => {
+            const visibleTables = filterMin1000
+              ? tables.filter((t) => extractMinBet(t) === MIN_BET_TARGET)
+              : tables;
+            return (
+              <>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <FormControl
+                    size="small"
+                    disabled={!isCaptureOk || busy || tablesLoading || visibleTables.length === 0}
+                    fullWidth
+                  >
+                    <InputLabel id="table-select-label">table_id</InputLabel>
+                    <Select
+                      labelId="table-select-label"
+                      label="table_id"
+                      value={tableId}
+                      onChange={(e) => setTableId(e.target.value)}
+                      renderValue={(val) => {
+                        const t = visibleTables.find((x) => (x.table_id || x.id) === val);
+                        if (!t) return val;
+                        const name = t.name || t.title || t.description;
+                        const min = extractMinBet(t);
+                        const max = extractMaxBet(t);
+                        const limitsStr = min != null ? ` [${min}${max != null ? `-${max}` : ""}]` : "";
+                        return name ? `${val} — ${name}${limitsStr}` : `${val}${limitsStr}`;
+                      }}
+                    >
+                      {visibleTables.map((t) => {
+                        const id = t.table_id || t.id;
+                        const name = t.name || t.title || t.description;
+                        const min = extractMinBet(t);
+                        const max = extractMaxBet(t);
+                        const limitsStr =
+                          min != null ? ` [${min}${max != null ? `-${max}` : ""}]` : " [limits ?]";
+                        return (
+                          <MenuItem key={id} value={id}>
+                            {name ? `${id} — ${name}${limitsStr}` : `${id}${limitsStr}`}
+                          </MenuItem>
+                        );
+                      })}
+                    </Select>
+                  </FormControl>
+                  <IconButton
+                    size="small"
+                    onClick={refreshTables}
+                    disabled={!isCaptureOk || busy || tablesLoading}
+                    title="재조회"
+                  >
+                    {tablesLoading ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
+                  </IconButton>
+                </Stack>
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={filterMin1000}
+                      onChange={(e) => setFilterMin1000(e.target.checked)}
+                    />
+                  }
+                  label={`최소 베팅 ${MIN_BET_TARGET} 만 보기 (전체 ${tables.length}개 중 ${visibleTables.length}개)`}
+                />
+
+                {tablesError && (
+                  <Alert severity="error" sx={{ mt: 0 }}>{tablesError}</Alert>
+                )}
+                {isCaptureOk && !tablesLoading && !tablesError && tables.length === 0 && (
+                  <Alert severity="info" sx={{ mt: 0 }}>
+                    테이블 목록을 가져오려면 새로고침 버튼을 누르세요
+                  </Alert>
+                )}
+                {isCaptureOk && !tablesLoading && filterMin1000 && tables.length > 0 && visibleTables.length === 0 && (
+                  <Alert severity="warning" sx={{ mt: 0 }}>
+                    최소 베팅 {MIN_BET_TARGET}원짜리 테이블이 없습니다. 필터를 끄고 전체 보기.
+                  </Alert>
+                )}
+              </>
+            );
+          })()}
         </Stack>
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>

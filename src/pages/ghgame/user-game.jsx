@@ -102,6 +102,8 @@ export default function GhUserGamePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const [results, setResults] = useState([]);
+  // 빅로드 hit 기준: false=A픽, true=AAR(A/AR 합성=마틴Z) 기준
+  const [bigRoadAar, setBigRoadAar] = useState(false);
   const [globalhitData, setGlobalhitData] = useState([]);
   const [topGhSections, setTopGhSections] = useState([]);
   const [topNextRound, setTopNextRound] = useState(null);
@@ -148,7 +150,11 @@ export default function GhUserGamePage() {
   const [myPragmaticId, setMyPragmaticId] = useState(null);
 
   const currentTurn = results.length + 1;
-  const grid = calculateCircleGrid(results);
+  // 빅로드 기준 토글: AAR이면 status를 statusAr로 치환해 격자 색상 결정
+  const gridResults = bigRoadAar
+    ? results.map((r) => ({ ...r, status: r.statusAr || "wait" }))
+    : results;
+  const grid = calculateCircleGrid(gridResults);
 
   // 마지막 hit/miss 라운드부터 거꾸로 같은 결과가 몇 번 연속되었는지 카운트.
   // pickAt(i): i번째 라운드의 픽 (없으면 null), seq[i]와 비교해 hit/miss 판정.
@@ -253,13 +259,15 @@ export default function GhUserGamePage() {
       const seq = data.seq || "";
       const picks = data.round_picks || [];
       const statuses = data.round_status || [];
+      const statusesAr = data.round_status_ar || [];
       const pcMarks = data.round_pick_change || [];
       const dsMarks = data.round_decal_shadow || [];
       setResults(seq.split("").map((v, i) => {
         const pick = picks[i];
         // hit/miss 여부는 서버가 내려준 round_status를 그대로 사용 (프론트는 색상만 결정)
         const status = statuses[i] || "wait";
-        return { value: v, status, aPick: pick || null, pickChanged: !!pcMarks[i], decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
+        const statusAr = statusesAr[i] || "wait";
+        return { value: v, status, statusAr, aPick: pick || null, pickChanged: !!pcMarks[i], decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
       }));
       setGlobalhitData(data.globalhit || []);
       setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
@@ -290,14 +298,22 @@ export default function GhUserGamePage() {
       try {
         const st = await autoService.getAutoStatus(gameId);
         if (!cancelled) {
-          setAutoStatus({
+          setAutoStatus((prev) => ({
+            ...prev,
             running: !!st.running,
             autoSessionId: st.auto_session_id || null,
             lastEventAt: st.last_event_at,
             betsAttempted: st.bets_attempted,
             betsSucceeded: st.bets_succeeded,
             betsFailed: st.bets_failed,
-          });
+            phase: st.phase ?? prev.phase,
+            goal_amount: st.goal_amount ?? prev.goal_amount,
+            end_round: st.end_round ?? prev.end_round,
+            clear_stage: st.clear_stage ?? prev.clear_stage,
+            pnl_total: st.pnl_total ?? prev.pnl_total,
+            pnl_actual: st.pnl_actual ?? prev.pnl_actual,
+            round_count: st.round_count ?? prev.round_count,
+          }));
         }
       } catch (e) {
         if (e?.response?.status === 503) {
@@ -310,6 +326,121 @@ export default function GhUserGamePage() {
     return () => { cancelled = true; clearInterval(id); };
   }, [gameId, autoFeatureAvailable]);
 
+  // ── Auto WebSocket 구독 (실시간 이벤트 푸시) ───────────
+  useEffect(() => {
+    if (!autoFeatureAvailable) return undefined;
+    if (!autoStatus.running) return undefined;
+    const token = sessionStorage.getItem("pick_hand_token");
+    if (!token) return undefined;
+
+    const base = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+    // base가 http://x:9001 → ws://x:9001/ws/auto
+    const wsBase = base.replace(/^http/, "ws");
+    const wsUrl = `${wsBase}/ws/auto?token=${encodeURIComponent(token)}`;
+
+    let ws;
+    let pingTimer;
+    let cancelled = false;
+
+    const connect = () => {
+      if (cancelled) return;
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        // keepalive ping 30초마다
+        pingTimer = setInterval(() => {
+          try { ws.send("ping"); } catch (_) {}
+        }, 30000);
+      };
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data);
+          const t = msg.type;
+          const data = msg.data || {};
+          if (t === "round_committed") {
+            // 라운드 추가 → restoreGame 호출이 가장 안전 (전체 state 동기화)
+            if (data.game_id) restoreGame(data.game_id);
+            // autoStatus 동기화 — phase / round_count / pnl_total / pnl_actual
+            setAutoStatus((prev) => ({
+              ...prev,
+              phase: data.phase ?? prev.phase,
+              round_count: data.round_count ?? prev.round_count,
+              pnl_total: data.pnl_total ?? prev.pnl_total,
+              pnl_actual: data.pnl_actual ?? prev.pnl_actual,
+            }));
+          } else if (t === "phase_changed") {
+            setAutoStatus((prev) => ({
+              ...prev,
+              phase: data.phase,
+              pnl_total: data.pnl_total ?? prev.pnl_total,
+              pnl_actual: data.pnl_actual ?? prev.pnl_actual,
+              goal_amount: data.goal_amount ?? prev.goal_amount,
+              end_round: data.end_round ?? prev.end_round,
+              clear_stage: data.clear_stage ?? prev.clear_stage,
+              round_count: data.round_count ?? prev.round_count,
+            }));
+            if (data.game_id && data.game_id !== gameId) {
+              setGameId(data.game_id);
+              setSearchParams({ gameId: data.game_id }, { replace: true });
+            }
+            if (data.phase === "clearing") {
+              console.info("[Auto] 단계해소 모드 진입 — 적중까지 연장");
+            }
+          } else if (t === "game_switched") {
+            setGameId(data.new_game_id);
+            setSearchParams({ gameId: data.new_game_id }, { replace: true });
+            restoreGame(data.new_game_id);
+          } else if (t === "auto_restarted") {
+            // 새 슈에서 Auto 자동 재시작 — 새 session_id로 갱신, running 유지
+            setAutoStatus((prev) => ({
+              ...prev,
+              running: true,
+              autoSessionId: data.auto_session_id,
+              phase: "betting",
+              round_count: 0,
+              pnl_total: 0,
+              pnl_actual: 0,
+            }));
+            console.info(`[Auto] 재시작: new_session=${data.auto_session_id} game=${data.game_id}`);
+          } else if (t === "goal_reached") {
+            console.info(`[Auto] 목표 달성: 실 PnL ${data.final_pnl_actual} / 목표 ${data.goal_amount}`);
+          } else if (t === "session_ended") {
+            const reasonMap = {
+              goal_reached: "목표액 도달",
+              end_round_reached: "종료회차 도달",
+              stage_cleared: "단계해소 완료",
+              casino_shoe_ended: "카지노 슈 종료",
+            };
+            console.info(
+              `[Auto] 종료: ${reasonMap[data.reason] || data.reason} | 실 PnL=${data.final_pnl_actual} | 라운드=${data.round_count} | 새 게임=${data.new_game_id ?? '생성 실패'}`,
+            );
+            // running 유지 — 자동 재시작이 따라올 수 있음. 진짜 정지는 status poll(5s)이 잡거나 stop 버튼이 처리.
+          }
+          // bet_attempt 는 별도 UI 없으면 생략
+        } catch (e) {
+          // ignore
+        }
+      };
+      ws.onclose = () => {
+        clearInterval(pingTimer);
+        if (!cancelled && autoStatus.running) {
+          // 자동 재연결 5초
+          setTimeout(connect, 5000);
+        }
+      };
+      ws.onerror = () => {
+        try { ws.close(); } catch (_) {}
+      };
+    };
+    connect();
+
+    return () => {
+      cancelled = true;
+      clearInterval(pingTimer);
+      try { ws && ws.close(); } catch (_) {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFeatureAvailable, autoStatus.running]);
+
   const handleAutoToggle = async () => {
     if (!autoFeatureAvailable) return;
     if (autoStatus.running && autoStatus.autoSessionId) {
@@ -320,6 +451,17 @@ export default function GhUserGamePage() {
         console.warn("auto stop failed", e);
       }
     } else {
+      // 새 게임에서 시작하는 게 안전 — 진행 중인 게임이면 경고
+      const hasRounds = (results?.length || 0) > 0;
+      if (hasRounds) {
+        const ok = window.confirm(
+          "현재 게임에 이미 진행된 라운드가 있습니다.\n\n" +
+          "Auto는 새 게임에서 시작하는 것을 권장합니다.\n" +
+          "취소 후 [new] 버튼으로 새 게임을 만든 뒤 다시 시작하세요.\n\n" +
+          "그래도 현재 게임에서 진행하시겠습니까?"
+        );
+        if (!ok) return;
+      }
       setAutoDialogOpen(true);
     }
   };
@@ -332,7 +474,7 @@ export default function GhUserGamePage() {
     // hit/miss 여부는 서버가 판정해 내려준다(응답의 round_status_current). 입력 직후엔 미정(wait)으로 낙관적 추가 후 응답으로 확정.
     const normalPick = betData?.user_martin?.combined?.direction || betData?.combined?.direction;
     const effectivePick = pickChangePick || normalPick;
-    setResults((prev) => [...prev, { value: inputValue, status: "wait", aPick: effectivePick && effectivePick !== "wait" ? effectivePick : null, pickChanged: !!pickChangePick, decalShadow: decalPick !== null || shadowPick !== null }]);
+    setResults((prev) => [...prev, { value: inputValue, status: "wait", statusAr: "wait", aPick: effectivePick && effectivePick !== "wait" ? effectivePick : null, pickChanged: !!pickChangePick, decalShadow: decalPick !== null || shadowPick !== null }]);
     setBetData(null);
 
     try {
@@ -345,7 +487,9 @@ export default function GhUserGamePage() {
       }
       // 방금 입력한 라운드의 hit/miss를 서버 판정값으로 확정 (프론트 자체 계산 안 함)
       if (data.round_status_current) {
-        setResults((prev) => prev.map((r, i) => (i === prev.length - 1 ? { ...r, status: data.round_status_current } : r)));
+        setResults((prev) => prev.map((r, i) => (i === prev.length - 1
+          ? { ...r, status: data.round_status_current, statusAr: data.round_status_ar_current || r.statusAr }
+          : r)));
       }
       setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0, labouchere: data.cum_pnl.labouchere || 0 });
       setGlobalhitData(data.globalhit || []);
@@ -514,9 +658,18 @@ export default function GhUserGamePage() {
 
   return (
     <Box sx={{ p: isMobile ? 0.5 : 2 }}>
-      <Box sx={{ mb: 1, display: "flex", alignItems: "baseline", gap: 1 }}>
+      <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
         <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>글로벌히트</span>
         {gameId && <span style={{ fontSize: 11, color: "#888" }}>#{gameId}</span>}
+        <label style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 8, cursor: "pointer", fontSize: 11, color: "#bbb", userSelect: "none" }}>
+          <input
+            type="checkbox"
+            checked={bigRoadAar}
+            onChange={(e) => setBigRoadAar(e.target.checked)}
+            style={{ cursor: "pointer" }}
+          />
+          빅로드 AAR 기준
+        </label>
       </Box>
       {/* ===== 상단: 6x40 빅로드 격자 ===== */}
       <Box
@@ -1043,9 +1196,47 @@ export default function GhUserGamePage() {
                       </Typography>
                     </Box>
                   )}
-                  <Box sx={{ ...fieldSx, width: 128, minWidth: 128, justifyContent: "flex-start", height: 32, border: "2px solid #7f7f7f", whiteSpace: "nowrap", overflow: "hidden" }}>
-                    <Typography variant="caption" sx={{ fontSize: 11, color: "#fff", whiteSpace: "nowrap" }}>HP:&nbsp;&nbsp;220000 P</Typography>
-                  </Box>
+                  {autoFeatureAvailable ? (() => {
+                    const phaseAbbr = {
+                      monitoring: "MON",
+                      betting: "BET",
+                      clearing: "CLR",
+                      completed: "DONE",
+                      error: "ERR",
+                      stopped: "STOP",
+                    };
+                    const abbr = phaseAbbr[autoStatus.phase] || "—";
+                    const pa = autoStatus.pnl_actual ?? 0;
+                    return (
+                      <Box sx={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5,
+                        width: 128, minWidth: 128, px: 1, height: 32, borderRadius: 1,
+                        border: autoStatus.running ? "2px solid #66bb6a" : "2px solid #7f7f7f",
+                        backgroundColor: autoStatus.running ? "rgba(102,187,106,0.1)" : "transparent",
+                        opacity: autoStatus.running ? 1 : 0.75,
+                        whiteSpace: "nowrap", overflow: "hidden",
+                      }}>
+                        <Typography variant="caption" sx={{ fontSize: 11, color: autoStatus.running ? "#66bb6a" : "#888", fontWeight: "bold" }}>
+                          {abbr}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: 11,
+                            color: pa > 0 ? "#66bb6a" : pa < 0 ? "#ef5350" : "#ccc",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {pa.toLocaleString()}
+                          {autoStatus.goal_amount ? `/${Number(autoStatus.goal_amount).toLocaleString()}` : ""}
+                        </Typography>
+                      </Box>
+                    );
+                  })() : (
+                    <Box sx={{ ...fieldSx, width: 128, minWidth: 128, justifyContent: "flex-start", height: 32, border: "2px solid #7f7f7f", whiteSpace: "nowrap", overflow: "hidden" }}>
+                      <Typography variant="caption" sx={{ fontSize: 11, color: "#fff", whiteSpace: "nowrap" }}>HP:&nbsp;&nbsp;220000 P</Typography>
+                    </Box>
+                  )}
                 </Box>
               </Box>
             );
@@ -2048,6 +2239,7 @@ export default function GhUserGamePage() {
         onStarted={(resp) => setAutoStatus({ running: true, autoSessionId: resp.auto_session_id })}
         gameId={gameId}
         pragmaticId={myPragmaticId}
+        gameType="gh"
       />
     </Box>
   );
