@@ -21,6 +21,10 @@ import {
   Switch,
   FormControlLabel,
   Chip,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -36,12 +40,12 @@ function UsersPage() {
   const [loading, setLoading] = useState(true);
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ username: "", password: "", nickname: "" });
+  const [addForm, setAddForm] = useState({ username: "", password: "", nickname: "", role: "user" });
   const [addError, setAddError] = useState("");
 
   const [editOpen, setEditOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
-  const [editForm, setEditForm] = useState({ nickname: "", password: "", is_active: true });
+  const [editForm, setEditForm] = useState({ nickname: "", password: "", is_active: true, role: "user" });
   const [editError, setEditError] = useState("");
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -82,7 +86,7 @@ function UsersPage() {
     try {
       await apiCaller.post(USERS_API.BASE, addForm);
       setAddOpen(false);
-      setAddForm({ username: "", password: "", nickname: "" });
+      setAddForm({ username: "", password: "", nickname: "", role: "user" });
       fetchUsers();
     } catch (err) {
       setAddError(err.response?.data?.detail || "사용자 추가에 실패했습니다.");
@@ -91,14 +95,14 @@ function UsersPage() {
 
   const handleEditOpen = (user) => {
     setEditUser(user);
-    setEditForm({ nickname: user.nickname || "", password: "", is_active: user.is_active });
+    setEditForm({ nickname: user.nickname || "", password: "", is_active: user.is_active, role: user.role || "user" });
     setEditError("");
     setEditOpen(true);
   };
 
   const handleEditSubmit = async () => {
     setEditError("");
-    const payload = { nickname: editForm.nickname, is_active: editForm.is_active };
+    const payload = { nickname: editForm.nickname, is_active: editForm.is_active, role: editForm.role };
     if (editForm.password.trim()) {
       payload.password = editForm.password;
     }
@@ -162,7 +166,7 @@ function UsersPage() {
           variant="contained"
           startIcon={<PersonAddIcon />}
           onClick={() => {
-            setAddForm({ username: "", password: "", nickname: "" });
+            setAddForm({ username: "", password: "", nickname: "", role: "user" });
             setAddError("");
             setAddOpen(true);
           }}
@@ -273,6 +277,18 @@ function UsersPage() {
             onChange={(e) => setAddForm((f) => ({ ...f, nickname: e.target.value }))}
             margin="dense" sx={dialogFieldSx}
           />
+          <FormControl fullWidth margin="dense" sx={dialogFieldSx}>
+            <InputLabel id="add-role-label">권한</InputLabel>
+            <Select
+              labelId="add-role-label"
+              label="권한"
+              value={addForm.role}
+              onChange={(e) => setAddForm((f) => ({ ...f, role: e.target.value }))}
+            >
+              <MenuItem value="user">user (일반)</MenuItem>
+              <MenuItem value="admin">admin (관리자)</MenuItem>
+            </Select>
+          </FormControl>
           {addError && (
             <Typography variant="body2" sx={{ color: "#f44336", mt: 1 }}>{addError}</Typography>
           )}
@@ -298,6 +314,18 @@ function UsersPage() {
             onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
             margin="dense" sx={dialogFieldSx}
           />
+          <FormControl fullWidth margin="dense" sx={dialogFieldSx}>
+            <InputLabel id="edit-role-label">권한</InputLabel>
+            <Select
+              labelId="edit-role-label"
+              label="권한"
+              value={editForm.role}
+              onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}
+            >
+              <MenuItem value="user">user (일반)</MenuItem>
+              <MenuItem value="admin">admin (관리자)</MenuItem>
+            </Select>
+          </FormControl>
           <FormControlLabel
             control={
               <Switch checked={editForm.is_active}
