@@ -147,7 +147,7 @@ export default function GhUserGamePage() {
   const [autoFeatureAvailable, setAutoFeatureAvailable] = useState(true);
   const [autoDialogOpen, setAutoDialogOpen] = useState(false);
   const [autoStatus, setAutoStatus] = useState({ running: false, autoSessionId: null });
-  const [myPragmaticId, setMyPragmaticId] = useState(null);
+  const [myPickhandId, setMyPickhandId] = useState(null);
 
   const currentTurn = results.length + 1;
   // 빅로드 기준 토글: AAR이면 status를 statusAr로 치환해 격자 색상 결정
@@ -284,10 +284,10 @@ export default function GhUserGamePage() {
   };
 
   // ─── Auto 모드 (pick-aboo 통합) — t9game/index.jsx 패턴 동일 ───
-  // pragmatic_id: userAtom에서 직접. fallback으로 username 사용
-  // (auth-store.js가 로그인 시 username을 pragmatic_id로 자동 등록한다는 가정)
+  // pickhand_id: userAtom에서 직접. fallback으로 username 사용
+  // (auth-store.js가 로그인 시 username을 pickhand_id로 자동 등록한다는 가정)
   useEffect(() => {
-    setMyPragmaticId(user?.pragmatic_id || user?.username || null);
+    setMyPickhandId(user?.pickhand_id || user?.username || null);
   }, [user]);
 
   // Auto 상태 폴링 (1초)
@@ -2238,7 +2238,7 @@ export default function GhUserGamePage() {
         onClose={() => setAutoDialogOpen(false)}
         onStarted={(resp) => setAutoStatus({ running: true, autoSessionId: resp.auto_session_id })}
         gameId={gameId}
-        pragmaticId={myPragmaticId}
+        pickhandId={myPickhandId}
         gameType="gh"
       />
     </Box>

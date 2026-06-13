@@ -177,7 +177,7 @@ export default function GamePage() {
   // Auto 모드 — mvp-aboo-integration.md §5.1
   const [autoDialogOpen, setAutoDialogOpen] = useState(false);
   const [autoStatus, setAutoStatus] = useState({ running: false, autoSessionId: null });
-  const [myPragmaticId, setMyPragmaticId] = useState(null);
+  const [myPickhandId, setMyPickhandId] = useState(null);
   const [autoFeatureAvailable, setAutoFeatureAvailable] = useState(true);
 
   const currentTurn = results.length + 1;
@@ -368,13 +368,13 @@ export default function GamePage() {
   }, [results, gameId]);
 
   // ─── Auto 모드 (pick-aboo 통합) ───
-  // 프로필 로드 — pragmatic_id 확인
+  // 프로필 로드 — pickhand_id 확인
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const me = await apiCaller.get("/api/v1/auth/me");
-        if (!cancelled) setMyPragmaticId(me?.data?.user?.pragmatic_id || null);
+        if (!cancelled) setMyPickhandId(me?.data?.user?.pickhand_id || null);
       } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
@@ -1316,7 +1316,7 @@ export default function GamePage() {
         onClose={() => setAutoDialogOpen(false)}
         onStarted={(resp) => setAutoStatus({ running: true, autoSessionId: resp.auto_session_id })}
         gameId={gameId}
-        pragmaticId={myPragmaticId}
+        pickhandId={myPickhandId}
       />
     </Box>
   );

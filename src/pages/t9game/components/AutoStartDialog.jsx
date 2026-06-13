@@ -68,7 +68,7 @@ const formatAge = (sec) => {
   return `${Math.floor(sec / 3600)}시간 전`;
 };
 
-const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId, gameType = "gh" }) => {
+const AutoStartDialog = ({ open, onClose, onStarted, gameId, pickhandId, gameType = "gh" }) => {
   const [sessionInfo, setSessionInfo] = useState(null);
   const [tableId, setTableId] = useState("");
   const [server, setServer] = useState("");
@@ -84,14 +84,14 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId, gameTy
 
   // 모달 열림 + 캡처 OK 시 테이블 목록 자동 로드
   useEffect(() => {
-    if (!open || !pragmaticId) return undefined;
+    if (!open || !pickhandId) return undefined;
     if (!sessionInfo || sessionInfo.status !== "fresh") return undefined;
     let cancelled = false;
     (async () => {
       setTablesLoading(true);
       setTablesError(null);
       try {
-        const res = await autoService.discoverTables(pragmaticId);
+        const res = await autoService.discoverTables(pickhandId);
         if (cancelled) return;
         const list = Array.isArray(res?.tables) ? res.tables : [];
         setTables(list);
@@ -109,14 +109,14 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId, gameTy
       }
     })();
     return () => { cancelled = true; };
-  }, [open, pragmaticId, sessionInfo]);
+  }, [open, pickhandId, sessionInfo]);
 
   const refreshTables = async () => {
-    if (!pragmaticId) return;
+    if (!pickhandId) return;
     setTablesLoading(true);
     setTablesError(null);
     try {
-      const res = await autoService.discoverTables(pragmaticId, true);
+      const res = await autoService.discoverTables(pickhandId, true);
       setTables(Array.isArray(res?.tables) ? res.tables : []);
     } catch (e) {
       const detail = e?.response?.data?.detail;
@@ -134,15 +134,15 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId, gameTy
       setBusy(false);
       return;
     }
-    if (!pragmaticId) {
-      setError("프로필에서 pragmatic_id를 먼저 등록하세요");
+    if (!pickhandId) {
+      setError("프로필에서 pickhand_id를 먼저 등록하세요");
       setSessionInfo(null);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const info = await autoService.getSessionStatus(pragmaticId);
+        const info = await autoService.getSessionStatus(pickhandId);
         if (!cancelled) setSessionInfo(info);
       } catch (e) {
         if (cancelled) return;
@@ -154,7 +154,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId, gameTy
       }
     })();
     return () => { cancelled = true; };
-  }, [open, pragmaticId]);
+  }, [open, pickhandId]);
 
   const handleStart = async () => {
     setError(null);
@@ -162,7 +162,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId, gameTy
     try {
       const resp = await autoService.startAuto({
         gameId,
-        pragmaticId,
+        pickhandId,
         tableId: tableId.trim(),
         server: server.trim() || null,
         gameType,
@@ -186,7 +186,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId, gameTy
   };
 
   const isCaptureOk = sessionInfo?.captured && sessionInfo?.status === "fresh";
-  const canStart = !!pragmaticId && isCaptureOk && tableId.trim().length > 0 && !busy;
+  const canStart = !!pickhandId && isCaptureOk && tableId.trim().length > 0 && !busy;
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
@@ -197,9 +197,9 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pragmaticId, gameTy
             자동 베팅 기능이 비활성화되어 있습니다 (운영자 문의)
           </Alert>
         )}
-        {!featureDisabled && !pragmaticId && (
+        {!featureDisabled && !pickhandId && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            프로필에서 pragmatic_id를 등록한 뒤 다시 시도하세요
+            프로필에서 pickhand_id를 등록한 뒤 다시 시도하세요
           </Alert>
         )}
         {!featureDisabled && sessionInfo && (

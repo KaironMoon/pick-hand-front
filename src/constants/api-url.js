@@ -148,7 +148,7 @@ const APP_SETTINGS_API = {
 const ABOO_API = {
   SESSION_STATUS: "/api/v1/auth/session-status",
   SESSION_CAPTURE: "/api/v1/auth/session-capture",
-  PRAGMATIC_ID: "/api/v1/users/profile/pragmatic-id",
+  PICKHAND_ID: "/api/v1/users/profile/pickhand-id",
   AUTO_START: "/api/v1/games/auto/start",
   AUTO_STOP: "/api/v1/games/auto/stop",
   AUTO_STATUS: "/api/v1/games/auto/status",
