@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress, Chip, Tooltip } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress, Chip, Tooltip, Snackbar, Alert } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
@@ -147,6 +147,7 @@ export default function GhUserGamePage() {
   const [autoFeatureAvailable, setAutoFeatureAvailable] = useState(true);
   const [autoDialogOpen, setAutoDialogOpen] = useState(false);
   const [autoStatus, setAutoStatus] = useState({ running: false, autoSessionId: null });
+  const [rejectMsg, setRejectMsg] = useState(null);  // 베팅 거부 레이어 팝업
   const [myPickhandId, setMyPickhandId] = useState(null);
 
   const currentTurn = results.length + 1;
@@ -313,6 +314,7 @@ export default function GhUserGamePage() {
             pnl_total: st.pnl_total ?? prev.pnl_total,
             pnl_actual: st.pnl_actual ?? prev.pnl_actual,
             round_count: st.round_count ?? prev.round_count,
+            table_name: st.table_name ?? prev.table_name,
           }));
         }
       } catch (e) {
@@ -414,6 +416,9 @@ export default function GhUserGamePage() {
               `[Auto] 종료: ${reasonMap[data.reason] || data.reason} | 실 PnL=${data.final_pnl_actual} | 라운드=${data.round_count} | 새 게임=${data.new_game_id ?? '생성 실패'}`,
             );
             // running 유지 — 자동 재시작이 따라올 수 있음. 진짜 정지는 status poll(5s)이 잡거나 stop 버튼이 처리.
+          } else if (t === "bet_rejected") {
+            // 카지노가 베팅을 받지 않음(미체결) → 실 PnL 보정됨. 레이어 팝업 안내.
+            setRejectMsg("베팅이 거부되었습니다 (카지노 미체결)");
           }
           // bet_attempt 는 별도 UI 없으면 생략
         } catch (e) {
@@ -670,6 +675,11 @@ export default function GhUserGamePage() {
           />
           빅로드 AAR 기준
         </label>
+        {autoStatus.running && autoStatus.table_name && (
+          <span style={{ fontSize: 11, color: "#66bb6a", fontWeight: "bold", marginLeft: 8 }}>
+            {autoStatus.table_name}
+          </span>
+        )}
       </Box>
       {/* ===== 상단: 6x40 빅로드 격자 ===== */}
       <Box
@@ -2241,6 +2251,18 @@ export default function GhUserGamePage() {
         pickhandId={myPickhandId}
         gameType="gh"
       />
+
+      {/* 베팅 거부 레이어 팝업 */}
+      <Snackbar
+        open={!!rejectMsg}
+        autoHideDuration={5000}
+        onClose={() => setRejectMsg(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert severity="warning" variant="filled" onClose={() => setRejectMsg(null)}>
+          {rejectMsg}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
