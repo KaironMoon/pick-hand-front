@@ -1336,6 +1336,9 @@ export default function GhUserGamePage() {
             ssrTracks={ssrTracks}
             sxTracks={sxTracks}
             pointApplied={!!picksSnapshot?.sq_tracks?.point_applied}
+            stats={picksSnapshot?.stats}
+            roundPicks={picksSnapshot?.round_picks}
+            nextPicks={picksSnapshot?.next_picks}
           />
           </>
         );

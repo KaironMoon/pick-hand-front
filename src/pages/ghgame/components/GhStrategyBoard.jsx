@@ -6,27 +6,28 @@ import { Box } from "@mui/material";
 
 const COLOR = {
   A: "#0066fe", AR: "#c0504d", SQ1: "#0063d6", SQ2: "#0063d6", SQ3: "#0063d6",
-  SR1: "#c0504d", SSR1: "#0063d6", SR2: "#c0504d", SSR2: "#0063d6", SR3: "#c0504d", SSR3: "#0063d6",
+  S1: "#0063d6", S2: "#0063d6", S3: "#0063d6",
+  SR1: "#c0504d", SR2: "#c0504d", SR3: "#c0504d",
   SX1: "#0063d6", SX2: "#0063d6", SX3: "#0063d6", D: "#c0504d", G: "#0063d6",
   허니비: "#c0504d", pattern: "#00a11a", "6MX": "#de6a08",
 };
 const colorOf = (n) => COLOR[n] || (n.endsWith("R") ? "#c0504d" : "#0063d6");
 
 const G1 = {
-  // A AR | SQ1 SR1 SSR | SQ2 SR2 SSR2 | SQ3 SR3 SSR3 | SX1 SX2 SX3 | D G
-  name: ["A", "AR", "SQ1", "SR1", "SSR1", "SQ2", "SR2", "SSR2", "SQ3", "SR3", "SSR3", "SX1", "SX2", "SX3", "D", "G"],
-  // 그룹 구분선: SQ1(2), SQ2(5), SQ3(8), SX1(11), D(14)
-  gstart: new Set([2, 5, 8, 11, 14]),
-  // R쌍 병합(stage/idx 셀): A(0)+AR / SQ1(2)+SR1 / SQ2(5)+SR2 / SQ3(8)+SR3
-  mergeAt: new Set([0, 2, 5, 8]),
-  // 노란 박스: A+AR / SQ1+SR1, SSR1 별도 / … / SX·D·G 개별
-  hlRanges: [[0, 1], [2, 3], [4, 4], [5, 6], [7, 7], [8, 9], [10, 10], [11, 11], [12, 12], [13, 13], [14, 14], [15, 15]],
-  // stage/idx1/idx2 = 픽 미산출(디자인 더미). 병합 자리(A·SQ1·SQ2·SQ3)에만 값,
-  // 옆칸(AR·SR·SSR)은 빈칸 → MergeRow가 colSpan=2로 SQ+SR 묶음 셀 표시.
-  //          A     AR  SQ1     SR1 SSR1 SQ2     SR2 SSR2 SQ3     SR3 SSR3 SX1   SX2   SX3   D   G
-  stage: ["1S-1", "", "1S-1", "", "", "1S-0", "", "", "1S-2", "", "", "1S", "1S", "1S", "", ""],
-  idx1: ["10000.5", "", "10000", "", "", "10007", "", "", "10007", "", "", "10007", "10008", "10009", "", ""],
-  idx2: ["10000", "", "10002", "", "", "10005", "", "", "10005", "", "", "10008", "10009", "10010", "", ""],
+  // A AR | SQ1 SQ2 SQ3 | S1 SR1 | S2 SR2 | S3 SR3 | SX1 SX2 SX3 | D G
+  // S1/S2/S3 = SQ1/SQ2/SQ3와 같은 값(라벨만 다름). S+SR이 한 묶음(병합).
+  name: ["A", "AR", "SQ1", "SQ2", "SQ3", "S1", "SR1", "S2", "SR2", "S3", "SR3", "SX1", "SX2", "SX3", "D", "G"],
+  // 그룹 구분선: SQ1(2), S1(5), SX1(11), D(14)
+  gstart: new Set([2, 5, 11, 14]),
+  // R쌍 병합(stage/idx 셀): A(0)+AR / S1(5)+SR1 / S2(7)+SR2 / S3(9)+SR3
+  mergeAt: new Set([0, 5, 7, 9]),
+  // 노란 박스: A+AR / SQ1·SQ2·SQ3 개별 / S1+SR1 / S2+SR2 / S3+SR3 / SX·D·G 개별
+  hlRanges: [[0, 1], [2, 2], [3, 3], [4, 4], [5, 6], [7, 8], [9, 10], [11, 11], [12, 12], [13, 13], [14, 14], [15, 15]],
+  // stage/idx1/idx2 = 픽 미산출(디자인 더미). 병합 자리(A·S1·S2·S3)에만 값, 옆칸은 빈칸.
+  //          A     AR  SQ1     SQ2     SQ3     S1      SR1 S2      SR2 S3      SR3 SX1   SX2   SX3   D   G
+  stage: ["1S-1", "", "1S-1", "1S-1", "1S-1", "1S-0", "", "1S-0", "", "1S-2", "", "1S", "1S", "1S", "", ""],
+  idx1: ["10000.5", "", "10000", "10001", "10002", "10007", "", "10007", "", "10007", "", "10007", "10008", "10009", "", ""],
+  idx2: ["10000", "", "10002", "10003", "10004", "10005", "", "10005", "", "10005", "", "10008", "10009", "10010", "", ""],
 };
 const G2 = {
   name: ["TN", "ONE", "TWO", "P", "B", "J", "6MX", "허니비", "허니R", "W111", "위너R", "M22", "메가R", "D122", "드림R", "pattern"],
@@ -213,13 +214,14 @@ const fromTrack = (tracks, scKey, amounts) => {
 // G1/G2 이름 → 실데이터 행. 매핑 없으면 null(디자인값 유지 안 하고 빈칸 처리).
 function buildRowData(name, ctx) {
   const { stats, nextPicks, sqTracks, srTracks, ssrTracks, sxTracks, betAmounts } = ctx;
-  // stats 직접 매핑되는 섹션
-  const STAT_KEYS = { A: "A", AR: "AR", D: "D", G: "G", TN: "TN", ONE: "ONE", TWO: "TWO" };
+  // stats 직접 매핑되는 섹션 (P/B 포함 — 서버가 60% 비율 기준으로 round/next 픽 산출)
+  const STAT_KEYS = { A: "A", AR: "AR", AAR: "AAR", D: "D", G: "G", TN: "TN", ONE: "ONE", TWO: "TWO", J: "J", P: "P", B: "B" };
   if (STAT_KEYS[name]) return fromStats(stats, nextPicks, STAT_KEYS[name], betAmounts);
-  const M = name.match(/^(SQ|SR|SSR|SX)([123])$/);
+  // SSR/SR을 S보다 먼저 매칭(S1이 SR1보다 앞서지 않게). S1/S2/S3 = SQ(sc#)와 동일.
+  const M = name.match(/^(SQ|SSR|SR|SX|S)([123])$/);
   if (M) {
     const sc = `sc${M[2]}`;
-    const tracks = { SQ: sqTracks, SR: srTracks, SSR: ssrTracks, SX: sxTracks }[M[1]];
+    const tracks = { SQ: sqTracks, S: sqTracks, SR: srTracks, SSR: ssrTracks, SX: sxTracks }[M[1]];
     return fromTrack(tracks, sc, betAmounts);
   }
   return null;
@@ -242,6 +244,9 @@ function withLiveData(base, ctx) {
     if (!isPair || base.mergeAt.has(i)) arr[i] = val;
     else arr[i] = ""; // 병합 옆칸 → 비움
   };
+  // 병합 셀(단계/배팅액/PnL)은 합성 전략 값으로 표시:
+  //   A+AR 칸 → AAR / S1+SR1 → SSR1 / S2+SR2 → SSR2 / S3+SR3 → SSR3
+  const MERGE_SOURCE = { A: "AAR", S1: "SSR1", S2: "SSR2", S3: "SSR3" };
   base.name.forEach((nm, i) => {
     const rd = buildRowData(nm, ctx);
     if (!rd) { // 데이터 없는 행: 비병합 행만 비우고 stage/idx(병합 더미)는 유지
@@ -249,9 +254,12 @@ function withLiveData(base, ctx) {
       return;
     }
     wait[i] = rd.wait; pick[i] = rd.pick; pct[i] = rd.pct; rec[i] = rd.rec; rec2[i] = rd.rec2;
-    setMerged(stage, i, rd.stage);
-    setMerged(idx1, i, rd.idx1);
-    setMerged(idx2, i, rd.idx2);
+    // 병합 시작칸이면 stage/idx는 합성 전략(AAR/SSR#) 값으로
+    const src = MERGE_SOURCE[nm];
+    const md = (src && buildRowData(src, ctx)) || rd;
+    setMerged(stage, i, md.stage);
+    setMerged(idx1, i, md.idx1);
+    setMerged(idx2, i, md.idx2);
   });
   return { ...base, wait, pick, stage, idx1, pct, idx2, rec, rec2 };
 }

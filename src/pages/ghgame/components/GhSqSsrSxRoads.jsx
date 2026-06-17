@@ -9,6 +9,8 @@ const COLOR = {
   SQ1: "#0063d6", SQ2: "#0063d6", SQ3: "#0063d6",
   SSR1: "#0063d6", SSR2: "#0063d6", SSR3: "#0063d6",
   SX1: "#0063d6", SX2: "#0063d6", SX3: "#0063d6",
+  P: "#0063d6", B: "#c0504d", J: "#0063d6",
+  D: "#c0504d", G: "#0063d6", TN: "#0063d6", ONE: "#0063d6", TWO: "#0063d6",
 };
 const colorOf = (n) => COLOR[n] || (n.endsWith("R") ? "#c0504d" : "#0063d6");
 
@@ -93,6 +95,41 @@ const tracksToRows = (tracks, prefix, pointApplied) => {
   });
 };
 
+// stats(round_picks + series) 기반 로드 1행 (P/B/J/D/G/TN/ONE/TWO 등 비-트랙 섹션).
+// roundPicks[key]: 라운드별 픽(P/B/null). series: 라운드별 hit/miss/null. nextPick: 다음 라운드 픽.
+const statsToRow = (name, key, stats, roundPicks, nextPick) => {
+  const s = stats?.[key];
+  const rp = roundPicks?.[key];
+  if (!s || !rp) return null;
+  const series = s.series || [];
+  const cells = new Array(78).fill(null);
+  const n = rp.length;
+  for (let i = 0; i < n && i < 78; i++) {
+    const pick = rp[i];
+    if (!pick || pick === "wait") {
+      cells[i] = { wait: true }; // 픽 없는 라운드(예: P/B 60% 미만) → W
+      continue;
+    }
+    let bg = null;
+    const st = series[i];
+    if (st === "hit") bg = HIT_BG;
+    else if (st === "miss") bg = MISS_BG;
+    cells[i] = { pick, bg };
+  }
+  // 현재 라운드(다음 픽) = n번째 셀, 흰 배경. 픽 없으면 빈칸(강조 안 함).
+  if (nextPick && n < 78) cells[n] = { pick: nextPick, bg: WAIT_BG };
+  const total = s.total ?? 0;
+  const cs = s.cur_streak_type ? { type: s.cur_streak_type, count: s.cur_streak_count } : null;
+  return {
+    name, offset: 0, triset: false, cells,
+    step: cs ? `${cs.count}${cs.type === "hit" ? "H" : "M"}` : "",
+    stepType: cs?.type || null,
+    pct: total > 0 ? `${((s.hit ?? 0) / total * 100).toFixed(1)}%` : "-",
+    rec: `${s.hit ?? 0}/${s.miss ?? 0}`, recHit: s.hit ?? 0, recMiss: s.miss ?? 0,
+    pctBg: null,
+  };
+};
+
 function RoadCell({ n, c, d }) {
   const off = d.offset || 0;
   let bg, content, color = "#777";
@@ -101,8 +138,9 @@ function RoadCell({ n, c, d }) {
     const idx = n - 1;
     const cell = d.cells[idx];
     if (cell && cell.wait) {
-      // SX 대기 구간
-      color = "#555";
+      // 대기/픽없음 → W. 현재 라운드(흰 배경)면 글자 어둡게.
+      bg = cell.bg || undefined;
+      color = cell.bg === WAIT_BG ? "#333" : "#555";
       content = "W";
     } else if (cell && cell.pick) {
       bg = cell.bg;
@@ -204,13 +242,17 @@ function RoadGroup({ title, rows, checks }) {
   );
 }
 
-export default function GhSqSsrSxRoads({ sqTracks, srTracks, ssrTracks, sxTracks, pointApplied }) {
+export default function GhSqSsrSxRoads({ sqTracks, srTracks, ssrTracks, sxTracks, pointApplied, stats, roundPicks, nextPicks }) {
   const [showSr, setShowSr] = useState(false); // "sr picture" 토글: 끄면 SSR, 켜면 SR
   // SQ/SR/SSR/SX = 동일 변환(sc1/sc2/sc3). 데이터 없으면 데모값 폴백.
   const sqRows = tracksToRows(sqTracks, "SQ", pointApplied) || SQ_DEMO;
   const srRows = tracksToRows(srTracks, "SR", pointApplied);
   const ssrRows = tracksToRows(ssrTracks, "SSR", pointApplied) || SSR;
   const sxRows = tracksToRows(sxTracks, "SX", pointApplied) || SX;
+  // PBJX / DGT = stats 기반 로드 (P/B/J/D/G/TN/ONE/TWO 채움, 6MX는 데이터 없어 제외)
+  const statsRow = (name, key) => statsToRow(name, key, stats, roundPicks, nextPicks?.[key]);
+  const pbjxRows = [statsRow("P", "P"), statsRow("B", "B"), statsRow("J", "J")].filter(Boolean);
+  const dgtRows = [statsRow("D", "D"), statsRow("G", "G"), statsRow("TN", "TN"), statsRow("ONE", "ONE"), statsRow("TWO", "TWO")].filter(Boolean);
   return (
     <Box sx={{ mb: 2 }}>
       <RoadGroup title="SQ" rows={sqRows} checks={[{ label: "assist picture" }]} />
@@ -223,6 +265,8 @@ export default function GhSqSsrSxRoads({ sqTracks, srTracks, ssrTracks, sxTracks
         ]}
       />
       <RoadGroup title="SX" rows={sxRows} checks={[{ label: "assist picture" }]} />
+      {pbjxRows.length > 0 && <RoadGroup title="PBJX" rows={pbjxRows} checks={[]} />}
+      {dgtRows.length > 0 && <RoadGroup title="DGT" rows={dgtRows} checks={[]} />}
     </Box>
   );
 }
