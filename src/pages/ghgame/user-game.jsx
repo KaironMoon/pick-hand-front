@@ -6,6 +6,8 @@ import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
 import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
+import GhStrategyBoard from "./components/GhStrategyBoard";
+import GhSqSsrSxRoads from "./components/GhSqSsrSxRoads";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 
 // blink 애니메이션
@@ -843,45 +845,11 @@ export default function GhUserGamePage() {
         const WAIT_BG = "#ffffff";  // 흰색 (현재 회차)
         const resBg = (r) => r === "hit" ? HIT_BG : r === "miss" ? MISS_BG : WAIT_BG;
 
-        // gh_tracks 데이터로 SROWS 구성 (sc1/sc2/sc3)
-        // 셀 인덱스 k에 표시되는 라운드 = startRound + k (sc1=1, sc2=2, sc3=3)
-        const ghTracks = picksSnapshot?.gh_tracks?.tracks;
-        const buildSrow = (key, label, startRound) => {
-          const t = ghTracks?.[key];
-          const filled = new Array(78).fill(null);
-          const bgPalette = new Array(78).fill(null);
-          const scoresAt = new Array(78).fill(null);  // 셀 인덱스별 그 시점 8 패턴 점수
-          if (!t) return { label, filled, bgPalette, scoresAt, startRound };
-          for (const r of (t.round_data || [])) {
-            const idx = r.round - startRound; // 셀 인덱스
-            if (idx < 0 || idx >= 78) continue;
-            filled[idx] = r.predict || null;
-            if (r.status === "hit") bgPalette[idx] = HIT_BG;
-            else if (r.status === "miss") bgPalette[idx] = MISS_BG;
-            else if (r.status === "current") bgPalette[idx] = WAIT_BG;  // 현재 라운드 = 흰색
-            else if (r.status === "future") bgPalette[idx] = "#1c1f25"; // 현재 묶음의 다른 미진행 = 어두운 회색
-            scoresAt[idx] = r.pattern_scores || null;
-          }
-          return { label, filled, bgPalette, scoresAt, startRound };
-        };
-        const SROWS = [
-          buildSrow("sc1", "S1", 1),
-          buildSrow("sc2", "S2", 2),
-          buildSrow("sc3", "S3", 3),
-        ];
-        const cellSz = 22;
-        const renderCell = (n, pick, bg) => (
-          <Box key={n} sx={{
-            width: cellSz, height: cellSz, border: "1px solid #333", display: "flex", alignItems: "center", justifyContent: "center",
-            backgroundColor: pick ? (bg || HIT_BG) : "#1c1f24",
-          }}>
-            {pick ? (
-              <Typography sx={{ fontSize: 11, fontWeight: "bold", color: pick === "P" ? "#1565c0" : "#f44336" }}>{pick}</Typography>
-            ) : (
-              <Typography sx={{ fontSize: 10, color: "#888" }}>{n}</Typography>
-            )}
-          </Box>
-        );
+        // sq_tracks 데이터 (sc1/sc2/sc3) — SQ 로드 + 누적 그래프용
+        const sqTracks = picksSnapshot?.sq_tracks?.tracks;
+        const srTracks = picksSnapshot?.sr_tracks?.tracks;
+        const ssrTracks = picksSnapshot?.ssr_tracks?.tracks;
+        const sxTracks = picksSnapshot?.sx_tracks?.tracks;
 
         return (
           <>
@@ -1350,180 +1318,25 @@ export default function GhUserGamePage() {
           </Box>
           {/* /1|2 row */}
 
-          {/* ===== 3: 나이스초이스 표 (실제 table) — admin 전용 ===== */}
-          {isAdmin && (() => {
-            const cellTd = (extra = {}) => ({
-              width: cellSz, minWidth: cellSz, maxWidth: cellSz,
-              height: cellSz, minHeight: cellSz, maxHeight: cellSz,
-              padding: 0, textAlign: "center",
-              border: "1px solid #333", verticalAlign: "middle",
-              boxSizing: "border-box", lineHeight: 1,
-              ...extra,
-            });
-            const labelTd = {
-              width: 44, height: cellSz, padding: 0, textAlign: "center",
-              backgroundColor: "transparent", boxSizing: "border-box",
-            };
-            // 3칸마다 굵은 우측선: col index k (0~39), (k+1) % 3 === 0 이고 마지막은 제외
-            const isThickRight = (k) => k < COLS - 1 && (k + 1) % 3 === 0;
-            const PATTERNS_ORDER = ["PPP", "BBB", "PBP", "BPB", "PPB", "BBP", "PBB", "BPP"];
-            const buildScoreTooltip = (n, scores) => {
-              if (!scores) return null;
-              const max = Math.max(...Object.values(scores));
-              return (
-                <Box sx={{ p: 0.5 }}>
-                  <Typography variant="caption" sx={{ display: "block", fontWeight: "bold", mb: 0.5 }}>R{n} 패턴별 누적 점수</Typography>
-                  {PATTERNS_ORDER.map((pat) => (
-                    <Box key={pat} sx={{ display: "flex", justifyContent: "space-between", gap: 2, fontSize: 11 }}>
-                      <span>{pat}</span>
-                      <span style={{ fontWeight: "bold", color: (scores[pat] ?? 0) === max ? "#4caf50" : "#fff" }}>
-                        {scores[pat] ?? 0}
-                      </span>
-                    </Box>
-                  ))}
-                </Box>
-              );
-            };
-            const renderTd = (key, n, pick, bg, k, scores) => {
-              const extra = isThickRight(k) ? { borderRight: "2px solid #aaa" } : {};
-              const cell = (
-                <td key={key} style={{ ...cellTd(extra) }}>
-                  <Box sx={{
-                    width: "100%", height: "100%",
-                    backgroundColor: pick ? (bg || HIT_BG) : "#1c1f24",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: scores ? "help" : "default",
-                  }}>
-                    {pick ? (
-                      <Typography sx={{ fontSize: 11, fontWeight: "bold", color: pick === "P" ? "#1565c0" : "#f44336" }}>{pick}</Typography>
-                    ) : (
-                      <Typography sx={{ fontSize: 10, color: "#888" }}>{n}</Typography>
-                    )}
-                  </Box>
-                </td>
-              );
-              if (!scores) return cell;
-              return (
-                <Tooltip key={key} title={buildScoreTooltip(n, scores)} arrow placement="top">
-                  {cell}
-                </Tooltip>
-              );
-            };
-            return (
-              <Box sx={{ mb: 2 }}>
-                <table style={{ borderCollapse: "collapse", borderSpacing: 0 }}>
-                  <tbody>
-                    {(() => {
-                      // 1/2/3등 배경색 매핑 (260525):
-                      //  - Point 회차단위 적용 시(point_applied) → 회차 점수(total_score) 기준 "적중 많은 트랙=1등"
-                      //  - 미적용(기본/복원) → 옛날처럼 승률 기준
-                      const pointApplied = !!picksSnapshot?.gh_tracks?.point_applied;
-                      const metric = (key) => {
-                        const t = ghTracks?.[key];
-                        if (!t) return null;
-                        const sm = t.summary || {};
-                        const tot = (sm.total_hit ?? 0) + (sm.total_miss ?? 0);
-                        if (tot === 0) return null;
-                        return pointApplied ? (t.total_score ?? 0) : (sm.rate ?? 0);
-                      };
-                      const trackRates = [
-                        { key: "sc1", rate: metric("sc1") },
-                        { key: "sc2", rate: metric("sc2") },
-                        { key: "sc3", rate: metric("sc3") },
-                      ].filter((x) => x.rate !== null).sort((a, b) => b.rate - a.rate);
-                      const rateBgByKey = (key) => {
-                        const idx = trackRates.findIndex((x) => x.key === key);
-                        if (idx === 0) return "#00e676";
-                        if (idx === 1) return "#ff9800";
-                        if (idx === 2) return "#ffeb3b";
-                        return null;
-                      };
-                      return SROWS.map((row, ri) => {
-                      const top = buildRow(row.startRound);
-                      const bottom = buildRow(row.startRound + 39);
-                      const fill = row.filled;
-                      const palette = row.bgPalette;
-                      const scoresAt = row.scoresAt || [];
-                      // 트랙 현재 연승/연패 + 총 승/패 산출
-                      const sckey = row.label === "S1" ? "sc1" : row.label === "S2" ? "sc2" : "sc3";
-                      // 트랙 통계는 서버 summary 사용 (프론트 루프 계산 제거 260602)
-                      const sm = ghTracks?.[sckey]?.summary || {};
-                      const totalHit = sm.total_hit ?? 0;
-                      const totalMiss = sm.total_miss ?? 0;
-                      const trackStreak = sm.cur_streak || null;
-                      const streakColor = trackStreak ? (trackStreak.type === "hit" ? "#4caf50" : "#f44336") : null;
-                      const streakText = trackStreak ? `${trackStreak.count}${trackStreak.type === "hit" ? "H" : "M"}` : "";
-                      const hidden = !!trackStreakHidden[sckey];
-                      const onToggle = () => setTrackStreakHidden((p) => ({ ...p, [sckey]: !p[sckey] }));
-                      const streakCell = (
-                        <td style={labelTd}>
-                          <Box
-                            onClick={onToggle}
-                            sx={{ px: 0.5, py: 0, borderRadius: 1, border: `1px solid ${hidden ? "#555" : (streakColor || "#555")}`, color: hidden ? "transparent" : (streakColor || "#666"), fontSize: 11, fontWeight: "bold", minWidth: 28, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", cursor: "pointer", "&:hover": { opacity: 0.8 } }}
-                          >{hidden ? "" : streakText}</Box>
-                        </td>
-                      );
-                      const totalCell = (
-                        <td style={labelTd}>
-                          {hidden ? (
-                            <Box sx={{ px: 0.5, py: 0, borderRadius: 1, border: "1px solid #555", minWidth: 28, height: cellSz, boxSizing: "border-box" }} />
-                          ) : (
-                            <Box sx={{ px: 0.5, py: 0, borderRadius: 1, border: "1px solid #555", fontSize: 10, fontWeight: "bold", minWidth: 28, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>
-                              <span style={{ color: "#01e676" }}>{totalHit}</span>
-                              <span style={{ color: "#aaa" }}>/</span>
-                              <span style={{ color: "#ffeb3b" }}>{totalMiss}</span>
-                            </Box>
-                          )}
-                        </td>
-                      );
-                      return (
-                        <React.Fragment key={row.label}>
-                          {/* 1행: S1 라벨 + 연승연패 + top 셀 40개 */}
-                          <tr>
-                            <td style={labelTd}>
-                              <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: "#aaa", fontSize: 12, minWidth: 40, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>{row.label}</Box>
-                            </td>
-                            {streakCell}
-                            {top.map((n, k) => {
-                              const pick = fill[k];
-                              const bg = pick ? palette[k] : null;
-                              return renderTd(`${row.label}-t-${k}`, n, pick, bg, k, scoresAt[k]);
-                            })}
-                          </tr>
-                          {/* 2행: 승률 라벨 + 총 승/패 + bottom 셀 40개 */}
-                          <tr>
-                            <td style={labelTd}>
-                              {(() => {
-                                const tot = totalHit + totalMiss;
-                                const rate = tot > 0 ? (totalHit / tot * 100).toFixed(1) : null;
-                                const bg = rateBgByKey(sckey);
-                                return (
-                                  <Box sx={{ px: 1, py: 0, borderRadius: 1, border: "1px solid #555", color: bg ? "#000" : "#aaa", fontSize: 11, fontWeight: "bold", minWidth: 40, height: cellSz, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", ...(bg ? { backgroundColor: bg } : {}) }}>
-                                    {rate ? `${rate}%` : "-"}
-                                  </Box>
-                                );
-                              })()}
-                            </td>
-                            {totalCell}
-                            {bottom.map((n, k) => {
-                              const idx = k + 39;
-                              const pick = fill[idx];
-                              const bg = pick ? palette[idx] : null;
-                              return renderTd(`${row.label}-b-${k}`, n, pick, bg, k, scoresAt[idx]);
-                            })}
-                          </tr>
-                          {ri < SROWS.length - 1 && (
-                            <tr><td colSpan={COLS + 2} style={{ height: 6, border: "none", padding: 0 }} /></tr>
-                          )}
-                        </React.Fragment>
-                      );
-                    });
-                    })()}
-                  </tbody>
-                </table>
-              </Box>
-            );
-          })()}
+          {/* ===== 전략별 현황 전광판 (배팅 판 ↔ S1/S2/S3 사이) ===== */}
+          <GhStrategyBoard
+            stats={picksSnapshot?.stats}
+            nextPicks={picksSnapshot?.next_picks}
+            sqTracks={sqTracks}
+            srTracks={srTracks}
+            ssrTracks={ssrTracks}
+            sxTracks={sxTracks}
+            betAmounts={picksSnapshot?.bet_amounts}
+          />
+
+          {/* ===== SQ/SSR/SX 로드 ===== */}
+          <GhSqSsrSxRoads
+            sqTracks={sqTracks}
+            srTracks={srTracks}
+            ssrTracks={ssrTracks}
+            sxTracks={sxTracks}
+            pointApplied={!!picksSnapshot?.sq_tracks?.point_applied}
+          />
           </>
         );
       })()}
@@ -1548,9 +1361,9 @@ export default function GhUserGamePage() {
                 "1-2": { ONE: "#f44336", TWO: "#2196f3" },
               };
               const N = results.length;
-              const tracks = picksSnapshot?.gh_tracks?.tracks || {};
+              const tracks = picksSnapshot?.sq_tracks?.tracks || {};
               const seriesFor = (key) => {
-                // S1/S2/S3 → gh_tracks round_data 사용
+                // S1/S2/S3 → sq_tracks round_data 사용
                 if (key === "S1" || key === "S2" || key === "S3") {
                   const sckey = key === "S1" ? "sc1" : key === "S2" ? "sc2" : "sc3";
                   const rd = tracks[sckey]?.round_data || [];
