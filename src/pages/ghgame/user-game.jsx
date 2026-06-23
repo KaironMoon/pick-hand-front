@@ -1327,6 +1327,7 @@ export default function GhUserGamePage() {
             ssrTracks={ssrTracks}
             sxTracks={sxTracks}
             betAmounts={picksSnapshot?.bet_amounts}
+            betAmountsMap={picksSnapshot?.bet_amounts_map}
           />
 
           {/* ===== SQ/SSR/SX 로드 ===== */}

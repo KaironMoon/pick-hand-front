@@ -159,19 +159,21 @@ const fmtRec = (total, hit, miss) => `${total}-${hit}/${miss}`;
 const fmtRec2 = (mh, mm) => `${mh}-${mm}`;
 // 단계: {마틴단계}S-{3연패수}
 const fmtStage = (step, triple) => (step ? `${step}S-${triple ?? 0}` : "");
-// 배팅액/PnL: 만원 단위(5천=0.5, 1천=0.1). 0이면 빈칸. 만원으로 안 나눠 떨어지면 소수1자리.
-const fmtMan = (won) => {
-  if (won === null || won === undefined) return "";
-  const v = won / 10000;
+// 배팅액/PnL: 이미 만원 단위(1=1만원, 0.1=1천원). 0이면 "0", 정수 아니면 소수1자리.
+const fmtMan = (man) => {
+  if (man === null || man === undefined) return "";
+  const v = Math.round((man || 0) * 10) / 10;
   if (v === 0) return "0";
   return Number.isInteger(v) ? `${v}` : `${v.toFixed(1)}`;
 };
-// 단계별 배팅액 조회 (임시 마틴A amounts 공용)
+// 단계별 배팅액 조회 (전략별 amounts, 없으면 공용 폴백)
 const betAt = (amounts, step) => {
   if (!amounts || !step) return null;
   const idx = step - 1;
   return idx >= 0 && idx < amounts.length ? amounts[idx] : null;
 };
+// 전략키별 amounts 조회 (만원 단위). 셋업 없으면 undefined → 빈칸.
+const amountsFor = (ctx, stratKey) => ctx.betAmountsMap && ctx.betAmountsMap[stratKey];
 
 // stats 키 기반 행 데이터
 const fromStats = (stats, nextPicks, key, amounts) => {
@@ -213,16 +215,21 @@ const fromTrack = (tracks, scKey, amounts) => {
 
 // G1/G2 이름 → 실데이터 행. 매핑 없으면 null(디자인값 유지 안 하고 빈칸 처리).
 function buildRowData(name, ctx) {
-  const { stats, nextPicks, sqTracks, srTracks, ssrTracks, sxTracks, betAmounts } = ctx;
+  const { stats, nextPicks, sqTracks, srTracks, ssrTracks, sxTracks } = ctx;
   // stats 직접 매핑되는 섹션 (P/B 포함 — 서버가 60% 비율 기준으로 round/next 픽 산출)
   const STAT_KEYS = { A: "A", AR: "AR", AAR: "AAR", D: "D", G: "G", TN: "TN", ONE: "ONE", TWO: "TWO", J: "J", P: "P", B: "B" };
-  if (STAT_KEYS[name]) return fromStats(stats, nextPicks, STAT_KEYS[name], betAmounts);
+  if (STAT_KEYS[name]) {
+    const key = STAT_KEYS[name];
+    return fromStats(stats, nextPicks, key, amountsFor(ctx, key));  // 전략키별 amounts
+  }
   // SSR/SR을 S보다 먼저 매칭(S1이 SR1보다 앞서지 않게). S1/S2/S3 = SQ(sc#)와 동일.
   const M = name.match(/^(SQ|SSR|SR|SX|S)([123])$/);
   if (M) {
     const sc = `sc${M[2]}`;
     const tracks = { SQ: sqTracks, S: sqTracks, SR: srTracks, SSR: ssrTracks, SX: sxTracks }[M[1]];
-    return fromTrack(tracks, sc, betAmounts);
+    // 전략키: S→SQ로 정규화(같은 sc 트랙). SR은 박스 없음 → 폴백.
+    const stratKey = ({ S: "SQ", SQ: "SQ", SSR: "SSR", SX: "SX" }[M[1]] || M[1]) + M[2];
+    return fromTrack(tracks, sc, amountsFor(ctx, stratKey));
   }
   return null;
 }
@@ -264,9 +271,9 @@ function withLiveData(base, ctx) {
   return { ...base, wait, pick, stage, idx1, pct, idx2, rec, rec2 };
 }
 
-export default function GhStrategyBoard({ stats, nextPicks, sqTracks, srTracks, ssrTracks, sxTracks, betAmounts }) {
+export default function GhStrategyBoard({ stats, nextPicks, sqTracks, srTracks, ssrTracks, sxTracks, betAmounts, betAmountsMap }) {
   const hasData = !!(stats || sqTracks);
-  const ctx = { stats, nextPicks, sqTracks, srTracks, ssrTracks, sxTracks, betAmounts };
+  const ctx = { stats, nextPicks, sqTracks, srTracks, ssrTracks, sxTracks, betAmounts, betAmountsMap };
   const g1 = hasData ? withLiveData(G1, ctx) : G1;
   const g2 = hasData ? withLiveData(G2, ctx) : G2;
   return (
