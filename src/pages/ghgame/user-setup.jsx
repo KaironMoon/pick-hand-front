@@ -469,6 +469,389 @@ function LabouchereSection({ labouchere, onChange }) {
   );
 }
 
+// ─── 전략별 셋업 박스 (260620) ───
+// 목업(setup_page_mockup.html) 기준. 각 전략이 독립 진행방식·P배열·목표금액·베팅운용을 갖는다.
+// full(AAR/SSR1~3): row7에 old/new + 동률시 + 어시스트. short(SQ/SX/D/G/TN/ONE/TWO): 어시스트만.
+const STRAT_BET_TYPES = ["manual", "martin", "cruise", "labouchere"];
+const STRAT_BET_LABELS = { manual: "수동", martin: "마틴", cruise: "크루즈", labouchere: "라보쉐르" };
+const STRAT_DIST_MODES = ["even", "asc", "desc"];
+const STRAT_DIST_LABELS = { even: "균등", asc: "증가", desc: "감소" };
+
+// 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
+const ASSIST_OPTS = [
+  "SQ(H1)", "SQ(%1)", "Gob(H1)", "Gob(M1)", "Gob(%1)", "Gob(%0)",
+  "해당섹션", "해당섹션 반대", "대기후진행",
+  "SQ(H1)H&H", "SQ(%1)H&H", "Gob(H1)H&H", "Gob(H%1)H&H", "이전3회차전결과",
+];
+// 패시 어시스트 행 (2~11패시). 각 행: { assist1, pct, assist2 }
+const PASI_LEVELS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+const PASI_DEFAULT_ASSIST1 = ["SQ(H1)", "SQ(%1)", "Gob(H1)", "Gob(%1)", "Gob(%1)", "Gob(%0)", "해당섹션", "해당섹션 반대", "대기후진행", "SQ(H1)H&H"];
+function defaultPasi() {
+  return PASI_LEVELS.map((lvl, i) => ({
+    level: lvl,
+    assist1: PASI_DEFAULT_ASSIST1[i] || "SQ(H1)",
+    pct: lvl === 2 ? 5 : lvl === 6 ? 55 : 0,
+    assist2: "Gob(M1)",
+  }));
+}
+
+const DEFAULT_STRATEGY_SETUP = {
+  enabled: false,
+  bet_type: "manual",
+  step_min: 1,
+  step_max: 16,        // 조건부 P배열은 16칸(흰/파/빨 각 1~16)
+  // 조건부 P배열: 흰색 하한/상한(%) 직접 입력. 파랑(0~lo-1)/빨강(hi+1~100)은 파생.
+  cond_lo: 0,          // 흰색 하한 (% 이상)
+  cond_hi: 100,        // 흰색 상한 (% 이하)
+  amounts_white: new Array(16).fill(0),
+  amounts_blue: new Array(16).fill(0),
+  amounts_red: new Array(16).fill(0),
+  // (구) 단일 amounts — 라보쉐르/하위호환 위해 유지
+  amounts: new Array(20).fill(0),
+  count: 10,
+  dist_mode: "even",
+  sequence: [],
+  target_man: 0,
+  bet_start: 1,
+  bet_close: 40,
+  bet_extend: 55,
+  unsettled_stop: 0,
+  // full(멀티판) 전용
+  multi_sections: { A: true, AR: true, OLD: true, NEW: true },  // 사용함 여부
+  tie_old: "Gob(H1)",   // 동률시 어시스트 (OLD)
+  tie_new: "Gob(%1)",   // 동률시 어시스트 (NEW)
+  priority_version: "new",
+  tie_priority: "A",
+  // 최상위조건설정 + 패시 어시스트 (멀티/일반판 공통)
+  miss_threshold: 5,    // NMiss
+  miss_occur: 2,        // 발생 N회
+  miss_wait: 9,         // N회대기
+  pasi: defaultPasi(),
+  assist: false,
+};
+function defaultStrategySetup() {
+  return {
+    ...DEFAULT_STRATEGY_SETUP,
+    amounts: new Array(20).fill(0),
+    amounts_white: new Array(16).fill(0),
+    amounts_blue: new Array(16).fill(0),
+    amounts_red: new Array(16).fill(0),
+    multi_sections: { A: true, AR: true, OLD: true, NEW: true },
+    pasi: defaultPasi(),
+    sequence: [],
+  };
+}
+
+// 렌더 순서 + variant. full(old/new+동률시+어시스트): AAR(A-AR), SSR1~3(S-SR). short: 나머지.
+const STRATEGY_SETUP_BOXES = [
+  { key: "AAR", variant: "full", aarLabel: "A-AR", label: "A멀티", sections: ["A", "AR", "AARO", "AARN"] },
+  { key: "SSR1", variant: "full", aarLabel: "S-SR", label: "SQ1세트", sections: ["SQ1", "SR1", "SSRO1", "SSRN1"] },
+  { key: "SSR2", variant: "full", aarLabel: "S-SR", label: "SQ2세트", sections: ["SQ2", "SR2", "SSRO2", "SSRN2"] },
+  { key: "SSR3", variant: "full", aarLabel: "S-SR", label: "SQ3세트", sections: ["SQ3", "SR3", "SSRO3", "SSRN3"] },
+  { key: "SX1", variant: "short" },
+  { key: "SX2", variant: "short" },
+  { key: "SX3", variant: "short" },
+  { key: "D", variant: "short" },
+  { key: "G", variant: "short" },
+  { key: "TN", variant: "short" },
+  { key: "ONE", variant: "short" },
+  { key: "TWO", variant: "short" },
+  { key: "P", variant: "short" },
+  { key: "B", variant: "short" },
+  { key: "J", variant: "short" },
+];
+
+// 목업 셀 스타일 (setup_page_mockup.html). 10열 통일, 84px 셀.
+const mkCell = { border: "1px solid #c9ccd1", width: 84, height: 22, lineHeight: 1.1, textAlign: "center", verticalAlign: "middle", fontSize: 13, padding: "1px 4px", whiteSpace: "nowrap", boxSizing: "border-box" };
+const mkGreen = { ...mkCell, background: "#009900", color: "#fff" };
+const mkTeal = { ...mkCell, background: "#33CCCC", color: "#000", cursor: "pointer" };
+const mkBlue = { ...mkCell, color: "#0066FF", fontWeight: "bold" };
+const mkRed = { ...mkCell, color: "#FF0000" };
+const mkMethod = { ...mkCell, cursor: "pointer", userSelect: "none" };
+const mkDisabled = { ...mkCell, opacity: 0.3, pointerEvents: "none" };
+const mkEmpty = { ...mkCell, background: "#0a0a0a", cursor: "default" };
+
+// 인라인 숫자 입력 헬퍼 셀 (목업 editStage/editCount/editVal/editP 통합).
+// suffix: 표시 접미사. range:[min,max]면 정수 클램프, 없으면 0.1 소수. pno: 좌상단 작은 단계번호.
+function MkInput({ value, onChange, suffix = "", range, style, disabled, render }) {
+  const [editing, setEditing] = useState(false);
+  const [tmp, setTmp] = useState("");
+  const start = () => { if (disabled) return; setTmp(value === 0 || value == null ? "" : String(value)); setEditing(true); };
+  const commit = () => {
+    setEditing(false);
+    let v = parseFloat(tmp);
+    if (isNaN(v)) v = range ? range[0] : 0;
+    if (range) { v = Math.round(v); if (v < range[0]) v = range[0]; if (v > range[1]) v = range[1]; }
+    else v = Math.round(v * 10) / 10;
+    if (v !== value) onChange(v);
+  };
+  const key = (e) => { if (e.key === "Enter") e.target.blur(); else if (e.key === "Escape") setEditing(false); };
+  if (editing) {
+    // 인풋 배경/글자색을 셀 배경에 맞춤 (teal·green 셀은 밝은 바탕+검정, 그 외 어두운 바탕+흰색).
+    const onLight = style === mkTeal || style === mkGreen;
+    return (
+      <td style={style}>
+        <input autoFocus type="number" step={range ? "1" : "0.1"} value={tmp}
+          onChange={(e) => setTmp(e.target.value)} onBlur={commit} onKeyDown={key}
+          style={{ width: 56, background: onLight ? "#cfeeee" : "#1a1a1a", border: "1px solid #0066FF",
+            color: onLight ? "#000" : "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, outline: "none" }} />
+      </td>
+    );
+  }
+  return (
+    <td style={{ ...style, cursor: disabled ? "default" : "pointer" }} onClick={start}>
+      {render ? render(value) : `${value == null ? "" : value}${suffix}`}
+    </td>
+  );
+}
+
+// ─── 셋업 시안(setup_page_mockup.html 260625) 추가 스타일/헬퍼 ───
+const mkNavy = { ...mkCell, background: "#16365c", color: "#fff", cursor: "pointer" };  // P배열 채움 후 보조
+const mkAssistHdr = { ...mkCell, background: "#17365e", color: "#0065fe", fontWeight: "bold" };  // 최상위조건설정 헤더
+const mkAssist2 = { ...mkCell, background: "#17365e" };  // 어시스트2 셀
+const mkPctHdr = { ...mkCell, background: "#17365e", color: "#ff6b6b", fontWeight: "bold" };
+const mkDim = { ...mkCell, color: "#777" };
+const mkCondOff = { color: "#666" };  // 구간 없음(회색)
+
+// 어시스트 셀렉트 (목업 assistSelectHTML)
+function AssistSelect({ value, onChange, sx }) {
+  return (
+    <select value={value || ASSIST_OPTS[0]} onChange={(e) => onChange(e.target.value)}
+      style={{ background: "#16365c", color: "#fff", border: "1px solid #2f5b8f", borderRadius: 3,
+        fontSize: 12, padding: "1px 2px", width: "96%", cursor: "pointer", outline: "none",
+        fontFamily: "D2Coding, Consolas, Menlo, monospace", ...sx }}>
+      {ASSIST_OPTS.map((o) => <option key={o} value={o}>{o} 1회</option>)}
+    </select>
+  );
+}
+
+// 작은 숫자 인풋(미스/발생/회대기/%). 시안의 .missin/.pct-in
+function NumIn({ value, onChange, min, max, color = "#0065fe", width = 30, bg = "#0d2440" }) {
+  return (
+    <input type="number" value={value ?? 0} min={min} max={max}
+      onChange={(e) => {
+        let v = parseInt(e.target.value || "0", 10) || 0;
+        if (v < min) v = min; if (v > max) v = max;
+        onChange(v);
+      }}
+      style={{ width, background: bg, border: "1px solid #2f5b8f", color, fontWeight: "bold",
+        textAlign: "center", fontSize: 12, borderRadius: 3, padding: 0 }} />
+  );
+}
+
+function StrategySetupSection({ name, strat, onChange, variant, sections }) {
+  // 단위: 만원. 입력값 그대로 저장(1=1만원, 0.1=1천원). 전광판/백엔드도 만원 단위로 통일.
+  const s = strat || defaultStrategySetup();
+  const isFull = variant === "full";
+  const isLab = s.bet_type === "labouchere";
+  const stepMin = s.step_min || 1;
+  const stepMax = s.step_max || 16;
+  const count = s.count || 10;
+
+  // 조건부 P배열: 흰색 lo/hi 직접 입력, 파랑/빨강 파생.
+  const condLo = s.cond_lo ?? 0;
+  const condHi = s.cond_hi ?? 100;
+  const blueOff = condLo <= 0;     // 하한 0 → 파랑 구간 없음(회색)
+  const redOff = condHi >= 100;    // 상한 100 → 빨강 구간 없음(회색)
+
+  const setMethod = (t) => {
+    if (t === "labouchere") {
+      const seq = generateLabouchereSequence(s.target_man, count, s.dist_mode || "even");
+      const arr = new Array(16).fill(0);
+      seq.forEach((v, i) => { const idx = (stepMin - 1) + i; if (idx >= 0 && idx < 16) arr[idx] = v; });
+      onChange({ ...s, bet_type: t, amounts_white: arr, amounts_blue: [...arr], amounts_red: [...arr] });
+    } else onChange({ ...s, bet_type: t });
+  };
+  const regenLab = (patch) => {
+    const next = { ...s, ...patch };
+    const seq = generateLabouchereSequence(next.target_man, next.count || count, next.dist_mode || "even");
+    const arr = new Array(16).fill(0);
+    seq.forEach((v, i) => { const idx = (next.step_min || stepMin) - 1 + i; if (idx >= 0 && idx < 16) arr[idx] = v; });
+    onChange({ ...next, sequence: seq, amounts_white: arr, amounts_blue: [...arr], amounts_red: [...arr] });
+  };
+
+  // 그룹별(white/blue/red) P배열 편집. 마틴이면 입력칸 기준 앞 절반·뒤 2배 자동채움.
+  const groupKey = { white: "amounts_white", blue: "amounts_blue", red: "amounts_red" };
+  const editP = (group, idx, val) => {
+    const key = groupKey[group];
+    const arr = [...(s[key] || new Array(16).fill(0))];
+    if (s.bet_type === "martin") {
+      for (let k = 0; k < 16; k++) arr[k] = Math.round(val * Math.pow(2, k - idx) * 10) / 10;
+    } else arr[idx] = val;
+    onChange({ ...s, [key]: arr });
+  };
+  const inRange = (step) => step >= stepMin && step <= stepMax;
+  const pRender = (v) => (v ? `${v}P` : "P");
+
+  // 조건부 P배열 한 그룹(2줄: 1~8, 9~16) 렌더
+  const condRows = (group, condLabel, condColor, off) => {
+    const key = groupKey[group];
+    const arr = s[key] || new Array(16).fill(0);
+    const txtStyle = off ? mkCondOff : (condColor ? { color: condColor } : {});
+    return [0, 1].map((half) => (
+      <tr key={`${name}-${group}-${half}`} style={off ? { opacity: 1 } : undefined}>
+        {/* 조건칸(colSpan2): half0=하한/이상, half1=상한/이하 */}
+        <td colSpan={2} style={{ ...mkCell, whiteSpace: "nowrap", ...txtStyle }}>
+          {group === "white" ? (
+            <>
+              <input type="number" value={half === 0 ? condLo : condHi} min={0} max={100}
+                onChange={(e) => {
+                  let v = parseInt(e.target.value || "0", 10) || 0;
+                  if (v < 0) v = 0; if (v > 100) v = 100;
+                  onChange(half === 0 ? { ...s, cond_lo: v } : { ...s, cond_hi: v });
+                }}
+                style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff",
+                  textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />
+              %<span style={{ marginLeft: 3 }}>{half === 0 ? "이상" : "이하"}</span>
+            </>
+          ) : (
+            <span>{condLabel[half]}%<span style={{ marginLeft: 3 }}>{half === 0 ? "이상" : "이하"}</span></span>
+          )}
+        </td>
+        {Array.from({ length: 8 }, (_, i) => {
+          const idx = half * 8 + i;        // 1~8, 9~16
+          const step = idx + 1;
+          // 최저~최고 단계 밖은 비활성(회색·입력불가). 칸은 시안처럼 그대로 보임.
+          if (!inRange(step)) return <td key={idx} style={mkEmpty}></td>;
+          const amt = arr[idx] || 0;
+          return (
+            <MkInput key={idx} value={amt} onChange={(v) => editP(group, idx, v)}
+              render={pRender} style={{ ...mkCell, cursor: "pointer", ...txtStyle }} />
+          );
+        })}
+      </tr>
+    ));
+  };
+
+  const toggleMulti = (k) => onChange({ ...s, multi_sections: { ...(s.multi_sections || {}), [k]: !(s.multi_sections?.[k] ?? true) } });
+  const setPasi = (i, patch) => {
+    const pasi = (s.pasi || defaultPasi()).map((p, j) => (j === i ? { ...p, ...patch } : p));
+    onChange({ ...s, pasi });
+  };
+  const pasi = s.pasi || defaultPasi();
+
+  return (
+    <>
+      {/* 1행: 전략명 | 사용함 | 수동 마틴 크루즈 라보쉐르 | 갯수 | 균등 증가 감소 */}
+      <tr>
+        <td style={mkRed}>{name}</td>
+        <td style={s.enabled ? { ...mkGreen, cursor: "pointer", userSelect: "none" } : { ...mkMethod }}
+          onClick={() => onChange({ ...s, enabled: !s.enabled })}>
+          {s.enabled ? "사용함" : "사용안함"}
+        </td>
+        {STRAT_BET_TYPES.map((t) => (
+          <td key={t} style={s.bet_type === t ? { ...mkGreen, cursor: "pointer" } : mkMethod} onClick={() => setMethod(t)}>
+            {STRAT_BET_LABELS[t]}
+          </td>
+        ))}
+        <MkInput value={count} onChange={(v) => regenLab({ count: Math.max(1, Math.min(16, v)) })} suffix="개"
+          range={[1, 16]} style={isLab ? mkCell : mkDisabled} disabled={!isLab} />
+        {STRAT_DIST_MODES.map((m) => (
+          <td key={m} style={!isLab ? mkDisabled : (s.dist_mode === m ? { ...mkGreen, cursor: "pointer" } : mkMethod)}
+            onClick={isLab ? () => regenLab({ dist_mode: m }) : undefined}>
+            {STRAT_DIST_LABELS[m]}
+          </td>
+        ))}
+      </tr>
+      {/* 2행: P설정 | 최저 (단계) 최고 (단계) */}
+      <tr>
+        <td style={mkBlue}>P설정</td>
+        <td style={mkGreen}>최저</td>
+        <MkInput value={stepMin} suffix="단계" range={[1, 16]} style={mkGreen} onChange={(v) => {
+          const upd = { ...s, step_min: v };
+          if (v > stepMax) upd.step_max = v;
+          onChange(upd);
+        }} />
+        <td style={mkGreen}>최고</td>
+        <MkInput value={stepMax} suffix="단계" range={[1, 16]} style={mkGreen} onChange={(v) => {
+          const upd = { ...s, step_max: v };
+          if (v < stepMin) upd.step_min = v;
+          onChange(upd);
+        }} />
+        <td style={mkCell}></td><td style={mkCell}></td><td style={mkCell}></td><td style={mkCell}></td><td style={mkCell}></td>
+      </tr>
+      {/* 3~8행: 조건부 P배열 (흰/파/빨) */}
+      {condRows("white", null, null, false)}
+      {condRows("blue", ["0", String(condLo - 1)], "#0066FF", blueOff)}
+      {condRows("red", [String(condHi + 1), "100"], "#FF0000", redOff)}
+      {/* 9행: 목표금액 베팅시작 베팅마감 마감연장 마감미처리 */}
+      <tr>
+        <td style={mkRed}>목표금액</td>
+        <MkInput value={s.target_man || 0} suffix="P" style={mkTeal}
+          onChange={(v) => isLab ? regenLab({ target_man: v }) : onChange({ ...s, target_man: v })} />
+        <td style={mkRed}>베팅시작</td>
+        <MkInput value={s.bet_start || 1} suffix="R" range={[1, 12]} style={mkTeal} onChange={(v) => onChange({ ...s, bet_start: v })} />
+        <td style={mkRed}>베팅마감</td>
+        <MkInput value={s.bet_close || 40} suffix="R" range={[40, 55]} style={mkTeal} onChange={(v) => onChange({ ...s, bet_close: v })} />
+        <td style={mkRed}>마감연장</td>
+        <MkInput value={s.bet_extend || 55} suffix="R" range={[55, 70]} style={mkTeal} onChange={(v) => onChange({ ...s, bet_extend: v })} />
+        <td style={mkRed}>마감미처리</td>
+        <MkInput value={s.unsettled_stop || 0} suffix="S 종료" style={mkTeal} onChange={(v) => onChange({ ...s, unsettled_stop: v })} />
+      </tr>
+      {/* 10행(full만): 멀티섹션 — 박스별 라벨 (A멀티: A AR AARO AARN / SQn세트: SQn SRn SSROn SSRNn) */}
+      {isFull && (
+        <tr>
+          <td colSpan={2} style={mkBlue}>멀티섹션</td>
+          {(sections || ["A", "AR", "AARO", "AARN"]).map((k, idx) => {
+            // 위치별 색: 0=파랑, 1=빨강, 2=파랑(OLD계), 3=초록(NEW계)
+            const lblSx = idx === 1 ? mkRed : idx === 3 ? { ...mkCell, color: "#33CC33", fontWeight: "bold" } : mkBlue;
+            const on = s.multi_sections?.[k] ?? true;
+            return [
+              <td key={`${k}-l`} style={lblSx}>{k}</td>,
+              <td key={`${k}-v`} style={on ? { ...mkGreen, cursor: "pointer" } : mkMethod} onClick={() => toggleMulti(k)}>
+                {on ? "사용함" : "사용안함"}
+              </td>,
+            ];
+          })}
+        </tr>
+      )}
+      {/* 11행(full만): 동률시어시스트지정 */}
+      {isFull && (
+        <tr>
+          <td colSpan={2} style={mkRed}>동률시어시스트지정</td>
+          <td colSpan={2} style={mkDim}>해당없음</td>
+          <td colSpan={2} style={mkDim}>해당없음</td>
+          <td colSpan={2} style={mkNavy}><AssistSelect value={s.tie_old} onChange={(v) => onChange({ ...s, tie_old: v })} /></td>
+          <td colSpan={2} style={mkNavy}><AssistSelect value={s.tie_new} onChange={(v) => onChange({ ...s, tie_new: v })} /></td>
+        </tr>
+      )}
+      {/* 12행: 최상위조건설정 헤더 */}
+      <tr>
+        <td colSpan={3} style={mkAssistHdr}>최상위조건설정</td>
+        <td colSpan={2} style={mkRed}>연패발생시어시스트</td>
+        <td colSpan={2} style={mkRed}>어시스트 우선순위</td>
+        <td colSpan={1} style={mkPctHdr}>%이하사용 →</td>
+        <td colSpan={2} style={mkAssistHdr}>어시스트2</td>
+      </tr>
+      {/* 13행: 5Miss / 발생N회 / N회대기 + 2패시 */}
+      {pasi.map((p, i) => {
+        const isFirst = i === 0;  // 2패시 = 13행 (좌측에 5Miss 블록)
+        return (
+          <tr key={`${name}-pasi-${p.level}`}>
+            {isFirst ? (
+              <>
+                <td style={mkAssistHdr}><NumIn value={s.miss_threshold ?? 5} min={2} max={10} onChange={(v) => onChange({ ...s, miss_threshold: v })} />Miss</td>
+                <td style={mkAssistHdr}>발생<NumIn value={s.miss_occur ?? 2} min={1} max={10} onChange={(v) => onChange({ ...s, miss_occur: v })} />회</td>
+                <td style={mkAssistHdr}><NumIn value={s.miss_wait ?? 9} min={1} max={20} onChange={(v) => onChange({ ...s, miss_wait: v })} />회대기</td>
+              </>
+            ) : (
+              <td colSpan={3} style={mkCell}></td>
+            )}
+            <td colSpan={2} style={mkRed}>{p.level}패시 어시스트 설정</td>
+            <td colSpan={2} style={mkCell}><AssistSelect value={p.assist1} onChange={(v) => setPasi(i, { assist1: v })} /></td>
+            <td colSpan={1} style={mkNavy}>
+              <NumIn value={p.pct ?? 0} min={0} max={100} color="#FF0000" width={38} bg="#1a1a1a" onChange={(v) => setPasi(i, { pct: v })} />%
+            </td>
+            <td colSpan={2} style={mkAssist2}>
+              <AssistSelect value={p.assist2} onChange={(v) => setPasi(i, { assist2: v })} sx={{ background: "#17365e", color: "#0065fe", fontWeight: "bold" }} />
+            </td>
+          </tr>
+        );
+      })}
+    </>
+  );
+}
+
 // ─── 글로벌히트 Point/복원 표 (260525 요청) ───
 const GH_POINT_PATTERNS = ["PPP", "BBB", "PPB", "BBP", "PBP", "BPB", "PBB", "BPP"];
 // 표시 전용 원안 승점 (3라운드1조). 편집 불가 · 복원 기준.
@@ -760,9 +1143,42 @@ export default function GhUserSetupPage() {
             <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={(m) => updateMartin("martin_a", m)} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={(m) => updateMartin("martin_z", m)} />
+          </tbody>
+        </table>
+      </Box>
+
+      {/* 전략별 셋업 박스 (260620) — 마틴Z 아래. full: AAR/SSR1~3 / short: SQ/SX/D/G/TN/ONE/TWO */}
+      {gameType === "gh" && (
+        <Box sx={{ overflowX: "auto", mt: 2 }}>
+          {STRATEGY_SETUP_BOXES.map((b) => (
+            <Box key={b.key} sx={{ mb: 1.5 }}>
+              {/* 라벨 박스 (전략명 + variant 구분색) */}
+              <Box sx={{ display: "inline-block", backgroundColor: b.variant === "full" ? "#c62828" : "#1565c0",
+                color: "#fff", fontWeight: "bold", borderRadius: 1, px: 1.5, py: 0.3, fontSize: 13, mb: 0.5 }}>
+                {b.label || b.key}
+              </Box>
+              <table style={{ borderCollapse: "collapse", tableLayout: "fixed", width: 840 }}>
+                {/* 시안과 동일: 10열 × 84px 고정 격자 → colSpan 섞여도 네모반듯 */}
+                <colgroup>
+                  {Array.from({ length: 10 }, (_, i) => <col key={i} style={{ width: 84 }} />)}
+                </colgroup>
+                <tbody>
+                  <StrategySetupSection
+                    name={b.label || b.key} variant={b.variant} aarLabel={b.aarLabel} sections={b.sections}
+                    strat={config[b.key] || defaultStrategySetup()}
+                    onChange={(o) => updateMartin(b.key, o)} />
+                </tbody>
+              </table>
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      <Box sx={{ overflowX: "auto", mt: 2 }}>
+        <table style={{ borderCollapse: "collapse", width: "fit-content" }}>
+          <tbody>
             {gameType === "gh" && (
               <>
-                <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
                 <LabouchereSection labouchere={labouchere} onChange={(m) => updateMartin("labouchere", m)} />
                 <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
                 <MartinSection name="cruise" label="크루즈" martin={cruise} onChange={(m) => updateMartin("cruise", m)} labelColor="#0097a7" />

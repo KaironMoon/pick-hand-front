@@ -849,6 +849,7 @@ export default function GhUserGamePage() {
         const sqTracks = picksSnapshot?.sq_tracks?.tracks;
         const srTracks = picksSnapshot?.sr_tracks?.tracks;
         const ssrTracks = picksSnapshot?.ssr_tracks?.tracks;
+        const ssroTracks = picksSnapshot?.ssro_tracks?.tracks;
         const sxTracks = picksSnapshot?.sx_tracks?.tracks;
 
         return (
@@ -1325,8 +1326,10 @@ export default function GhUserGamePage() {
             sqTracks={sqTracks}
             srTracks={srTracks}
             ssrTracks={ssrTracks}
+            ssroTracks={ssroTracks}
             sxTracks={sxTracks}
             betAmounts={picksSnapshot?.bet_amounts}
+            betAmountsMap={picksSnapshot?.bet_amounts_map}
           />
 
           {/* ===== SQ/SSR/SX 로드 ===== */}

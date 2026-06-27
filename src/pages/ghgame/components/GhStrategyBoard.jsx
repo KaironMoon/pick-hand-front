@@ -1,59 +1,45 @@
 import { Box } from "@mui/material";
 
-// ── 전략별 현황 전광판 (design-260615-gh-calc.html 포팅, 테이블만) ──
-// 행: 전략명 / 대기(H 녹·M 노랑) / 픽(P·B 칩) / 단계 / 픽번호 / 적중률% / 번호2 / 전적 / 보조
-// ①단 G1: 값 채움 / ②단 G2·③단 G3: 위치만(빈칸)
+// ── 전략별 현황 전광판 (design-260615-gh-calc.html 260623 신버전 포팅) ──
+// 4개 테이블(G1~G4) · 각 16컬럼 · 10행.
+// 행: wait(대기 H녹/M노랑) / pick(P·B 칩) / pct(적중률%) / rec(전적) / rec2(보조)
+//     / pick2(보조픽) / pct2(적중률2) / stage(단계) / idx1(배팅액) / idx2(PnL)
+// R쌍 분리(병합 없음). 각 전략 세트 뒤 OLD/NEW 컬럼.
+//   NEW = 합성본(A세트→AAR, S세트→SSR#, 드림R세트→실데이터). OLD = 위치만(빈칸, 추후 연결).
+// 실데이터: A/AR/AAR/D/G/TN/ONE/TWO/P/B/J(stats) + SQ/SR/SSR/SX(트랙). 그 외(허니비/W111/NC/6MX 등)는 칸만.
+
+const HC_BLUE = "#2f9bff";
+const HC_RED = "#ff5b5b";
 
 const COLOR = {
-  A: "#0066fe", AR: "#c0504d", SQ1: "#0063d6", SQ2: "#0063d6", SQ3: "#0063d6",
+  A: "#0066fe", AR: "#c0504d",
+  SQ1: "#0063d6", SQ2: "#0063d6", SQ3: "#0063d6",
   S1: "#0063d6", S2: "#0063d6", S3: "#0063d6",
-  SR1: "#c0504d", SR2: "#c0504d", SR3: "#c0504d",
-  SX1: "#0063d6", SX2: "#0063d6", SX3: "#0063d6", D: "#c0504d", G: "#0063d6",
+  S1R: "#c0504d", S2R: "#c0504d", S3R: "#c0504d",
+  SX: "#0063d6", D: "#c0504d", G: "#0063d6",
   허니비: "#c0504d", pattern: "#00a11a", "6MX": "#de6a08",
 };
 const colorOf = (n) => COLOR[n] || (n.endsWith("R") ? "#c0504d" : "#0063d6");
+// 헤더 색: 그룹 범위(headColors) 우선, 없으면 colorOf 폴백.
+function headColorOf(data, i, n) {
+  for (const [a, b, c] of (data.headColors || [])) {
+    if (i >= a && i <= b) return c;
+  }
+  return colorOf(n);
+}
 
-const G1 = {
-  // A AR | SQ1 SQ2 SQ3 | S1 SR1 | S2 SR2 | S3 SR3 | SX1 SX2 SX3 | D G
-  // S1/S2/S3 = SQ1/SQ2/SQ3와 같은 값(라벨만 다름). S+SR이 한 묶음(병합).
-  name: ["A", "AR", "SQ1", "SQ2", "SQ3", "S1", "SR1", "S2", "SR2", "S3", "SR3", "SX1", "SX2", "SX3", "D", "G"],
-  // 그룹 구분선: SQ1(2), S1(5), SX1(11), D(14)
-  gstart: new Set([2, 5, 11, 14]),
-  // R쌍 병합(stage/idx 셀): A(0)+AR / S1(5)+SR1 / S2(7)+SR2 / S3(9)+SR3
-  mergeAt: new Set([0, 5, 7, 9]),
-  // 노란 박스: A+AR / SQ1·SQ2·SQ3 개별 / S1+SR1 / S2+SR2 / S3+SR3 / SX·D·G 개별
-  hlRanges: [[0, 1], [2, 2], [3, 3], [4, 4], [5, 6], [7, 8], [9, 10], [11, 11], [12, 12], [13, 13], [14, 14], [15, 15]],
-  // stage/idx1/idx2 = 픽 미산출(디자인 더미). 병합 자리(A·S1·S2·S3)에만 값, 옆칸은 빈칸.
-  //          A     AR  SQ1     SQ2     SQ3     S1      SR1 S2      SR2 S3      SR3 SX1   SX2   SX3   D   G
-  stage: ["1S-1", "", "1S-1", "1S-1", "1S-1", "1S-0", "", "1S-0", "", "1S-2", "", "1S", "1S", "1S", "", ""],
-  idx1: ["10000.5", "", "10000", "10001", "10002", "10007", "", "10007", "", "10007", "", "10007", "10008", "10009", "", ""],
-  idx2: ["10000", "", "10002", "10003", "10004", "10005", "", "10005", "", "10005", "", "10008", "10009", "10010", "", ""],
-};
-const G2 = {
-  name: ["TN", "ONE", "TWO", "P", "B", "J", "6MX", "허니비", "허니R", "W111", "위너R", "M22", "메가R", "D122", "드림R", "pattern"],
-  gstart: new Set([7, 9, 11, 13, 15]),
-  hlRanges: [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 8], [9, 10], [11, 12], [13, 14], [15, 15]],
-};
-const G3 = {
-  name: ["N1", "N1R", "N2", "N2R", "N3", "N3R", "N4", "N4R", "N5", "N5R", "N6", "N6R", "N7", "N7R", "N8", "N8R"],
-  gstart: new Set([2, 4, 6, 8, 10, 12, 14]),
-  hlRanges: [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 13], [14, 15]],
-};
-
-const MERGE = { stage: 1, idx1: 1, idx2: 1 };
 const HL = "#ffd54f";
 const GSEP = "2px solid #9a9a9a";
 const BASE = "1px solid #555";
 
-// 셀의 노란 박스/그룹선 테두리 계산 (디자인 edgeCls 포팅)
-function edgeStyle(data, i, pos, span = 1) {
-  const end = i + span - 1;
+// 셀의 노란 박스/그룹선 테두리 계산 (디자인 edgeCls 포팅, span=1 고정 — 병합 없음)
+function edgeStyle(data, i, pos) {
   const st = {};
   if (data.gstart && data.gstart.has(i)) st.borderLeft = GSEP;
   (data.hlRanges || []).forEach(([a, b]) => {
-    if (end >= a && i <= b) {
-      if (i <= a) st.borderLeft = `3px solid ${HL}`;
-      if (end >= b) st.borderRight = `3px solid ${HL}`;
+    if (i >= a && i <= b) {
+      if (i === a) st.borderLeft = `3px solid ${HL}`;
+      if (i === b) st.borderRight = `3px solid ${HL}`;
       if (pos === "head") st.borderTop = `3px solid ${HL}`;
       if (pos === "last") st.borderBottom = `3px solid ${HL}`;
     }
@@ -61,6 +47,41 @@ function edgeStyle(data, i, pos, span = 1) {
   return st;
 }
 
+// ── 테이블 정의 (전략명 + 그룹선/노란박스/헤더색). 값은 실데이터로 채움. ──
+// G1: A/AR 세트 + SQ1/SQ2/SQ3 세트(각 뒤 OLD/NEW). NEW=합성본, OLD=위치만.
+const G1n = ["A", "AR", "OLD", "NEW", "SQ1", "S1R", "OLD", "NEW", "SQ2", "S2R", "OLD", "NEW", "SQ3", "S3R", "OLD", "NEW"];
+const G1 = {
+  name: G1n,
+  gstart: new Set([4, 8, 12]),
+  hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
+  headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
+};
+// G2: SX1/2/3 + 6MX + D/G + TN/ONE/TWO/P/B/J + G(H1)~G(%0)(칸만)
+const G2n = ["SX1", "SX2", "SX3", "6MX", "D", "G", "TN", "ONE", "TWO", "P", "B", "J", "G(H1)", "G(H0)", "G(%1)", "G(%0)"];
+const G2 = {
+  name: G2n,
+  gstart: new Set([3, 4, 12]),
+  hlRanges: [[0, 0], [1, 1], [2, 2], [3, 3], [4, 8], [9, 11], [12, 15]],
+  headColors: [[0, 3, HC_BLUE], [4, 8, HC_RED], [9, 11, HC_BLUE], [12, 15, HC_RED]],
+};
+// G3: 허니비/W111/M22/D112 세트(각 뒤 OLD/NEW). 백엔드 미구현 → 칸만.
+const G3n = ["허니비", "허니R", "OLD", "NEW", "W111", "위너R", "OLD", "NEW", "M22", "메가R", "OLD", "NEW", "D112", "드림R", "OLD", "NEW"];
+const G3 = {
+  name: G3n,
+  gstart: new Set([4, 8, 12]),
+  hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
+  headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
+};
+// G4: NC세트 + 이전3 + 빈칸. 칸만. (6MX는 G2 SX3 뒤로 이동)
+const G4n = ["NC", "NCR", "OLD", "NEW", "이전3", "", "", "", "", "", "", "", "", "", "", ""];
+const G4 = {
+  name: G4n,
+  gstart: new Set([4]),
+  hlRanges: [[0, 3], [4, 4]],
+  headColors: [[0, 3, HC_BLUE], [4, 4, HC_RED]],
+};
+
+// ── 셀 렌더 헬퍼 ──
 const recHTML = (v) => {
   const m = v.match(/^(\d+)-(\d+)(\/\d+)$/);
   return m ? (<><span>{m[1]}-</span><b style={{ color: "#66bb6a" }}>{m[2]}</b><span>{m[3]}</span></>) : v;
@@ -88,32 +109,13 @@ function Chip({ v }) {
   );
 }
 
-// 병합(stage/idx1/idx2) 처리 행
-function MergeRow({ data, dataKey, render, pos }) {
-  const names = data.name;
-  const arr = data[dataKey] || [];
-  const cells = [];
-  for (let i = 0; i < names.length; i++) {
-    const v = arr[i] || "";
-    if (MERGE[dataKey] && v && data.mergeAt && data.mergeAt.has(i) && (arr[i + 1] === "" || arr[i + 1] === undefined) && i + 1 < names.length) {
-      cells.push(<Box component="td" key={i} colSpan={2} sx={{ ...tdSx, ...edgeStyle(data, i, pos, 2) }}>{render(v)}</Box>);
-      i++;
-    } else if (v === "") {
-      cells.push(<Box component="td" key={i} sx={{ ...tdSx, color: dimColor, ...edgeStyle(data, i, pos, 1) }}>–</Box>);
-    } else {
-      cells.push(<Box component="td" key={i} sx={{ ...tdSx, ...edgeStyle(data, i, pos, 1) }}>{render(v)}</Box>);
-    }
-  }
-  return <tr>{cells}</tr>;
-}
-
-// 단순(병합 없음) 행
+// 단순(병합 없음) 행. 빈값은 회색 대시(–).
 function SimpleRow({ data, dataKey, render, pos }) {
   return (
     <tr>
       {data.name.map((n, i) => {
         const v = (data[dataKey] || [])[i] || "";
-        const sx = { ...tdSx, ...edgeStyle(data, i, pos, 1) };
+        const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
         return v
           ? <Box component="td" key={i} sx={sx}>{render(v)}</Box>
           : <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
@@ -122,72 +124,92 @@ function SimpleRow({ data, dataKey, render, pos }) {
   );
 }
 
+// 어시스트 행 (rec2 다음, 시안 pick2 행): P/B 색 글자 + 값 있는 칸만 #16365c 배경. 빈칸은 dim(–).
+// 어시스트 픽은 (임시) 원래 픽(pick)과 동일. 실제 어시스트 로직은 추후 처리.
+const ASSIST_BG = "#16365c";
+function AssistRow({ data, pos }) {
+  return (
+    <tr>
+      {data.name.map((n, i) => {
+        const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
+        // 어시스트 픽 = (임시) 원래 픽과 동일
+        const v = (data.assist || [])[i] || (data.pick || [])[i] || "";
+        if (!v) return <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
+        const col = v === "P" ? "#1565d8" : v === "B" ? "#e53935" : "#fff";
+        return (
+          <Box component="td" key={i} sx={{ ...sx, backgroundColor: ASSIST_BG }}>
+            <span style={{ color: col, fontWeight: "bold" }}>{v}</span>
+          </Box>
+        );
+      })}
+    </tr>
+  );
+}
+
 function StrategyTable({ data }) {
   return (
-    <Box component="table" sx={{ borderCollapse: "collapse", backgroundColor: "#000", tableLayout: "fixed", width: 1000 }}>
+    <Box component="table" sx={{ borderCollapse: "collapse", backgroundColor: "#000", tableLayout: "fixed", width: 1180 }}>
       <thead>
         <tr>
           {data.name.map((n, i) => (
-            <Box component="th" key={i} sx={{ ...thSx, color: colorOf(n), backgroundColor: "#000", ...edgeStyle(data, i, "head", 1) }}>{n}</Box>
+            <Box component="th" key={i} sx={{ ...thSx, color: headColorOf(data, i, n), backgroundColor: "#000", ...edgeStyle(data, i, "head") }}>{n}</Box>
           ))}
         </tr>
       </thead>
       <tbody>
         <SimpleRow data={data} dataKey="wait" render={waitCell} pos="mid" />
         <SimpleRow data={data} dataKey="pick" render={(v) => <Chip v={v} />} pos="mid" />
-        <MergeRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" />
-        <MergeRow data={data} dataKey="idx1" render={(v) => <span style={{ color: "#fff" }}>{v}</span>} pos="mid" />
         <SimpleRow data={data} dataKey="pct" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" />
-        <MergeRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#69f0ae" }}>{v}</span>} pos="mid" />
         <SimpleRow data={data} dataKey="rec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" />
-        <SimpleRow data={data} dataKey="rec2" render={(v) => <span>{rec2HTML(v)}</span>} pos="last" />
+        <SimpleRow data={data} dataKey="rec2" render={(v) => <span>{rec2HTML(v)}</span>} pos="mid" />
+        <AssistRow data={data} pos="mid" />
+        <SimpleRow data={data} dataKey="pct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" />
+        <SimpleRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" />
+        <SimpleRow data={data} dataKey="idx1" render={(v) => <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>} pos="mid" />
+        <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="last" />
       </tbody>
     </Box>
   );
 }
 
-// ── 실데이터 채우기 ──
-// 픽까지(대기=streak / 픽 / 승률 / 전적)만 채움. stage·idx1·idx2는 디자인값 유지.
+// ── 실데이터 포맷터 ──
 const fmtStreak = (type, count) => {
   if (!type || !count) return "";
   return `${count}${type === "hit" ? "H" : "M"}`;
 };
 const fmtPct = (hit, total) => (total > 0 ? `${(hit / total * 100).toFixed(1)}%` : "");
-// 전적: {전}-{승}/{패} (recHTML이 승=초록·패=노랑 파싱)
 const fmtRec = (total, hit, miss) => `${total}-${hit}/${miss}`;
-// 보조: 최대연승-최대연패
 const fmtRec2 = (mh, mm) => `${mh}-${mm}`;
-// 단계: {마틴단계}S-{3연패수}
 const fmtStage = (step, triple) => (step ? `${step}S-${triple ?? 0}` : "");
-// 배팅액/PnL: 만원 단위(5천=0.5, 1천=0.1). 0이면 빈칸. 만원으로 안 나눠 떨어지면 소수1자리.
-const fmtMan = (won) => {
-  if (won === null || won === undefined) return "";
-  const v = won / 10000;
+const fmtMan = (man) => {
+  if (man === null || man === undefined) return "";
+  const v = Math.round((man || 0) * 10) / 10;
   if (v === 0) return "0";
   return Number.isInteger(v) ? `${v}` : `${v.toFixed(1)}`;
 };
-// 단계별 배팅액 조회 (임시 마틴A amounts 공용)
 const betAt = (amounts, step) => {
   if (!amounts || !step) return null;
   const idx = step - 1;
   return idx >= 0 && idx < amounts.length ? amounts[idx] : null;
 };
+const amountsFor = (ctx, stratKey) => ctx.betAmountsMap && ctx.betAmountsMap[stratKey];
 
-// stats 키 기반 행 데이터
-const fromStats = (stats, nextPicks, key, amounts) => {
-  const s = stats?.[key];
+// stats 키 기반 행 데이터 (A/AR/AAR/AARO/D/G/TN/ONE/TWO/P/B/J)
+const fromStats = (ctx, key) => {
+  const s = ctx.stats?.[key];
   if (!s) return null;
   const total = s.total ?? 0;
+  if (total === 0 && !ctx.nextPicks?.[key]) return null;
+  const amounts = amountsFor(ctx, key);
   return {
     wait: fmtStreak(s.cur_streak_type, s.cur_streak_count),
-    pick: nextPicks?.[key] || "",
-    stage: fmtStage(s.martin_step, s.triple_loss),
-    idx1: fmtMan(betAt(amounts, s.martin_step)),
+    pick: ctx.nextPicks?.[key] || "",
     pct: fmtPct(s.hit ?? 0, total),
-    idx2: fmtMan(s.pnl),
     rec: fmtRec(total, s.hit ?? 0, s.miss ?? 0),
     rec2: fmtRec2(s.max_hit_streak ?? 0, s.max_miss_streak ?? 0),
-    pnl: s.pnl ?? 0,
+    stage: fmtStage(s.martin_step, s.triple_loss),
+    idx1: fmtMan(betAt(amounts, s.martin_step)),
+    idx2: fmtMan(s.pnl),
   };
 };
 // 트랙(sq/sr/ssr/sx) sc# 기반 행 데이터
@@ -196,85 +218,88 @@ const fromTrack = (tracks, scKey, amounts) => {
   const sm = t?.summary;
   if (!sm) return null;
   const total = (sm.total_hit ?? 0) + (sm.total_miss ?? 0);
-  // 트랙 픽: 현재 라운드(current) 셀의 predict
   const cur = (t.round_data || []).find((r) => r.status === "current");
   return {
     wait: fmtStreak(sm.cur_streak?.type, sm.cur_streak?.count),
     pick: cur?.predict || "",
-    stage: fmtStage(sm.martin_step, sm.triple_loss),
-    idx1: fmtMan(betAt(amounts, sm.martin_step)),
     pct: fmtPct(sm.total_hit ?? 0, total),
-    idx2: fmtMan(sm.pnl),
     rec: fmtRec(total, sm.total_hit ?? 0, sm.total_miss ?? 0),
     rec2: fmtRec2(sm.max_hit_streak ?? 0, sm.max_miss_streak ?? 0),
-    pnl: sm.pnl ?? 0,
+    stage: fmtStage(sm.martin_step, sm.triple_loss),
+    idx1: fmtMan(betAt(amounts, sm.martin_step)),
+    idx2: fmtMan(sm.pnl),
   };
 };
 
-// G1/G2 이름 → 실데이터 행. 매핑 없으면 null(디자인값 유지 안 하고 빈칸 처리).
-function buildRowData(name, ctx) {
-  const { stats, nextPicks, sqTracks, srTracks, ssrTracks, sxTracks, betAmounts } = ctx;
-  // stats 직접 매핑되는 섹션 (P/B 포함 — 서버가 60% 비율 기준으로 round/next 픽 산출)
-  const STAT_KEYS = { A: "A", AR: "AR", AAR: "AAR", D: "D", G: "G", TN: "TN", ONE: "ONE", TWO: "TWO", J: "J", P: "P", B: "B" };
-  if (STAT_KEYS[name]) return fromStats(stats, nextPicks, STAT_KEYS[name], betAmounts);
-  // SSR/SR을 S보다 먼저 매칭(S1이 SR1보다 앞서지 않게). S1/S2/S3 = SQ(sc#)와 동일.
-  const M = name.match(/^(SQ|SSR|SR|SX|S)([123])$/);
-  if (M) {
-    const sc = `sc${M[2]}`;
-    const tracks = { SQ: sqTracks, S: sqTracks, SR: srTracks, SSR: ssrTracks, SX: sxTracks }[M[1]];
-    return fromTrack(tracks, sc, betAmounts);
+// 컬럼명(라벨 + 컬럼 인덱스) → 실데이터 행. 매핑 없으면 null(빈칸).
+// OLD는 항상 null(위치만). NEW는 직전 세트 합성본을 연결.
+function buildColData(label, i, data, ctx) {
+  // stats 직접 매핑
+  const STAT_KEYS = { A: "A", AR: "AR", D: "D", G: "G", TN: "TN", ONE: "ONE", TWO: "TWO", J: "J", P: "P", B: "B" };
+  if (STAT_KEYS[label]) return fromStats(ctx, STAT_KEYS[label]);
+  // SQ1/2/3 (G1 메인) — SQ 트랙
+  let m = label.match(/^SQ([123])$/);
+  if (m) return fromTrack(ctx.sqTracks, `sc${m[1]}`, amountsFor(ctx, `SQ${m[1]}`));
+  // SX1/2/3 (G2) — SX 트랙 sc1/2/3
+  m = label.match(/^SX([123])$/);
+  if (m) return fromTrack(ctx.sxTracks, `sc${m[1]}`, amountsFor(ctx, `SX${m[1]}`));
+  // S1R/S2R/S3R (G1) — SR 트랙
+  m = label.match(/^S([123])R$/);
+  if (m) return fromTrack(ctx.srTracks, `sc${m[1]}`, amountsFor(ctx, `SQ${m[1]}`));
+  // NEW: 직전 세트 합성본 연결 (G1만 실데이터, 나머지 테이블은 칸만)
+  if (label === "NEW") {
+    if (data === G1) {
+      // 컬럼 3 = A세트 NEW → AAR / 컬럼 7/11/15 = S세트 NEW → SSR1/2/3
+      if (i === 3) return fromStats(ctx, "AAR");
+      const sIdx = { 7: 1, 11: 2, 15: 3 }[i];
+      if (sIdx) return fromTrack(ctx.ssrTracks, `sc${sIdx}`, amountsFor(ctx, `SSR${sIdx}`));
+    }
+    return null;
   }
+  // OLD: A세트(컬럼2)→AARO stats / S세트(컬럼6/10/14)→SSRO sc1/2/3 (260627)
+  if (label === "OLD") {
+    if (data === G1) {
+      if (i === 2) return fromStats(ctx, "AARO");
+      const sIdx = { 6: 1, 10: 2, 14: 3 }[i];
+      if (sIdx) return fromTrack(ctx.ssroTracks, `sc${sIdx}`, amountsFor(ctx, `SSR${sIdx}`));
+    }
+    return null;  // G3 등 다른 테이블의 OLD는 위치만
+  }
+  // 그 외(허니비/W111/NC/6MX/G(H1) 등): 위치만
   return null;
 }
 
-// base(디자인 data)에 실데이터 덮어쓰기 — wait/pick/stage/pct/rec.
-// stage는 병합 구조 표현이라, 데이터 없는 행은 base 더미값을 유지(비우지 않음).
+// 테이블 정의 + 실데이터 → 값이 채워진 data
 function withLiveData(base, ctx) {
-  const wait = [...(base.wait || base.name.map(() => ""))];
-  const pick = [...(base.pick || base.name.map(() => ""))];
-  const stage = [...(base.stage || base.name.map(() => ""))];
-  const idx1 = [...(base.idx1 || base.name.map(() => ""))];
-  const pct = [...(base.pct || base.name.map(() => ""))];
-  const idx2 = [...(base.idx2 || base.name.map(() => ""))];
-  const rec = [...(base.rec || base.name.map(() => ""))];
-  const rec2 = [...(base.rec2 || base.name.map(() => ""))];
-  // 병합(colSpan) 행: 병합 시작칸(mergeAt)에만 값, 옆칸은 빈칸. 단독칸은 그대로.
-  const setMerged = (arr, i, val) => {
-    const isPair = base.mergeAt && (base.mergeAt.has(i) || base.mergeAt.has(i - 1));
-    if (!isPair || base.mergeAt.has(i)) arr[i] = val;
-    else arr[i] = ""; // 병합 옆칸 → 비움
-  };
-  // 병합 셀(단계/배팅액/PnL)은 합성 전략 값으로 표시:
-  //   A+AR 칸 → AAR / S1+SR1 → SSR1 / S2+SR2 → SSR2 / S3+SR3 → SSR3
-  const MERGE_SOURCE = { A: "AAR", S1: "SSR1", S2: "SSR2", S3: "SSR3" };
-  base.name.forEach((nm, i) => {
-    const rd = buildRowData(nm, ctx);
-    if (!rd) { // 데이터 없는 행: 비병합 행만 비우고 stage/idx(병합 더미)는 유지
-      wait[i] = ""; pick[i] = ""; pct[i] = ""; rec[i] = ""; rec2[i] = "";
-      return;
-    }
-    wait[i] = rd.wait; pick[i] = rd.pick; pct[i] = rd.pct; rec[i] = rd.rec; rec2[i] = rd.rec2;
-    // 병합 시작칸이면 stage/idx는 합성 전략(AAR/SSR#) 값으로
-    const src = MERGE_SOURCE[nm];
-    const md = (src && buildRowData(src, ctx)) || rd;
-    setMerged(stage, i, md.stage);
-    setMerged(idx1, i, md.idx1);
-    setMerged(idx2, i, md.idx2);
+  const keys = ["wait", "pick", "pct", "rec", "rec2", "assist", "pct2", "stage", "idx1", "idx2"];
+  const out = { ...base };
+  keys.forEach((k) => { out[k] = base.name.map(() => ""); });
+  base.name.forEach((label, i) => {
+    if (!label) return; // 빈 컬럼
+    const rd = buildColData(label, i, base, ctx);
+    if (!rd) return;
+    keys.forEach((k) => { if (rd[k] != null) out[k][i] = rd[k]; });
+    // ── 어시스트 기반 행 (임시: 어시스트=원래픽이라 원래 값과 동일) ──
+    //   원래 픽의 단계는 wait 행(2H/2M 연승·연패)으로 알 수 있으므로,
+    //   stage·idx1(현 회차 배팅)·idx2(누적 PnL)는 모두 '어시스트' 기준으로 표시한다.
+    //   실제 어시스트 로직 붙으면 어시스트 픽 시리즈로 재산출해 assist_* 값만 교체.
+    if (rd.assist == null && rd.pick != null) out.assist[i] = rd.pick;
+    if (rd.pct2 == null && rd.pct != null) out.pct2[i] = rd.pct;
+    if (rd.assist_stage != null) out.stage[i] = rd.assist_stage;   // 어시스트 단계
+    if (rd.assist_idx1 != null) out.idx1[i] = rd.assist_idx1;      // 어시스트 현 회차 배팅
+    if (rd.assist_idx2 != null) out.idx2[i] = rd.assist_idx2;      // 어시스트 누적 PnL
   });
-  return { ...base, wait, pick, stage, idx1, pct, idx2, rec, rec2 };
+  return out;
 }
 
-export default function GhStrategyBoard({ stats, nextPicks, sqTracks, srTracks, ssrTracks, sxTracks, betAmounts }) {
+export default function GhStrategyBoard({ stats, nextPicks, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, betAmounts, betAmountsMap }) {
   const hasData = !!(stats || sqTracks);
-  const ctx = { stats, nextPicks, sqTracks, srTracks, ssrTracks, sxTracks, betAmounts };
-  const g1 = hasData ? withLiveData(G1, ctx) : G1;
-  const g2 = hasData ? withLiveData(G2, ctx) : G2;
+  const ctx = { stats, nextPicks, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, betAmounts, betAmountsMap };
+  const tables = [G1, G2, G3, G4].map((t) => (hasData ? withLiveData(t, ctx) : t));
   return (
     <Box sx={{ overflowX: "auto", mb: 2 }}>
       <Box sx={{ display: "inline-block", backgroundColor: "#000" }}>
-        <StrategyTable data={g1} />
-        <StrategyTable data={g2} />
-        <StrategyTable data={G3} />
+        {tables.map((t, idx) => <StrategyTable key={idx} data={t} />)}
       </Box>
     </Box>
   );
