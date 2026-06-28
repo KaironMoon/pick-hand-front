@@ -13,7 +13,7 @@ const HC_RED = "#ff5b5b";
 
 const COLOR = {
   A: "#0066fe", AR: "#c0504d",
-  SQ1: "#0063d6", SQ2: "#0063d6", SQ3: "#0063d6",
+  S1: "#0063d6", S2: "#0063d6", S3: "#0063d6",
   S1: "#0063d6", S2: "#0063d6", S3: "#0063d6",
   S1R: "#c0504d", S2R: "#c0504d", S3R: "#c0504d",
   SX: "#0063d6", D: "#c0504d", G: "#0063d6",
@@ -48,37 +48,38 @@ function edgeStyle(data, i, pos) {
 }
 
 // ── 테이블 정의 (전략명 + 그룹선/노란박스/헤더색). 값은 실데이터로 채움. ──
-// G1: A/AR 세트 + SQ1/SQ2/SQ3 세트(각 뒤 OLD/NEW). NEW=합성본, OLD=위치만.
-const G1n = ["A", "AR", "OLD", "NEW", "SQ1", "S1R", "OLD", "NEW", "SQ2", "S2R", "OLD", "NEW", "SQ3", "S3R", "OLD", "NEW"];
+// G1: A/AR 세트 + S1/S2/S3 세트. 각 세트 OLD/NEW = AARO/AARN, SSROn/SSRNn. (260628)
+const G1n = ["A", "AR", "AARO", "AARN", "S1", "S1R", "SSRO1", "SSRN1", "S2", "S2R", "SSRO2", "SSRN2", "S3", "S3R", "SSRO3", "SSRN3"];
 const G1 = {
   name: G1n,
   gstart: new Set([4, 8, 12]),
   hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
   headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
 };
-// G2: SX1/2/3 + 6MX + D/G + TN/ONE/TWO/P/B/J + G(H1)~G(%0)(칸만)
-const G2n = ["SX1", "SX2", "SX3", "6MX", "D", "G", "TN", "ONE", "TWO", "P", "B", "J", "G(H1)", "G(H0)", "G(%1)", "G(%0)"];
+// G2: FOR1/2/3(따라) + FOR1X/2X/3X(반대) + D/G/TN/ONE/TWO + P/B/J/6MX + 빈칸1
+// FOR1/2/3·FOR1X/2X/3X 각각 한 묶음(노란박스). 헤더색은 묶음별 번갈아(파/빨).
+const G2n = ["FOR1", "FOR2", "FOR3", "FOR1X", "FOR2X", "FOR3X", "D", "G", "TN", "ONE", "TWO", "P", "B", "J", "6MX", ""];
 const G2 = {
   name: G2n,
-  gstart: new Set([3, 4, 12]),
-  hlRanges: [[0, 0], [1, 1], [2, 2], [3, 3], [4, 8], [9, 11], [12, 15]],
-  headColors: [[0, 3, HC_BLUE], [4, 8, HC_RED], [9, 11, HC_BLUE], [12, 15, HC_RED]],
+  gstart: new Set([3, 6, 11, 14]),
+  hlRanges: [[0, 2], [3, 5], [6, 10], [11, 13], [14, 14]],
+  headColors: [[0, 2, HC_BLUE], [3, 5, HC_RED], [6, 10, HC_BLUE], [11, 13, HC_RED], [14, 14, "#de6a08"]],
 };
-// G3: 허니비/W111/M22/D112 세트(각 뒤 OLD/NEW). 백엔드 미구현 → 칸만.
-const G3n = ["허니비", "허니R", "OLD", "NEW", "W111", "위너R", "OLD", "NEW", "M22", "메가R", "OLD", "NEW", "D112", "드림R", "OLD", "NEW"];
+// G3: G(H1~%0)(칸만) + 허니비/W111/M22 세트(정픽/R/SRO/SRN).
+const G3n = ["G(H1)", "G(H0)", "G(%1)", "G(%0)", "허니비", "허니R", "허니SRO", "허니SRN", "W111", "위너R", "위너SRO", "위너SRN", "M22", "메가R", "메가SRO", "메가SRN"];
 const G3 = {
   name: G3n,
   gstart: new Set([4, 8, 12]),
   hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
   headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
 };
-// G4: NC세트 + 이전3 + 빈칸. 칸만. (6MX는 G2 SX3 뒤로 이동)
-const G4n = ["NC", "NCR", "OLD", "NEW", "이전3", "", "", "", "", "", "", "", "", "", "", ""];
+// G4: D112세트 + NC세트(정픽/R/SRO/SRN) + SQ1/2/3(쿼터배팅, S와 픽 공유) + 빈칸 5.
+const G4n = ["D112", "드림R", "드림SRO", "드림SRN", "NC", "NCR", "NCSRO", "NCSRN", "SQ1", "SQ2", "SQ3", "", "", "", "", ""];
 const G4 = {
   name: G4n,
-  gstart: new Set([4]),
-  hlRanges: [[0, 3], [4, 4]],
-  headColors: [[0, 3, HC_BLUE], [4, 4, HC_RED]],
+  gstart: new Set([4, 8]),
+  hlRanges: [[0, 3], [4, 7], [8, 10]],
+  headColors: [[0, 3, HC_RED], [4, 7, HC_BLUE], [8, 10, HC_BLUE]],
 };
 
 // ── 셀 렌더 헬퍼 ──
@@ -109,10 +110,11 @@ function Chip({ v }) {
   );
 }
 
-// 단순(병합 없음) 행. 빈값은 회색 대시(–).
-function SimpleRow({ data, dataKey, render, pos }) {
+// 단순(병합 없음) 행. 빈값은 회색 대시(–). label 있으면 맨 앞 라벨 셀.
+function SimpleRow({ data, dataKey, render, pos, label, labelColor }) {
   return (
     <tr>
+      {label != null && <LblCell text={label} color={labelColor} edge={pos === "last" ? "last" : undefined} />}
       {data.name.map((n, i) => {
         const v = (data[dataKey] || [])[i] || "";
         const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
@@ -127,9 +129,10 @@ function SimpleRow({ data, dataKey, render, pos }) {
 // 어시스트 행 (rec2 다음, 시안 pick2 행): P/B 색 글자 + 값 있는 칸만 #16365c 배경. 빈칸은 dim(–).
 // 어시스트 픽은 (임시) 원래 픽(pick)과 동일. 실제 어시스트 로직은 추후 처리.
 const ASSIST_BG = "#16365c";
-function AssistRow({ data, pos }) {
+function AssistRow({ data, pos, label, labelColor }) {
   return (
     <tr>
+      {label != null && <LblCell text={label} color={labelColor} edge={pos === "last" ? "last" : undefined} />}
       {data.name.map((n, i) => {
         const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
         // 어시스트 픽 = (임시) 원래 픽과 동일
@@ -146,27 +149,48 @@ function AssistRow({ data, pos }) {
   );
 }
 
+// 행 라벨 (왼쪽 고정 컬럼). [텍스트, 글자색]. 어시스트 블록만 빨강. (시안 동일)
+const LBL_RED = "#ff5252";
+const lblSx = { ...tdSx, color: "#fff", fontWeight: "bold", background: "#141414", textAlign: "right",
+  position: "sticky", left: 0, zIndex: 2,
+  borderLeft: `3px solid ${HL}`, borderRight: `3px solid ${HL}` };
+function LblCell({ text, color = "#fff", edge }) {
+  const sx = { ...lblSx, color };
+  if (edge === "head") sx.borderTop = `3px solid ${HL}`;
+  if (edge === "last") sx.borderBottom = `3px solid ${HL}`;
+  const Tag = edge === "head" ? "th" : "td";
+  return <Box component={Tag} sx={sx}>{text}</Box>;
+}
+
 function StrategyTable({ data }) {
   return (
-    <Box component="table" sx={{ borderCollapse: "collapse", backgroundColor: "#000", tableLayout: "fixed", width: 1180 }}>
+    <Box component="table" sx={{ borderCollapse: "collapse", backgroundColor: "#000", tableLayout: "fixed", width: 1020 }}>
       <thead>
         <tr>
+          <LblCell text="섹션" edge="head" />
           {data.name.map((n, i) => (
             <Box component="th" key={i} sx={{ ...thSx, color: headColorOf(data, i, n), backgroundColor: "#000", ...edgeStyle(data, i, "head") }}>{n}</Box>
           ))}
         </tr>
       </thead>
       <tbody>
-        <SimpleRow data={data} dataKey="wait" render={waitCell} pos="mid" />
-        <SimpleRow data={data} dataKey="pick" render={(v) => <Chip v={v} />} pos="mid" />
-        <SimpleRow data={data} dataKey="pct" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" />
-        <SimpleRow data={data} dataKey="rec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" />
-        <SimpleRow data={data} dataKey="rec2" render={(v) => <span>{rec2HTML(v)}</span>} pos="mid" />
-        <AssistRow data={data} pos="mid" />
-        <SimpleRow data={data} dataKey="pct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" />
-        <SimpleRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" />
-        <SimpleRow data={data} dataKey="idx1" render={(v) => <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>} pos="mid" />
-        <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="last" />
+        <SimpleRow data={data} dataKey="wait" render={waitCell} pos="mid" label="연속" />
+        <SimpleRow data={data} dataKey="pick" render={(v) => <Chip v={v} />} pos="mid" label="생성" />
+        <SimpleRow data={data} dataKey="stage1" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" />
+        <SimpleRow data={data} dataKey="pct" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" />
+        <SimpleRow data={data} dataKey="rec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="총전적" />
+        <SimpleRow data={data} dataKey="rec2" render={(v) => <span>{rec2HTML(v)}</span>} pos="mid" label="최다" />
+        <AssistRow data={data} pos="mid" label="어시스트" labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="wait2" render={waitCell} pos="mid" label="연속" labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="pct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="idx1" render={(v) => <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>} pos="mid" label="회차P" labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label="누적P" labelColor={LBL_RED} />
+        {/* 쿼터 블록 (쿼터 로직 미구현 → 데이터 비움) */}
+        <SimpleRow data={data} dataKey="qrec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="쿼터전적" />
+        <SimpleRow data={data} dataKey="qstage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" />
+        <SimpleRow data={data} dataKey="qidx1" render={(v) => <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>} pos="mid" label="쿼터P" />
+        <SimpleRow data={data} dataKey="qidx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="last" label="누적P" />
       </tbody>
     </Box>
   );
@@ -194,6 +218,17 @@ const betAt = (amounts, step) => {
 };
 const amountsFor = (ctx, stratKey) => ctx.betAmountsMap && ctx.betAmountsMap[stratKey];
 
+// 쿼터(3회묶음 1승) 블록: 쿼터전적/단계/쿼터P/누적P
+const quarterRow = (q, amounts) => {
+  if (!q) return {};
+  return {
+    qrec: `${q.total_q ?? 0}-${q.win_q ?? 0}/${q.lose_q ?? 0}`,
+    qstage: fmtStage(q.martin_step, 0),
+    qidx1: fmtMan(betAt(amounts, q.martin_step)),
+    qidx2: fmtMan(q.pnl),
+  };
+};
+
 // stats 키 기반 행 데이터 (A/AR/AAR/AARO/D/G/TN/ONE/TWO/P/B/J)
 const fromStats = (ctx, key) => {
   const s = ctx.stats?.[key];
@@ -207,9 +242,11 @@ const fromStats = (ctx, key) => {
     pct: fmtPct(s.hit ?? 0, total),
     rec: fmtRec(total, s.hit ?? 0, s.miss ?? 0),
     rec2: fmtRec2(s.max_hit_streak ?? 0, s.max_miss_streak ?? 0),
-    stage: fmtStage(s.martin_step, s.triple_loss),
+    stage1: fmtStage(s.martin_step, s.triple_loss),   // 생성(원래픽) 단계
+    stage: fmtStage(s.martin_step, s.triple_loss),    // 어시스트 단계 (임시: 동일)
     idx1: fmtMan(betAt(amounts, s.martin_step)),
     idx2: fmtMan(s.pnl),
+    ...quarterRow(s.quarter, amounts),
   };
 };
 // 트랙(sq/sr/ssr/sx) sc# 기반 행 데이터
@@ -225,53 +262,72 @@ const fromTrack = (tracks, scKey, amounts) => {
     pct: fmtPct(sm.total_hit ?? 0, total),
     rec: fmtRec(total, sm.total_hit ?? 0, sm.total_miss ?? 0),
     rec2: fmtRec2(sm.max_hit_streak ?? 0, sm.max_miss_streak ?? 0),
+    stage1: fmtStage(sm.martin_step, sm.triple_loss),
     stage: fmtStage(sm.martin_step, sm.triple_loss),
     idx1: fmtMan(betAt(amounts, sm.martin_step)),
     idx2: fmtMan(sm.pnl),
+    ...quarterRow(sm.quarter, amounts),
   };
 };
 
 // 컬럼명(라벨 + 컬럼 인덱스) → 실데이터 행. 매핑 없으면 null(빈칸).
 // OLD는 항상 null(위치만). NEW는 직전 세트 합성본을 연결.
 function buildColData(label, i, data, ctx) {
-  // stats 직접 매핑
+  // stats 직접 매핑 (서브게임 허니비/W111/M22/D112 포함 — 정픽만, R쌍은 위치만)
   const STAT_KEYS = { A: "A", AR: "AR", D: "D", G: "G", TN: "TN", ONE: "ONE", TWO: "TWO", J: "J", P: "P", B: "B" };
   if (STAT_KEYS[label]) return fromStats(ctx, STAT_KEYS[label]);
-  // SQ1/2/3 (G1 메인) — SQ 트랙
-  let m = label.match(/^SQ([123])$/);
-  if (m) return fromTrack(ctx.sqTracks, `sc${m[1]}`, amountsFor(ctx, `SQ${m[1]}`));
-  // SX1/2/3 (G2) — SX 트랙 sc1/2/3
-  m = label.match(/^SX([123])$/);
-  if (m) return fromTrack(ctx.sxTracks, `sc${m[1]}`, amountsFor(ctx, `SX${m[1]}`));
-  // S1R/S2R/S3R (G1) — SR 트랙
+  // 서브게임 세트: 정픽/R/SRO/SRN — stats 키가 라벨과 동일. (허니비/허니R/허니SRO/허니SRN 등 + NC계열)
+  const SUBGAME_LABELS = ["허니비", "허니R", "허니SRO", "허니SRN", "W111", "위너R", "위너SRO", "위너SRN",
+    "M22", "메가R", "메가SRO", "메가SRN", "D112", "드림R", "드림SRO", "드림SRN",
+    "NC", "NCR", "NCSRO", "NCSRN"];
+  if (SUBGAME_LABELS.includes(label)) return fromStats(ctx, label);
+  // G(H1/M1/%1/%0) — 다른 섹션 메트릭으로 산출된 픽. 전광판 G(H0)=백엔드 G(M1).
+  const G_LABEL_KEY = { "G(H1)": "G(H1)", "G(H0)": "G(M1)", "G(%1)": "G(%1)", "G(%0)": "G(%0)" };
+  if (G_LABEL_KEY[label]) return fromStats(ctx, G_LABEL_KEY[label]);
+  // FOR1X/2X/3X (G2) — 전 도막 반대픽 트랙(sxTracks) sc1/2/3
+  let m = label.match(/^FOR([123])X$/);
+  if (m) return fromTrack(ctx.sxTracks, `sc${m[1]}`, amountsFor(ctx, `FOR${m[1]}X`));
+  // FOR1/2/3 (G4) — 전 도막 따라가기 트랙(forTracks) sc1/2/3
+  m = label.match(/^FOR([123])$/);
+  if (m) return fromTrack(ctx.forTracks, `sc${m[1]}`, amountsFor(ctx, `FOR${m[1]}`));
+  // S1R/S2R/S3R (G1) — SR 트랙 (S1보다 먼저 매치)
   m = label.match(/^S([123])R$/);
-  if (m) return fromTrack(ctx.srTracks, `sc${m[1]}`, amountsFor(ctx, `SQ${m[1]}`));
-  // NEW: 직전 세트 합성본 연결 (G1만 실데이터, 나머지 테이블은 칸만)
-  if (label === "NEW") {
-    if (data === G1) {
-      // 컬럼 3 = A세트 NEW → AAR / 컬럼 7/11/15 = S세트 NEW → SSR1/2/3
-      if (i === 3) return fromStats(ctx, "AAR");
-      const sIdx = { 7: 1, 11: 2, 15: 3 }[i];
-      if (sIdx) return fromTrack(ctx.ssrTracks, `sc${sIdx}`, amountsFor(ctx, `SSR${sIdx}`));
+  if (m) return fromTrack(ctx.srTracks, `sc${m[1]}`, amountsFor(ctx, `S${m[1]}`));
+  // S1/S2/S3 (G1 메인) — S 트랙 (회차배팅). 260628 SQ→S 리네임
+  m = label.match(/^S([123])$/);
+  if (m) return fromTrack(ctx.sqTracks, `sc${m[1]}`, amountsFor(ctx, `S${m[1]}`));
+  // SQ1/2/3 (G4) — 쿼터배팅. 픽/연속/적중율/전적은 S와 동일(같은 트랙).
+  //   쿼터 블록(쿼터전적/단계/쿼터P/누적P)은 quarterTracks(3회묶음 1승 판정).
+  m = label.match(/^SQ([123])$/);
+  if (m) {
+    const sc = `sc${m[1]}`;
+    const base = fromTrack(ctx.sqTracks, sc, amountsFor(ctx, `S${m[1]}`)) || {};
+    const q = ctx.quarterTracks?.[sc]?.summary;
+    if (q) {
+      const amts = amountsFor(ctx, `SQ${m[1]}`);
+      base.qrec = `${q.total_q ?? 0}-${q.win_q ?? 0}/${q.lose_q ?? 0}`;
+      base.qstage = fmtStage(q.martin_step, 0);
+      base.qidx1 = fmtMan(betAt(amts, q.martin_step));
+      base.qidx2 = fmtMan(q.pnl);
     }
-    return null;
+    return base;
   }
-  // OLD: A세트(컬럼2)→AARO stats / S세트(컬럼6/10/14)→SSRO sc1/2/3 (260627)
-  if (label === "OLD") {
-    if (data === G1) {
-      if (i === 2) return fromStats(ctx, "AARO");
-      const sIdx = { 6: 1, 10: 2, 14: 3 }[i];
-      if (sIdx) return fromTrack(ctx.ssroTracks, `sc${sIdx}`, amountsFor(ctx, `SSR${sIdx}`));
-    }
-    return null;  // G3 등 다른 테이블의 OLD는 위치만
-  }
-  // 그 외(허니비/W111/NC/6MX/G(H1) 등): 위치만
+  // AARN(A세트 NEW) → AAR 합성 stats / AARO(A세트 OLD) → AARO stats
+  if (label === "AARN") return fromStats(ctx, "AAR");
+  if (label === "AARO") return fromStats(ctx, "AARO");
+  // SSRN1/2/3(S세트 NEW) → SSR 트랙 / SSRO1/2/3(S세트 OLD) → SSRO 트랙
+  m = label.match(/^SSRN([123])$/);
+  if (m) return fromTrack(ctx.ssrTracks, `sc${m[1]}`, amountsFor(ctx, `SSR${m[1]}`));
+  m = label.match(/^SSRO([123])$/);
+  if (m) return fromTrack(ctx.ssroTracks, `sc${m[1]}`, amountsFor(ctx, `SSR${m[1]}`));
+  // OLD/NEW(G3 등 다른 테이블) 및 그 외(허니비/W111/NC/6MX/G(H1)): 위치만
   return null;
 }
 
 // 테이블 정의 + 실데이터 → 값이 채워진 data
 function withLiveData(base, ctx) {
-  const keys = ["wait", "pick", "pct", "rec", "rec2", "assist", "pct2", "stage", "idx1", "idx2"];
+  const keys = ["wait", "pick", "stage1", "pct", "rec", "rec2", "assist", "wait2", "pct2", "stage", "idx1", "idx2",
+    "qrec", "qstage", "qidx1", "qidx2"];
   const out = { ...base };
   keys.forEach((k) => { out[k] = base.name.map(() => ""); });
   base.name.forEach((label, i) => {
@@ -280,21 +336,20 @@ function withLiveData(base, ctx) {
     if (!rd) return;
     keys.forEach((k) => { if (rd[k] != null) out[k][i] = rd[k]; });
     // ── 어시스트 기반 행 (임시: 어시스트=원래픽이라 원래 값과 동일) ──
-    //   원래 픽의 단계는 wait 행(2H/2M 연승·연패)으로 알 수 있으므로,
-    //   stage·idx1(현 회차 배팅)·idx2(누적 PnL)는 모두 '어시스트' 기준으로 표시한다.
-    //   실제 어시스트 로직 붙으면 어시스트 픽 시리즈로 재산출해 assist_* 값만 교체.
-    if (rd.assist == null && rd.pick != null) out.assist[i] = rd.pick;
-    if (rd.pct2 == null && rd.pct != null) out.pct2[i] = rd.pct;
-    if (rd.assist_stage != null) out.stage[i] = rd.assist_stage;   // 어시스트 단계
-    if (rd.assist_idx1 != null) out.idx1[i] = rd.assist_idx1;      // 어시스트 현 회차 배팅
-    if (rd.assist_idx2 != null) out.idx2[i] = rd.assist_idx2;      // 어시스트 누적 PnL
+    //   stage·idx1·idx2는 어시스트 기준. 실제 어시스트 로직 붙으면 assist_* 값만 교체.
+    if (rd.assist == null && rd.pick != null) out.assist[i] = rd.pick;      // 어시스트 픽
+    if (rd.wait2 == null && rd.wait != null) out.wait2[i] = rd.wait;        // 어시스트 연속
+    if (rd.pct2 == null && rd.pct != null) out.pct2[i] = rd.pct;            // 어시스트 적중율
+    if (rd.assist_stage != null) out.stage[i] = rd.assist_stage;
+    if (rd.assist_idx1 != null) out.idx1[i] = rd.assist_idx1;
+    if (rd.assist_idx2 != null) out.idx2[i] = rd.assist_idx2;
   });
   return out;
 }
 
-export default function GhStrategyBoard({ stats, nextPicks, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, betAmounts, betAmountsMap }) {
+export default function GhStrategyBoard({ stats, nextPicks, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap }) {
   const hasData = !!(stats || sqTracks);
-  const ctx = { stats, nextPicks, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, betAmounts, betAmountsMap };
+  const ctx = { stats, nextPicks, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap };
   const tables = [G1, G2, G3, G4].map((t) => (hasData ? withLiveData(t, ctx) : t));
   return (
     <Box sx={{ overflowX: "auto", mb: 2 }}>

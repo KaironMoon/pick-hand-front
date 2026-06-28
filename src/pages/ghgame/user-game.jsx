@@ -845,12 +845,14 @@ export default function GhUserGamePage() {
         const WAIT_BG = "#ffffff";  // 흰색 (현재 회차)
         const resBg = (r) => r === "hit" ? HIT_BG : r === "miss" ? MISS_BG : WAIT_BG;
 
-        // sq_tracks 데이터 (sc1/sc2/sc3) — SQ 로드 + 누적 그래프용
-        const sqTracks = picksSnapshot?.sq_tracks?.tracks;
+        // s_tracks 데이터 (sc1/sc2/sc3) — S 로드 + 누적 그래프용 (260628 SQ→S 리네임)
+        const sqTracks = picksSnapshot?.s_tracks?.tracks;
         const srTracks = picksSnapshot?.sr_tracks?.tracks;
         const ssrTracks = picksSnapshot?.ssr_tracks?.tracks;
         const ssroTracks = picksSnapshot?.ssro_tracks?.tracks;
         const sxTracks = picksSnapshot?.sx_tracks?.tracks;
+        const forTracks = picksSnapshot?.for_tracks?.tracks;
+        const quarterTracks = picksSnapshot?.quarter_tracks?.tracks;
 
         return (
           <>
@@ -1328,6 +1330,8 @@ export default function GhUserGamePage() {
             ssrTracks={ssrTracks}
             ssroTracks={ssroTracks}
             sxTracks={sxTracks}
+            forTracks={forTracks}
+            quarterTracks={quarterTracks}
             betAmounts={picksSnapshot?.bet_amounts}
             betAmountsMap={picksSnapshot?.bet_amounts_map}
           />
@@ -1338,7 +1342,7 @@ export default function GhUserGamePage() {
             srTracks={srTracks}
             ssrTracks={ssrTracks}
             sxTracks={sxTracks}
-            pointApplied={!!picksSnapshot?.sq_tracks?.point_applied}
+            pointApplied={!!picksSnapshot?.s_tracks?.point_applied}
             stats={picksSnapshot?.stats}
             roundPicks={picksSnapshot?.round_picks}
             nextPicks={picksSnapshot?.next_picks}
@@ -1367,9 +1371,9 @@ export default function GhUserGamePage() {
                 "1-2": { ONE: "#f44336", TWO: "#2196f3" },
               };
               const N = results.length;
-              const tracks = picksSnapshot?.sq_tracks?.tracks || {};
+              const tracks = picksSnapshot?.s_tracks?.tracks || {};
               const seriesFor = (key) => {
-                // S1/S2/S3 → sq_tracks round_data 사용
+                // S1/S2/S3 → s_tracks round_data 사용
                 if (key === "S1" || key === "S2" || key === "S3") {
                   const sckey = key === "S1" ? "sc1" : key === "S2" ? "sc2" : "sc3";
                   const rd = tracks[sckey]?.round_data || [];

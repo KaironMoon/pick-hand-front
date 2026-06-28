@@ -545,12 +545,19 @@ function defaultStrategySetup() {
 // 렌더 순서 + variant. full(old/new+동률시+어시스트): AAR(A-AR), SSR1~3(S-SR). short: 나머지.
 const STRATEGY_SETUP_BOXES = [
   { key: "AAR", variant: "full", aarLabel: "A-AR", label: "A멀티", sections: ["A", "AR", "AARO", "AARN"] },
-  { key: "SSR1", variant: "full", aarLabel: "S-SR", label: "SQ1세트", sections: ["SQ1", "SR1", "SSRO1", "SSRN1"] },
-  { key: "SSR2", variant: "full", aarLabel: "S-SR", label: "SQ2세트", sections: ["SQ2", "SR2", "SSRO2", "SSRN2"] },
-  { key: "SSR3", variant: "full", aarLabel: "S-SR", label: "SQ3세트", sections: ["SQ3", "SR3", "SSRO3", "SSRN3"] },
-  { key: "SX1", variant: "short" },
-  { key: "SX2", variant: "short" },
-  { key: "SX3", variant: "short" },
+  { key: "SSR1", variant: "full", aarLabel: "S-SR", label: "S1세트", sections: ["S1", "SR1", "SSRO1", "SSRN1"] },
+  { key: "SSR2", variant: "full", aarLabel: "S-SR", label: "S2세트", sections: ["S2", "SR2", "SSRO2", "SSRN2"] },
+  { key: "SSR3", variant: "full", aarLabel: "S-SR", label: "S3세트", sections: ["S3", "SR3", "SSRO3", "SSRN3"] },
+  // FOR/SQ 세트: 한 박스 + 멀티섹션(공유 배당). 대표키 amounts를 멤버가 공유(백엔드 별칭).
+  { key: "FOR", variant: "full", label: "FOR세트", sections: ["FOR1", "FOR2", "FOR3"] },
+  { key: "FORX", variant: "full", label: "FORX세트", sections: ["FOR1X", "FOR2X", "FOR3X"] },
+  { key: "SQ", variant: "full", label: "SQ세트", sections: ["SQ1", "SQ2", "SQ3"] },
+  // 서브게임: full 멀티판 (정/R/SRO/SRN + 공유 배당)
+  { key: "허니비", variant: "full", label: "허니비", sections: ["허니비", "허니R", "허니SRO", "허니SRN"] },
+  { key: "W111", variant: "full", label: "위너히트", sections: ["W111", "위너R", "위너SRO", "위너SRN"] },
+  { key: "M22", variant: "full", label: "메가히트", sections: ["M22", "메가R", "메가SRO", "메가SRN"] },
+  { key: "D112", variant: "full", label: "드림히트", sections: ["D112", "드림R", "드림SRO", "드림SRN"] },
+  { key: "NC", variant: "full", label: "나이스초이스", sections: ["NC", "NCR", "NCSRO", "NCSRN"] },
   { key: "D", variant: "short" },
   { key: "G", variant: "short" },
   { key: "TN", variant: "short" },
@@ -789,10 +796,13 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
         <MkInput value={s.unsettled_stop || 0} suffix="S 종료" style={mkTeal} onChange={(v) => onChange({ ...s, unsettled_stop: v })} />
       </tr>
       {/* 10행(full만): 멀티섹션 — 박스별 라벨 (A멀티: A AR AARO AARN / SQn세트: SQn SRn SSROn SSRNn) */}
-      {isFull && (
+      {isFull && (() => {
+        const secs = sections || ["A", "AR", "AARO", "AARN"];
+        const pad = 8 - secs.length * 2;  // 멀티섹션(2) + 섹션×2 = 10 맞추기. 3섹션이면 2칸 빈칸
+        return (
         <tr>
           <td colSpan={2} style={mkBlue}>멀티섹션</td>
-          {(sections || ["A", "AR", "AARO", "AARN"]).map((k, idx) => {
+          {secs.map((k, idx) => {
             // 위치별 색: 0=파랑, 1=빨강, 2=파랑(OLD계), 3=초록(NEW계)
             const lblSx = idx === 1 ? mkRed : idx === 3 ? { ...mkCell, color: "#33CC33", fontWeight: "bold" } : mkBlue;
             const on = s.multi_sections?.[k] ?? true;
@@ -803,8 +813,10 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
               </td>,
             ];
           })}
+          {pad > 0 && <td colSpan={pad} style={mkCell}></td>}
         </tr>
-      )}
+        );
+      })()}
       {/* 11행(full만): 동률시어시스트지정 */}
       {isFull && (
         <tr>
