@@ -7,7 +7,7 @@ import apiCaller from "@/services/api-caller";
 import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
-import GhSqSsrSxRoads from "./components/GhSqSsrSxRoads";
+import GhBigRoad2 from "./components/GhBigRoad2";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 
 // blink 애니메이션
@@ -1325,6 +1325,8 @@ export default function GhUserGamePage() {
           <GhStrategyBoard
             stats={picksSnapshot?.stats}
             nextPicks={picksSnapshot?.next_picks}
+            assistNextPicks={picksSnapshot?.assist_next_picks}
+            assistStats={picksSnapshot?.assist_stats}
             sqTracks={sqTracks}
             srTracks={srTracks}
             ssrTracks={ssrTracks}
@@ -1336,16 +1338,23 @@ export default function GhUserGamePage() {
             betAmountsMap={picksSnapshot?.bet_amounts_map}
           />
 
-          {/* ===== SQ/SSR/SX 로드 ===== */}
-          <GhSqSsrSxRoads
+          {/* ===== 빅로드2 ===== */}
+          <GhBigRoad2
             sqTracks={sqTracks}
             srTracks={srTracks}
             ssrTracks={ssrTracks}
             sxTracks={sxTracks}
-            pointApplied={!!picksSnapshot?.s_tracks?.point_applied}
+            ssroTracks={ssroTracks}
+            forTracks={forTracks}
             stats={picksSnapshot?.stats}
             roundPicks={picksSnapshot?.round_picks}
             nextPicks={picksSnapshot?.next_picks}
+            assistRoundPicks={picksSnapshot?.assist_round_picks}
+            assistNextPicks={picksSnapshot?.assist_next_picks}
+            subgameBasis={picksSnapshot?.subgame_basis}
+            ncRefShoes={picksSnapshot?.nc_ref_shoes}
+            ncRefShoeNo={picksSnapshot?.nc_ref_shoe_no}
+            actualSeq={results.map((r) => r.value).join("")}
           />
           </>
         );

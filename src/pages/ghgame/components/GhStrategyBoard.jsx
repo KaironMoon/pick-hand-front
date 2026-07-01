@@ -14,7 +14,6 @@ const HC_RED = "#ff5b5b";
 const COLOR = {
   A: "#0066fe", AR: "#c0504d",
   S1: "#0063d6", S2: "#0063d6", S3: "#0063d6",
-  S1: "#0063d6", S2: "#0063d6", S3: "#0063d6",
   S1R: "#c0504d", S2R: "#c0504d", S3R: "#c0504d",
   SX: "#0063d6", D: "#c0504d", G: "#0063d6",
   허니비: "#c0504d", pattern: "#00a11a", "6MX": "#de6a08",
@@ -236,9 +235,14 @@ const fromStats = (ctx, key) => {
   const total = s.total ?? 0;
   if (total === 0 && !ctx.nextPicks?.[key]) return null;
   const amounts = amountsFor(ctx, key);
+  const as = ctx.assistStats?.[key];
+  const assistTotal = as?.total ?? 0;
   return {
     wait: fmtStreak(s.cur_streak_type, s.cur_streak_count),
     pick: ctx.nextPicks?.[key] || "",
+    assist: ctx.assistNextPicks?.[key] || ctx.nextPicks?.[key] || "",
+    wait2: as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined,
+    pct2: as ? fmtPct(as.hit ?? 0, assistTotal) : undefined,
     pct: fmtPct(s.hit ?? 0, total),
     rec: fmtRec(total, s.hit ?? 0, s.miss ?? 0),
     rec2: fmtRec2(s.max_hit_streak ?? 0, s.max_miss_streak ?? 0),
@@ -347,9 +351,9 @@ function withLiveData(base, ctx) {
   return out;
 }
 
-export default function GhStrategyBoard({ stats, nextPicks, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap }) {
+export default function GhStrategyBoard({ stats, nextPicks, assistNextPicks, assistStats, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap }) {
   const hasData = !!(stats || sqTracks);
-  const ctx = { stats, nextPicks, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap };
+  const ctx = { stats, nextPicks, assistNextPicks, assistStats, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap };
   const tables = [G1, G2, G3, G4].map((t) => (hasData ? withLiveData(t, ctx) : t));
   return (
     <Box sx={{ overflowX: "auto", mb: 2 }}>
