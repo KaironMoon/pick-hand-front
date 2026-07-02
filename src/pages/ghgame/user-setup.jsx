@@ -479,7 +479,7 @@ const STRAT_DIST_LABELS = { even: "균등", asc: "증가", desc: "감소" };
 
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
 const ASSIST_OPTS = [
-  "SQ(H1)", "SQ(%1)", "Gob(H1)", "Gob(M1)", "Gob(%1)", "Gob(%0)",
+  "SQ(H1)", "SQ(%1)", "Gob(H1)", "Gob(H0)", "Gob(%1)", "Gob(%0)",
   "해당섹션", "해당섹션 반대", "대기후진행",
   "SQ(H1)H&H", "SQ(%1)H&H", "Gob(H1)H&H", "Gob(H%1)H&H", "이전3회차전결과",
 ];
@@ -491,7 +491,7 @@ function defaultPasi() {
     level: lvl,
     assist1: PASI_DEFAULT_ASSIST1[i] || "SQ(H1)",
     pct: lvl === 2 ? 5 : lvl === 6 ? 55 : 0,
-    assist2: "Gob(M1)",
+    assist2: "Gob(H0)",
   }));
 }
 
@@ -552,6 +552,7 @@ const STRATEGY_SETUP_BOXES = [
   { key: "FOR", variant: "full", label: "FOR세트", sections: ["FOR1", "FOR2", "FOR3"] },
   { key: "FORX", variant: "full", label: "FORX세트", sections: ["FOR1X", "FOR2X", "FOR3X"] },
   { key: "SQ", variant: "full", label: "SQ세트", sections: ["SQ1", "SQ2", "SQ3"] },
+  { key: "GOB", variant: "full", label: "G시리즈", sections: ["G(H1)", "G(H0)", "G(%1)", "G(%0)"] },
   // 서브게임: full 멀티판 (정/R/SRO/SRN + 공유 배당)
   { key: "허니비", variant: "full", label: "허니비", sections: ["허니비", "허니R", "허니SRO", "허니SRN"] },
   { key: "W111", variant: "full", label: "위너히트", sections: ["W111", "위너R", "위너SRO", "위너SRN"] },

@@ -285,8 +285,8 @@ function buildColData(label, i, data, ctx) {
     "M22", "메가R", "메가SRO", "메가SRN", "D112", "드림R", "드림SRO", "드림SRN",
     "NC", "NCR", "NCSRO", "NCSRN"];
   if (SUBGAME_LABELS.includes(label)) return fromStats(ctx, label);
-  // G(H1/M1/%1/%0) — 다른 섹션 메트릭으로 산출된 픽. 전광판 G(H0)=백엔드 G(M1).
-  const G_LABEL_KEY = { "G(H1)": "G(H1)", "G(H0)": "G(M1)", "G(%1)": "G(%1)", "G(%0)": "G(%0)" };
+  // G(H1/H0/%1/%0) — 다른 섹션 메트릭으로 산출된 픽.
+  const G_LABEL_KEY = { "G(H1)": "G(H1)", "G(H0)": "G(H0)", "G(%1)": "G(%1)", "G(%0)": "G(%0)" };
   if (G_LABEL_KEY[label]) return fromStats(ctx, G_LABEL_KEY[label]);
   // FOR1X/2X/3X (G2) — 전 도막 반대픽 트랙(sxTracks) sc1/2/3
   let m = label.match(/^FOR([123])X$/);
