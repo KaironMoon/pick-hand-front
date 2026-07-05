@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress, Chip, Tooltip, Snackbar, Alert } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, CircularProgress, Tooltip, Snackbar, Alert } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
@@ -95,6 +95,58 @@ const controlBtnSx = {
   "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" },
 };
 
+function RoundAmountTable({ snapshot, results }) {
+  const table = snapshot?.round_amount_table || {};
+  const cells = table.cells || Array.from({ length: 56 }, (_, idx) => ({ round: idx + 1, amount: 0, pnl: 0, status: null, actual: results?.[idx]?.value || null }));
+  const fmt = (v) => Number(v || 0).toFixed(1);
+  const finalSide = table.total_side;
+  const finalSideColor = finalSide === "P" ? "#1565d8" : finalSide === "B" ? "#e53935" : "#555";
+  const cellSx = (idx) => {
+    const cell = cells[idx] || {};
+    const hasResult = !!(cell.actual || results?.[idx]?.value);
+    const hasBet = Number(cell.amount || 0) > 0;
+    return {
+      width: 86,
+      height: 30,
+      border: "1px solid #3f4650",
+      backgroundColor: hasResult && hasBet ? (cell.status === "hit" ? "#2e9e5b" : "#5b6068") : "#101318",
+      display: "grid",
+      gridTemplateColumns: "22px 1fr",
+      alignItems: "center",
+      overflow: "hidden",
+    };
+  };
+  const roundColor = (idx) => {
+    const v = cells[idx]?.side;
+    if (v === "P") return "#1565d8";
+    if (v === "B") return "#e53935";
+    return "#777";
+  };
+  return (
+    <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 0.4, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1 }}>
+      <Box sx={{ display: "flex", gap: 0.5, justifyContent: "flex-end", width: "100%" }}>
+        <Box sx={{ width: 30, border: "1px solid #3f4650", backgroundColor: finalSideColor, color: "#fff", fontSize: 13, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {finalSide || "-"}
+        </Box>
+        <Box sx={{ width: 150, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 1, py: 0.35, display: "flex", justifyContent: "space-between" }}>
+          <span>합산</span><span>{fmt(table.total_amount)}</span>
+        </Box>
+        <Box sx={{ width: 150, border: "1px solid #3f4650", backgroundColor: "#111821", color: Number(table.total_pnl || 0) >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 1, py: 0.35, display: "flex", justifyContent: "space-between" }}>
+          <span>PnL</span><span>{fmt(table.total_pnl)}</span>
+        </Box>
+      </Box>
+      <Box sx={{ display: "grid", gridTemplateRows: "repeat(8, 30px)", gridAutoFlow: "column", gridAutoColumns: "86px", gap: "2px" }}>
+        {Array.from({ length: 56 }, (_, idx) => (
+          <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${fmt(cells[idx]?.amount)} / PnL ${fmt(cells[idx]?.pnl)}`}>
+            <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
+            <Box sx={{ color: "#fff", fontSize: 11, fontWeight: "bold", textAlign: "right", pr: 0.4 }}>{fmt(cells[idx]?.amount)}</Box>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
 export default function GhUserGamePage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -123,8 +175,7 @@ export default function GhUserGamePage() {
   const [picksSnapshot, setPicksSnapshot] = useState(null);
   const [batExpanded, setBatExpanded] = useState({}); // {`gi-ri`: true} — Bat 셀 전체 표시 토글
   const [trackStreakHidden, setTrackStreakHidden] = useState({}); // {sckey: true} — 트랙 연승/연패 셀 숨김 토글
-  const [chipStreakHidden, setChipStreakHidden] = useState({}); // {chipLabel: true} — 칩 연승/연패 라벨 숨김 토글
-  const [chartGroup, setChartGroup] = useState("S123"); // 누적 step 그래프 표시 그룹
+  const [chartGroup, setChartGroup] = useState("A"); // 빅로드2 누적 그래프 표시 그룹
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
@@ -159,28 +210,7 @@ export default function GhUserGamePage() {
     : results;
   const grid = calculateCircleGrid(gridResults);
 
-  // 마지막 hit/miss 라운드부터 거꾸로 같은 결과가 몇 번 연속되었는지 카운트.
-  // pickAt(i): i번째 라운드의 픽 (없으면 null), seq[i]와 비교해 hit/miss 판정.
-  // 연승/연패 streak은 서버가 계산한 picks_snapshot.stats[key]를 그대로 사용 (프론트 자체 계산 제거).
-  // 서버 _calc_pick_stats가 round_picks vs seq로 cur_streak_type/cur_streak_count 산출 → {type, count}로 변환.
-  const streakOf = (key) => {
-    const s = picksSnapshot?.stats?.[key];
-    if (!s || !s.cur_streak_type || !s.cur_streak_count) return null;
-    return { type: s.cur_streak_type, count: s.cur_streak_count };
-  };
-  const streakA = streakOf("A");
-  const streakD = streakOf("D");
-  const streakG = streakOf("G");
-  const streakTN = streakOf("TN");
-  const streakTWO = streakOf("TWO");
-  const streakONE = streakOf("ONE");
-  const streakAR = streakOf("AR");
-  const streakJ = streakOf("J");
-
   // 백엔드 picks_snapshot에서 픽 정보 가져오기 (프론트 로직 제거됨)
-  const arPick = picksSnapshot?.next_picks?.AR || null;
-  const jPick = picksSnapshot?.next_picks?.J || null;
-  const onePick = picksSnapshot?.next_picks?.ONE || null;
   const roundArList = picksSnapshot?.round_picks?.AR || [];
   const roundJList = picksSnapshot?.round_picks?.J || [];
 
@@ -750,93 +780,6 @@ export default function GhUserGamePage() {
            [   3   ]
       */}
       {(() => {
-        // 2번: 픽 카드
-        const pickImg = (p) => p === "P" ? "/player.png" : p === "B" ? "/banker.png" : "/wait.png";
-        const aPick = pickChangePick || betData?.user_martin?.martin_a?.direction || null;
-        const PICK_LIST = [
-          { label: "A",   img: pickImg(aPick),    color: aPick ? "#90caf9" : "#aaa", streak: streakA },
-          { label: "AR",  img: pickImg(arPick),   color: arPick ? "#ce93d8" : "#aaa", streak: streakAR, badge: picksSnapshot?.modes?.AR === "reverse" ? "⇄" : null },
-          { label: "D",   img: pickImg(decalPick), color: decalPick ? "#ce93d8" : "#aaa", streak: streakD },
-          { label: "G",   img: pickImg(shadowPick), color: shadowPick ? "#ce93d8" : "#aaa", streak: streakG },
-          { label: "TN",  img: pickImg(lscPick),  color: lscPick ? "#90caf9" : "#aaa", streak: streakTN },
-          { label: "J",   img: pickImg(jPick),    color: jPick ? "#90caf9" : "#aaa", streak: streakJ },
-          // 7번째 카드: armed에 따라 ONE / TWO 동적 표시 (260527)
-          (onePick && !twoPick
-            ? { label: "ONE", img: pickImg(onePick), color: "#90caf9", streak: streakONE }
-            : { label: "TWO", img: pickImg(twoPick), color: twoPick ? "#90caf9" : "#aaa", streak: streakTWO }),
-        ];
-        // 2번: 배팅 테이블 정적 데이터
-        const SEC_COLOR = "#5165f3";
-        const BET_GROUPS = [
-          [{ sec: "A" }, { sec: "AR" }, { sec: "AR_RATE" }],
-          [{ sec: "D" }, { sec: "G" }, { sec: "TN" }],
-          [{ sec: "J" }, { sec: "1" }, { sec: "2" }],
-        ];
-        // 1000원 마틴 9단계 (2배 진행, 9단계 cap)
-        const MARTIN_AMOUNTS = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 256000];
-        const calcBatBySec = (sec) => {
-          const SEC_TO_KEY = { "1": "ONE", "2": "TWO" };
-          const key = SEC_TO_KEY[sec] || sec;
-          const s = picksSnapshot?.stats?.[key];
-          if (!s) return 0;
-          let step = 1;
-          if (s.cur_streak_type === "miss") {
-            step = Math.min((s.cur_streak_count || 0) + 1, 9);
-          }
-          return MARTIN_AMOUNTS[step - 1];
-        };
-        // picks_snapshot.stats에서 가져옴 (없으면 0/0/0[0-0])
-        const SEC_TO_KEY = { "1": "ONE", "2": "TWO" };
-        // SEC 라벨 색상: 승률(hit/total) 상위 1~3등 강조
-        const ALL_SECS = ["A", "D", "G", "TN", "AR", "J", "1", "2"];
-        // 순위(rank)는 서버가 stats[key].rank로 내려줌(로직). 색 매핑만 프론트 (260602)
-        const RANK_BG = { 1: "#00e676", 2: "#ff9800", 3: "#ffeb3b" };
-        const secRankBg = (sec) => {
-          const key = SEC_TO_KEY[sec] || sec;
-          const rank = picksSnapshot?.stats?.[key]?.rank;
-          return rank ? (RANK_BG[rank] || null) : null;
-        };
-        // sec → 칩 라벨 매핑 (이 sec를 가리는 칩)
-        const SEC_TO_CHIP = { A: "A", D: "D", G: "G", TN: "TN", AR: "AR", J: "J", "1": "TWO", "2": "TWO" };
-        const fmtStats = (sec) => {
-          const chipKey = SEC_TO_CHIP[sec];
-          if (chipKey && chipStreakHidden[chipKey]) {
-            return null; // 칩 toggle 숨김 상태면 통계도 숨김
-          }
-          const key = SEC_TO_KEY[sec] || sec;
-          const s = picksSnapshot?.stats?.[key];
-          const total = s?.total ?? 0;
-          const hit = s?.hit ?? 0;
-          const miss = s?.miss ?? 0;
-          const mh = s?.max_hit_streak ?? 0;
-          const mm = s?.max_miss_streak ?? 0;
-          return (
-            <>
-              {total}/<span style={{ color: HIT_BG }}>{hit}</span>/<span style={{ color: MISS_BG }}>{miss}</span>[<span style={{ color: HIT_BG }}>{mh}</span>-<span style={{ color: MISS_BG }}>{mm}</span>]
-            </>
-          );
-        };
-        // 만 단위 표시(절대값 ≥ 100,000)는 어두운 톤, 그 외는 밝은 톤
-        const batColor = (v) => {
-          const isMan = Math.abs(v) >= 100000;
-          if (v < 0) return isMan ? "#c62828" : "#ff1744";
-          return isMan ? "#b8860b" : "#ffea00";
-        };
-        // 단축 표시: 10만 이상은 XX만, 그 미만은 그냥 숫자
-        const fmtBatShort = (v) => {
-          const n = Math.abs(v);
-          if (n >= 100000) {
-            return `${Math.floor(n / 10000)}만`;
-          }
-          return n.toLocaleString();
-        };
-        const tdCell = { border: "1px solid #555", padding: "1px 10px", fontSize: 11, lineHeight: 1.2, textAlign: "center", whiteSpace: "nowrap", color: "#e0e0e0", backgroundColor: "#0f1217" };
-        const tdCellBat = { ...tdCell, padding: "1px 6px", minWidth: 50 };
-        const tdCellNarrow = { ...tdCell, padding: "1px 4px" };
-        const thCell = { ...tdCell, color: "#9e9e9e", fontWeight: "bold", backgroundColor: "#161a20" };
-        const thCellBat = { ...thCell, padding: "1px 6px", minWidth: 50 };
-        const thCellNarrow = { ...thCell, padding: "1px 4px" };
-
         // 3번: S1/S2/S3 78셀 그리드 (39열 × 2행 = 78셀, 1~39 / 40~78)
         const COLS = 39;
         const buildRow = (start) => Array.from({ length: COLS }, (_, k) => start + k);
@@ -1223,100 +1166,7 @@ export default function GhUserGamePage() {
             );
           })()}
 
-          {/* ===== 2: 픽 정보부 (이미지15 정적 디자인) ===== */}
-          <Box sx={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: 1, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1, overflowX: "auto" }}>
-            {/* 2-1: 7-픽 카드 + streak */}
-            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "nowrap" }}>
-              {PICK_LIST.map(({ label, img, color, streak, badge }) => (
-                <Box key={label} sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
-                  <Box sx={{ width: 52, height: 52, border: "1px solid #4e4e4e", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", backgroundColor: "#0a0c10" }}>
-                    <img src={img} alt={label} style={{ width: 46, height: 46, objectFit: "contain" }} />
-                    <Typography variant="caption" sx={{ position: "absolute", top: 2, left: 4, fontSize: 10, color, fontWeight: "bold" }}>{label}</Typography>
-                    {badge && (
-                      <Typography variant="caption" sx={{ position: "absolute", top: 1, right: 3, fontSize: 14, lineHeight: 1, color: "#ffeb3b", fontWeight: 900, textShadow: "0 0 2px #000, 0 0 2px #000" }}>{badge}</Typography>
-                    )}
-                  </Box>
-                  {(() => {
-                    const chipHidden = !!chipStreakHidden[label];
-                    const onChipToggle = () => setChipStreakHidden((p) => ({ ...p, [label]: !p[label] }));
-                    if (!streak || chipHidden) {
-                      return (
-                        <Box
-                          onClick={streak ? onChipToggle : undefined}
-                          sx={{ width: 36, height: 22, border: "1px solid #7f7f7f", borderRadius: 1, cursor: streak ? "pointer" : "default" }}
-                        />
-                      );
-                    }
-                    return (
-                      <Box
-                        onClick={onChipToggle}
-                        sx={{ width: 36, height: 22, border: "1px solid #7f7f7f", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", "&:hover": { opacity: 0.8 } }}
-                      >
-                        <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: streak.type === "hit" ? "#4caf50" : "#f44336" }}>
-                          {streak.count}{streak.type === "hit" ? "H" : "M"}
-                        </Typography>
-                      </Box>
-                    );
-                  })()}
-                </Box>
-              ))}
-            </Box>
-            {/* 2-1.5: NEW SEC 7개 미니 테이블 (260527) — 위 픽 카드와 컬럼 정렬, A/AR/D/G/TN/J/(1or2) */}
-            {(() => {
-              const SEC_TO_KEY_NEW = { "1": "ONE", "2": "TWO" };
-              const NEW_SECS_BASE = ["A", "AR", "D", "G", "TN", "J"];
-              // 마지막 컬럼: 현재 ONE/TWO 픽 중 활성된 쪽 라벨 (없으면 "2" 기본)
-              const _onePresent = picksSnapshot?.next_picks?.ONE != null;
-              const _twoPresent = picksSnapshot?.next_picks?.TWO != null;
-              const lastSec = _onePresent && !_twoPresent ? "1" : "2";
-              const NEW_SECS_7 = [...NEW_SECS_BASE, lastSec];
-              const getStat7 = (sec) => {
-                const k = SEC_TO_KEY_NEW[sec] || sec;
-                return picksSnapshot?.stats?.[k] || { total: 0, hit: 0, miss: 0, max_hit_streak: 0, max_miss_streak: 0 };
-              };
-              const rates7 = NEW_SECS_7.map((sec) => {
-                const s = getStat7(sec);
-                return { sec, total: s.total ?? 0, hit: s.hit ?? 0, rate: (s.total ?? 0) > 0 ? (s.hit ?? 0) / s.total : -1 };
-              });
-              // 순위(rank)는 서버가 stats[key].rank로 내려줌(로직). 색 매핑만 프론트 (260602)
-              const RANK_BG_7 = { 1: "#00e676", 2: "#ff9800", 3: "#ffeb3b" };
-              const bgFor7 = (sec) => {
-                const k = SEC_TO_KEY_NEW[sec] || sec;
-                const rank = picksSnapshot?.stats?.[k]?.rank;
-                return rank ? (RANK_BG_7[rank] || null) : null;
-              };
-              const cellBase7 = { border: "1px solid #444", padding: "1px 2px", textAlign: "center", fontSize: 11, color: "#fff", lineHeight: 1.3 };
-              // 픽 카드와 동일한 flex 레이아웃(gap 0.5, flexShrink 0, width 52) → 컬럼 정렬
-              return (
-                <Box sx={{ display: "flex", gap: 0.5, flexWrap: "nowrap" }}>
-                  {NEW_SECS_7.map((sec) => {
-                    const s = getStat7(sec);
-                    const r = rates7.find((x) => x.sec === sec);
-                    const rate = r && r.rate >= 0 ? (r.rate * 100).toFixed(1) : null;
-                    const bg = bgFor7(sec);
-                    return (
-                      <Box key={`sec-mini-${sec}`} sx={{ flexShrink: 0, width: 52 }}>
-                        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-                          <tbody>
-                            <tr><td style={cellBase7}>{s.total ?? 0}</td></tr>
-                            <tr><td style={cellBase7}>
-                              <span style={{ color: HIT_BG }}>{s.hit ?? 0}</span>/<span style={{ color: MISS_BG }}>{s.miss ?? 0}</span>
-                            </td></tr>
-                            <tr><td style={{ ...cellBase7, backgroundColor: bg || "transparent", color: bg ? "#000" : "#fff", fontWeight: "bold" }}>
-                              {rate !== null ? `${rate}%` : "-"}
-                            </td></tr>
-                            <tr><td style={cellBase7}>
-                              <span style={{ color: HIT_BG }}>{s.max_hit_streak ?? 0}</span>-<span style={{ color: MISS_BG }}>{s.max_miss_streak ?? 0}</span>
-                            </td></tr>
-                          </tbody>
-                        </table>
-                      </Box>
-                    );
-                  })}
-                </Box>
-              );
-            })()}
-          </Box>
+          <RoundAmountTable snapshot={picksSnapshot} results={results} />
 
           </Box>
           {/* /1|2 row */}
@@ -1367,114 +1217,159 @@ export default function GhUserGamePage() {
         );
       })()}
 
-      {/* ===== 배팅부: 마틴A/Z + P/B + next/new + 셋업/픽체인지 ===== */}
-      {/* ===== 중단: 인터페이스 (한줄) ===== */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: isMobile ? 0.5 : 1, mb: 1, flexWrap: "wrap" }}>
-        {/* 좌: 배팅 8행 + 총배팅 영역 제거됨 (새 2번 영역의 배팅 테이블이 대체) */}
-
-        {/* 우측: 상하 분리 */}
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-          {/* 상: 회차/P/B/del/next/new/셋업/픽체인지/픽카드는 새 1·2번 영역으로 이동됨 */}
-          {/* 하: 슈 넘버 + 라벨 */}
-          <Box>
-            {/* 누적 step 그래프 (260527) — 회차별 적중=+1 / 미적=-1 / wait=0 누적 */}
-            {(() => {
-              // 통일된 3색: 빨강 / 파랑 / 흰색 순
-              const CHART_GROUPS = {
-                S123: { S1: "#f44336", S2: "#2196f3", S3: "#ffffff" },
-                AAR:  { A: "#f44336", AR: "#2196f3" },
-                DGT:  { D: "#f44336", G: "#2196f3", TN: "#ffffff" },
-                "1-2": { ONE: "#f44336", TWO: "#2196f3" },
-              };
-              const N = results.length;
-              const tracks = picksSnapshot?.s_tracks?.tracks || {};
-              const seriesFor = (key) => {
-                // S1/S2/S3 → s_tracks round_data 사용
-                if (key === "S1" || key === "S2" || key === "S3") {
-                  const sckey = key === "S1" ? "sc1" : key === "S2" ? "sc2" : "sc3";
-                  const rd = tracks[sckey]?.round_data || [];
-                  const arr = new Array(N).fill(null);
-                  for (const r of rd) {
-                    const idx = (r.round || 0) - 1;
-                    if (idx >= 0 && idx < N) {
-                      if (r.status === "hit") arr[idx] = "hit";
-                      else if (r.status === "miss") arr[idx] = "miss";
-                    }
-                  }
-                  return arr;
-                }
-                // 나머지 키: 서버 stats[key].series 사용 (프론트 hit/miss 재판정 제거 260602)
-                const SEC_TO_STATKEY = { "1": "ONE", "2": "TWO" };
-                const sk = SEC_TO_STATKEY[key] || key;
-                return picksSnapshot?.stats?.[sk]?.series || [];
-              };
-              const cumulativeFor = (key) => {
-                const series = seriesFor(key);
-                let sum = 0;
-                return series.map((s) => {
-                  if (s === "hit") sum += 1;
-                  else if (s === "miss") sum -= 1;
-                  return sum;
-                });
-              };
-              const colors = CHART_GROUPS[chartGroup] || CHART_GROUPS.S123;
-              const lines = Object.entries(colors).map(([key, color]) => ({ key, color, data: cumulativeFor(key) }));
-              // SVG 차트 영역
-              const W = 800, H = 160, padL = 22, padR = 8, padT = 8, padB = 22;
-              const innerW = W - padL - padR;
-              const innerH = H - padT - padB;
-              const maxRound = Math.max(65, N);
-              const allVals = lines.flatMap((l) => l.data).filter((v) => v !== null && v !== undefined);
-              const minY = Math.min(0, ...(allVals.length ? allVals : [0]));
-              const maxY = Math.max(0, ...(allVals.length ? allVals : [0]));
-              const yRange = Math.max(1, maxY - minY);
-              const xOf = (i) => padL + (i / Math.max(1, maxRound - 1)) * innerW;
-              const yOf = (v) => padT + (1 - (v - minY) / yRange) * innerH;
-              return (
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                  {/* 그룹 토글 */}
-                  <Box sx={{ display: "flex", gap: 0.5 }}>
-                    {Object.keys(CHART_GROUPS).map((g) => (
-                      <Box
-                        key={g}
-                        onClick={() => setChartGroup(g)}
-                        sx={{
-                          px: 1.5, py: 0.3, border: "1px solid #555", borderRadius: 0.5,
-                          cursor: "pointer", fontSize: 11, fontWeight: "bold",
-                          backgroundColor: chartGroup === g ? "#00e676" : "#1a1a2e",
-                          color: chartGroup === g ? "#000" : "#90caf9",
-                          userSelect: "none",
-                        }}
-                      >{g}</Box>
-                    ))}
-                  </Box>
-                  {/* SVG 차트 */}
-                  <Box sx={{ overflowX: "auto" }}>
-                    <svg width={W} height={H} style={{ backgroundColor: "#0a0c10", display: "block" }}>
-                      {/* X 라벨 (회차 번호) */}
-                      {Array.from({ length: maxRound }, (_, i) => i + 1).map((n) => (
-                        <text key={`xl-${n}`} x={xOf(n - 1)} y={H - 6} fontSize={8} fill="#666" textAnchor="middle">{n}</text>
-                      ))}
-                      {/* 0 기준선 */}
-                      <line x1={padL} y1={yOf(0)} x2={W - padR} y2={yOf(0)} stroke="#555" strokeDasharray="2 2" strokeWidth={1} />
-                      {/* 라인들 */}
-                      {lines.map((l) => {
-                        const points = l.data
-                          .map((v, i) => (v !== null && v !== undefined) ? `${xOf(i)},${yOf(v)}` : null)
-                          .filter(Boolean)
-                          .join(" ");
-                        return points ? (
-                          <polyline key={`line-${l.key}`} points={points} fill="none" stroke={l.color} strokeWidth={1.5} />
-                        ) : null;
-                      })}
-                    </svg>
-                  </Box>
+      {/* ===== 빅로드2 누적 그래프 ===== */}
+      {(() => {
+        const N = results.length;
+        const sqTracks = picksSnapshot?.s_tracks?.tracks;
+        const srTracks = picksSnapshot?.sr_tracks?.tracks;
+        const ssrTracks = picksSnapshot?.ssr_tracks?.tracks;
+        const ssroTracks = picksSnapshot?.ssro_tracks?.tracks;
+        const sxTracks = picksSnapshot?.sx_tracks?.tracks;
+        const forTracks = picksSnapshot?.for_tracks?.tracks;
+        const quarterTracks = picksSnapshot?.quarter_tracks?.tracks;
+        const palette = ["#f44336", "#2196f3", "#ffffff", "#00e676", "#ff9800", "#e040fb", "#26c6da", "#ffeb3b", "#9ccc65", "#ef5350", "#5c6bc0", "#8d6e63"];
+        const seriesFromRows = (rows = []) => {
+          const arr = new Array(N).fill(null);
+          for (const r of rows || []) {
+            const idx = (r.round || 0) - 1;
+            if (idx < 0 || idx >= N) continue;
+            if (r.status === "hit" || r.status === "miss") arr[idx] = r.status;
+          }
+          return arr;
+        };
+        const statSeries = (key) => picksSnapshot?.stats?.[key]?.series || [];
+        const assistSeries = (key) => picksSnapshot?.assist_stats?.[key]?.series || [];
+        const qAssistSeries = (key) => picksSnapshot?.q_assist_stats?.[key]?.series || [];
+        const trackSeries = (container, sc, quarter = false) => {
+          const track = container?.tracks?.[sc] || container?.[sc];
+          return seriesFromRows(quarter ? track?.bigroad_data : track?.round_data);
+        };
+        const add = (list, key, label, type = "stat") => {
+          let series;
+          if (type === "assist") series = assistSeries(key);
+          else if (type === "qassist") series = qAssistSeries(key);
+          else series = statSeries(key);
+          if (series?.some((v) => v === "hit" || v === "miss")) list.push({ label, series });
+        };
+        const addTrack = (list, container, sc, label, quarter = false) => {
+          const series = trackSeries(container, sc, quarter);
+          if (series?.some((v) => v === "hit" || v === "miss")) list.push({ label, series });
+        };
+        const addAllModes = (list, key, label) => {
+          add(list, key, label);
+          add(list, key, `${label} A`, "assist");
+          add(list, key, `${label} Q`, "qassist");
+        };
+        const addTrackAllModes = (list, container, sc, assistKey, label, quarter = false) => {
+          addTrack(list, container, sc, label, quarter);
+          if (!quarter) add(list, assistKey, `${label} A`, "assist");
+          add(list, assistKey, `${label} Q`, "qassist");
+        };
+        const buildGroups = () => {
+          const groups = {};
+          groups.A = [];
+          ["A", "AR", "AARO", "AAR"].forEach((key) => addAllModes(groups.A, key, key));
+          [["S1", "sc1"], ["S2", "sc2"], ["S3", "sc3"]].forEach(([gid, sc], idx) => {
+            const n = idx + 1;
+            groups[gid] = [];
+            addTrackAllModes(groups[gid], sqTracks, sc, `S${n}`, `S${n}`);
+            addTrackAllModes(groups[gid], srTracks, sc, `SR${n}`, `S${n}R`);
+            addTrackAllModes(groups[gid], ssroTracks, sc, `SSRO${n}`, `SSRO${n}`);
+            addTrackAllModes(groups[gid], ssrTracks, sc, `SSR${n}`, `SSRN${n}`);
+          });
+          groups.FOR = [];
+          [["sc1", "FOR1"], ["sc2", "FOR2"], ["sc3", "FOR3"]].forEach(([sc, key]) => addTrackAllModes(groups.FOR, forTracks, sc, key, key));
+          groups.FORX = [];
+          [["sc1", "FOR1X"], ["sc2", "FOR2X"], ["sc3", "FOR3X"]].forEach(([sc, key]) => addTrackAllModes(groups.FORX, sxTracks, sc, key, key));
+          groups.DGT = [];
+          ["D", "G", "TN", "ONE", "TWO"].forEach((key) => addAllModes(groups.DGT, key, key));
+          groups.PBJ = [];
+          ["P", "B", "J"].forEach((key) => addAllModes(groups.PBJ, key, key));
+          groups.G = [];
+          ["G(H1)", "G(H0)", "G(%1)", "G(%0)"].forEach((key) => addAllModes(groups.G, key, key));
+          groups.HB = [];
+          ["허니비", "허니R", "허니SRO", "허니SRN"].forEach((key) => addAllModes(groups.HB, key, key));
+          groups.WH = [];
+          ["W111", "위너R", "위너SRO", "위너SRN"].forEach((key) => addAllModes(groups.WH, key, key));
+          groups.MH = [];
+          ["M22", "메가R", "메가SRO", "메가SRN"].forEach((key) => addAllModes(groups.MH, key, key));
+          groups.DH = [];
+          ["D112", "드림R", "드림SRO", "드림SRN"].forEach((key) => addAllModes(groups.DH, key, key));
+          groups.NC = [];
+          ["NC", "NCR", "NCSRO", "NCSRN"].forEach((key) => addAllModes(groups.NC, key, key));
+          groups.SQ = [];
+          [["sc1", "SQ1"], ["sc2", "SQ2"], ["sc3", "SQ3"]].forEach(([sc, key]) => addTrackAllModes(groups.SQ, quarterTracks, sc, key, key, true));
+          return Object.fromEntries(Object.entries(groups).filter(([, rows]) => rows.length > 0));
+        };
+        const CHART_GROUPS = buildGroups();
+        const selectedGroup = CHART_GROUPS[chartGroup] ? chartGroup : Object.keys(CHART_GROUPS)[0];
+        const cumulative = (series) => {
+          let sum = 0;
+          return (series || []).map((s) => {
+            if (s === "hit") sum += 1;
+            else if (s === "miss") sum -= 1;
+            return sum;
+          });
+        };
+        const lines = (CHART_GROUPS[selectedGroup] || []).map((row, idx) => ({
+          key: row.label,
+          color: palette[idx % palette.length],
+          data: cumulative(row.series),
+        }));
+        const maxRound = Math.max(78, N || 0);
+        const W = Math.max(1080, maxRound * 16);
+        const H = 260, padL = 28, padR = 12, padT = 12, padB = 24;
+        const innerW = W - padL - padR;
+        const innerH = H - padT - padB;
+        const allVals = lines.flatMap((l) => l.data).filter((v) => v !== null && v !== undefined);
+        const minY = Math.min(0, ...(allVals.length ? allVals : [0]));
+        const maxY = Math.max(0, ...(allVals.length ? allVals : [0]));
+        const yRange = Math.max(1, maxY - minY);
+        const xOf = (i) => padL + (i / Math.max(1, maxRound - 1)) * innerW;
+        const yOf = (v) => padT + (1 - (v - minY) / yRange) * innerH;
+        return (
+          <Box sx={{ mb: 1, display: "flex", flexDirection: "column", gap: 0.5 }}>
+            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+              {Object.keys(CHART_GROUPS).map((g) => (
+                <Box
+                  key={g}
+                  onClick={() => setChartGroup(g)}
+                  sx={{
+                    px: 1.2, py: 0.3, border: "1px solid #555", borderRadius: 0.5,
+                    cursor: "pointer", fontSize: 11, fontWeight: "bold",
+                    backgroundColor: selectedGroup === g ? "#00e676" : "#1a1a2e",
+                    color: selectedGroup === g ? "#000" : "#90caf9",
+                    userSelect: "none",
+                  }}
+                >{g}</Box>
+              ))}
+            </Box>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+              {lines.map((l) => (
+                <Box key={`legend-${l.key}`} sx={{ display: "inline-flex", alignItems: "center", gap: 0.35, fontSize: 10, color: "#ddd" }}>
+                  <Box sx={{ width: 14, height: 2, backgroundColor: l.color }} />
+                  {l.key}
                 </Box>
-              );
-            })()}
+              ))}
+            </Box>
+            <Box sx={{ overflowX: "auto", border: "1px solid #222", backgroundColor: "#0a0c10" }}>
+              <svg width={W} height={H} style={{ display: "block" }}>
+                {Array.from({ length: maxRound }, (_, i) => i + 1).map((n) => (
+                  <text key={`xl-${n}`} x={xOf(n - 1)} y={H - 7} fontSize={8} fill="#666" textAnchor="middle">{n}</text>
+                ))}
+                <line x1={padL} y1={yOf(0)} x2={W - padR} y2={yOf(0)} stroke="#777" strokeDasharray="2 2" strokeWidth={1} />
+                {lines.map((l) => {
+                  const points = l.data
+                    .map((v, i) => (v !== null && v !== undefined) ? `${xOf(i)},${yOf(v)}` : null)
+                    .filter(Boolean)
+                    .join(" ");
+                  return points ? <polyline key={`line-${l.key}`} points={points} fill="none" stroke={l.color} strokeWidth={1.7} /> : null;
+                })}
+              </svg>
+            </Box>
           </Box>
-        </Box>
-      </Box>
+        );
+      })()}
 
       {/* 종료 다이얼로그 */}
       <Dialog open={endingDone} onClose={() => {}}>
