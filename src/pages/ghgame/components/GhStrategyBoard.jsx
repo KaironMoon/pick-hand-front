@@ -364,10 +364,11 @@ function withLiveData(base, ctx) {
   keys.forEach((k) => { out[k] = base.name.map(() => ""); });
   out.waitBg = base.name.map(() => "");
   out.pctBg = base.name.map(() => "");
-  const markWait = new Map();
+  const markWaitHit = new Map();
+  const markWaitMiss = new Map();
   const markPct = new Map();
-  (ctx.gobMarks?.H1 || []).forEach((key) => addGobBg(markWait, gobLabelOf(key), GOB_TOP_BG));
-  (ctx.gobMarks?.H0 || []).forEach((key) => addGobBg(markWait, gobLabelOf(key), GOB_LOW_BG));
+  (ctx.gobMarks?.H1 || []).forEach((key) => addGobBg(markWaitHit, gobLabelOf(key), GOB_TOP_BG));
+  (ctx.gobMarks?.H0 || []).forEach((key) => addGobBg(markWaitMiss, gobLabelOf(key), GOB_LOW_BG));
   (ctx.gobMarks?.PCT1 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_TOP_BG));
   (ctx.gobMarks?.PCT0 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_LOW_BG));
   out.sourceMarks = base.name.map(() => false);
@@ -387,11 +388,16 @@ function withLiveData(base, ctx) {
   });
   base.name.forEach((label, i) => {
     if (!label) return; // 빈 컬럼
-    if (markWait.has(label)) out.waitBg[i] = markWait.get(label);
     if (markPct.has(label)) out.pctBg[i] = markPct.get(label);
     const rd = buildColData(label, i, base, ctx);
     if (!rd) return;
     keys.forEach((k) => { if (rd[k] != null) out[k][i] = rd[k]; });
+    const waitValue = String(out.wait[i] || "");
+    if (markWaitHit.has(label) && waitValue.endsWith("H")) {
+      out.waitBg[i] = markWaitHit.get(label);
+    } else if (markWaitMiss.has(label) && waitValue.endsWith("M")) {
+      out.waitBg[i] = markWaitMiss.get(label);
+    }
     // ── 어시스트 기반 행 (임시: 어시스트=원래픽이라 원래 값과 동일) ──
     //   stage·idx1·idx2는 어시스트 기준. 실제 어시스트 로직 붙으면 assist_* 값만 교체.
     if (rd.assist == null && rd.pick != null) out.assist[i] = rd.pick;      // 어시스트 픽

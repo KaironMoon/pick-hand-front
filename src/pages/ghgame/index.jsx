@@ -644,10 +644,10 @@ export default function GhGamePage() {
           const cellSize = 20;
           const colsPerRow = 30;
           const totalCols = colsPerRow + 2;
-          const GH_CELL_BG = { hit: "#00e676", miss: "#ffeb3b", wait: "#fff" };
+          const GH_CELL_BG = { hit: "#00e676", wait: "#fff" };
           const tdStyleFn = (status) => ({
             width: cellSize, height: cellSize, border: "1px solid #555", padding: 0, textAlign: "center",
-            backgroundColor: status ? (GH_CELL_BG[status] || "#fff") : "#333",
+            backgroundColor: status ? (GH_CELL_BG[status] || "#333") : "#333",
           });
           const circleStyle = (charIdx) => ({
             width: cellSize - 2, height: cellSize - 2, borderRadius: "50%",
