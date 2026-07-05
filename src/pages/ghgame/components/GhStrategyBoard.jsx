@@ -3,7 +3,7 @@ import { Box } from "@mui/material";
 // ── 전략별 현황 전광판 (design-260615-gh-calc.html 260623 신버전 포팅) ──
 // 4개 테이블(G1~G4) · 각 16컬럼 · 10행.
 // 행: wait(대기 H녹/M노랑) / pick(P·B 칩) / pct(적중률%) / rec(전적) / rec2(보조)
-//     / pick2(보조픽) / pct2(적중률2) / stage(단계) / idx1(배팅액) / idx2(PnL)
+//     / pick2(보조픽) / pct2(적중률2) / assistRec(어시 총전적) / stage(단계) / idx1(배팅액) / idx2(PnL)
 // R쌍 분리(병합 없음). 각 전략 세트 뒤 OLD/NEW 컬럼.
 //   NEW = 합성본(A세트→AAR, S세트→SSR#, 드림R세트→실데이터). OLD = 위치만(빈칸, 추후 연결).
 // 실데이터: A/AR/AAR/D/G/TN/ONE/TWO/P/B/J(stats) + SQ/SR/SSR/SX(트랙). 그 외(허니비/W111/NC/6MX 등)는 칸만.
@@ -111,6 +111,10 @@ function Chip({ v }) {
   );
 }
 
+function PickText({ v }) {
+  return v === "P" || v === "B" ? <Chip v={v} /> : <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>;
+}
+
 // 단순(병합 없음) 행. 빈값은 회색 대시(–). label 있으면 맨 앞 라벨 셀.
 function SimpleRow({ data, dataKey, render, pos, label, labelColor }) {
   const bgKey = `${dataKey}Bg`;
@@ -190,13 +194,17 @@ function StrategyTable({ data }) {
         <SimpleRow data={data} dataKey="pct" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" />
         <SimpleRow data={data} dataKey="rec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="총전적" />
         <SimpleRow data={data} dataKey="rec2" render={(v) => <span>{rec2HTML(v)}</span>} pos="mid" label="최다" />
-        <AssistRow data={data} pos="mid" label="어시스트" labelColor={LBL_RED} />
+        <AssistRow data={data} pos="mid" label="어시H픽" labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="wait2" render={waitCell} pos="mid" label="연속" labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="pct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="assistRec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="총전적" labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="idx1" render={(v) => <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>} pos="mid" label="회차P" labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label="누적P" labelColor={LBL_RED} />
-        {/* 쿼터 블록 (쿼터 로직 미구현 → 데이터 비움) */}
+        <SimpleRow data={data} dataKey="qAssist" render={(v) => <PickText v={v} />} pos="mid" label="어시Q픽" labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label="연속" labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="qPct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" labelColor={LBL_RED} />
+        {/* 쿼터 블록 */}
         <SimpleRow data={data} dataKey="qrec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="쿼터전적" />
         <SimpleRow data={data} dataKey="qstage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" />
         <SimpleRow data={data} dataKey="qidx1" render={(v) => <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>} pos="mid" label="쿼터P" />
@@ -255,6 +263,15 @@ const quarterRow = (q, amounts) => {
     qidx2: fmtMan(q.pnl),
   };
 };
+const quarterAssistRow = (q, pick) => {
+  if (!q) return {};
+  const total = q.total_q ?? 0;
+  return {
+    qAssist: q.next_action === "wait" ? "W" : (pick || ""),
+    qWait2: fmtStreak(q.cur_streak?.type, q.cur_streak?.count),
+    qPct2: fmtPct(q.win_q ?? 0, total),
+  };
+};
 
 // stats 키 기반 행 데이터 (A/AR/AAR/AARO/D/G/TN/ONE/TWO/P/B/J)
 const fromStats = (ctx, key) => {
@@ -271,6 +288,7 @@ const fromStats = (ctx, key) => {
     assist: ctx.assistNextPicks?.[key] || ctx.nextPicks?.[key] || "",
     wait2: as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined,
     pct2: as ? fmtPct(as.hit ?? 0, assistTotal) : undefined,
+    assistRec: as ? fmtRec(assistTotal, as.hit ?? 0, as.miss ?? 0) : undefined,
     pct: fmtPct(s.hit ?? 0, total),
     rec: fmtRec(total, s.hit ?? 0, s.miss ?? 0),
     rec2: fmtRec2(s.max_hit_streak ?? 0, s.max_miss_streak ?? 0),
@@ -278,6 +296,8 @@ const fromStats = (ctx, key) => {
     stage: fmtStage(s.martin_step, s.triple_loss),    // 어시스트 단계 (임시: 동일)
     idx1: fmtMan(betAt(amounts, s.martin_step)),
     idx2: fmtMan(s.pnl),
+    // 어시Q픽은 별도 행 데이터로 두되, 실제 어시Q 로직 전까지는 생성 쿼터와 동일하게 표시한다.
+    ...quarterAssistRow(s.quarter, ctx.nextPicks?.[key] || ""),
     ...quarterRow(s.quarter, amounts),
   };
 };
@@ -298,6 +318,7 @@ const fromTrack = (tracks, scKey, amounts) => {
     stage: fmtStage(sm.martin_step, sm.triple_loss),
     idx1: fmtMan(betAt(amounts, sm.martin_step)),
     idx2: fmtMan(sm.pnl),
+    ...quarterAssistRow(sm.quarter, cur?.predict || ""),
     ...quarterRow(sm.quarter, amounts),
   };
 };
@@ -341,6 +362,7 @@ function buildColData(label, i, data, ctx) {
       base.qstage = fmtStage(q.martin_step, 0);
       base.qidx1 = fmtMan(betAt(amts, q.martin_step));
       base.qidx2 = fmtMan(q.pnl);
+      Object.assign(base, quarterAssistRow(q, base.pick || ""));
     }
     return base;
   }
@@ -358,7 +380,8 @@ function buildColData(label, i, data, ctx) {
 
 // 테이블 정의 + 실데이터 → 값이 채워진 data
 function withLiveData(base, ctx) {
-  const keys = ["wait", "pick", "stage1", "pct", "rec", "rec2", "assist", "wait2", "pct2", "stage", "idx1", "idx2",
+  const keys = ["wait", "pick", "stage1", "pct", "rec", "rec2", "assist", "wait2", "pct2", "assistRec", "stage", "idx1", "idx2",
+    "qAssist", "qWait2", "qPct2",
     "qrec", "qstage", "qidx1", "qidx2"];
   const out = { ...base };
   keys.forEach((k) => { out[k] = base.name.map(() => ""); });
@@ -403,6 +426,7 @@ function withLiveData(base, ctx) {
     if (rd.assist == null && rd.pick != null) out.assist[i] = rd.pick;      // 어시스트 픽
     if (rd.wait2 == null && rd.wait != null) out.wait2[i] = rd.wait;        // 어시스트 연속
     if (rd.pct2 == null && rd.pct != null) out.pct2[i] = rd.pct;            // 어시스트 적중율
+    if (rd.assistRec == null && rd.rec != null) out.assistRec[i] = rd.rec;   // 어시스트 총전적
     if (rd.assist_stage != null) out.stage[i] = rd.assist_stage;
     if (rd.assist_idx1 != null) out.idx1[i] = rd.assist_idx1;
     if (rd.assist_idx2 != null) out.idx2[i] = rd.assist_idx2;

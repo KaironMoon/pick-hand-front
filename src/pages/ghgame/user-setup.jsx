@@ -479,19 +479,20 @@ const STRAT_DIST_LABELS = { even: "균등", asc: "증가", desc: "감소" };
 
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
 const ASSIST_OPTS = [
-  "SQ(H1)", "SQ(%1)", "Gob(H1)", "Gob(H0)", "Gob(%1)", "Gob(%0)",
-  "해당섹션", "해당섹션 반대", "대기후진행",
-  "SQ(H1)H&H", "SQ(%1)H&H", "Gob(H1)H&H", "Gob(H%1)H&H", "이전3회차전결과",
+  "해당반대", "해당진행", "대기진행",
+  "G(H1)", "G(H0)", "G(%1)", "G(%0)",
+  "A멀티(H1)", "S1멀티(H1)", "S2멀티(H1)", "S3멀티(H1)",
+  "HB멀티(H1)", "WH멀티(H1)", "MH멀티(H1)", "DH멀티(H1)",
 ];
-// 패시 어시스트 행 (2~11패시). 각 행: { assist1, pct, assist2 }
-const PASI_LEVELS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-const PASI_DEFAULT_ASSIST1 = ["SQ(H1)", "SQ(%1)", "Gob(H1)", "Gob(%1)", "Gob(%1)", "Gob(%0)", "해당섹션", "해당섹션 반대", "대기후진행", "SQ(H1)H&H"];
+// 패시 어시스트 행 (2~15패시). 최고 16단계면 15패시까지 표시.
+const PASI_LEVELS = Array.from({ length: 14 }, (_, i) => i + 2);
+const PASI_DEFAULT_ASSIST1 = ["해당반대", "해당진행", "대기진행", "G(H1)", "G(%1)", "G(%0)", "A멀티(H1)", "S1멀티(H1)", "S2멀티(H1)", "S3멀티(H1)"];
 function defaultPasi() {
   return PASI_LEVELS.map((lvl, i) => ({
     level: lvl,
-    assist1: PASI_DEFAULT_ASSIST1[i] || "SQ(H1)",
+    assist1: PASI_DEFAULT_ASSIST1[i] || "해당반대",
     pct: lvl === 2 ? 5 : lvl === 6 ? 55 : 0,
-    assist2: "Gob(H0)",
+    assist2: "G(H0)",
   }));
 }
 
@@ -518,8 +519,8 @@ const DEFAULT_STRATEGY_SETUP = {
   unsettled_stop: 0,
   // full(멀티판) 전용
   multi_sections: { A: true, AR: true, OLD: true, NEW: true },  // 사용함 여부
-  tie_old: "Gob(H1)",   // 동률시 어시스트 (OLD)
-  tie_new: "Gob(%1)",   // 동률시 어시스트 (NEW)
+  tie_old: "G(H1)",   // 동률시 어시스트 (OLD)
+  tie_new: "G(%1)",   // 동률시 어시스트 (NEW)
   priority_version: "new",
   tie_priority: "A",
   // 최상위조건설정 + 패시 어시스트 (멀티/일반판 공통)
@@ -623,12 +624,13 @@ const mkCondOff = { color: "#666" };  // 구간 없음(회색)
 
 // 어시스트 셀렉트 (목업 assistSelectHTML)
 function AssistSelect({ value, onChange, sx }) {
+  const normalized = ASSIST_OPTS.includes(value) ? value : ASSIST_OPTS[0];
   return (
-    <select value={value || ASSIST_OPTS[0]} onChange={(e) => onChange(e.target.value)}
+    <select value={normalized} onChange={(e) => onChange(e.target.value)}
       style={{ background: "#16365c", color: "#fff", border: "1px solid #2f5b8f", borderRadius: 3,
         fontSize: 12, padding: "1px 2px", width: "96%", cursor: "pointer", outline: "none",
         fontFamily: "D2Coding, Consolas, Menlo, monospace", ...sx }}>
-      {ASSIST_OPTS.map((o) => <option key={o} value={o}>{o} 1회</option>)}
+      {ASSIST_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
   );
 }
@@ -737,6 +739,9 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
     onChange({ ...s, pasi });
   };
   const pasi = s.pasi || defaultPasi();
+  const visiblePasi = pasi
+    .map((p, i) => ({ p, originalIndex: i }))
+    .filter(({ p, originalIndex }) => (p.level ?? (originalIndex + 2)) < stepMax);
 
   return (
     <>
@@ -831,13 +836,13 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
       {/* 12행: 최상위조건설정 헤더 */}
       <tr>
         <td colSpan={3} style={mkAssistHdr}>최상위조건설정</td>
-        <td colSpan={2} style={mkRed}>연패발생시어시스트</td>
-        <td colSpan={2} style={mkRed}>어시스트 우선순위</td>
-        <td colSpan={1} style={mkPctHdr}>%이하사용 →</td>
-        <td colSpan={2} style={mkAssistHdr}>어시스트2</td>
+        <td colSpan={2} style={mkRed}>연패발생</td>
+        <td colSpan={2} style={{ ...mkRed, background: "#16365c", color: "#015fe5" }}>어시 H픽</td>
+        <td colSpan={1} style={{ ...mkRed, background: "#60497b" }}>연패발생</td>
+        <td colSpan={2} style={{ ...mkAssistHdr, background: "#60497b", color: "#e5281a" }}>어시Q픽</td>
       </tr>
       {/* 13행: 5Miss / 발생N회 / N회대기 + 2패시 */}
-      {pasi.map((p, i) => {
+      {visiblePasi.map(({ p, originalIndex }, i) => {
         const isFirst = i === 0;  // 2패시 = 13행 (좌측에 5Miss 블록)
         return (
           <tr key={`${name}-pasi-${p.level}`}>
@@ -850,14 +855,18 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
             ) : (
               <td colSpan={3} style={mkCell}></td>
             )}
-            <td colSpan={2} style={mkRed}>{p.level}패시 어시스트 설정</td>
-            <td colSpan={2} style={mkCell}><AssistSelect value={p.assist1} onChange={(v) => setPasi(i, { assist1: v })} /></td>
-            <td colSpan={1} style={mkNavy}>
-              <NumIn value={p.pct ?? 0} min={0} max={100} color="#FF0000" width={38} bg="#1a1a1a" onChange={(v) => setPasi(i, { pct: v })} />%
+            <td colSpan={2} style={{ ...mkRed, background: "#16365c", color: "#fff" }}>
+              <NumIn value={p.level ?? (originalIndex + 2)} min={1} max={20} color="#fff" width={38} bg="#16365c" onChange={(v) => setPasi(originalIndex, { level: v })} />패시
             </td>
-            <td colSpan={2} style={mkAssist2}>
-              <AssistSelect value={p.assist2} onChange={(v) => setPasi(i, { assist2: v })} sx={{ background: "#17365e", color: "#0065fe", fontWeight: "bold" }} />
+            <td style={{ ...mkCell, background: "#16365c" }}><AssistSelect value={p.assist1} onChange={(v) => setPasi(originalIndex, { assist1: v })} /></td>
+            <td style={{ ...mkCell, background: "#16365c", color: "#fff" }}>1회</td>
+            <td colSpan={1} style={{ ...mkNavy, background: "#60497b", color: "#fff" }}>
+              <NumIn value={p.q_level ?? p.level ?? (originalIndex + 2)} min={1} max={20} color="#fff" width={38} bg="#60497b" onChange={(v) => setPasi(originalIndex, { q_level: v })} />패시
             </td>
+            <td style={{ ...mkAssist2, background: "#60497b" }}>
+              <AssistSelect value={p.assist2} onChange={(v) => setPasi(originalIndex, { assist2: v })} sx={{ background: "#60497b", color: "#fff", borderColor: "#8067a0", fontWeight: "bold" }} />
+            </td>
+            <td style={{ ...mkAssist2, background: "#60497b", color: "#fff" }}>1회</td>
           </tr>
         );
       })}
