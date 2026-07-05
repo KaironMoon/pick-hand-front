@@ -473,6 +473,8 @@ function withLiveData(base, ctx) {
   (ctx.gobMarks?.PCT0 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_LOW_BG));
   out.waitSourceMarks = base.name.map(() => []);
   out.pctSourceMarks = base.name.map(() => []);
+  const subgameSrnKeys = new Set(["허니SRN", "위너SRN", "메가SRN", "드림SRN", "NCSRN"]);
+  const subgameSroKeys = new Set(["허니SRO", "위너SRO", "메가SRO", "드림SRO", "NCSRO"]);
   const addSourceMark = (target, src, key, label) => {
     const selected = src?.tie === "x" ? src?.x : src?.tie === "xr" ? src?.xr : null;
     if (!selected) return;
@@ -482,9 +484,9 @@ function withLiveData(base, ctx) {
   };
   Object.entries(ctx.xxSources || {}).forEach(([key, src]) => {
     if (!src?.x || !src?.xr) return;
-    if (key === "AAR" || /^SSRN[123]$/.test(key)) {
+    if (key === "AAR" || /^SSRN[123]$/.test(key) || subgameSrnKeys.has(key)) {
       addSourceMark(out.waitSourceMarks, src, key, key === "AAR" ? "AARN" : key);
-    } else if (key === "AARO" || /^SSRO[123]$/.test(key)) {
+    } else if (key === "AARO" || /^SSRO[123]$/.test(key) || subgameSroKeys.has(key)) {
       addSourceMark(out.pctSourceMarks, src, key, key);
     }
   });
