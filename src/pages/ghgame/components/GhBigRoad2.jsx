@@ -27,7 +27,7 @@ const SECTION_DEFS = [
   { id: "MH", label: "메가히트멀티", kind: "subgame", xKey: "M22", rows: [["M22", "M22"], ["메가R", "메가R"], ["메가SRO", "메가SRO"], ["메가SRN", "메가SRN"]] },
   { id: "DH", label: "드림히트멀티", kind: "subgame", xKey: "D112", rows: [["D112", "D112"], ["드림R", "드림R"], ["드림SRO", "드림SRO"], ["드림SRN", "드림SRN"]] },
   { id: "NC", label: "NC멀티", kind: "normal", rows: [["NC", "NC"], ["NCR", "NCR"], ["NCSRO", "NCSRO"], ["NCSRN", "NCSRN"]] },
-  { id: "SQ", label: "SQ쿼터", kind: "normal", rows: [["SQ1", "track:quarter:sc1"], ["SQ2", "track:quarter:sc2"], ["SQ3", "track:quarter:sc3"]] },
+  { id: "SQ", label: "SQ", kind: "normal", rows: [["SQ1", "track:quarter:sc1"], ["SQ2", "track:quarter:sc2"], ["SQ3", "track:quarter:sc3"]] },
 ];
 
 const TRACK_MAP = {
