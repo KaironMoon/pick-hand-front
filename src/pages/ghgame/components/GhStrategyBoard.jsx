@@ -174,8 +174,7 @@ function AssistRow({ data, pos, label, labelColor }) {
       {label != null && <LblCell text={label} color={labelColor} edge={pos === "last" ? "last" : undefined} />}
       {data.name.map((n, i) => {
         const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
-        // 어시스트 픽 = (임시) 원래 픽과 동일
-        const v = (data.assist || [])[i] || (data.pick || [])[i] || "";
+        const v = (data.assist || [])[i] || "";
         const title = (data.assistSource || [])[i] || undefined;
         if (!v) return <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
         return (
@@ -329,14 +328,15 @@ const quarterRow = (q, amounts, stepMin = 1) => {
   };
 };
 const quarterAssistRow = (q, pick) => {
-  if (!q) return {};
+  if (!q) return { qAssist: pick || "" };
   const total = q.total ?? q.total_q ?? 0;
   return {
-    qAssist: q.next_action === "wait" ? "W" : (pick || ""),
+    qAssist: pick || "",
     qWait2: fmtStreak(q.cur_streak?.type, q.cur_streak?.count),
     qPct2: fmtPct(q.hit ?? q.win_q ?? 0, total),
   };
 };
+const qAssistPickText = (qas) => qas?.next_pick || "";
 
 // stats 키 기반 행 데이터 (A/AR/AAR/AARO/D/G/TN/ONE/TWO/P/B/J)
 const fromStats = (ctx, key) => {
@@ -352,7 +352,7 @@ const fromStats = (ctx, key) => {
   return {
     wait: fmtStreak(s.cur_streak_type, s.cur_streak_count),
     pick: ctx.nextPicks?.[key] || "",
-    assist: Object.prototype.hasOwnProperty.call(ctx.assistNextPicks || {}, key) ? (ctx.assistNextPicks?.[key] || "W") : (ctx.nextPicks?.[key] || ""),
+    assist: ctx.assistNextPicks?.[key] || "",
     assistSource: ctx.assistSources?.[key],
     wait2: as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined,
     pct2: as ? fmtPct(as.hit ?? 0, assistTotal) : undefined,
@@ -364,7 +364,7 @@ const fromStats = (ctx, key) => {
     stage: as ? fmtStage(as.martin_step, as.triple_loss) : "",
     idx1: amounts && as ? fmtMan(betAt(amounts, as.martin_step, stepMin)) : "",
     idx2: amounts && as ? fmtMan(as.pnl) : "",
-    ...(HIDE_QUARTER_KEYS.has(key) ? {} : { ...quarterAssistRow(qas?.quarter || s.quarter, qas?.hasNext ? (qas.next_pick || "W") : (ctx.nextPicks?.[key] || "")), qAssistSource: qas?.source }),
+    ...(HIDE_QUARTER_KEYS.has(key) ? {} : { ...quarterAssistRow(qas?.quarter || s.quarter, qAssistPickText(qas)), qAssistSource: qas?.source }),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterRow(qas?.quarter || s.quarter, amounts, stepMin)),
   };
 };
@@ -380,7 +380,7 @@ const fromTrack = (tracks, scKey, amounts, qas = null, assist = null, stepMin = 
   return {
     wait: fmtStreak(sm.cur_streak?.type, sm.cur_streak?.count),
     pick: cur?.predict || "",
-    assist: assist?.hasNext ? (assist.next || "W") : (cur?.predict || ""),
+    assist: assist?.next || "",
     assistSource: assist?.source,
     wait2: as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined,
     pct2: as ? fmtPct(as.hit ?? 0, assistTotal) : undefined,
@@ -392,7 +392,7 @@ const fromTrack = (tracks, scKey, amounts, qas = null, assist = null, stepMin = 
     stage: as ? fmtStage(as.martin_step, as.triple_loss) : "",
     idx1: amounts && as ? fmtMan(betAt(amounts, as.martin_step, stepMin)) : "",
     idx2: amounts && as ? fmtMan(as.pnl) : "",
-    ...quarterAssistRow(qas?.quarter || sm.quarter, qas?.hasNext ? (qas.next_pick || "W") : (cur?.predict || "")),
+    ...quarterAssistRow(qas?.quarter || sm.quarter, qAssistPickText(qas)),
     qAssistSource: qas?.source,
     ...quarterRow(qas?.quarter || sm.quarter, amounts, stepMin),
   };
@@ -438,7 +438,7 @@ function buildColData(label, i, data, ctx) {
       base.qstage = fmtStage(q.martin_step, 0);
       base.qidx1 = amts ? fmtMan(betAt(amts, q.martin_step, stepMinFor(ctx, `SQ${m[1]}`))) : "";
       base.qidx2 = amts ? fmtMan(q.pnl) : "";
-      Object.assign(base, quarterAssistRow(qas?.quarter || q, qas?.hasNext ? (qas.next_pick || "W") : (base.pick || "")));
+      Object.assign(base, quarterAssistRow(qas?.quarter || q, qAssistPickText(qas)));
       base.qAssistSource = qas?.source;
     }
     return base;
@@ -502,15 +502,6 @@ function withLiveData(base, ctx) {
     } else if (markWaitMiss.has(label) && waitValue.endsWith("M")) {
       out.waitBg[i] = markWaitMiss.get(label);
     }
-    // ── 어시스트 기반 행 (임시: 어시스트=원래픽이라 원래 값과 동일) ──
-    //   stage·idx1·idx2는 어시스트 기준. 실제 어시스트 로직 붙으면 assist_* 값만 교체.
-    if (rd.assist == null && rd.pick != null) out.assist[i] = rd.pick;      // 어시스트 픽
-    if (rd.wait2 == null && rd.wait != null) out.wait2[i] = rd.wait;        // 어시스트 연속
-    if (rd.pct2 == null && rd.pct != null) out.pct2[i] = rd.pct;            // 어시스트 적중율
-    if (rd.assistRec == null && rd.rec != null) out.assistRec[i] = rd.rec;   // 어시스트 총전적
-    if (rd.assist_stage != null) out.stage[i] = rd.assist_stage;
-    if (rd.assist_idx1 != null) out.idx1[i] = rd.assist_idx1;
-    if (rd.assist_idx2 != null) out.idx2[i] = rd.assist_idx2;
   });
   return out;
 }
