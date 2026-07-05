@@ -115,13 +115,38 @@ function PickText({ v }) {
   return v === "P" || v === "B" ? <Chip v={v} /> : <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>;
 }
 
+function SourceDots({ marks }) {
+  if (!Array.isArray(marks) || marks.length === 0) return null;
+  return (
+    <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+      {marks.map((m) => (
+        <Box
+          component="span"
+          key={m.key}
+          title={m.label}
+          sx={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#00e676", display: "inline-block" }}
+        />
+      ))}
+    </Box>
+  );
+}
+
+function withSourceDots(value, marks) {
+  return (
+    <Box component="span" sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "3px" }}>
+      {value}
+      <SourceDots marks={marks} />
+    </Box>
+  );
+}
+
 function AssistText({ v }) {
   const col = v === "P" ? "#1565d8" : v === "B" ? "#e53935" : "#fff";
   return <span style={{ color: col, fontWeight: "bold" }}>{v}</span>;
 }
 
 // 단순(병합 없음) 행. 빈값은 회색 대시(–). label 있으면 맨 앞 라벨 셀.
-function SimpleRow({ data, dataKey, render, pos, label, labelColor }) {
+function SimpleRow({ data, dataKey, render, pos, label, labelColor, markKey }) {
   const bgKey = `${dataKey}Bg`;
   return (
     <tr>
@@ -129,9 +154,10 @@ function SimpleRow({ data, dataKey, render, pos, label, labelColor }) {
       {data.name.map((n, i) => {
         const v = (data[dataKey] || [])[i] || "";
         const bg = (data[bgKey] || [])[i];
+        const marks = markKey ? (data[markKey] || [])[i] : null;
         const sx = { ...tdSx, ...(bg ? { backgroundColor: bg } : {}), ...edgeStyle(data, i, pos) };
         return v
-          ? <Box component="td" key={i} sx={sx}>{render(v)}</Box>
+          ? <Box component="td" key={i} sx={sx}>{withSourceDots(render(v), marks)}</Box>
           : <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
       })}
     </tr>
@@ -202,19 +228,16 @@ function StrategyTable({ data }) {
             <Box component="th" key={i} sx={{ ...thSx, color: headColorOf(data, i, n), backgroundColor: "#000", ...edgeStyle(data, i, "head") }}>
               <Box component="span" sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "3px" }}>
                 {n}
-                {data.sourceMarks?.[i] && (
-                  <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#00e676", display: "inline-block" }} />
-                )}
               </Box>
             </Box>
           ))}
         </tr>
       </thead>
       <tbody>
-        <SimpleRow data={data} dataKey="wait" render={waitCell} pos="mid" label="연속" />
+        <SimpleRow data={data} dataKey="wait" render={waitCell} pos="mid" label="연속" markKey="waitSourceMarks" />
         <SimpleRow data={data} dataKey="pick" render={(v) => <Chip v={v} />} pos="mid" label="생성" />
         <SimpleRow data={data} dataKey="stage1" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" />
-        <SimpleRow data={data} dataKey="pct" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" />
+        <SimpleRow data={data} dataKey="pct" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" markKey="pctSourceMarks" />
         <SimpleRow data={data} dataKey="rec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="총전적" />
         <SimpleRow data={data} dataKey="rec2" render={(v) => <span>{rec2HTML(v)}</span>} pos="mid" label="최다" />
         <AssistRow data={data} pos="mid" label="어시H픽" labelColor={LBL_RED} />
@@ -418,20 +441,22 @@ function withLiveData(base, ctx) {
   (ctx.gobMarks?.H0 || []).forEach((key) => addGobBg(markWaitMiss, gobLabelOf(key), GOB_LOW_BG));
   (ctx.gobMarks?.PCT1 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_TOP_BG));
   (ctx.gobMarks?.PCT0 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_LOW_BG));
-  out.sourceMarks = base.name.map(() => false);
-  const markByPair = new Map();
-  Object.entries(ctx.xxSources || {}).forEach(([key, src]) => {
-    const pairKey = `${src?.x || ""}|${src?.xr || ""}`;
-    if (!src?.x || !src?.xr) return;
-    if (!/RN$|AAR$|SSRN[123]$/.test(key)) return;
-    if (!markByPair.has(pairKey)) markByPair.set(pairKey, src);
-  });
-  markByPair.forEach((src) => {
+  out.waitSourceMarks = base.name.map(() => []);
+  out.pctSourceMarks = base.name.map(() => []);
+  const addSourceMark = (target, src, key, label) => {
     const selected = src?.tie === "x" ? src?.x : src?.tie === "xr" ? src?.xr : null;
     if (!selected) return;
-    base.name.forEach((label, i) => {
-      if (label === selected) out.sourceMarks[i] = true;
+    base.name.forEach((name, idx) => {
+      if (name === selected) target[idx] = [...(target[idx] || []), { key, label }];
     });
+  };
+  Object.entries(ctx.xxSources || {}).forEach(([key, src]) => {
+    if (!src?.x || !src?.xr) return;
+    if (key === "AAR" || /^SSRN[123]$/.test(key)) {
+      addSourceMark(out.waitSourceMarks, src, key, key === "AAR" ? "AARN" : key);
+    } else if (key === "AARO" || /^SSRO[123]$/.test(key)) {
+      addSourceMark(out.pctSourceMarks, src, key, key);
+    }
   });
   base.name.forEach((label, i) => {
     if (!label) return; // 빈 컬럼
