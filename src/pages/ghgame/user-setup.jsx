@@ -488,6 +488,7 @@ const ASSIST_OPTS = [
   "A멀티(H1)", "S1멀티(H1)", "S2멀티(H1)", "S3멀티(H1)",
   "HB멀티(H1)", "WH멀티(H1)", "MH멀티(H1)", "DH멀티(H1)",
 ];
+const isKnownAssistOption = (value) => !value || ASSIST_OPTS.includes(value);
 // 패시 어시스트 행 (2~15패시). 최고 16단계면 15패시까지 표시.
 const PASI_LEVELS = Array.from({ length: 14 }, (_, i) => i + 2);
 function defaultPasi() {
@@ -574,6 +575,24 @@ const STRATEGY_SETUP_BOXES = [
   { key: "J", variant: "short" },
 ];
 
+function normalizeUnknownAssistOptions(cfg) {
+  if (!cfg || typeof cfg !== "object") return cfg;
+  const next = { ...cfg };
+  STRATEGY_SETUP_BOXES.forEach(({ key }) => {
+    const box = next[key];
+    if (!box || typeof box !== "object" || !Array.isArray(box.pasi)) return;
+    next[key] = {
+      ...box,
+      pasi: box.pasi.map((row) => ({
+        ...row,
+        assist1: isKnownAssistOption(row?.assist1) ? row.assist1 : "",
+        assist2: isKnownAssistOption(row?.assist2) ? row.assist2 : "",
+      })),
+    };
+  });
+  return next;
+}
+
 // 목업 셀 스타일 (setup_page_mockup.html). 10열 통일, 84px 셀.
 const mkCell = { border: "1px solid #c9ccd1", width: 84, height: 22, lineHeight: 1.1, textAlign: "center", verticalAlign: "middle", fontSize: 13, padding: "1px 4px", whiteSpace: "nowrap", boxSizing: "border-box" };
 const mkGreen = { ...mkCell, background: "#009900", color: "#fff" };
@@ -628,12 +647,15 @@ const mkCondOff = { color: "#666" };  // 구간 없음(회색)
 
 // 어시스트 셀렉트 (목업 assistSelectHTML)
 function AssistSelect({ value, onChange, sx }) {
-  const normalized = ASSIST_OPTS.includes(value) ? value : ASSIST_OPTS[0];
+  const isUnknown = !isKnownAssistOption(value);
+  const selectValue = isUnknown ? "" : (value || "");
   return (
-    <select value={normalized} onChange={(e) => onChange(e.target.value)}
-      style={{ background: "#16365c", color: "#fff", border: "1px solid #2f5b8f", borderRadius: 3,
+    <select value={selectValue} onChange={(e) => onChange(e.target.value)}
+      title={isUnknown ? `알 수 없는 어시스트 설정값: ${value}` : undefined}
+      style={{ background: isUnknown ? "#7f1d1d" : "#16365c", color: "#fff", border: isUnknown ? "1px solid #ff6b6b" : "1px solid #2f5b8f", borderRadius: 3,
         fontSize: 12, padding: "1px 2px", width: "96%", cursor: "pointer", outline: "none",
         fontFamily: "D2Coding, Consolas, Menlo, monospace", ...sx }}>
+      <option value="">해당없음</option>
       {ASSIST_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
   );
@@ -1042,7 +1064,7 @@ export default function GhUserSetupPage() {
     if (!dirty) return;
     setSaving(true);
     try {
-      const res = await apiCaller.put(USER_BET_SETTINGS_API.SAVE(gameType), { config });
+      const res = await apiCaller.put(USER_BET_SETTINGS_API.SAVE(gameType), { config: normalizeUnknownAssistOptions(config) });
       setConfig(res.data.config);
       setDirty(false);
       setSnack({ open: true, message: "설정이 저장되었습니다.", severity: "success" });
