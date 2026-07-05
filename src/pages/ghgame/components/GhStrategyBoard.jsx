@@ -429,8 +429,9 @@ function buildColData(label, i, data, ctx) {
   m = label.match(/^SQ([123])$/);
   if (m) {
     const sc = `sc${m[1]}`;
-    const qas = qAssistFor(ctx, `SQ${m[1]}`);
-    const base = fromTrack(ctx.sqTracks, sc, amountsFor(ctx, `S${m[1]}`), qas, assistFor(ctx, `S${m[1]}`), stepMinFor(ctx, `S${m[1]}`)) || {};
+    const sqKey = `SQ${m[1]}`;
+    const qas = qAssistFor(ctx, sqKey);
+    const base = fromTrack(ctx.sqTracks, sc, amountsFor(ctx, `S${m[1]}`), qas, assistFor(ctx, sqKey), stepMinFor(ctx, `S${m[1]}`)) || {};
     const q = qas?.quarter || ctx.quarterTracks?.[sc]?.summary;
     if (q) {
       const amts = amountsFor(ctx, `SQ${m[1]}`);
