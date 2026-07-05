@@ -30,6 +30,8 @@ function headColorOf(data, i, n) {
 const HL = "#ffd54f";
 const GSEP = "2px solid #9a9a9a";
 const BASE = "1px solid #555";
+const GOB_TOP_BG = "rgba(0, 200, 83, 0.55)";
+const GOB_LOW_BG = "rgba(255, 213, 79, 0.62)";
 
 // 셀의 노란 박스/그룹선 테두리 계산 (디자인 edgeCls 포팅, span=1 고정 — 병합 없음)
 function edgeStyle(data, i, pos) {
@@ -111,12 +113,14 @@ function Chip({ v }) {
 
 // 단순(병합 없음) 행. 빈값은 회색 대시(–). label 있으면 맨 앞 라벨 셀.
 function SimpleRow({ data, dataKey, render, pos, label, labelColor }) {
+  const bgKey = `${dataKey}Bg`;
   return (
     <tr>
       {label != null && <LblCell text={label} color={labelColor} edge={pos === "last" ? "last" : undefined} />}
       {data.name.map((n, i) => {
         const v = (data[dataKey] || [])[i] || "";
-        const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
+        const bg = (data[bgKey] || [])[i];
+        const sx = { ...tdSx, ...(bg ? { backgroundColor: bg } : {}), ...edgeStyle(data, i, pos) };
         return v
           ? <Box component="td" key={i} sx={sx}>{render(v)}</Box>
           : <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
@@ -168,7 +172,14 @@ function StrategyTable({ data }) {
         <tr>
           <LblCell text="섹션" edge="head" />
           {data.name.map((n, i) => (
-            <Box component="th" key={i} sx={{ ...thSx, color: headColorOf(data, i, n), backgroundColor: "#000", ...edgeStyle(data, i, "head") }}>{n}</Box>
+            <Box component="th" key={i} sx={{ ...thSx, color: headColorOf(data, i, n), backgroundColor: "#000", ...edgeStyle(data, i, "head") }}>
+              <Box component="span" sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "3px" }}>
+                {n}
+                {data.sourceMarks?.[i] && (
+                  <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "#00e676", display: "inline-block" }} />
+                )}
+              </Box>
+            </Box>
           ))}
         </tr>
       </thead>
@@ -216,6 +227,23 @@ const betAt = (amounts, step) => {
   return idx >= 0 && idx < amounts.length ? amounts[idx] : null;
 };
 const amountsFor = (ctx, stratKey) => ctx.betAmountsMap && ctx.betAmountsMap[stratKey];
+const GOB_KEY_TO_LABEL = {
+  S1: "S1", S2: "S2", S3: "S3",
+  SR1: "S1R", SR2: "S2R", SR3: "S3R",
+  SSR1: "SSRN1", SSR2: "SSRN2", SSR3: "SSRN3",
+  SSRO1: "SSRO1", SSRO2: "SSRO2", SSRO3: "SSRO3",
+  FOR1: "FOR1", FOR2: "FOR2", FOR3: "FOR3",
+  FORX1: "FOR1X", FORX2: "FOR2X", FORX3: "FOR3X",
+};
+const gobLabelOf = (key) => GOB_KEY_TO_LABEL[key] || key;
+const addGobBg = (map, label, color) => {
+  const prev = map.get(label);
+  if (!prev || prev === color) {
+    map.set(label, color);
+    return;
+  }
+  map.set(label, `linear-gradient(90deg, ${prev} 0 50%, ${color} 50% 100%)`);
+};
 
 // 쿼터(3회묶음 1승) 블록: 쿼터전적/단계/쿼터P/누적P
 const quarterRow = (q, amounts) => {
@@ -334,8 +362,33 @@ function withLiveData(base, ctx) {
     "qrec", "qstage", "qidx1", "qidx2"];
   const out = { ...base };
   keys.forEach((k) => { out[k] = base.name.map(() => ""); });
+  out.waitBg = base.name.map(() => "");
+  out.pctBg = base.name.map(() => "");
+  const markWait = new Map();
+  const markPct = new Map();
+  (ctx.gobMarks?.H1 || []).forEach((key) => addGobBg(markWait, gobLabelOf(key), GOB_TOP_BG));
+  (ctx.gobMarks?.H0 || []).forEach((key) => addGobBg(markWait, gobLabelOf(key), GOB_LOW_BG));
+  (ctx.gobMarks?.PCT1 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_TOP_BG));
+  (ctx.gobMarks?.PCT0 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_LOW_BG));
+  out.sourceMarks = base.name.map(() => false);
+  const markByPair = new Map();
+  Object.entries(ctx.xxSources || {}).forEach(([key, src]) => {
+    const pairKey = `${src?.x || ""}|${src?.xr || ""}`;
+    if (!src?.x || !src?.xr) return;
+    if (!/RN$|AAR$|SSRN[123]$/.test(key)) return;
+    if (!markByPair.has(pairKey)) markByPair.set(pairKey, src);
+  });
+  markByPair.forEach((src) => {
+    const selected = src?.tie === "x" ? src?.x : src?.tie === "xr" ? src?.xr : null;
+    if (!selected) return;
+    base.name.forEach((label, i) => {
+      if (label === selected) out.sourceMarks[i] = true;
+    });
+  });
   base.name.forEach((label, i) => {
     if (!label) return; // 빈 컬럼
+    if (markWait.has(label)) out.waitBg[i] = markWait.get(label);
+    if (markPct.has(label)) out.pctBg[i] = markPct.get(label);
     const rd = buildColData(label, i, base, ctx);
     if (!rd) return;
     keys.forEach((k) => { if (rd[k] != null) out[k][i] = rd[k]; });
@@ -351,9 +404,9 @@ function withLiveData(base, ctx) {
   return out;
 }
 
-export default function GhStrategyBoard({ stats, nextPicks, assistNextPicks, assistStats, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap }) {
+export default function GhStrategyBoard({ stats, nextPicks, assistNextPicks, assistStats, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap, xxSources, gobMarks }) {
   const hasData = !!(stats || sqTracks);
-  const ctx = { stats, nextPicks, assistNextPicks, assistStats, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap };
+  const ctx = { stats, nextPicks, assistNextPicks, assistStats, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap, xxSources, gobMarks };
   const tables = [G1, G2, G3, G4].map((t) => (hasData ? withLiveData(t, ctx) : t));
   return (
     <Box sx={{ overflowX: "auto", mb: 2 }}>

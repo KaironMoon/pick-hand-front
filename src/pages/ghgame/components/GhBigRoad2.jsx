@@ -58,7 +58,7 @@ function statusForPick(pick, actual) {
   return pick === actual ? "hit" : "miss";
 }
 
-function cellsFromPicks(picks, actualSeq, nextPick) {
+function cellsFromPicks(picks, actualSeq, nextPick, series = null) {
   const cells = new Array(MAX_CELLS).fill(null);
   const n = Math.min(picks?.length || 0, MAX_CELLS);
   for (let i = 0; i < n; i++) {
@@ -67,7 +67,7 @@ function cellsFromPicks(picks, actualSeq, nextPick) {
       cells[i] = { wait: true, round: i + 1 };
       continue;
     }
-    const st = statusForPick(pick, actualSeq?.[i]);
+    const st = series?.[i] || statusForPick(pick, actualSeq?.[i]);
     cells[i] = { pick, status: st, round: i + 1 };
   }
   if (nextPick && n < MAX_CELLS) cells[n] = { pick: nextPick, status: "current", round: n + 1 };
@@ -122,7 +122,10 @@ function getRowCells(ctx, spec, assist = false) {
   const nextPick = assist
     ? (ctx.assistNextPicks?.[spec] || ctx.nextPicks?.[spec])
     : ctx.nextPicks?.[spec];
-  return cellsFromPicks(picks || [], ctx.actualSeq, nextPick);
+  const series = assist
+    ? (ctx.assistStats?.[spec]?.series || ctx.stats?.[spec]?.series)
+    : ctx.stats?.[spec]?.series;
+  return cellsFromPicks(picks || [], ctx.actualSeq, nextPick, series);
 }
 
 function Cell({ cell, onClick }) {
@@ -389,6 +392,7 @@ export default function GhBigRoad2({
   roundPicks,
   assistRoundPicks,
   assistNextPicks,
+  assistStats,
   sqTracks,
   srTracks,
   ssrTracks,
@@ -415,6 +419,7 @@ export default function GhBigRoad2({
     roundPicks,
     assistRoundPicks,
     assistNextPicks,
+    assistStats,
     sqTracks,
     srTracks,
     ssrTracks,

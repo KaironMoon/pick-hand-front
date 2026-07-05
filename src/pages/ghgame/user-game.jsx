@@ -1336,6 +1336,8 @@ export default function GhUserGamePage() {
             quarterTracks={quarterTracks}
             betAmounts={picksSnapshot?.bet_amounts}
             betAmountsMap={picksSnapshot?.bet_amounts_map}
+            xxSources={picksSnapshot?.xx_sources}
+            gobMarks={picksSnapshot?.gob_marks}
           />
 
           {/* ===== 빅로드2 ===== */}
@@ -1351,6 +1353,7 @@ export default function GhUserGamePage() {
             nextPicks={picksSnapshot?.next_picks}
             assistRoundPicks={picksSnapshot?.assist_round_picks}
             assistNextPicks={picksSnapshot?.assist_next_picks}
+            assistStats={picksSnapshot?.assist_stats}
             subgameBasis={picksSnapshot?.subgame_basis}
             ncRefShoes={picksSnapshot?.nc_ref_shoes}
             ncRefShoeNo={picksSnapshot?.nc_ref_shoe_no}
