@@ -1188,6 +1188,8 @@ export default function GhUserGamePage() {
             quarterTracks={quarterTracks}
             betAmounts={picksSnapshot?.bet_amounts}
             betAmountsMap={picksSnapshot?.bet_amounts_map}
+            betStepMinMap={picksSnapshot?.bet_step_min_map}
+            strategyEnabled={picksSnapshot?.strategy_enabled}
             xxSources={picksSnapshot?.xx_sources}
             gobMarks={picksSnapshot?.gob_marks}
           />
