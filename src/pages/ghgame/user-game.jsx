@@ -1348,6 +1348,7 @@ export default function GhUserGamePage() {
             sxTracks={sxTracks}
             ssroTracks={ssroTracks}
             forTracks={forTracks}
+            quarterTracks={quarterTracks}
             stats={picksSnapshot?.stats}
             roundPicks={picksSnapshot?.round_picks}
             nextPicks={picksSnapshot?.next_picks}

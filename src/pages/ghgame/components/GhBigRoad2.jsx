@@ -27,6 +27,7 @@ const SECTION_DEFS = [
   { id: "MH", label: "메가히트멀티", kind: "subgame", xKey: "M22", rows: [["M22", "M22"], ["메가R", "메가R"], ["메가SRO", "메가SRO"], ["메가SRN", "메가SRN"]] },
   { id: "DH", label: "드림히트멀티", kind: "subgame", xKey: "D112", rows: [["D112", "D112"], ["드림R", "드림R"], ["드림SRO", "드림SRO"], ["드림SRN", "드림SRN"]] },
   { id: "NC", label: "NC멀티", kind: "normal", rows: [["NC", "NC"], ["NCR", "NCR"], ["NCSRO", "NCSRO"], ["NCSRN", "NCSRN"]] },
+  { id: "SQ", label: "SQ쿼터", kind: "normal", rows: [["SQ1", "track:quarter:sc1"], ["SQ2", "track:quarter:sc2"], ["SQ3", "track:quarter:sc3"]] },
 ];
 
 const TRACK_MAP = {
@@ -36,6 +37,7 @@ const TRACK_MAP = {
   ssro: "ssroTracks",
   sx: "sxTracks",
   for: "forTracks",
+  quarter: "quarterTracks",
 };
 
 const titleSx = {
@@ -85,6 +87,18 @@ function cellsFromTrack(track, actualSeq) {
   return cells;
 }
 
+function cellsFromQuarterTrack(track, actualSeq) {
+  const cells = new Array(MAX_CELLS).fill(null);
+  for (const r of track?.bigroad_data || []) {
+    const idx = (r.round || 0) - 1;
+    if (idx < 0 || idx >= MAX_CELLS) continue;
+    if (r.status === "rest") cells[idx] = { rest: true, round: r.round };
+    else if (r.status === "wait") cells[idx] = { wait: true, round: r.round };
+    else cells[idx] = { pick: r.predict || null, status: r.status, actual: actualSeq?.[idx], round: r.round };
+  }
+  return cells;
+}
+
 function sourceCells(actualSeq, offset, reverse = false) {
   const cells = new Array(MAX_CELLS).fill(null);
   for (let i = 0; i < MAX_CELLS; i++) {
@@ -114,6 +128,8 @@ function getTrack(ctx, spec) {
 
 function getRowCells(ctx, spec, assist = false) {
   if (spec?.startsWith("track:")) {
+    const [, family] = spec.split(":");
+    if (family === "quarter") return cellsFromQuarterTrack(getTrack(ctx, spec), ctx.actualSeq);
     return cellsFromTrack(getTrack(ctx, spec), ctx.actualSeq);
   }
   const picks = assist
@@ -135,6 +151,10 @@ function Cell({ cell, onClick }) {
   const title = cell?.pick && cell?.round ? `${cell.round}회차` : undefined;
   if (cell?.basis) {
     content = "";
+  } else if (cell?.rest) {
+    content = "W";
+    color = "#888";
+    bg = "#101318";
   } else if (cell?.wait) {
     content = "W";
     color = "#555";
@@ -399,6 +419,7 @@ export default function GhBigRoad2({
   ssroTracks,
   sxTracks,
   forTracks,
+  quarterTracks,
   subgameBasis,
   ncRefShoes,
   ncRefShoeNo,
@@ -426,6 +447,7 @@ export default function GhBigRoad2({
     ssroTracks,
     sxTracks,
     forTracks,
+    quarterTracks,
     subgameBasis,
     ncRefShoes: ncRefShoeNo || ncRefShoes,
     actualSeq: actualSeq || "",
