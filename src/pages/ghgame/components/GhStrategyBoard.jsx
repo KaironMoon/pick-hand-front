@@ -115,6 +115,11 @@ function PickText({ v }) {
   return v === "P" || v === "B" ? <Chip v={v} /> : <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>;
 }
 
+function AssistText({ v }) {
+  const col = v === "P" ? "#1565d8" : v === "B" ? "#e53935" : "#fff";
+  return <span style={{ color: col, fontWeight: "bold" }}>{v}</span>;
+}
+
 // 단순(병합 없음) 행. 빈값은 회색 대시(–). label 있으면 맨 앞 라벨 셀.
 function SimpleRow({ data, dataKey, render, pos, label, labelColor }) {
   const bgKey = `${dataKey}Bg`;
@@ -136,6 +141,7 @@ function SimpleRow({ data, dataKey, render, pos, label, labelColor }) {
 // 어시스트 행 (rec2 다음, 시안 pick2 행): P/B 색 글자 + 값 있는 칸만 #16365c 배경. 빈칸은 dim(–).
 // 어시스트 픽은 (임시) 원래 픽(pick)과 동일. 실제 어시스트 로직은 추후 처리.
 const ASSIST_BG = "#16365c";
+const Q_ASSIST_BG = "#60497b";
 function AssistRow({ data, pos, label, labelColor }) {
   return (
     <tr>
@@ -145,10 +151,27 @@ function AssistRow({ data, pos, label, labelColor }) {
         // 어시스트 픽 = (임시) 원래 픽과 동일
         const v = (data.assist || [])[i] || (data.pick || [])[i] || "";
         if (!v) return <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
-        const col = v === "P" ? "#1565d8" : v === "B" ? "#e53935" : "#fff";
         return (
           <Box component="td" key={i} sx={{ ...sx, backgroundColor: ASSIST_BG }}>
-            <span style={{ color: col, fontWeight: "bold" }}>{v}</span>
+            <AssistText v={v} />
+          </Box>
+        );
+      })}
+    </tr>
+  );
+}
+
+function QAssistRow({ data, pos, label, labelColor }) {
+  return (
+    <tr>
+      {label != null && <LblCell text={label} color={labelColor} edge={pos === "last" ? "last" : undefined} />}
+      {data.name.map((n, i) => {
+        const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
+        const v = (data.qAssist || [])[i] || "";
+        if (!v) return <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
+        return (
+          <Box component="td" key={i} sx={{ ...sx, backgroundColor: Q_ASSIST_BG }}>
+            <AssistText v={v} />
           </Box>
         );
       })}
@@ -201,9 +224,9 @@ function StrategyTable({ data }) {
         <SimpleRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="idx1" render={(v) => <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>} pos="mid" label="회차P" labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label="누적P" labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="qAssist" render={(v) => <PickText v={v} />} pos="mid" label="어시Q픽" labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label="연속" labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="qPct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" labelColor={LBL_RED} />
+        <QAssistRow data={data} pos="mid" label="어시Q픽" />
+        <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label="연속" />
+        <SimpleRow data={data} dataKey="qPct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" />
         {/* 쿼터 블록 */}
         <SimpleRow data={data} dataKey="qrec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="쿼터전적" />
         <SimpleRow data={data} dataKey="qstage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" />
@@ -235,6 +258,7 @@ const betAt = (amounts, step) => {
   return idx >= 0 && idx < amounts.length ? amounts[idx] : null;
 };
 const amountsFor = (ctx, stratKey) => ctx.betAmountsMap && ctx.betAmountsMap[stratKey];
+const HIDE_QUARTER_KEYS = new Set(["D", "G", "TN", "ONE", "TWO", "P", "B", "J"]);
 const GOB_KEY_TO_LABEL = {
   S1: "S1", S2: "S2", S3: "S3",
   SR1: "S1R", SR2: "S2R", SR3: "S3R",
@@ -297,8 +321,8 @@ const fromStats = (ctx, key) => {
     idx1: fmtMan(betAt(amounts, s.martin_step)),
     idx2: fmtMan(s.pnl),
     // 어시Q픽은 별도 행 데이터로 두되, 실제 어시Q 로직 전까지는 생성 쿼터와 동일하게 표시한다.
-    ...quarterAssistRow(s.quarter, ctx.nextPicks?.[key] || ""),
-    ...quarterRow(s.quarter, amounts),
+    ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterAssistRow(s.quarter, ctx.nextPicks?.[key] || "")),
+    ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterRow(s.quarter, amounts)),
   };
 };
 // 트랙(sq/sr/ssr/sx) sc# 기반 행 데이터
