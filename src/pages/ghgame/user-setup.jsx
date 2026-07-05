@@ -32,6 +32,10 @@ const editableCell = { ...cellStyle, cursor: "pointer", position: "relative" };
 const disabledHeaderStyle = {
   ...headerStyle, opacity: 0.4,
 };
+const fmtP1 = (value) => {
+  const n = Number(value || 0);
+  return Number.isFinite(n) ? n.toFixed(1) : "0.0";
+};
 
 function calcAmounts(amounts, editedIdx, editedVal, betType, stepMin, stepMax) {
   const newAmounts = [...amounts];
@@ -73,7 +77,7 @@ function EditableCell({ value, onChange, prefix = "", suffix = "", style = norma
   }
   return (
     <td style={style} onClick={handleClick}>
-      {prefix}{(value === undefined || value === null || value === "" || value === 0) ? "" : value.toLocaleString()}{suffix}
+      {prefix}{suffix === "P" ? fmtP1(value) : ((value === undefined || value === null || value === "" || value === 0) ? "" : value.toLocaleString())}{suffix}
     </td>
   );
 }
@@ -365,7 +369,7 @@ function LabouchereCell({ value, onChange, style }) {
   }
   return (
     <td style={style} onClick={handleClick}>
-      {(value || 0).toLocaleString()}P
+      {fmtP1(value)}P
     </td>
   );
 }
@@ -486,13 +490,13 @@ const ASSIST_OPTS = [
 ];
 // 패시 어시스트 행 (2~15패시). 최고 16단계면 15패시까지 표시.
 const PASI_LEVELS = Array.from({ length: 14 }, (_, i) => i + 2);
-const PASI_DEFAULT_ASSIST1 = ["해당반대", "해당진행", "대기진행", "G(H1)", "G(%1)", "G(%0)", "A멀티(H1)", "S1멀티(H1)", "S2멀티(H1)", "S3멀티(H1)"];
 function defaultPasi() {
-  return PASI_LEVELS.map((lvl, i) => ({
+  return PASI_LEVELS.map((lvl) => ({
     level: lvl,
-    assist1: PASI_DEFAULT_ASSIST1[i] || "해당반대",
+    assist1: "해당진행",
     pct: lvl === 2 ? 5 : lvl === 6 ? 55 : 0,
-    assist2: "G(H0)",
+    q_level: lvl,
+    assist2: "해당진행",
   }));
 }
 
@@ -609,7 +613,7 @@ function MkInput({ value, onChange, suffix = "", range, style, disabled, render 
   }
   return (
     <td style={{ ...style, cursor: disabled ? "default" : "pointer" }} onClick={start}>
-      {render ? render(value) : `${value == null ? "" : value}${suffix}`}
+      {render ? render(value) : `${suffix === "P" ? fmtP1(value) : (value == null ? "" : value)}${suffix}`}
     </td>
   );
 }
@@ -691,7 +695,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
     onChange({ ...s, [key]: arr });
   };
   const inRange = (step) => step >= stepMin && step <= stepMax;
-  const pRender = (v) => (v ? `${v}P` : "P");
+  const pRender = (v) => `${fmtP1(v)}P`;
 
   // 조건부 P배열 한 그룹(2줄: 1~8, 9~16) 렌더
   const condRows = (group, condLabel, condColor, off) => {

@@ -9,6 +9,7 @@ const BORDER = "1px solid #3a3a3a";
 const CELL_W = 23;
 const CELL_H = 19;
 const MAX_CELLS = 78;
+const HIDE_QUARTER_KEYS = new Set(["D", "G", "TN", "ONE", "TWO", "P", "B"]);
 
 const flip = (p) => (p === "P" ? "B" : p === "B" ? "P" : null);
 
@@ -38,6 +39,15 @@ const TRACK_MAP = {
   sx: "sxTracks",
   for: "forTracks",
   quarter: "quarterTracks",
+};
+
+const Q_TRACK_KEYS = {
+  s: ["S1", "S2", "S3"],
+  sr: ["SR1", "SR2", "SR3"],
+  ssr: ["SSR1", "SSR2", "SSR3"],
+  ssro: ["SSRO1", "SSRO2", "SSRO3"],
+  sx: ["FOR1X", "FOR2X", "FOR3X"],
+  for: ["FOR1", "FOR2", "FOR3"],
 };
 
 const titleSx = {
@@ -73,6 +83,42 @@ function cellsFromPicks(picks, actualSeq, nextPick, series = null) {
     cells[i] = { pick, status: st, round: i + 1 };
   }
   if (nextPick && n < MAX_CELLS) cells[n] = { pick: nextPick, status: "current", round: n + 1 };
+  return cells;
+}
+
+function cellsFromQuarterPicks(picks, actualSeq, nextPick, quarter = null, series = null) {
+  const cells = new Array(MAX_CELLS).fill(null);
+  const n = Math.min(picks?.length || 0, MAX_CELLS);
+  let groupWon = false;
+  let groupStart = -1;
+  for (let i = 0; i < n; i++) {
+    const curGroup = Math.floor(i / 3);
+    if (curGroup !== groupStart) {
+      groupStart = curGroup;
+      groupWon = false;
+    }
+    const round = i + 1;
+    if (groupWon) {
+      cells[i] = { rest: true, round };
+      continue;
+    }
+    const pick = picks?.[i];
+    if (!pick || pick === "wait") {
+      cells[i] = { wait: true, round };
+      continue;
+    }
+    const st = series?.[i] || statusForPick(pick, actualSeq?.[i]);
+    cells[i] = { pick, status: st, round };
+    if (st === "hit") groupWon = true;
+  }
+  if (n < MAX_CELLS) {
+    const nextRound = n + 1;
+    if (quarter?.next_action === "wait") {
+      cells[n] = { rest: true, round: nextRound };
+    } else if (nextPick) {
+      cells[n] = { pick: nextPick, status: "current", round: nextRound };
+    }
+  }
   return cells;
 }
 
@@ -128,8 +174,27 @@ function getTrack(ctx, spec) {
 
 function getRowCells(ctx, spec, assist = false) {
   if (spec?.startsWith("track:")) {
-    const [, family] = spec.split(":");
-    if (family === "quarter") return cellsFromQuarterTrack(getTrack(ctx, spec), ctx.actualSeq);
+    const [, family, sc] = spec.split(":");
+    if (family === "quarter") {
+      if (assist) {
+        const key = `SQ${sc?.slice(-1) || ""}`;
+        const qas = ctx.qAssistStats?.[key];
+        if (qas) return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
+      }
+      return cellsFromQuarterTrack(getTrack(ctx, spec), ctx.actualSeq);
+    }
+    if (assist) {
+      const idx = Number(String(sc || "").replace("sc", "")) - 1;
+      const key = Q_TRACK_KEYS[family]?.[idx];
+      if (key && ctx.assistRoundPicks?.[key]) {
+        return cellsFromPicks(
+          ctx.assistRoundPicks[key] || [],
+          ctx.actualSeq,
+          ctx.assistNextPicks?.[key],
+          ctx.assistStats?.[key]?.series
+        );
+      }
+    }
     return cellsFromTrack(getTrack(ctx, spec), ctx.actualSeq);
   }
   const picks = assist
@@ -142,6 +207,76 @@ function getRowCells(ctx, spec, assist = false) {
     ? (ctx.assistStats?.[spec]?.series || ctx.stats?.[spec]?.series)
     : ctx.stats?.[spec]?.series;
   return cellsFromPicks(picks || [], ctx.actualSeq, nextPick, series);
+}
+
+function getTrackCurrentPick(track) {
+  return (track?.round_data || []).find((r) => r.status === "current")?.predict || null;
+}
+
+function getTrackPicks(track) {
+  return (track?.round_data || []).map((r) => (
+    r?.status === "hit" || r?.status === "miss" || r?.status === "current"
+      ? r.predict || null
+      : null
+  ));
+}
+
+function getTrackSeries(track) {
+  return (track?.round_data || []).map((r) => (
+    r?.status === "hit" || r?.status === "miss" ? r.status : null
+  ));
+}
+
+function hasRenderableCells(cells) {
+  return Array.isArray(cells) && cells.some((cell) => cell?.pick || cell?.wait || cell?.rest);
+}
+
+function getQuarterCells(ctx, spec, assist = false) {
+  if (!spec || HIDE_QUARTER_KEYS.has(spec)) return null;
+  if (spec.startsWith("track:")) {
+    const [, family, sc] = spec.split(":");
+    if (family === "quarter") {
+      const key = `SQ${sc?.slice(-1) || ""}`;
+      if (assist) {
+        const qas = ctx.qAssistStats?.[key];
+        if (!qas) return null;
+        return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
+      }
+      return cellsFromQuarterTrack(getTrack(ctx, spec), ctx.actualSeq);
+    }
+    if (assist) {
+      const idx = Number(String(sc || "").replace("sc", "")) - 1;
+      const key = Q_TRACK_KEYS[family]?.[idx];
+      const qas = key ? ctx.qAssistStats?.[key] : null;
+      if (!qas) return null;
+      return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
+    }
+    const track = getTrack(ctx, spec);
+    const q = track?.summary?.quarter;
+    if (!q) return null;
+    return cellsFromQuarterPicks(
+      getTrackPicks(track),
+      ctx.actualSeq,
+      getTrackCurrentPick(track),
+      q,
+      getTrackSeries(track)
+    );
+  }
+
+  if (assist) {
+    const qas = ctx.qAssistStats?.[spec];
+    if (!qas) return null;
+    return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
+  }
+  const q = ctx.stats?.[spec]?.quarter;
+  if (!q) return null;
+  return cellsFromQuarterPicks(
+    ctx.roundPicks?.[spec] || [],
+    ctx.actualSeq,
+    ctx.nextPicks?.[spec],
+    q,
+    ctx.stats?.[spec]?.series
+  );
 }
 
 function Cell({ cell, onClick }) {
@@ -332,6 +467,9 @@ function NormalSection({ section, ctx, selectedBasis, onSelectBasis }) {
     ? [...(ctx.subgameBasis?.[section.xKey] || [])].reverse().find((row) => row?.prev_picks)
     : null;
   const basisForDisplay = selectedBasis || latestBasis || null;
+  const qAssistRows = section.rows
+    .map(([label, key]) => [label, getQuarterCells(ctx, key, true)])
+    .filter(([, cells]) => hasRenderableCells(cells));
   return (
     <>
       <Block title="original">
@@ -348,11 +486,20 @@ function NormalSection({ section, ctx, selectedBasis, onSelectBasis }) {
           </Box>
         ))}
       </Block>
-      <Block title="assist">
-        {section.rows.map(([label, key]) => (
-          <RoadRow key={`a-${label}`} label={label} cells={getRowCells(ctx, key, true)} />
-        ))}
-      </Block>
+      {section.id !== "SQ" && (
+        <Block title="assist">
+          {section.rows.map(([label, key]) => (
+            <RoadRow key={`a-${label}`} label={label} cells={getRowCells(ctx, key, true)} />
+          ))}
+        </Block>
+      )}
+      {qAssistRows.length > 0 && (
+        <Block title="quarter assist">
+          {qAssistRows.map(([label, cells]) => (
+            <RoadRow key={`qa-${label}`} label={label} cells={cells} />
+          ))}
+        </Block>
+      )}
     </>
   );
 }
@@ -360,13 +507,19 @@ function NormalSection({ section, ctx, selectedBasis, onSelectBasis }) {
 function ForSection({ section, ctx }) {
   return (
     <>
-      {section.rows.map(([label, key, offset]) => (
-        <Box key={label} sx={{ mb: 1 }}>
-          <RoadRow label={`${label} source`} cells={sourceCells(ctx.actualSeq, offset, false)} />
-          <RoadRow label={`${label} original`} cells={getRowCells(ctx, key, false)} />
-          <RoadRow label={`${label} assist`} cells={getRowCells(ctx, key, true)} />
-        </Box>
-      ))}
+      {section.rows.map(([label, key, offset]) => {
+        const qAssistCells = getQuarterCells(ctx, key, true);
+        return (
+          <Box key={label} sx={{ mb: 1 }}>
+            <RoadRow label={`${label} source`} cells={sourceCells(ctx.actualSeq, offset, false)} />
+            <RoadRow label={`${label} original`} cells={getRowCells(ctx, key, false)} />
+            <RoadRow label={`${label} assist`} cells={getRowCells(ctx, key, true)} />
+            {hasRenderableCells(qAssistCells) && (
+              <RoadRow label={`${label} q assist`} cells={qAssistCells} />
+            )}
+          </Box>
+        );
+      })}
     </>
   );
 }
@@ -413,6 +566,7 @@ export default function GhBigRoad2({
   assistRoundPicks,
   assistNextPicks,
   assistStats,
+  qAssistStats,
   sqTracks,
   srTracks,
   ssrTracks,
@@ -441,6 +595,7 @@ export default function GhBigRoad2({
     assistRoundPicks,
     assistNextPicks,
     assistStats,
+    qAssistStats,
     sqTracks,
     srTracks,
     ssrTracks,

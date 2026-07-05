@@ -1327,6 +1327,8 @@ export default function GhUserGamePage() {
             nextPicks={picksSnapshot?.next_picks}
             assistNextPicks={picksSnapshot?.assist_next_picks}
             assistStats={picksSnapshot?.assist_stats}
+            assistSources={picksSnapshot?.assist_sources}
+            qAssistStats={picksSnapshot?.q_assist_stats}
             sqTracks={sqTracks}
             srTracks={srTracks}
             ssrTracks={ssrTracks}
@@ -1355,6 +1357,7 @@ export default function GhUserGamePage() {
             assistRoundPicks={picksSnapshot?.assist_round_picks}
             assistNextPicks={picksSnapshot?.assist_next_picks}
             assistStats={picksSnapshot?.assist_stats}
+            qAssistStats={picksSnapshot?.q_assist_stats}
             subgameBasis={picksSnapshot?.subgame_basis}
             ncRefShoes={picksSnapshot?.nc_ref_shoes}
             ncRefShoeNo={picksSnapshot?.nc_ref_shoe_no}
