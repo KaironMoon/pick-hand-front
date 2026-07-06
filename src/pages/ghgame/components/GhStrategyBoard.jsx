@@ -320,11 +320,12 @@ const addGobBg = (map, label, color) => {
 // 쿼터(3회묶음 1승) 블록: 쿼터전적/단계/쿼터P/누적P
 const quarterRow = (q, amounts, stepMin = 1) => {
   if (!q) return {};
+  const amount = q.amount ?? (amounts ? betAt(amounts, q.martin_step, stepMin) : null);
   return {
     qrec: `${q.total_q ?? 0}-${q.win_q ?? 0}/${q.lose_q ?? 0}`,
     qstage: fmtStage(q.martin_step, 0),
-    qidx1: amounts ? fmtMan(betAt(amounts, q.martin_step, stepMin)) : "",
-    qidx2: amounts ? fmtMan(q.pnl) : "",
+    qidx1: amount !== null && amount !== undefined ? fmtMan(amount) : "",
+    qidx2: q.pnl !== null && q.pnl !== undefined ? fmtMan(q.pnl) : "",
   };
 };
 const quarterAssistRow = (q, pick) => {
@@ -362,8 +363,8 @@ const fromStats = (ctx, key) => {
     rec2: fmtRec2(s.max_hit_streak ?? 0, s.max_miss_streak ?? 0),
     stage1: fmtStage(s.martin_step, s.triple_loss),   // 생성(원래픽) 단계
     stage: as ? fmtStage(as.martin_step, as.triple_loss) : "",
-    idx1: amounts && as ? fmtMan(betAt(amounts, as.martin_step, stepMin)) : "",
-    idx2: amounts && as ? fmtMan(as.pnl) : "",
+    idx1: as ? fmtMan(as.amount ?? (amounts ? betAt(amounts, as.martin_step, stepMin) : null)) : "",
+    idx2: as && as.pnl !== null && as.pnl !== undefined ? fmtMan(as.pnl) : "",
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : { ...quarterAssistRow(qas?.quarter || s.quarter, qAssistPickText(qas)), qAssistSource: qas?.source }),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterRow(qas?.quarter || s.quarter, amounts, stepMin)),
   };
@@ -390,8 +391,8 @@ const fromTrack = (tracks, scKey, amounts, qas = null, assist = null, stepMin = 
     rec2: fmtRec2(sm.max_hit_streak ?? 0, sm.max_miss_streak ?? 0),
     stage1: fmtStage(sm.martin_step, sm.triple_loss),
     stage: as ? fmtStage(as.martin_step, as.triple_loss) : "",
-    idx1: amounts && as ? fmtMan(betAt(amounts, as.martin_step, stepMin)) : "",
-    idx2: amounts && as ? fmtMan(as.pnl) : "",
+    idx1: as ? fmtMan(as.amount ?? (amounts ? betAt(amounts, as.martin_step, stepMin) : null)) : "",
+    idx2: as && as.pnl !== null && as.pnl !== undefined ? fmtMan(as.pnl) : "",
     ...quarterAssistRow(qas?.quarter || sm.quarter, qAssistPickText(qas)),
     qAssistSource: qas?.source,
     ...quarterRow(qas?.quarter || sm.quarter, amounts, stepMin),
@@ -437,8 +438,10 @@ function buildColData(label, i, data, ctx) {
       const amts = amountsFor(ctx, `SQ${m[1]}`);
       base.qrec = `${q.total_q ?? 0}-${q.win_q ?? 0}/${q.lose_q ?? 0}`;
       base.qstage = fmtStage(q.martin_step, 0);
-      base.qidx1 = amts ? fmtMan(betAt(amts, q.martin_step, stepMinFor(ctx, `SQ${m[1]}`))) : "";
-      base.qidx2 = amts ? fmtMan(q.pnl) : "";
+      base.qidx1 = q.amount !== null && q.amount !== undefined
+        ? fmtMan(q.amount)
+        : (amts ? fmtMan(betAt(amts, q.martin_step, stepMinFor(ctx, `SQ${m[1]}`))) : "");
+      base.qidx2 = q.pnl !== null && q.pnl !== undefined ? fmtMan(q.pnl) : "";
       Object.assign(base, quarterAssistRow(qas?.quarter || q, qAssistPickText(qas)));
       base.qAssistSource = qas?.source;
     }

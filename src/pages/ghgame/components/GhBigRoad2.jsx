@@ -72,7 +72,8 @@ function statusForPick(pick, actual) {
 
 function cellsFromPicks(picks, actualSeq, nextPick, series = null) {
   const cells = new Array(MAX_CELLS).fill(null);
-  const n = Math.min(picks?.length || 0, MAX_CELLS);
+  const completedRounds = typeof actualSeq === "string" ? actualSeq.length : null;
+  const n = Math.min(completedRounds ?? (picks?.length || 0), MAX_CELLS);
   for (let i = 0; i < n; i++) {
     const pick = picks[i];
     if (!pick || pick === "wait") {
@@ -145,6 +146,24 @@ function cellsFromQuarterTrack(track, actualSeq) {
   return cells;
 }
 
+function cellsFromRoundData(rows, actualSeq, nextPick = null) {
+  const cells = new Array(MAX_CELLS).fill(null);
+  for (const r of rows || []) {
+    const idx = (r.round || 0) - 1;
+    if (idx < 0 || idx >= MAX_CELLS) continue;
+    if (r.status === "rest") cells[idx] = { rest: true, round: r.round };
+    else if (r.status === "wait") cells[idx] = { wait: true, round: r.round };
+    else cells[idx] = { pick: r.predict || null, status: r.status, actual: actualSeq?.[idx], round: r.round };
+  }
+  const nextRound = (actualSeq?.length || 0) + 1;
+  const idx = nextRound - 1;
+  if (nextPick && idx >= 0 && idx < MAX_CELLS && !cells[idx]) {
+    if (nextPick === "W") cells[idx] = { wait: true, status: "current", round: nextRound };
+    else cells[idx] = { pick: nextPick, status: "current", round: nextRound };
+  }
+  return cells;
+}
+
 function sourceCells(actualSeq, offset, reverse = false) {
   const cells = new Array(MAX_CELLS).fill(null);
   for (let i = 0; i < MAX_CELLS; i++) {
@@ -178,8 +197,12 @@ function getRowCells(ctx, spec, assist = false) {
     if (family === "quarter") {
       if (assist) {
         const key = `SQ${sc?.slice(-1) || ""}`;
-        const qas = ctx.qAssistStats?.[key];
-        if (qas) return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
+        return cellsFromPicks(
+          ctx.assistRoundPicks?.[key] || [],
+          ctx.actualSeq,
+          ctx.assistNextPicks?.[key],
+          ctx.assistStats?.[key]?.series
+        );
       }
       return cellsFromQuarterTrack(getTrack(ctx, spec), ctx.actualSeq);
     }
@@ -240,6 +263,7 @@ function getQuarterCells(ctx, spec, assist = false) {
       if (assist) {
         const qas = ctx.qAssistStats?.[key];
         if (!qas) return null;
+        if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick);
         return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
       }
       return cellsFromQuarterTrack(getTrack(ctx, spec), ctx.actualSeq);
@@ -249,6 +273,7 @@ function getQuarterCells(ctx, spec, assist = false) {
       const key = Q_TRACK_KEYS[family]?.[idx];
       const qas = key ? ctx.qAssistStats?.[key] : null;
       if (!qas) return null;
+      if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick);
       return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
     }
     const track = getTrack(ctx, spec);
@@ -266,6 +291,7 @@ function getQuarterCells(ctx, spec, assist = false) {
   if (assist) {
     const qas = ctx.qAssistStats?.[spec];
     if (!qas) return null;
+    if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick);
     return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
   }
   const q = ctx.stats?.[spec]?.quarter;
@@ -293,6 +319,10 @@ function Cell({ cell, onClick }) {
   } else if (cell?.wait) {
     content = "W";
     color = "#555";
+    if (cell.status === "current") {
+      color = "#333";
+      bg = CURRENT_BG;
+    }
   } else if (cell?.pick) {
     content = cell.pick;
     color = cell.pick === "P" ? "#1565d8" : "#e53935";
@@ -486,15 +516,13 @@ function NormalSection({ section, ctx, selectedBasis, onSelectBasis }) {
           </Box>
         ))}
       </Block>
-      {section.id !== "SQ" && (
-        <Block title="assist">
-          {section.rows.map(([label, key]) => (
-            <RoadRow key={`a-${label}`} label={label} cells={getRowCells(ctx, key, true)} />
-          ))}
-        </Block>
-      )}
+      <Block title="회차어시스트">
+        {section.rows.map(([label, key]) => (
+          <RoadRow key={`a-${label}`} label={label} cells={getRowCells(ctx, key, true)} />
+        ))}
+      </Block>
       {qAssistRows.length > 0 && (
-        <Block title="quarter assist">
+        <Block title="쿼터어시스트">
           {qAssistRows.map(([label, cells]) => (
             <RoadRow key={`qa-${label}`} label={label} cells={cells} />
           ))}
@@ -513,9 +541,9 @@ function ForSection({ section, ctx }) {
           <Box key={label} sx={{ mb: 1 }}>
             <RoadRow label={`${label} source`} cells={sourceCells(ctx.actualSeq, offset, false)} />
             <RoadRow label={`${label} original`} cells={getRowCells(ctx, key, false)} />
-            <RoadRow label={`${label} assist`} cells={getRowCells(ctx, key, true)} />
+            <RoadRow label={`${label} 회차어시스트`} cells={getRowCells(ctx, key, true)} />
             {hasRenderableCells(qAssistCells) && (
-              <RoadRow label={`${label} q assist`} cells={qAssistCells} />
+              <RoadRow label={`${label} 쿼터어시스트`} cells={qAssistCells} />
             )}
           </Box>
         );

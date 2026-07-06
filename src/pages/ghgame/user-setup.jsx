@@ -766,7 +766,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
   const pasi = s.pasi || defaultPasi();
   const visiblePasi = pasi
     .map((p, i) => ({ p, originalIndex: i }))
-    .filter(({ p, originalIndex }) => (p.level ?? (originalIndex + 2)) < stepMax);
+    .filter(({ originalIndex }) => (originalIndex + 2) < stepMax);
 
   return (
     <>

@@ -12,7 +12,6 @@ import HbUserGamePage from "../pages/hbgame/user-game.jsx";
 import HbSetupPage from "../pages/hbgame/setup.jsx";
 import GhGamePage from "../pages/ghgame";
 import GhUserGamePage from "../pages/ghgame/user-game.jsx";
-import GhUserGameV2Page from "../pages/ghgame/user-game-v2.jsx";
 import GhSetupPage from "../pages/ghgame/setup.jsx";
 import T9UserSetupPage from "../pages/t9game/user-setup.jsx";
 import HbUserSetupPage from "../pages/hbgame/user-setup.jsx";
@@ -123,10 +122,6 @@ const router = createBrowserRouter([
           {
             path: "/ghgame/user",
             element: <GameGuard gameType="gh"><GhUserGamePage /></GameGuard>,
-          },
-          {
-            path: "/ghgame/user-v2",
-            element: <GameGuard gameType="gh"><GhUserGameV2Page /></GameGuard>,
           },
           {
             path: "/ghgame/user-setup",

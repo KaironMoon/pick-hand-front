@@ -95,15 +95,15 @@ const controlBtnSx = {
   "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" },
 };
 
-function RoundAmountTable({ snapshot, results }) {
+function RoundAmountTable({ snapshot }) {
   const table = snapshot?.round_amount_table || {};
-  const cells = table.cells || Array.from({ length: 56 }, (_, idx) => ({ round: idx + 1, amount: 0, pnl: 0, status: null, actual: results?.[idx]?.value || null }));
+  const cells = table.cells || Array.from({ length: 56 }, (_, idx) => ({ round: idx + 1, amount: 0, pnl: 0, status: null, actual: null }));
   const fmt = (v) => Number(v || 0).toFixed(1);
   const finalSide = table.total_side;
   const finalSideColor = finalSide === "P" ? "#1565d8" : finalSide === "B" ? "#e53935" : "#555";
   const cellSx = (idx) => {
     const cell = cells[idx] || {};
-    const hasResult = !!(cell.actual || results?.[idx]?.value);
+    const hasResult = !!cell.actual;
     const hasBet = Number(cell.amount || 0) > 0;
     return {
       width: 86,
@@ -1166,7 +1166,7 @@ export default function GhUserGamePage() {
             );
           })()}
 
-          <RoundAmountTable snapshot={picksSnapshot} results={results} />
+          <RoundAmountTable snapshot={picksSnapshot} />
 
           </Box>
           {/* /1|2 row */}
@@ -1241,7 +1241,10 @@ export default function GhUserGamePage() {
         };
         const statSeries = (key) => picksSnapshot?.stats?.[key]?.series || [];
         const assistSeries = (key) => picksSnapshot?.assist_stats?.[key]?.series || [];
-        const qAssistSeries = (key) => picksSnapshot?.q_assist_stats?.[key]?.series || [];
+        const qAssistSeries = (key) => {
+          const qas = picksSnapshot?.q_assist_stats?.[key];
+          return qas?.round_data ? seriesFromRows(qas.round_data) : (qas?.series || []);
+        };
         const trackSeries = (container, sc, quarter = false) => {
           const track = container?.tracks?.[sc] || container?.[sc];
           return seriesFromRows(quarter ? track?.bigroad_data : track?.round_data);
