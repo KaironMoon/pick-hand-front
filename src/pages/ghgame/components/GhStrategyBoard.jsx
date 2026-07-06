@@ -271,10 +271,12 @@ const fmtRec = (total, hit, miss) => `${total}-${hit}/${miss}`;
 const fmtRec2 = (mh, mm) => `${mh}-${mm}`;
 const fmtStage = (step, triple) => (step ? `${step}S-${triple ?? 0}` : "");
 const fmtMan = (man) => {
+  if (man === "N/A") return "-";
   if (man === null || man === undefined) return "";
   const v = Math.round((man || 0) * 10) / 10;
   return v.toFixed(1);
 };
+const fmtValue = (v) => (v === "N/A" ? "-" : (v || ""));
 const betAt = (amounts, step, stepMin = 1) => {
   if (!amounts || !step) return null;
   if (step < (stepMin || 1)) return 0;
@@ -305,7 +307,7 @@ const GOB_KEY_TO_LABEL = {
   SSR1: "SSRN1", SSR2: "SSRN2", SSR3: "SSRN3",
   SSRO1: "SSRO1", SSRO2: "SSRO2", SSRO3: "SSRO3",
   FOR1: "FOR1", FOR2: "FOR2", FOR3: "FOR3",
-  FORX1: "FOR1X", FORX2: "FOR2X", FORX3: "FOR3X",
+  FOR1X: "FOR1X", FOR2X: "FOR2X", FOR3X: "FOR3X",
 };
 const gobLabelOf = (key) => GOB_KEY_TO_LABEL[key] || key;
 const addGobBg = (map, label, color) => {
@@ -337,7 +339,7 @@ const quarterAssistRow = (q, pick) => {
     qPct2: fmtPct(q.hit ?? q.win_q ?? 0, total),
   };
 };
-const qAssistPickText = (qas) => qas?.next_pick || "";
+const qAssistPickText = (qas) => fmtValue(qas?.next_pick);
 
 // stats 키 기반 행 데이터 (A/AR/AAR/AARO/D/G/TN/ONE/TWO/P/B/J)
 const fromStats = (ctx, key) => {
@@ -352,8 +354,8 @@ const fromStats = (ctx, key) => {
   const assistTotal = as?.total ?? 0;
   return {
     wait: fmtStreak(s.cur_streak_type, s.cur_streak_count),
-    pick: ctx.nextPicks?.[key] || "",
-    assist: ctx.assistNextPicks?.[key] || "",
+    pick: fmtValue(ctx.nextPicks?.[key]),
+    assist: fmtValue(ctx.assistNextPicks?.[key]),
     assistSource: ctx.assistSources?.[key],
     wait2: as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined,
     pct2: as ? fmtPct(as.hit ?? 0, assistTotal) : undefined,
@@ -380,8 +382,8 @@ const fromTrack = (tracks, scKey, amounts, qas = null, assist = null, stepMin = 
   const assistTotal = as?.total ?? 0;
   return {
     wait: fmtStreak(sm.cur_streak?.type, sm.cur_streak?.count),
-    pick: cur?.predict || "",
-    assist: assist?.next || "",
+    pick: fmtValue(cur?.predict),
+    assist: fmtValue(assist?.next),
     assistSource: assist?.source,
     wait2: as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined,
     pct2: as ? fmtPct(as.hit ?? 0, assistTotal) : undefined,

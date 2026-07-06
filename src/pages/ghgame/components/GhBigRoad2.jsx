@@ -12,6 +12,7 @@ const MAX_CELLS = 78;
 const HIDE_QUARTER_KEYS = new Set(["D", "G", "TN", "ONE", "TWO", "P", "B"]);
 
 const flip = (p) => (p === "P" ? "B" : p === "B" ? "P" : null);
+const fmtValue = (v) => (v === "N/A" ? "-" : v);
 
 const SECTION_DEFS = [
   { id: "A", label: "A멀티", kind: "normal", rows: [["A", "A"], ["AR", "AR"], ["AARO", "AARO"], ["AARN", "AAR"]] },
@@ -324,8 +325,8 @@ function Cell({ cell, onClick }) {
       bg = CURRENT_BG;
     }
   } else if (cell?.pick) {
-    content = cell.pick;
-    color = cell.pick === "P" ? "#1565d8" : "#e53935";
+    content = fmtValue(cell.pick);
+    color = cell.pick === "P" ? "#1565d8" : cell.pick === "B" ? "#e53935" : "#777";
     if (cell.status === "hit") bg = HIT_BG;
     else if (cell.status === "miss") bg = MISS_BG;
     else if (cell.status === "current") bg = CURRENT_BG;
