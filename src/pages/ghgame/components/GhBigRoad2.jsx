@@ -95,31 +95,37 @@ function cellsFromQuarterPicks(picks, actualSeq, nextPick, quarter = null, serie
   let groupStart = -1;
   for (let i = 0; i < n; i++) {
     const curGroup = Math.floor(i / 3);
+    const groupDivider = i % 3 === 2;
     if (curGroup !== groupStart) {
       groupStart = curGroup;
       groupWon = false;
     }
     const round = i + 1;
     if (groupWon) {
-      cells[i] = { rest: true, round };
+      cells[i] = { rest: true, round, groupDivider };
       continue;
     }
     const pick = picks?.[i];
     if (!pick || pick === "wait") {
-      cells[i] = { wait: true, round };
+      cells[i] = { wait: true, round, groupDivider };
       continue;
     }
     const st = series?.[i] || statusForPick(pick, actualSeq?.[i]);
-    cells[i] = { pick, status: st, round };
+    cells[i] = { pick, status: st, round, groupDivider };
     if (st === "hit") groupWon = true;
   }
   if (n < MAX_CELLS) {
     const nextRound = n + 1;
+    const groupDivider = n % 3 === 2;
     if (quarter?.next_action === "wait") {
-      cells[n] = { rest: true, round: nextRound };
+      cells[n] = { rest: true, round: nextRound, groupDivider };
     } else if (nextPick) {
-      cells[n] = { pick: nextPick, status: "current", round: nextRound };
+      cells[n] = { pick: nextPick, status: "current", round: nextRound, groupDivider };
     }
+  }
+  for (let i = 0; i < MAX_CELLS; i++) {
+    const groupDivider = i % 3 === 2;
+    if (groupDivider) cells[i] = { ...(cells[i] || { round: i + 1 }), groupDivider };
   }
   return cells;
 }
@@ -140,27 +146,45 @@ function cellsFromQuarterTrack(track, actualSeq) {
   for (const r of track?.bigroad_data || []) {
     const idx = (r.round || 0) - 1;
     if (idx < 0 || idx >= MAX_CELLS) continue;
-    if (r.status === "rest") cells[idx] = { rest: true, round: r.round };
+    if (r.status === "rest") cells[idx] = { rest: true, pick: r.predict || null, round: r.round };
     else if (r.status === "wait") cells[idx] = { wait: true, round: r.round };
     else cells[idx] = { pick: r.predict || null, status: r.status, actual: actualSeq?.[idx], round: r.round };
   }
   return cells;
 }
 
-function cellsFromRoundData(rows, actualSeq, nextPick = null) {
+function cellsFromRoundData(rows, actualSeq, nextPick = null, nextStatus = null) {
   const cells = new Array(MAX_CELLS).fill(null);
+  let activeSlotCount = 0;
+  let firstQuarterIdx = null;
   for (const r of rows || []) {
     const idx = (r.round || 0) - 1;
     if (idx < 0 || idx >= MAX_CELLS) continue;
-    if (r.status === "rest") cells[idx] = { rest: true, round: r.round };
-    else if (r.status === "wait") cells[idx] = { wait: true, round: r.round };
-    else cells[idx] = { pick: r.predict || null, status: r.status, actual: actualSeq?.[idx], round: r.round };
+    const isQuarterSlot = r.status === "hit" || r.status === "miss" || r.status === "current" || r.status === "rest" || r.status === "wait";
+    if (isQuarterSlot) {
+      if (firstQuarterIdx == null) firstQuarterIdx = idx;
+      activeSlotCount += 1;
+    }
+    const groupDivider = isQuarterSlot && activeSlotCount % 3 === 0;
+    if (r.status === "rest") cells[idx] = { rest: true, pick: r.predict || null, round: r.round, groupDivider };
+    else if (r.status === "wait") cells[idx] = { wait: true, round: r.round, groupDivider };
+    else cells[idx] = { pick: r.predict || null, status: r.status, actual: actualSeq?.[idx], round: r.round, groupDivider };
   }
   const nextRound = (actualSeq?.length || 0) + 1;
   const idx = nextRound - 1;
   if (nextPick && idx >= 0 && idx < MAX_CELLS && !cells[idx]) {
-    if (nextPick === "W") cells[idx] = { wait: true, status: "current", round: nextRound };
-    else cells[idx] = { pick: nextPick, status: "current", round: nextRound };
+    if (firstQuarterIdx == null) firstQuarterIdx = idx;
+    activeSlotCount += 1;
+    const groupDivider = activeSlotCount % 3 === 0;
+    if (nextStatus === "rest") cells[idx] = { rest: true, pick: nextPick === "W" ? null : nextPick, status: "current", round: nextRound, groupDivider };
+    else if (nextPick === "W") cells[idx] = { wait: true, status: "current", round: nextRound, groupDivider };
+    else cells[idx] = { pick: nextPick, status: "current", round: nextRound, groupDivider };
+  }
+  if (firstQuarterIdx != null) {
+    for (let i = firstQuarterIdx; i < MAX_CELLS; i++) {
+      const groupDivider = (i - firstQuarterIdx + 1) % 3 === 0;
+      if (groupDivider) cells[i] = { ...(cells[i] || { round: i + 1 }), groupDivider };
+    }
   }
   return cells;
 }
@@ -264,7 +288,7 @@ function getQuarterCells(ctx, spec, assist = false) {
       if (assist) {
         const qas = ctx.qAssistStats?.[key];
         if (!qas) return null;
-        if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick);
+        if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick, qas.next_status);
         return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
       }
       return cellsFromQuarterTrack(getTrack(ctx, spec), ctx.actualSeq);
@@ -274,7 +298,7 @@ function getQuarterCells(ctx, spec, assist = false) {
       const key = Q_TRACK_KEYS[family]?.[idx];
       const qas = key ? ctx.qAssistStats?.[key] : null;
       if (!qas) return null;
-      if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick);
+      if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick, qas.next_status);
       return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
     }
     const track = getTrack(ctx, spec);
@@ -292,7 +316,7 @@ function getQuarterCells(ctx, spec, assist = false) {
   if (assist) {
     const qas = ctx.qAssistStats?.[spec];
     if (!qas) return null;
-    if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick);
+    if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick, qas.next_status);
     return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
   }
   const q = ctx.stats?.[spec]?.quarter;
@@ -314,9 +338,9 @@ function Cell({ cell, onClick }) {
   if (cell?.basis) {
     content = "";
   } else if (cell?.rest) {
-    content = "W";
-    color = "#888";
-    bg = "#101318";
+    content = fmtValue(cell.pick) || "";
+    color = cell.pick === "P" ? "#8fb8f5" : cell.pick === "B" ? "#f2a0a0" : "#888";
+    bg = "#2f3338";
   } else if (cell?.wait) {
     content = "W";
     color = "#555";
@@ -334,8 +358,9 @@ function Cell({ cell, onClick }) {
   }
   const box = (
     <Box onClick={onClick} sx={{
-      borderRight: BORDER,
+      borderRight: cell?.groupDivider ? "2px solid #3f8cff" : BORDER,
       borderBottom: BORDER,
+      boxSizing: "border-box",
       minWidth: CELL_W,
       width: CELL_W,
       height: CELL_H,
@@ -477,7 +502,13 @@ function RoadRow({ label, cells, basis = false, onCellClick }) {
       }}>
         {pairCells.map((cell, i) => basis
           ? <BasisCell key={i} cell={cell} />
-          : <Cell key={i} cell={cell} onClick={onCellClick && cell?.round ? () => onCellClick(cell.round) : undefined} />)}
+          : (
+            <Cell
+              key={i}
+              cell={cell}
+              onClick={onCellClick && cell?.round ? () => onCellClick(cell.round) : undefined}
+            />
+          ))}
       </Box>
     </Box>
   );

@@ -763,10 +763,10 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
     const pasi = (s.pasi || defaultPasi()).map((p, j) => (j === i ? { ...p, ...patch } : p));
     onChange({ ...s, pasi });
   };
-  const pasi = s.pasi || defaultPasi();
+  const pasi = defaultPasi().map((fallback, i) => ({ ...fallback, ...((s.pasi || [])[i] || {}) }));
   const visiblePasi = pasi
-    .map((p, i) => ({ p, originalIndex: i }))
-    .filter(({ originalIndex }) => (originalIndex + 2) < stepMax);
+    .slice(0, Math.max(0, stepMax - 2))
+    .map((p, i) => ({ p, originalIndex: i }));
 
   return (
     <>
@@ -870,7 +870,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
       {visiblePasi.map(({ p, originalIndex }, i) => {
         const isFirst = i === 0;  // 2패시 = 13행 (좌측에 5Miss 블록)
         return (
-          <tr key={`${name}-pasi-${p.level}`}>
+          <tr key={`${name}-pasi-${originalIndex}`}>
             {isFirst ? (
               <>
                 <td style={mkAssistHdr}><NumIn value={s.miss_threshold ?? 5} min={2} max={10} onChange={(v) => onChange({ ...s, miss_threshold: v })} />Miss</td>

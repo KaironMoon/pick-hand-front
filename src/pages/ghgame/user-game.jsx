@@ -147,6 +147,98 @@ function RoundAmountTable({ snapshot }) {
   );
 }
 
+function snapshotFromRoundState(roundState, fallback) {
+  if (!roundState?.sections) return fallback;
+  const roundPicks = {};
+  const nextPicks = {};
+  const stats = {};
+  const assistRoundPicks = {};
+  const assistNextPicks = {};
+  const assistStats = {};
+  const assistSources = {};
+  const qAssistStats = {};
+
+  const fromBigRoadRows = (rows) => (rows || []).map((r, idx) => {
+    let pick = r.pick ?? r.predict ?? null;
+    const rawResult = r.result ?? r.status ?? null;
+    if (pick === "W" && (rawResult == null || rawResult === "wait")) pick = null;
+    const status = rawResult === "none" ? "rest" : (rawResult === "wait" ? null : (rawResult || (pick ? "current" : null)));
+    return {
+      round: r.round || idx + 1,
+      predict: pick,
+      status,
+      bet: rawResult === "none" ? false : rawResult === "hit" || rawResult === "miss",
+    };
+  });
+
+  const trackStats = (track) => ({
+    total: track?.total || 0,
+    hit: track?.hit || 0,
+    miss: track?.miss || 0,
+    max_hit_streak: track?.max_hit_streak || 0,
+    max_miss_streak: track?.max_miss_streak || 0,
+    cur_streak_type: track?.cur_streak_type || null,
+    cur_streak_count: track?.cur_streak_count || 0,
+    martin_step: track?.step || 1,
+    pnl: track?.pnl || 0,
+    series: (track?.rounds || []).map((r) => (r.status === "hit" || r.status === "miss" ? r.status : null)),
+  });
+
+  const quarterStats = (assistQ) => {
+    const q = assistQ?.quarter || assistQ || {};
+    const type = q.cur_streak_type || assistQ?.cur_streak_type || null;
+    const count = q.cur_streak_count || assistQ?.cur_streak_count || 0;
+    return {
+      ...q,
+      total: assistQ?.total || 0,
+      hit: assistQ?.hit || 0,
+      miss: assistQ?.miss || 0,
+      total_q: q.total_q ?? assistQ?.total_q ?? 0,
+      win_q: q.win_q ?? assistQ?.win_q ?? 0,
+      lose_q: q.lose_q ?? assistQ?.lose_q ?? 0,
+      martin_step: (q.step ?? assistQ?.step) || 1,
+      cur_streak: type ? { type, count } : null,
+    };
+  };
+
+  Object.entries(roundState.sections).forEach(([key, section]) => {
+    const base = section?.base || {};
+    const assistH = section?.assist_h || {};
+    const assistQ = section?.assist_q || {};
+    const br = section?.bigroad2 || {};
+    const baseRows = fromBigRoadRows(br.picks || base.rounds || []);
+    const hRows = fromBigRoadRows(br.h_assist || assistH.rounds || []);
+    const qRows = fromBigRoadRows(br.q_assist || assistQ.rounds || []);
+    roundPicks[key] = baseRows.map((r) => r.predict || null);
+    nextPicks[key] = base.pick ?? base.next_pick ?? null;
+    stats[key] = { ...trackStats(base), quarter: fallback?.stats?.[key]?.quarter };
+    assistRoundPicks[key] = hRows.map((r) => r.predict || null);
+    assistNextPicks[key] = assistH.pick ?? assistH.next_pick ?? null;
+    assistStats[key] = trackStats(assistH);
+    assistSources[key] = assistH.source ?? fallback?.assist_sources?.[key] ?? null;
+    qAssistStats[key] = {
+      round_picks: qRows.map((r) => r.predict || null),
+      round_data: qRows,
+      next_pick: assistQ.pick ?? assistQ.next_pick ?? null,
+      next_status: assistQ?.cur_streak_type === "hit" && (assistQ?.bet_index || 0) % 3 !== 0 ? "rest" : null,
+      source: assistQ.source ?? fallback?.q_assist_stats?.[key]?.source ?? null,
+      quarter: quarterStats(assistQ),
+    };
+  });
+
+  return {
+    ...(fallback || {}),
+    round_picks: { ...(fallback?.round_picks || {}), ...roundPicks },
+    next_picks: { ...(fallback?.next_picks || {}), ...nextPicks },
+    stats: { ...(fallback?.stats || {}), ...stats },
+    assist_round_picks: { ...(fallback?.assist_round_picks || {}), ...assistRoundPicks },
+    assist_next_picks: { ...(fallback?.assist_next_picks || {}), ...assistNextPicks },
+    assist_stats: { ...(fallback?.assist_stats || {}), ...assistStats },
+    assist_sources: { ...(fallback?.assist_sources || {}), ...assistSources },
+    q_assist_stats: { ...(fallback?.q_assist_stats || {}), ...qAssistStats },
+  };
+}
+
 export default function GhUserGamePage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -173,6 +265,8 @@ export default function GhUserGamePage() {
   const [twoPick, setTwoPick] = useState(null);
   const [roundTwoList, setRoundTwoList] = useState([]);
   const [picksSnapshot, setPicksSnapshot] = useState(null);
+  const [roundState, setRoundState] = useState(null);
+  const [roundStateBackfill, setRoundStateBackfill] = useState(false);
   const [batExpanded, setBatExpanded] = useState({}); // {`gi-ri`: true} — Bat 셀 전체 표시 토글
   const [trackStreakHidden, setTrackStreakHidden] = useState({}); // {sckey: true} — 트랙 연승/연패 셀 숨김 토글
   const [chartGroup, setChartGroup] = useState("A"); // 빅로드2 누적 그래프 표시 그룹
@@ -204,6 +298,8 @@ export default function GhUserGamePage() {
   const [myPickhandId, setMyPickhandId] = useState(null);
 
   const currentTurn = results.length + 1;
+  const inputLocked = processing || roundStateBackfill;
+  const displaySnapshot = snapshotFromRoundState(roundState, picksSnapshot);
   // 빅로드 기준 토글: AAR이면 status를 statusAr로 치환해 격자 색상 결정
   const gridResults = bigRoadAar
     ? results.map((r) => ({ ...r, status: r.statusAr || "wait" }))
@@ -211,8 +307,8 @@ export default function GhUserGamePage() {
   const grid = calculateCircleGrid(gridResults);
 
   // 백엔드 picks_snapshot에서 픽 정보 가져오기 (프론트 로직 제거됨)
-  const roundArList = picksSnapshot?.round_picks?.AR || [];
-  const roundJList = picksSnapshot?.round_picks?.J || [];
+  const roundArList = displaySnapshot?.round_picks?.AR || [];
+  const roundJList = displaySnapshot?.round_picks?.J || [];
 
   const checkGoalAlert = useCallback((summary) => {
     if (!summary) return;
@@ -284,6 +380,7 @@ export default function GhUserGamePage() {
 
   const restoreGame = async (gid) => {
     try {
+      setRoundStateBackfill(true);
       const res = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user");
       const data = res.data;
       setGameId(data.game_id);
@@ -303,7 +400,7 @@ export default function GhUserGamePage() {
         return { value: v, status, statusAr, aPick: pick || null, pickChanged: !!pcMarks[i], decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
       }));
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setRoundStateBackfill(!!data.round_state_backfilled); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);      if (data.status === "ending" && data.ending_snapshot) {
@@ -313,6 +410,8 @@ export default function GhUserGamePage() {
     } catch (err) {
       console.error("Failed to restore, starting new:", err);
       startGame();
+    } finally {
+      setTimeout(() => setRoundStateBackfill(false), 1200);
     }
   };
 
@@ -504,7 +603,7 @@ export default function GhUserGamePage() {
   };
 
   const handleInput = async (inputValue) => {
-    if (!gameId || processingRef.current) return;
+    if (!gameId || processingRef.current || roundStateBackfill) return;
     processingRef.current = true;
     setProcessing(true);
 
@@ -530,7 +629,7 @@ export default function GhUserGamePage() {
       }
       setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0, labouchere: data.cum_pnl.labouchere || 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setRoundStateBackfill(!!data.round_state_backfilled); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);      checkGoalAlert(data.user_summary);
@@ -564,7 +663,7 @@ export default function GhUserGamePage() {
       setResults(results.slice(0, -1));
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setRoundStateBackfill(!!data.round_state_backfilled); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);      if (data.status === "ending" && data.ending_snapshot) {
@@ -632,7 +731,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
       const data = res.data;
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setRoundStateBackfill(!!data.round_state_backfilled); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);    } catch (err) {
@@ -698,6 +797,15 @@ export default function GhUserGamePage() {
       <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
         <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>글로벌히트</span>
         {gameId && <span style={{ fontSize: 11, color: "#888" }}>#{gameId}</span>}
+        {roundStateBackfill && (
+          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, color: "#90caf9", fontSize: 11, fontWeight: "bold" }}>
+            <CircularProgress size={12} color="inherit" />
+            기존 라운드 데이터를 재계산 중
+          </Box>
+        )}
+        {roundState && !roundStateBackfill && (
+          <span style={{ fontSize: 10, color: "#666" }}>state r{roundState.round_num || 0}</span>
+        )}
         <label style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 8, cursor: "pointer", fontSize: 11, color: "#bbb", userSelect: "none" }}>
           <input
             type="checkbox"
@@ -812,9 +920,9 @@ export default function GhUserGamePage() {
               width: 48, height: 48, borderRadius: 2, backgroundColor: bg,
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "#fff", fontSize: 24, fontWeight: "bold",
-              cursor: processing ? "not-allowed" : "pointer",
-              opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
-              "&:hover": { opacity: processing ? 0.4 : 0.85 },
+              cursor: inputLocked ? "not-allowed" : "pointer",
+              opacity: inputLocked ? 0.4 : 1, pointerEvents: inputLocked ? "none" : "auto",
+              "&:hover": { opacity: inputLocked ? 0.4 : 0.85 },
               "&:active": { transform: "scale(0.95)" },
             });
             const ctrlBtnSx = (borderColor, fg) => ({ ...controlBtnSx, border: `2px solid ${borderColor}`, color: fg || "#fff", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 50 });
@@ -1166,19 +1274,19 @@ export default function GhUserGamePage() {
             );
           })()}
 
-          <RoundAmountTable snapshot={picksSnapshot} />
+          <RoundAmountTable snapshot={displaySnapshot} />
 
           </Box>
           {/* /1|2 row */}
 
           {/* ===== 전략별 현황 전광판 (배팅 판 ↔ S1/S2/S3 사이) ===== */}
           <GhStrategyBoard
-            stats={picksSnapshot?.stats}
-            nextPicks={picksSnapshot?.next_picks}
-            assistNextPicks={picksSnapshot?.assist_next_picks}
-            assistStats={picksSnapshot?.assist_stats}
-            assistSources={picksSnapshot?.assist_sources}
-            qAssistStats={picksSnapshot?.q_assist_stats}
+            stats={displaySnapshot?.stats}
+            nextPicks={displaySnapshot?.next_picks}
+            assistNextPicks={displaySnapshot?.assist_next_picks}
+            assistStats={displaySnapshot?.assist_stats}
+            assistSources={displaySnapshot?.assist_sources}
+            qAssistStats={displaySnapshot?.q_assist_stats}
             sqTracks={sqTracks}
             srTracks={srTracks}
             ssrTracks={ssrTracks}
@@ -1186,12 +1294,12 @@ export default function GhUserGamePage() {
             sxTracks={sxTracks}
             forTracks={forTracks}
             quarterTracks={quarterTracks}
-            betAmounts={picksSnapshot?.bet_amounts}
-            betAmountsMap={picksSnapshot?.bet_amounts_map}
-            betStepMinMap={picksSnapshot?.bet_step_min_map}
-            strategyEnabled={picksSnapshot?.strategy_enabled}
-            xxSources={picksSnapshot?.xx_sources}
-            gobMarks={picksSnapshot?.gob_marks}
+            betAmounts={displaySnapshot?.bet_amounts}
+            betAmountsMap={displaySnapshot?.bet_amounts_map}
+            betStepMinMap={displaySnapshot?.bet_step_min_map}
+            strategyEnabled={displaySnapshot?.strategy_enabled}
+            xxSources={displaySnapshot?.xx_sources}
+            gobMarks={displaySnapshot?.gob_marks}
           />
 
           {/* ===== 빅로드2 ===== */}
@@ -1203,16 +1311,16 @@ export default function GhUserGamePage() {
             ssroTracks={ssroTracks}
             forTracks={forTracks}
             quarterTracks={quarterTracks}
-            stats={picksSnapshot?.stats}
-            roundPicks={picksSnapshot?.round_picks}
-            nextPicks={picksSnapshot?.next_picks}
-            assistRoundPicks={picksSnapshot?.assist_round_picks}
-            assistNextPicks={picksSnapshot?.assist_next_picks}
-            assistStats={picksSnapshot?.assist_stats}
-            qAssistStats={picksSnapshot?.q_assist_stats}
-            subgameBasis={picksSnapshot?.subgame_basis}
-            ncRefShoes={picksSnapshot?.nc_ref_shoes}
-            ncRefShoeNo={picksSnapshot?.nc_ref_shoe_no}
+            stats={displaySnapshot?.stats}
+            roundPicks={displaySnapshot?.round_picks}
+            nextPicks={displaySnapshot?.next_picks}
+            assistRoundPicks={displaySnapshot?.assist_round_picks}
+            assistNextPicks={displaySnapshot?.assist_next_picks}
+            assistStats={displaySnapshot?.assist_stats}
+            qAssistStats={displaySnapshot?.q_assist_stats}
+            subgameBasis={displaySnapshot?.subgame_basis}
+            ncRefShoes={displaySnapshot?.nc_ref_shoes}
+            ncRefShoeNo={displaySnapshot?.nc_ref_shoe_no}
             actualSeq={results.map((r) => r.value).join("")}
           />
           </>
