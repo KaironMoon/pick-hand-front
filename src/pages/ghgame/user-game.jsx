@@ -97,7 +97,8 @@ const controlBtnSx = {
 
 function RoundAmountTable({ snapshot }) {
   const table = snapshot?.round_amount_table || {};
-  const cells = table.cells || Array.from({ length: 56 }, (_, idx) => ({ round: idx + 1, amount: 0, pnl: 0, status: null, actual: null }));
+  const cellCount = 64;
+  const cells = table.cells || Array.from({ length: cellCount }, (_, idx) => ({ round: idx + 1, amount: 0, pnl: 0, status: null, actual: null, pick: null }));
   const fmt = (v) => Number(v || 0).toFixed(1);
   const finalSide = table.total_side;
   const finalSideColor = finalSide === "P" ? "#1565d8" : finalSide === "B" ? "#e53935" : "#555";
@@ -117,7 +118,7 @@ function RoundAmountTable({ snapshot }) {
     };
   };
   const roundColor = (idx) => {
-    const v = cells[idx]?.side;
+    const v = cells[idx]?.pick ?? cells[idx]?.side;
     if (v === "P") return "#1565d8";
     if (v === "B") return "#e53935";
     return "#777";
@@ -136,7 +137,7 @@ function RoundAmountTable({ snapshot }) {
         </Box>
       </Box>
       <Box sx={{ display: "grid", gridTemplateRows: "repeat(8, 30px)", gridAutoFlow: "column", gridAutoColumns: "86px", gap: "2px" }}>
-        {Array.from({ length: 56 }, (_, idx) => (
+        {Array.from({ length: cellCount }, (_, idx) => (
           <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${fmt(cells[idx]?.amount)} / PnL ${fmt(cells[idx]?.pnl)}`}>
             <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
             <Box sx={{ color: "#fff", fontSize: 11, fontWeight: "bold", textAlign: "right", pr: 0.4 }}>{fmt(cells[idx]?.amount)}</Box>
