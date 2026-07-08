@@ -3,6 +3,8 @@ import { Box, Tooltip } from "@mui/material";
 
 const HIT_BG = "#2e9e5b";
 const MISS_BG = "#ffeb3b";
+const REST_HIT_BG = "#555555";
+const REST_MISS_BG = "#555555";
 const CURRENT_BG = "#ffffff";
 const FUTURE_BG = "#1c1f25";
 const BORDER = "1px solid #3a3a3a";
@@ -210,13 +212,14 @@ function cellsFromStateBigRoad2(rows, nextPick = null, nextStatus = null, actual
     const r = rows[i] || {};
     const pick = r.pick || null;
     const result = r.result;
+    const savedStatus = r.status;
     const hasSlot = pick || result;
     if (!hasSlot) continue;
     if (firstQuarterIdx == null) firstQuarterIdx = i;
     activeSlotCount += 1;
     const groupDivider = activeSlotCount % 3 === 0;
     if (result === "hit" || result === "miss") {
-      cells[i] = { pick, status: result, round: i + 1, groupDivider };
+      cells[i] = { pick, status: result, savedStatus, round: i + 1, groupDivider };
     } else {
       cells[i] = { rest: true, pick, round: i + 1, groupDivider };
     }
@@ -402,13 +405,22 @@ function Cell({ cell, onClick }) {
   let bg;
   let content = cell?.round || "";
   let color = "#777";
+  let insetBorder;
   const title = cell?.pick && cell?.round ? `${cell.round}회차` : undefined;
   if (cell?.basis) {
     content = "";
   } else if (cell?.rest) {
     content = fmtValue(cell.pick) || "";
     color = cell.pick === "P" ? "#8fb8f5" : cell.pick === "B" ? "#f2a0a0" : "#888";
-    if (cell.status === "current") {
+    if (cell.savedStatus === "rest" && cell.status === "hit") {
+      bg = REST_HIT_BG;
+      insetBorder = `inset 0 0 0 3px ${HIT_BG}`;
+      color = cell.pick === "P" ? "#9ec5ff" : cell.pick === "B" ? "#ff9b9b" : "#ddd";
+    } else if (cell.savedStatus === "rest" && cell.status === "miss") {
+      bg = REST_MISS_BG;
+      insetBorder = `inset 0 0 0 3px ${MISS_BG}`;
+      color = cell.pick === "P" ? "#9ec5ff" : cell.pick === "B" ? "#ff9b9b" : "#ddd";
+    } else if (cell.status === "current") {
       color = cell.pick === "P" ? "#1565d8" : cell.pick === "B" ? "#e53935" : "#888";
       bg = CURRENT_BG;
     }
@@ -422,7 +434,16 @@ function Cell({ cell, onClick }) {
   } else if (cell?.pick) {
     content = fmtValue(cell.pick);
     color = cell.pick === "P" ? "#1565d8" : cell.pick === "B" ? "#e53935" : "#777";
-    if (cell.status === "hit") bg = HIT_BG;
+    if (cell.savedStatus === "rest" && cell.status === "hit") {
+      bg = REST_HIT_BG;
+      insetBorder = `inset 0 0 0 3px ${HIT_BG}`;
+      color = cell.pick === "P" ? "#9ec5ff" : cell.pick === "B" ? "#ff9b9b" : "#ddd";
+    } else if (cell.savedStatus === "rest" && cell.status === "miss") {
+      bg = REST_MISS_BG;
+      insetBorder = `inset 0 0 0 3px ${MISS_BG}`;
+      color = cell.pick === "P" ? "#9ec5ff" : cell.pick === "B" ? "#ff9b9b" : "#ddd";
+    }
+    else if (cell.status === "hit") bg = HIT_BG;
     else if (cell.status === "miss") bg = MISS_BG;
     else if (cell.status === "current") bg = CURRENT_BG;
     else if (cell.status === "future") bg = FUTURE_BG;
@@ -438,7 +459,8 @@ function Cell({ cell, onClick }) {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: bg,
+      background: bg,
+      boxShadow: insetBorder,
       color,
       fontSize: 10.5,
       fontWeight: content === "P" || content === "B" ? "bold" : undefined,
