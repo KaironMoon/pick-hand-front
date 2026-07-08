@@ -1219,6 +1219,7 @@ export default function GhUserGamePage() {
             assistNextPicks={displaySnapshot?.assist_next_picks}
             assistStats={displaySnapshot?.assist_stats}
             qAssistStats={displaySnapshot?.q_assist_stats}
+            roundState={roundState}
             subgameBasis={displaySnapshot?.subgame_basis}
             ncRefShoes={displaySnapshot?.nc_ref_shoes}
             ncRefShoeNo={displaySnapshot?.nc_ref_shoe_no}

@@ -202,6 +202,43 @@ function cellsFromRoundData(rows, actualSeq, nextPick = null, nextStatus = null)
   return cells;
 }
 
+function cellsFromStateBigRoad2(rows, nextPick = null, nextStatus = null, actualSeq = "") {
+  const cells = new Array(MAX_CELLS).fill(null);
+  let activeSlotCount = 0;
+  let firstQuarterIdx = null;
+  for (let i = 0; i < Math.min(rows?.length || 0, MAX_CELLS); i++) {
+    const r = rows[i] || {};
+    const pick = r.pick || null;
+    const result = r.result;
+    const hasSlot = pick || result;
+    if (!hasSlot) continue;
+    if (firstQuarterIdx == null) firstQuarterIdx = i;
+    activeSlotCount += 1;
+    const groupDivider = activeSlotCount % 3 === 0;
+    if (result === "hit" || result === "miss") {
+      cells[i] = { pick, status: result, round: i + 1, groupDivider };
+    } else {
+      cells[i] = { rest: true, pick, round: i + 1, groupDivider };
+    }
+  }
+  const idx = (actualSeq?.length || 0);
+  if (nextPick && idx >= 0 && idx < MAX_CELLS && !cells[idx]) {
+    if (firstQuarterIdx == null) firstQuarterIdx = idx;
+    activeSlotCount += 1;
+    const groupDivider = activeSlotCount % 3 === 0;
+    if (nextStatus === "rest") cells[idx] = { rest: true, pick: nextPick === "W" ? null : nextPick, status: "current", round: idx + 1, groupDivider };
+    else if (nextPick === "W") cells[idx] = { wait: true, status: "current", round: idx + 1, groupDivider };
+    else cells[idx] = { pick: nextPick, status: "current", round: idx + 1, groupDivider };
+  }
+  if (firstQuarterIdx != null) {
+    for (let i = firstQuarterIdx; i < MAX_CELLS; i++) {
+      const groupDivider = (i - firstQuarterIdx + 1) % 3 === 0;
+      if (groupDivider) cells[i] = { ...(cells[i] || { round: i + 1 }), groupDivider };
+    }
+  }
+  return cells;
+}
+
 function sourceCells(actualSeq, offset, reverse = false) {
   const cells = new Array(MAX_CELLS).fill(null);
   for (let i = 0; i < MAX_CELLS; i++) {
@@ -288,6 +325,15 @@ function getTrackSeries(track) {
   ));
 }
 
+function getRoundStateQAssist(ctx, key) {
+  return key ? ctx.roundState?.sections?.[key]?.assist_q || null : null;
+}
+
+function getRoundStateQAssistRows(ctx, key) {
+  const rows = key ? ctx.roundState?.sections?.[key]?.bigroad2?.q_assist : null;
+  return Array.isArray(rows) && rows.length ? rows : null;
+}
+
 function hasRenderableCells(cells) {
   return Array.isArray(cells) && cells.some((cell) => cell?.pick || cell?.wait || cell?.rest);
 }
@@ -300,6 +346,9 @@ function getQuarterCells(ctx, spec, assist = false) {
       const key = `SQ${sc?.slice(-1) || ""}`;
       if (assist) {
         const qas = ctx.qAssistStats?.[key];
+        const stateRows = getRoundStateQAssistRows(ctx, key);
+        const state = getRoundStateQAssist(ctx, key);
+        if (stateRows) return cellsFromStateBigRoad2(stateRows, state?.pick ?? qas?.next_pick, qas?.next_status, ctx.actualSeq);
         if (!qas) return null;
         if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick, qas.next_status);
         return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
@@ -310,6 +359,9 @@ function getQuarterCells(ctx, spec, assist = false) {
       const idx = Number(String(sc || "").replace("sc", "")) - 1;
       const key = Q_TRACK_KEYS[family]?.[idx];
       const qas = key ? ctx.qAssistStats?.[key] : null;
+      const stateRows = getRoundStateQAssistRows(ctx, key);
+      const state = getRoundStateQAssist(ctx, key);
+      if (stateRows) return cellsFromStateBigRoad2(stateRows, state?.pick ?? qas?.next_pick, qas?.next_status, ctx.actualSeq);
       if (!qas) return null;
       if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick, qas.next_status);
       return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
@@ -328,6 +380,9 @@ function getQuarterCells(ctx, spec, assist = false) {
 
   if (assist) {
     const qas = ctx.qAssistStats?.[spec];
+    const stateRows = getRoundStateQAssistRows(ctx, spec);
+    const state = getRoundStateQAssist(ctx, spec);
+    if (stateRows) return cellsFromStateBigRoad2(stateRows, state?.pick ?? qas?.next_pick, qas?.next_status, ctx.actualSeq);
     if (!qas) return null;
     if (qas.round_data) return cellsFromRoundData(qas.round_data, ctx.actualSeq, qas.next_pick, qas.next_status);
     return cellsFromQuarterPicks(qas.round_picks || [], ctx.actualSeq, qas.next_pick, qas.quarter);
@@ -652,6 +707,7 @@ export default function GhBigRoad2({
   assistNextPicks,
   assistStats,
   qAssistStats,
+  roundState,
   sqTracks,
   srTracks,
   ssrTracks,
@@ -681,6 +737,7 @@ export default function GhBigRoad2({
     assistNextPicks,
     assistStats,
     qAssistStats,
+    roundState,
     sqTracks,
     srTracks,
     ssrTracks,

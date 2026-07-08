@@ -330,21 +330,23 @@ const addGobBg = (map, label, color) => {
 // 쿼터(3회묶음 1승) 블록: 쿼터전적/단계/쿼터P/누적P
 const quarterRow = (q, amounts, stepMin = 1) => {
   if (!q) return {};
-  const amount = q.amount ?? (amounts ? betAt(amounts, q.martin_step, stepMin) : null);
+  const step = q.martin_step ?? q.step;
+  const amount = q.amount ?? (amounts ? betAt(amounts, step, stepMin) : null);
   return {
     qrec: `${q.total_q ?? 0}-${q.win_q ?? 0}/${q.lose_q ?? 0}`,
-    qstage: fmtStage(q.martin_step, 0),
+    qstage: fmtStage(step, 0),
     qidx1: amount !== null && amount !== undefined ? fmtMan(amount) : "",
     qidx2: q.pnl !== null && q.pnl !== undefined ? fmtMan(q.pnl) : "",
   };
 };
 const quarterAssistRow = (q, pick, streak = null) => {
   if (!q) return { qAssist: pick || "" };
-  const total = q.total ?? q.total_q ?? 0;
+  const total = q.rate_total ?? q.total ?? q.total_q ?? 0;
+  const hit = q.rate_hit ?? q.hit ?? q.win_q ?? 0;
   return {
     qAssist: pick || "",
     qWait2: fmtStreak(streak?.cur_streak_type, streak?.cur_streak_count),
-    qPct2: fmtPct(q.hit ?? q.win_q ?? 0, total),
+    qPct2: fmtPct(hit, total),
   };
 };
 const qAssistPickText = (qas, state = null) => {
@@ -364,6 +366,7 @@ const fromStats = (ctx, key) => {
   const qas = qAssistFor(ctx, key);
   const hs = sectionFor(ctx, key)?.assist_h;
   const qs = qAssistStateFor(ctx, qas);
+  const qData = qs ? { ...(qas?.quarter || s.quarter || {}), ...qs } : (qas?.quarter || s.quarter);
   const assistTotal = as?.total ?? 0;
   return {
     wait: fmtStreak(s.cur_streak_type, s.cur_streak_count),
@@ -380,8 +383,8 @@ const fromStats = (ctx, key) => {
     stage: as ? fmtStage(as.martin_step, as.triple_loss) : "",
     idx1: as ? fmtMan(as.amount ?? (amounts ? betAt(amounts, as.martin_step, stepMin) : null)) : "",
     idx2: as && as.pnl !== null && as.pnl !== undefined ? fmtMan(as.pnl) : "",
-    ...(HIDE_QUARTER_KEYS.has(key) ? {} : { ...quarterAssistRow(qas?.quarter || s.quarter, qAssistPickText(qas, qs), qs), qAssistSource: qs?.source ?? qas?.source }),
-    ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterRow(qas?.quarter || s.quarter, amounts, stepMin)),
+    ...(HIDE_QUARTER_KEYS.has(key) ? {} : { ...quarterAssistRow(qData, qAssistPickText(qas, qs), qs), qAssistSource: qs?.source ?? qas?.source }),
+    ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterRow(qData, amounts, stepMin)),
   };
 };
 // 트랙(sq/sr/ssr/sx) sc# 기반 행 데이터
@@ -394,6 +397,7 @@ const fromTrack = (ctx, tracks, scKey, amounts, qas = null, assist = null, stepM
   const as = assist?.stats;
   const hs = assistStateFor(ctx, assist);
   const qs = qAssistStateFor(ctx, qas);
+  const qData = qs ? { ...(qas?.quarter || sm.quarter || {}), ...qs } : (qas?.quarter || sm.quarter);
   const assistTotal = as?.total ?? 0;
   return {
     wait: fmtStreak(sm.cur_streak_type, sm.cur_streak_count),
@@ -410,9 +414,9 @@ const fromTrack = (ctx, tracks, scKey, amounts, qas = null, assist = null, stepM
     stage: as ? fmtStage(as.martin_step, as.triple_loss) : "",
     idx1: as ? fmtMan(as.amount ?? (amounts ? betAt(amounts, as.martin_step, stepMin) : null)) : "",
     idx2: as && as.pnl !== null && as.pnl !== undefined ? fmtMan(as.pnl) : "",
-    ...quarterAssistRow(qas?.quarter || sm.quarter, qAssistPickText(qas, qs), qs),
+    ...quarterAssistRow(qData, qAssistPickText(qas, qs), qs),
     qAssistSource: qs?.source ?? qas?.source,
-    ...quarterRow(qas?.quarter || sm.quarter, amounts, stepMin),
+    ...quarterRow(qData, amounts, stepMin),
   };
 };
 
@@ -452,15 +456,17 @@ function buildColData(label, i, data, ctx) {
     const qs = qAssistStateFor(ctx, qas);
     const base = fromTrack(ctx, ctx.sqTracks, sc, amountsFor(ctx, `S${m[1]}`), qas, assistFor(ctx, sqKey), stepMinFor(ctx, `S${m[1]}`)) || {};
     const q = qas?.quarter || ctx.quarterTracks?.[sc]?.summary;
-    if (q) {
+    const qData = qs ? { ...(q || {}), ...qs } : q;
+    if (qData) {
       const amts = amountsFor(ctx, `SQ${m[1]}`);
-      base.qrec = `${q.total_q ?? 0}-${q.win_q ?? 0}/${q.lose_q ?? 0}`;
-      base.qstage = fmtStage(q.martin_step, 0);
-      base.qidx1 = q.amount !== null && q.amount !== undefined
-        ? fmtMan(q.amount)
-        : (amts ? fmtMan(betAt(amts, q.martin_step, stepMinFor(ctx, `SQ${m[1]}`))) : "");
-      base.qidx2 = q.pnl !== null && q.pnl !== undefined ? fmtMan(q.pnl) : "";
-      Object.assign(base, quarterAssistRow(qas?.quarter || q, qAssistPickText(qas, qs), qs));
+      const step = qData.martin_step ?? qData.step;
+      base.qrec = `${qData.total_q ?? 0}-${qData.win_q ?? 0}/${qData.lose_q ?? 0}`;
+      base.qstage = fmtStage(step, 0);
+      base.qidx1 = qData.amount !== null && qData.amount !== undefined
+        ? fmtMan(qData.amount)
+        : (amts ? fmtMan(betAt(amts, step, stepMinFor(ctx, `SQ${m[1]}`))) : "");
+      base.qidx2 = qData.pnl !== null && qData.pnl !== undefined ? fmtMan(qData.pnl) : "";
+      Object.assign(base, quarterAssistRow(qData, qAssistPickText(qas, qs), qs));
       base.qAssistSource = qs?.source ?? qas?.source;
     }
     return base;
