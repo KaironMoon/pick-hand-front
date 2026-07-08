@@ -136,9 +136,22 @@ function cellsFromTrack(track, actualSeq) {
     const idx = (r.round || 0) - 1;
     if (idx < 0 || idx >= MAX_CELLS) continue;
     if (r.status === "wait") cells[idx] = { wait: true, round: r.round };
-    else cells[idx] = { pick: r.predict || null, status: r.status, actual: actualSeq?.[idx], round: r.round };
+    else cells[idx] = { pick: r.predict || null, status: r.result || r.status, actual: r.actual || actualSeq?.[idx], round: r.round };
   }
   return cells;
+}
+
+function judgedRestCell(row, actualSeq, groupDivider = false) {
+  const idx = (row.round || 0) - 1;
+  const pick = row.predict || null;
+  const actual = row.actual || actualSeq?.[idx];
+  if (row.result === "hit" || row.result === "miss") {
+    return { pick, status: row.result, actual, round: row.round, groupDivider };
+  }
+  if ((pick === "P" || pick === "B") && (actual === "P" || actual === "B")) {
+    return { pick, status: pick === actual ? "hit" : "miss", actual, round: row.round, groupDivider };
+  }
+  return { rest: true, pick, round: row.round, groupDivider };
 }
 
 function cellsFromQuarterTrack(track, actualSeq) {
@@ -146,9 +159,9 @@ function cellsFromQuarterTrack(track, actualSeq) {
   for (const r of track?.bigroad_data || []) {
     const idx = (r.round || 0) - 1;
     if (idx < 0 || idx >= MAX_CELLS) continue;
-    if (r.status === "rest") cells[idx] = { rest: true, pick: r.predict || null, round: r.round };
+    if (r.status === "rest") cells[idx] = judgedRestCell(r, actualSeq);
     else if (r.status === "wait") cells[idx] = { wait: true, round: r.round };
-    else cells[idx] = { pick: r.predict || null, status: r.status, actual: actualSeq?.[idx], round: r.round };
+    else cells[idx] = { pick: r.predict || null, status: r.result || r.status, actual: r.actual || actualSeq?.[idx], round: r.round };
   }
   return cells;
 }
@@ -166,9 +179,9 @@ function cellsFromRoundData(rows, actualSeq, nextPick = null, nextStatus = null)
       activeSlotCount += 1;
     }
     const groupDivider = isQuarterSlot && activeSlotCount % 3 === 0;
-    if (r.status === "rest") cells[idx] = { rest: true, pick: r.predict || null, round: r.round, groupDivider };
+    if (r.status === "rest") cells[idx] = judgedRestCell(r, actualSeq, groupDivider);
     else if (r.status === "wait") cells[idx] = { wait: true, round: r.round, groupDivider };
-    else cells[idx] = { pick: r.predict || null, status: r.status, actual: actualSeq?.[idx], round: r.round, groupDivider };
+    else cells[idx] = { pick: r.predict || null, status: r.result || r.status, actual: r.actual || actualSeq?.[idx], round: r.round, groupDivider };
   }
   const nextRound = (actualSeq?.length || 0) + 1;
   const idx = nextRound - 1;
@@ -340,7 +353,10 @@ function Cell({ cell, onClick }) {
   } else if (cell?.rest) {
     content = fmtValue(cell.pick) || "";
     color = cell.pick === "P" ? "#8fb8f5" : cell.pick === "B" ? "#f2a0a0" : "#888";
-    bg = "#2f3338";
+    if (cell.status === "current") {
+      color = cell.pick === "P" ? "#1565d8" : cell.pick === "B" ? "#e53935" : "#888";
+      bg = CURRENT_BG;
+    }
   } else if (cell?.wait) {
     content = "W";
     color = "#555";
@@ -376,7 +392,16 @@ function Cell({ cell, onClick }) {
   );
   if (!title) return box;
   return (
-    <Tooltip title={title} arrow placement="top">
+    <Tooltip
+      title={title}
+      arrow
+      placement="top"
+      disableInteractive
+      enterDelay={0}
+      enterNextDelay={0}
+      leaveDelay={0}
+      TransitionProps={{ timeout: 0 }}
+    >
       {box}
     </Tooltip>
   );
