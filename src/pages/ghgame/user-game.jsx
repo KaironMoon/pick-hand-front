@@ -1181,21 +1181,7 @@ export default function GhUserGamePage() {
 
           {/* ===== 전략별 현황 전광판 (배팅 판 ↔ S1/S2/S3 사이) ===== */}
           <GhStrategyBoard
-            stats={displaySnapshot?.stats}
-            nextPicks={displaySnapshot?.next_picks}
-            assistNextPicks={displaySnapshot?.assist_next_picks}
-            assistStats={displaySnapshot?.assist_stats}
-            assistSources={displaySnapshot?.assist_sources}
-            qAssistStats={displaySnapshot?.q_assist_stats}
             roundState={roundState}
-            sqTracks={sqTracks}
-            srTracks={srTracks}
-            ssrTracks={ssrTracks}
-            ssroTracks={ssroTracks}
-            sxTracks={sxTracks}
-            forTracks={forTracks}
-            quarterTracks={quarterTracks}
-            betAmounts={displaySnapshot?.bet_amounts}
             betAmountsMap={displaySnapshot?.bet_amounts_map}
             betStepMinMap={displaySnapshot?.bet_step_min_map}
             strategyEnabled={displaySnapshot?.strategy_enabled}
@@ -1205,20 +1191,6 @@ export default function GhUserGamePage() {
 
           {/* ===== 빅로드2 ===== */}
           <GhBigRoad2
-            sqTracks={sqTracks}
-            srTracks={srTracks}
-            ssrTracks={ssrTracks}
-            sxTracks={sxTracks}
-            ssroTracks={ssroTracks}
-            forTracks={forTracks}
-            quarterTracks={quarterTracks}
-            stats={displaySnapshot?.stats}
-            roundPicks={displaySnapshot?.round_picks}
-            nextPicks={displaySnapshot?.next_picks}
-            assistRoundPicks={displaySnapshot?.assist_round_picks}
-            assistNextPicks={displaySnapshot?.assist_next_picks}
-            assistStats={displaySnapshot?.assist_stats}
-            qAssistStats={displaySnapshot?.q_assist_stats}
             roundState={roundState}
             subgameBasis={displaySnapshot?.subgame_basis}
             ncRefShoes={displaySnapshot?.nc_ref_shoes}

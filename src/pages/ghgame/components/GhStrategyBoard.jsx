@@ -291,14 +291,13 @@ const stepMinFor = (ctx, stratKey) => (ctx.betStepMinMap && ctx.betStepMinMap[st
 const HIDE_QUARTER_KEYS = new Set(["D", "G", "TN", "ONE", "TWO", "P", "B"]);
 const assistFor = (ctx, key) => ({
   _key: key,
-  next: ctx.assistNextPicks?.[key],
-  hasNext: Object.prototype.hasOwnProperty.call(ctx.assistNextPicks || {}, key),
-  source: ctx.assistSources?.[key],
-  stats: ctx.assistStats?.[key],
+  next: sectionFor(ctx, key)?.assist_h?.pick,
+  source: sectionFor(ctx, key)?.assist_h?.source,
+  stats: sectionFor(ctx, key)?.assist_h,
 });
 const qAssistFor = (ctx, key) => {
-  const qas = ctx.qAssistStats?.[key];
-  return qas ? { ...qas, _key: key, hasNext: Object.prototype.hasOwnProperty.call(qas, "next_pick") } : null;
+  const qas = sectionFor(ctx, key)?.assist_q;
+  return qas ? { ...qas, _key: key } : null;
 };
 const qAssistStreakFor = (ctx, qas) => {
   const key = qas?._key;
@@ -350,75 +349,45 @@ const quarterAssistRow = (q, pick, streak = null) => {
   };
 };
 const qAssistPickText = (qas, state = null) => {
-  const pick = fmtValue(state?.pick ?? qas?.next_pick);
-  return qas?.next_status === "rest" && (pick === "P" || pick === "B") ? `${pick}(W)` : pick;
+  const pick = fmtValue(state?.pick ?? qas?.pick);
+  return (state?.source || qas?.source || "").startsWith("쿼터휴식") && (pick === "P" || pick === "B") ? `${pick}(W)` : pick;
 };
 
-// stats 키 기반 행 데이터 (A/AR/AAR/AARO/D/G/TN/ONE/TWO/P/B/J)
+// roundState.sections 기반 행 데이터
 const fromStats = (ctx, key) => {
-  const s = ctx.stats?.[key];
+  const section = sectionFor(ctx, key);
+  const s = section?.base;
   if (!s) return null;
   const total = s.total ?? 0;
-  if (total === 0 && !ctx.nextPicks?.[key]) return null;
+  if (total === 0 && !s.pick) return null;
   const amounts = amountsFor(ctx, key);
   const stepMin = stepMinFor(ctx, key);
-  const as = ctx.assistStats?.[key];
+  const as = section?.assist_h;
   const qas = qAssistFor(ctx, key);
-  const hs = sectionFor(ctx, key)?.assist_h;
+  const hs = section?.assist_h;
   const qs = qAssistStateFor(ctx, qas);
-  const qData = qs ? { ...(qas?.quarter || s.quarter || {}), ...qs } : (qas?.quarter || s.quarter);
+  const qData = qs || qas;
   const assistTotal = as?.total ?? 0;
   return {
     wait: fmtStreak(s.cur_streak_type, s.cur_streak_count),
-    pick: fmtValue(ctx.nextPicks?.[key]),
-    assist: fmtValue(hs?.pick ?? ctx.assistNextPicks?.[key]),
-    assistSource: hs?.source ?? ctx.assistSources?.[key],
+    pick: fmtValue(s.pick),
+    assist: fmtValue(hs?.pick),
+    assistSource: hs?.source,
     wait2: hs ? fmtStreak(hs.cur_streak_type, hs.cur_streak_count) : (as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined),
     pct2: as ? fmtPct(as.hit ?? 0, assistTotal) : undefined,
     assistRec: as ? fmtRec(assistTotal, as.hit ?? 0, as.miss ?? 0) : undefined,
     pct: fmtPct(s.hit ?? 0, total),
     rec: fmtRec(total, s.hit ?? 0, s.miss ?? 0),
     rec2: fmtRec2(s.max_hit_streak ?? 0, s.max_miss_streak ?? 0),
-    stage1: fmtStage(s.martin_step, s.triple_loss),   // 생성(원래픽) 단계
-    stage: as ? fmtStage(as.martin_step, as.triple_loss) : "",
-    idx1: as ? fmtMan(as.amount ?? (amounts ? betAt(amounts, as.martin_step, stepMin) : null)) : "",
+    stage1: fmtStage(s.step, 0),
+    stage: as ? fmtStage(as.step, 0) : "",
+    idx1: as ? fmtMan(as.amount ?? (amounts ? betAt(amounts, as.step, stepMin) : null)) : "",
     idx2: as && as.pnl !== null && as.pnl !== undefined ? fmtMan(as.pnl) : "",
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : { ...quarterAssistRow(qData, qAssistPickText(qas, qs), qs), qAssistSource: qs?.source ?? qas?.source }),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterRow(qData, amounts, stepMin)),
   };
 };
-// 트랙(sq/sr/ssr/sx) sc# 기반 행 데이터
-const fromTrack = (ctx, tracks, scKey, amounts, qas = null, assist = null, stepMin = 1) => {
-  const t = tracks?.[scKey];
-  const sm = t?.summary;
-  if (!sm) return null;
-  const total = (sm.total_hit ?? 0) + (sm.total_miss ?? 0);
-  const cur = (t.round_data || []).find((r) => r.status === "current");
-  const as = assist?.stats;
-  const hs = assistStateFor(ctx, assist);
-  const qs = qAssistStateFor(ctx, qas);
-  const qData = qs ? { ...(qas?.quarter || sm.quarter || {}), ...qs } : (qas?.quarter || sm.quarter);
-  const assistTotal = as?.total ?? 0;
-  return {
-    wait: fmtStreak(sm.cur_streak_type, sm.cur_streak_count),
-    pick: fmtValue(cur?.predict),
-    assist: fmtValue(hs?.pick ?? assist?.next),
-    assistSource: hs?.source ?? assist?.source,
-    wait2: hs ? fmtStreak(hs.cur_streak_type, hs.cur_streak_count) : (as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined),
-    pct2: as ? fmtPct(as.hit ?? 0, assistTotal) : undefined,
-    assistRec: as ? fmtRec(assistTotal, as.hit ?? 0, as.miss ?? 0) : undefined,
-    pct: fmtPct(sm.total_hit ?? 0, total),
-    rec: fmtRec(total, sm.total_hit ?? 0, sm.total_miss ?? 0),
-    rec2: fmtRec2(sm.max_hit_streak ?? 0, sm.max_miss_streak ?? 0),
-    stage1: fmtStage(sm.martin_step, sm.triple_loss),
-    stage: as ? fmtStage(as.martin_step, as.triple_loss) : "",
-    idx1: as ? fmtMan(as.amount ?? (amounts ? betAt(amounts, as.martin_step, stepMin) : null)) : "",
-    idx2: as && as.pnl !== null && as.pnl !== undefined ? fmtMan(as.pnl) : "",
-    ...quarterAssistRow(qData, qAssistPickText(qas, qs), qs),
-    qAssistSource: qs?.source ?? qas?.source,
-    ...quarterRow(qData, amounts, stepMin),
-  };
-};
+const fromSection = (ctx, key) => fromStats(ctx, key);
 
 // 컬럼명(라벨 + 컬럼 인덱스) → 실데이터 행. 매핑 없으면 null(빈칸).
 // OLD는 항상 null(위치만). NEW는 직전 세트 합성본을 연결.
@@ -434,28 +403,21 @@ function buildColData(label, i, data, ctx) {
   // G(H1/H0/%1/%0) — 다른 섹션 메트릭으로 산출된 픽.
   const G_LABEL_KEY = { "G(H1)": "G(H1)", "G(H0)": "G(H0)", "G(%1)": "G(%1)", "G(%0)": "G(%0)" };
   if (G_LABEL_KEY[label]) return fromStats(ctx, G_LABEL_KEY[label]);
-  // FOR1X/2X/3X (G2) — 전 도막 반대픽 트랙(sxTracks) sc1/2/3
   let m = label.match(/^FOR([123])X$/);
-  if (m) return fromTrack(ctx, ctx.sxTracks, `sc${m[1]}`, amountsFor(ctx, `FOR${m[1]}X`), qAssistFor(ctx, `FOR${m[1]}X`), assistFor(ctx, `FOR${m[1]}X`), stepMinFor(ctx, `FOR${m[1]}X`));
-  // FOR1/2/3 (G4) — 전 도막 따라가기 트랙(forTracks) sc1/2/3
+  if (m) return fromSection(ctx, `FOR${m[1]}X`);
   m = label.match(/^FOR([123])$/);
-  if (m) return fromTrack(ctx, ctx.forTracks, `sc${m[1]}`, amountsFor(ctx, `FOR${m[1]}`), qAssistFor(ctx, `FOR${m[1]}`), assistFor(ctx, `FOR${m[1]}`), stepMinFor(ctx, `FOR${m[1]}`));
-  // S1R/S2R/S3R (G1) — SR 트랙 (S1보다 먼저 매치)
+  if (m) return fromSection(ctx, `FOR${m[1]}`);
   m = label.match(/^S([123])R$/);
-  if (m) return fromTrack(ctx, ctx.srTracks, `sc${m[1]}`, amountsFor(ctx, `S${m[1]}`), qAssistFor(ctx, `SR${m[1]}`), assistFor(ctx, `SR${m[1]}`), stepMinFor(ctx, `SR${m[1]}`));
-  // S1/S2/S3 (G1 메인) — S 트랙 (회차배팅). 260628 SQ→S 리네임
+  if (m) return fromSection(ctx, `SR${m[1]}`);
   m = label.match(/^S([123])$/);
-  if (m) return fromTrack(ctx, ctx.sqTracks, `sc${m[1]}`, amountsFor(ctx, `S${m[1]}`), qAssistFor(ctx, `S${m[1]}`), assistFor(ctx, `S${m[1]}`), stepMinFor(ctx, `S${m[1]}`));
-  // SQ1/2/3 (G4) — 쿼터배팅. 픽/연속/적중율/전적은 S와 동일(같은 트랙).
-  //   쿼터 블록(쿼터전적/단계/쿼터P/누적P)은 quarterTracks(3회묶음 1승 판정).
+  if (m) return fromSection(ctx, `S${m[1]}`);
   m = label.match(/^SQ([123])$/);
   if (m) {
-    const sc = `sc${m[1]}`;
     const sqKey = `SQ${m[1]}`;
     const qas = qAssistFor(ctx, sqKey);
     const qs = qAssistStateFor(ctx, qas);
-    const base = fromTrack(ctx, ctx.sqTracks, sc, amountsFor(ctx, `S${m[1]}`), qas, assistFor(ctx, sqKey), stepMinFor(ctx, `S${m[1]}`)) || {};
-    const q = qas?.quarter || ctx.quarterTracks?.[sc]?.summary;
+    const base = fromSection(ctx, sqKey) || {};
+    const q = qas;
     const qData = qs ? { ...(q || {}), ...qs } : q;
     if (qData) {
       const amts = amountsFor(ctx, `SQ${m[1]}`);
@@ -476,9 +438,9 @@ function buildColData(label, i, data, ctx) {
   if (label === "AARO") return fromStats(ctx, "AARO");
   // SSRN1/2/3(S세트 NEW) → SSR 트랙 / SSRO1/2/3(S세트 OLD) → SSRO 트랙
   m = label.match(/^SSRN([123])$/);
-  if (m) return fromTrack(ctx, ctx.ssrTracks, `sc${m[1]}`, amountsFor(ctx, `SSR${m[1]}`), qAssistFor(ctx, `SSR${m[1]}`), assistFor(ctx, `SSR${m[1]}`), stepMinFor(ctx, `SSR${m[1]}`));
+  if (m) return fromSection(ctx, `SSR${m[1]}`);
   m = label.match(/^SSRO([123])$/);
-  if (m) return fromTrack(ctx, ctx.ssroTracks, `sc${m[1]}`, amountsFor(ctx, `SSR${m[1]}`), qAssistFor(ctx, `SSRO${m[1]}`), assistFor(ctx, `SSRO${m[1]}`), stepMinFor(ctx, `SSRO${m[1]}`));
+  if (m) return fromSection(ctx, `SSRO${m[1]}`);
   // OLD/NEW(G3 등 다른 테이블) 및 그 외(허니비/W111/NC/6MX/G(H1)): 위치만
   return null;
 }
@@ -534,9 +496,9 @@ function withLiveData(base, ctx) {
   return out;
 }
 
-export default function GhStrategyBoard({ stats, nextPicks, assistNextPicks, assistStats, assistSources, qAssistStats, roundState, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap, betStepMinMap, strategyEnabled, xxSources, gobMarks }) {
-  const hasData = !!(stats || sqTracks);
-  const ctx = { stats, nextPicks, assistNextPicks, assistStats, assistSources, qAssistStats, roundState, sqTracks, srTracks, ssrTracks, ssroTracks, sxTracks, forTracks, quarterTracks, betAmounts, betAmountsMap, betStepMinMap, strategyEnabled, xxSources, gobMarks };
+export default function GhStrategyBoard({ roundState, betAmountsMap, betStepMinMap, strategyEnabled, xxSources, gobMarks }) {
+  const hasData = !!roundState?.sections;
+  const ctx = { roundState, betAmountsMap, betStepMinMap, strategyEnabled, xxSources, gobMarks };
   const tables = [G1, G2, G3, G4].map((t) => (hasData ? withLiveData(t, ctx) : t));
   return (
     <Box sx={{ overflowX: "auto", mb: 2 }}>
