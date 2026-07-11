@@ -12,6 +12,12 @@ const CELL_W = 23;
 const CELL_H = 19;
 const MAX_CELLS = 78;
 const HIDE_QUARTER_KEYS = new Set(["D", "G", "TN", "ONE", "TWO", "P", "B"]);
+const pickTextColor = (pick, fallback = "#777") => (
+  pick === "P" ? "#1565d8" : pick === "B" ? "#e53935" : pick === "W" ? "#222" : fallback
+);
+const restPickTextColor = (pick, fallback = "#888") => (
+  pick === "P" ? "#8fb8f5" : pick === "B" ? "#f2a0a0" : pick === "W" ? "#f7f7f7" : fallback
+);
 
 const flip = (p) => (p === "P" ? "B" : p === "B" ? "P" : null);
 const fmtValue = (v) => (v === "N/A" ? "-" : v);
@@ -67,25 +73,30 @@ function cellsFromStateBigRoad2(rows, nextPick = null, nextStatus = null, actual
     const pick = r.pick || null;
     const result = r.result;
     const savedStatus = r.status;
-    const hasSlot = pick || result;
+    const waitSlot = pick === "W" && !result;
+    const hasSlot = pick || result || waitSlot;
     if (!hasSlot) continue;
     if (firstQuarterIdx == null) firstQuarterIdx = i;
     activeSlotCount += 1;
     const groupDivider = activeSlotCount % 3 === 0;
-    if (result === "hit" || result === "miss") {
+    if (waitSlot) {
+      cells[i] = { wait: true, pick: "W", status: savedStatus, savedStatus, round: i + 1, groupDivider };
+    } else if (result === "hit" || result === "miss") {
       cells[i] = { pick, status: result, savedStatus, round: i + 1, groupDivider };
     } else {
       cells[i] = { rest: true, pick, round: i + 1, groupDivider };
     }
   }
   const idx = (actualSeq?.length || 0);
-  if (nextPick && idx >= 0 && idx < MAX_CELLS && !cells[idx]) {
+  const hasCurrentPick = nextPick !== undefined && nextPick !== "";
+  if (hasCurrentPick && idx >= 0 && idx < MAX_CELLS && !cells[idx]) {
+    const currentPick = nextPick == null ? "W" : nextPick;
     if (firstQuarterIdx == null) firstQuarterIdx = idx;
     activeSlotCount += 1;
     const groupDivider = activeSlotCount % 3 === 0;
-    if (nextStatus === "rest") cells[idx] = { rest: true, pick: nextPick === "W" ? null : nextPick, status: "current", round: idx + 1, groupDivider };
-    else if (nextPick === "W") cells[idx] = { wait: true, status: "current", round: idx + 1, groupDivider };
-    else cells[idx] = { pick: nextPick, status: "current", round: idx + 1, groupDivider };
+    if (nextStatus === "rest") cells[idx] = { rest: true, pick: currentPick, status: "current", round: idx + 1, groupDivider };
+    else if (currentPick === "W") cells[idx] = { wait: true, status: "current", round: idx + 1, groupDivider };
+    else cells[idx] = { pick: currentPick, status: "current", round: idx + 1, groupDivider };
   }
   if (firstQuarterIdx != null) {
     for (let i = firstQuarterIdx; i < MAX_CELLS; i++) {
@@ -174,18 +185,19 @@ function Cell({ cell, onClick }) {
   if (cell?.basis) {
     content = "";
   } else if (cell?.rest) {
-    content = fmtValue(cell.pick) || "";
-    color = cell.pick === "P" ? "#8fb8f5" : cell.pick === "B" ? "#f2a0a0" : "#888";
+    const restPick = cell.pick == null || cell.pick === "" ? "W" : cell.pick;
+    content = fmtValue(restPick) || "";
+    color = restPickTextColor(restPick);
     if (cell.savedStatus === "rest" && cell.status === "hit") {
       bg = REST_HIT_BG;
       insetBorder = `inset 0 0 0 3px ${HIT_BG}`;
-      color = cell.pick === "P" ? "#9ec5ff" : cell.pick === "B" ? "#ff9b9b" : "#ddd";
+      color = restPick === "P" ? "#9ec5ff" : restPick === "B" ? "#ff9b9b" : restPick === "W" ? "#fff" : "#ddd";
     } else if (cell.savedStatus === "rest" && cell.status === "miss") {
       bg = REST_MISS_BG;
       insetBorder = `inset 0 0 0 3px ${MISS_BG}`;
-      color = cell.pick === "P" ? "#9ec5ff" : cell.pick === "B" ? "#ff9b9b" : "#ddd";
+      color = restPick === "P" ? "#9ec5ff" : restPick === "B" ? "#ff9b9b" : restPick === "W" ? "#fff" : "#ddd";
     } else if (cell.status === "current") {
-      color = cell.pick === "P" ? "#1565d8" : cell.pick === "B" ? "#e53935" : "#888";
+      color = pickTextColor(restPick, "#888");
       bg = CURRENT_BG;
     }
   } else if (cell?.wait) {
@@ -197,20 +209,24 @@ function Cell({ cell, onClick }) {
     }
   } else if (cell?.pick) {
     content = fmtValue(cell.pick);
-    color = cell.pick === "P" ? "#1565d8" : cell.pick === "B" ? "#e53935" : "#777";
+    color = pickTextColor(cell.pick);
     if (cell.savedStatus === "rest" && cell.status === "hit") {
       bg = REST_HIT_BG;
       insetBorder = `inset 0 0 0 3px ${HIT_BG}`;
-      color = cell.pick === "P" ? "#9ec5ff" : cell.pick === "B" ? "#ff9b9b" : "#ddd";
+      color = cell.pick === "P" ? "#9ec5ff" : cell.pick === "B" ? "#ff9b9b" : cell.pick === "W" ? "#fff" : "#ddd";
     } else if (cell.savedStatus === "rest" && cell.status === "miss") {
       bg = REST_MISS_BG;
       insetBorder = `inset 0 0 0 3px ${MISS_BG}`;
-      color = cell.pick === "P" ? "#9ec5ff" : cell.pick === "B" ? "#ff9b9b" : "#ddd";
+      color = cell.pick === "P" ? "#9ec5ff" : cell.pick === "B" ? "#ff9b9b" : cell.pick === "W" ? "#fff" : "#ddd";
     }
     else if (cell.status === "hit") bg = HIT_BG;
     else if (cell.status === "miss") bg = MISS_BG;
     else if (cell.status === "current") bg = CURRENT_BG;
     else if (cell.status === "future") bg = FUTURE_BG;
+  }
+  if ((content == null || content === "") && (cell?.pick === "W" || cell?.status === "wait" || cell?.savedStatus === "wait")) {
+    content = "W";
+    color = bg === CURRENT_BG ? "#333" : "#f7f7f7";
   }
   const box = (
     <Box onClick={onClick} sx={{
@@ -227,7 +243,7 @@ function Cell({ cell, onClick }) {
       boxShadow: insetBorder,
       color,
       fontSize: 10.5,
-      fontWeight: content === "P" || content === "B" ? "bold" : undefined,
+      fontWeight: content === "P" || content === "B" || content === "W" ? "bold" : undefined,
       cursor: onClick ? "pointer" : "default",
     }}>{content}</Box>
   );
