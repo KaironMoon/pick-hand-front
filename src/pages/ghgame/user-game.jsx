@@ -157,8 +157,6 @@ export default function GhUserGamePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const [results, setResults] = useState([]);
-  // 빅로드 hit 기준: false=A픽, true=AAR(A/AR 합성=마틴Z) 기준
-  const [bigRoadAar, setBigRoadAar] = useState(false);
   const [globalhitData, setGlobalhitData] = useState([]);
   const [topGhSections, setTopGhSections] = useState([]);
   const [topNextRound, setTopNextRound] = useState(null);
@@ -211,10 +209,19 @@ export default function GhUserGamePage() {
   const inputLocked = processing;
   // LEGACY ONLY: 신규 화면 표시 경로는 roundState만 사용한다.
   const displaySnapshot = picksSnapshot;
-  // 빅로드 기준 토글: AAR이면 status를 statusAr로 치환해 격자 색상 결정
-  const gridResults = bigRoadAar
-    ? results.map((r) => ({ ...r, status: r.statusAr || "wait" }))
-    : results;
+  const roundAmountCells = displaySnapshot?.round_amount_table?.cells || [];
+  const amountTableStatusFor = (idx) => {
+    const cell = roundAmountCells[idx] || {};
+    const pick = cell.pick ?? cell.side;
+    const actual = cell.actual ?? results[idx]?.value;
+    if (cell.status === "hit" || cell.status === "miss") return cell.status;
+    if ((pick === "P" || pick === "B") && (actual === "P" || actual === "B")) {
+      return pick === actual ? "hit" : "miss";
+    }
+    return "wait";
+  };
+  // 빅로드1: 지난 회차의 실제 결과 P/B를 표시하고, 배경색은 금액 합산표의 적/미적으로 결정한다.
+  const gridResults = results.map((r, i) => ({ ...r, status: amountTableStatusFor(i) }));
   const grid = calculateCircleGrid(gridResults);
 
   // LEGACY ONLY: 하단 보조 표시용. 현재 판/전략보드/빅로드 표시는 roundState 사용.
@@ -709,15 +716,6 @@ export default function GhUserGamePage() {
       <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
         <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>글로벌히트</span>
         {gameId && <span style={{ fontSize: 11, color: "#888" }}>#{gameId}</span>}
-        <label style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 8, cursor: "pointer", fontSize: 11, color: "#bbb", userSelect: "none" }}>
-          <input
-            type="checkbox"
-            checked={bigRoadAar}
-            onChange={(e) => setBigRoadAar(e.target.checked)}
-            style={{ cursor: "pointer" }}
-          />
-          빅로드 AAR 기준
-        </label>
         {autoStatus.running && autoStatus.table_name && (
           <span style={{ fontSize: 11, color: "#66bb6a", fontWeight: "bold", marginLeft: 8 }}>
             {autoStatus.table_name}
