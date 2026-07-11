@@ -1182,9 +1182,6 @@ export default function GhUserGamePage() {
           {/* ===== 전략별 현황 전광판 (배팅 판 ↔ S1/S2/S3 사이) ===== */}
           <GhStrategyBoard
             roundState={roundState}
-            betAmountsMap={displaySnapshot?.bet_amounts_map}
-            betStepMinMap={displaySnapshot?.bet_step_min_map}
-            strategyEnabled={displaySnapshot?.strategy_enabled}
           />
 
           {/* ===== 빅로드2 ===== */}

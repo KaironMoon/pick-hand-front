@@ -284,10 +284,10 @@ const betAt = (amounts, step, stepMin = 1) => {
   return idx >= 0 && idx < amounts.length ? amounts[idx] : null;
 };
 const amountsFor = (ctx, stratKey) => {
-  if (ctx.strategyEnabled?.[stratKey] === false) return null;
-  return ctx.betAmountsMap && ctx.betAmountsMap[stratKey];
+  if (ctx.roundState?.strategy_enabled?.[stratKey] === false) return null;
+  return ctx.roundState?.bet_amounts_map && ctx.roundState.bet_amounts_map[stratKey];
 };
-const stepMinFor = (ctx, stratKey) => (ctx.betStepMinMap && ctx.betStepMinMap[stratKey]) || 1;
+const stepMinFor = (ctx, stratKey) => (ctx.roundState?.bet_step_min_map && ctx.roundState.bet_step_min_map[stratKey]) || 1;
 const HIDE_QUARTER_KEYS = new Set(["D", "G", "TN", "ONE", "TWO", "P", "B"]);
 const assistFor = (ctx, key) => ({
   _key: key,
@@ -480,9 +480,9 @@ function withLiveData(base, ctx) {
   return out;
 }
 
-export default function GhStrategyBoard({ roundState, betAmountsMap, betStepMinMap, strategyEnabled }) {
+export default function GhStrategyBoard({ roundState }) {
   const hasData = !!roundState?.sections;
-  const ctx = { roundState, betAmountsMap, betStepMinMap, strategyEnabled };
+  const ctx = { roundState };
   const tables = [G1, G2, G3, G4].map((t) => (hasData ? withLiveData(t, ctx) : t));
   return (
     <Box sx={{ overflowX: "auto", mb: 2 }}>
