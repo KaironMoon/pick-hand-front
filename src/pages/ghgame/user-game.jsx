@@ -1185,8 +1185,6 @@ export default function GhUserGamePage() {
             betAmountsMap={displaySnapshot?.bet_amounts_map}
             betStepMinMap={displaySnapshot?.bet_step_min_map}
             strategyEnabled={displaySnapshot?.strategy_enabled}
-            xxSources={displaySnapshot?.xx_sources}
-            gobMarks={displaySnapshot?.gob_marks}
           />
 
           {/* ===== 빅로드2 ===== */}

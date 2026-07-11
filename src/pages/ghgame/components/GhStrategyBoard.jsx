@@ -457,29 +457,13 @@ function withLiveData(base, ctx) {
   const markWaitHit = new Map();
   const markWaitMiss = new Map();
   const markPct = new Map();
-  (ctx.gobMarks?.H1 || []).forEach((key) => addGobBg(markWaitHit, gobLabelOf(key), GOB_TOP_BG));
-  (ctx.gobMarks?.H0 || []).forEach((key) => addGobBg(markWaitMiss, gobLabelOf(key), GOB_LOW_BG));
-  (ctx.gobMarks?.PCT1 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_TOP_BG));
-  (ctx.gobMarks?.PCT0 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_LOW_BG));
+  const gobMarks = ctx.roundState?.gob_marks || {};
+  (gobMarks.H1 || []).forEach((key) => addGobBg(markWaitHit, gobLabelOf(key), GOB_TOP_BG));
+  (gobMarks.H0 || []).forEach((key) => addGobBg(markWaitMiss, gobLabelOf(key), GOB_LOW_BG));
+  (gobMarks.PCT1 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_TOP_BG));
+  (gobMarks.PCT0 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_LOW_BG));
   out.waitSourceMarks = base.name.map(() => []);
   out.pctSourceMarks = base.name.map(() => []);
-  const subgameSrnKeys = new Set(["허니SRN", "위너SRN", "메가SRN", "드림SRN", "NCSRN"]);
-  const subgameSroKeys = new Set(["허니SRO", "위너SRO", "메가SRO", "드림SRO", "NCSRO"]);
-  const addSourceMark = (target, src, key, label) => {
-    const selected = src?.tie === "x" ? src?.x : src?.tie === "xr" ? src?.xr : null;
-    if (!selected) return;
-    base.name.forEach((name, idx) => {
-      if (name === selected) target[idx] = [...(target[idx] || []), { key, label }];
-    });
-  };
-  Object.entries(ctx.xxSources || {}).forEach(([key, src]) => {
-    if (!src?.x || !src?.xr) return;
-    if (key === "AAR" || /^SSRN[123]$/.test(key) || subgameSrnKeys.has(key)) {
-      addSourceMark(out.waitSourceMarks, src, key, key === "AAR" ? "AARN" : key);
-    } else if (key === "AARO" || /^SSRO[123]$/.test(key) || subgameSroKeys.has(key)) {
-      addSourceMark(out.pctSourceMarks, src, key, key);
-    }
-  });
   base.name.forEach((label, i) => {
     if (!label) return; // 빈 컬럼
     if (markPct.has(label)) out.pctBg[i] = markPct.get(label);
@@ -496,9 +480,9 @@ function withLiveData(base, ctx) {
   return out;
 }
 
-export default function GhStrategyBoard({ roundState, betAmountsMap, betStepMinMap, strategyEnabled, xxSources, gobMarks }) {
+export default function GhStrategyBoard({ roundState, betAmountsMap, betStepMinMap, strategyEnabled }) {
   const hasData = !!roundState?.sections;
-  const ctx = { roundState, betAmountsMap, betStepMinMap, strategyEnabled, xxSources, gobMarks };
+  const ctx = { roundState, betAmountsMap, betStepMinMap, strategyEnabled };
   const tables = [G1, G2, G3, G4].map((t) => (hasData ? withLiveData(t, ctx) : t));
   return (
     <Box sx={{ overflowX: "auto", mb: 2 }}>
