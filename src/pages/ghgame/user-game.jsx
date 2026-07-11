@@ -173,6 +173,8 @@ export default function GhUserGamePage() {
   const [roundLscList, setRoundLscList] = useState([]);
   const [twoPick, setTwoPick] = useState(null);
   const [roundTwoList, setRoundTwoList] = useState([]);
+  // LEGACY ONLY: picksSnapshot은 RoundAmountTable/하단 보조표 호환용이다.
+  // BigRoad2/StrategyBoard/현재 표시 로직에서 새로 참조하지 말 것. 화면 기준 데이터는 roundState다.
   const [picksSnapshot, setPicksSnapshot] = useState(null);
   const [roundState, setRoundState] = useState(null);
   const [batExpanded, setBatExpanded] = useState({}); // {`gi-ri`: true} — Bat 셀 전체 표시 토글
@@ -207,6 +209,7 @@ export default function GhUserGamePage() {
 
   const currentTurn = results.length + 1;
   const inputLocked = processing;
+  // LEGACY ONLY: 신규 화면 표시 경로는 roundState만 사용한다.
   const displaySnapshot = picksSnapshot;
   // 빅로드 기준 토글: AAR이면 status를 statusAr로 치환해 격자 색상 결정
   const gridResults = bigRoadAar
@@ -214,7 +217,7 @@ export default function GhUserGamePage() {
     : results;
   const grid = calculateCircleGrid(gridResults);
 
-  // 백엔드 picks_snapshot에서 픽 정보 가져오기 (프론트 로직 제거됨)
+  // LEGACY ONLY: 하단 보조 표시용. 현재 판/전략보드/빅로드 표시는 roundState 사용.
   const roundArList = displaySnapshot?.round_picks?.AR || [];
   const roundJList = displaySnapshot?.round_picks?.J || [];
 
