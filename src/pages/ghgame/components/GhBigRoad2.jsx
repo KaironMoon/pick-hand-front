@@ -64,10 +64,9 @@ const titleSx = {
   fontSize: 13,
 };
 
-function cellsFromStateBigRoad2(rows, nextPick = null, nextStatus = null, actualSeq = "") {
+function cellsFromStateBigRoad2(rows, nextPick = null, nextStatus = null, actualSeq = "", showGroupDivider = false) {
   const cells = new Array(MAX_CELLS).fill(null);
-  let activeSlotCount = 0;
-  let firstQuarterIdx = null;
+  let firstDividerIdx = null;
   for (let i = 0; i < Math.min(rows?.length || 0, MAX_CELLS); i++) {
     const r = rows[i] || {};
     const pick = r.pick || null;
@@ -76,32 +75,33 @@ function cellsFromStateBigRoad2(rows, nextPick = null, nextStatus = null, actual
     const waitSlot = pick === "W" && !result;
     const hasSlot = pick || result || waitSlot;
     if (!hasSlot) continue;
-    if (firstQuarterIdx == null) firstQuarterIdx = i;
-    activeSlotCount += 1;
-    const groupDivider = activeSlotCount % 3 === 0;
+    if (showGroupDivider && firstDividerIdx == null && (pick === "P" || pick === "B")) {
+      firstDividerIdx = i;
+    }
     if (waitSlot) {
-      cells[i] = { wait: true, pick: "W", status: savedStatus, savedStatus, round: i + 1, groupDivider };
+      cells[i] = { wait: true, pick: "W", status: savedStatus, savedStatus, round: i + 1 };
     } else if (result === "hit" || result === "miss") {
-      cells[i] = { pick, status: result, savedStatus, round: i + 1, groupDivider };
+      cells[i] = { pick, status: result, savedStatus, round: i + 1 };
     } else {
-      cells[i] = { rest: true, pick, round: i + 1, groupDivider };
+      cells[i] = { rest: true, pick, round: i + 1 };
     }
   }
   const idx = (actualSeq?.length || 0);
   const hasCurrentPick = nextPick !== undefined && nextPick !== "";
   if (hasCurrentPick && idx >= 0 && idx < MAX_CELLS && !cells[idx]) {
     const currentPick = nextPick == null ? "W" : nextPick;
-    if (firstQuarterIdx == null) firstQuarterIdx = idx;
-    activeSlotCount += 1;
-    const groupDivider = activeSlotCount % 3 === 0;
-    if (nextStatus === "rest") cells[idx] = { rest: true, pick: currentPick, status: "current", round: idx + 1, groupDivider };
-    else if (currentPick === "W") cells[idx] = { wait: true, status: "current", round: idx + 1, groupDivider };
-    else cells[idx] = { pick: currentPick, status: "current", round: idx + 1, groupDivider };
+    if (showGroupDivider && firstDividerIdx == null && (currentPick === "P" || currentPick === "B")) {
+      firstDividerIdx = idx;
+    }
+    if (nextStatus === "rest") cells[idx] = { rest: true, pick: currentPick, status: "current", round: idx + 1 };
+    else if (currentPick === "W") cells[idx] = { wait: true, status: "current", round: idx + 1 };
+    else cells[idx] = { pick: currentPick, status: "current", round: idx + 1 };
   }
-  if (firstQuarterIdx != null) {
-    for (let i = firstQuarterIdx; i < MAX_CELLS; i++) {
-      const groupDivider = (i - firstQuarterIdx + 1) % 3 === 0;
-      if (groupDivider) cells[i] = { ...(cells[i] || { round: i + 1 }), groupDivider };
+  if (showGroupDivider && firstDividerIdx != null) {
+    for (let i = firstDividerIdx; i < MAX_CELLS; i++) {
+      if ((i - firstDividerIdx + 1) % 3 === 0) {
+        cells[i] = { ...(cells[i] || { round: i + 1 }), groupDivider: true };
+      }
     }
   }
   return cells;
@@ -173,7 +173,13 @@ function getQuarterCells(ctx, spec, assist = false) {
   const stateRows = getRoundStateQAssistRows(ctx, stateKey);
   const state = getRoundStateQAssist(ctx, stateKey);
   if (!stateRows) return null;
-  return cellsFromStateBigRoad2(stateRows, state?.pick, state?.status, ctx.actualSeq);
+  return cellsFromStateBigRoad2(
+    stateRows,
+    state?.pick,
+    state?.status,
+    ctx.actualSeq,
+    true,
+  );
 }
 
 function Cell({ cell, onClick }) {
