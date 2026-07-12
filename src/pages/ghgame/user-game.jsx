@@ -171,8 +171,9 @@ export default function GhUserGamePage() {
   const [roundLscList, setRoundLscList] = useState([]);
   const [twoPick, setTwoPick] = useState(null);
   const [roundTwoList, setRoundTwoList] = useState([]);
-  // LEGACY ONLY: picksSnapshot은 RoundAmountTable/하단 보조표 호환용이다.
-  // BigRoad2/StrategyBoard/현재 표시 로직에서 새로 참조하지 말 것. 화면 기준 데이터는 roundState다.
+  // DO NOT USE FOR NEW UI: picks_snapshot은 서버 roundState 갱신 입력 전용 레거시 payload다.
+  // 화면 표시/빅로드/전략보드/API 표시 기준 데이터는 반드시 roundState만 사용한다.
+  // 기존 보조 컴포넌트가 아직 남아 있어 state로 보관하지만, 신규 참조를 추가하지 말 것.
   const [picksSnapshot, setPicksSnapshot] = useState(null);
   const [roundState, setRoundState] = useState(null);
   const [batExpanded, setBatExpanded] = useState({}); // {`gi-ri`: true} — Bat 셀 전체 표시 토글
@@ -207,7 +208,8 @@ export default function GhUserGamePage() {
 
   const currentTurn = results.length + 1;
   const inputLocked = processing;
-  // LEGACY ONLY: 신규 화면 표시 경로는 roundState만 사용한다.
+  // LEGACY COMPAT ONLY: displaySnapshot 별칭은 남은 레거시 보조표용이다.
+  // 새 화면/상태 판단/픽 표시/닷 표시에는 사용 금지. 필요한 데이터는 서버에서 roundState에 추가한다.
   const displaySnapshot = picksSnapshot;
   const roundAmountCells = displaySnapshot?.round_amount_table?.cells || [];
   const amountTableStatusFor = (idx) => {
@@ -224,7 +226,7 @@ export default function GhUserGamePage() {
   const gridResults = results.map((r, i) => ({ ...r, status: amountTableStatusFor(i) }));
   const grid = calculateCircleGrid(gridResults);
 
-  // LEGACY ONLY: 하단 보조 표시용. 현재 판/전략보드/빅로드 표시는 roundState 사용.
+  // LEGACY COMPAT ONLY: 하단 보조 표시용. 현재 판/전략보드/빅로드 표시는 roundState 사용.
   const roundArList = displaySnapshot?.round_picks?.AR || [];
   const roundJList = displaySnapshot?.round_picks?.J || [];
 
