@@ -532,6 +532,10 @@ const DEFAULT_STRATEGY_SETUP = {
   multi_sections: { A: true, AR: true, OLD: true, NEW: true },  // 사용함 여부
   tie_old: "G(H1)",   // 동률시 어시스트 (OLD)
   tie_new: "G(%1)",   // 동률시 어시스트 (NEW)
+  assiHLimit1: 0,
+  assiHLimit2: 0,
+  assiQLimit1: 0,
+  assiQLimit2: 0,
   priority_version: "new",
   tie_priority: "A",
   // 최상위조건설정 + 패시 어시스트 (멀티/일반판 공통)
@@ -859,16 +863,22 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
       {isFull && (
         <tr>
           <td colSpan={2} style={mkRed}>동률시어시스트지정</td>
-          <td colSpan={2} style={mkDim}>해당없음</td>
-          <td colSpan={2} style={mkDim}>해당없음</td>
-          <td colSpan={2} style={mkNavy}><AssistSelect value={s.tie_old} onChange={(v) => onChange({ ...s, tie_old: v })} /></td>
-          <td colSpan={2} style={mkNavy}><AssistSelect value={s.tie_new} onChange={(v) => onChange({ ...s, tie_new: v })} /></td>
+          <td style={mkDim}>해당없음</td>
+          <td style={mkBlue}>멀티지정</td>
+          <td colSpan={3} style={mkNavy}>
+            <NumIn value={s.assiHLimit1 ?? 0} min={0} max={100} color="#fff" width={34} bg="#16365c" onChange={(v) => onChange({ ...s, assiHLimit1: v })} />
+            % 이하 해당(%1) <NumIn value={s.assiHLimit2 ?? 0} min={0} max={100} color="#fff" width={34} bg="#16365c" onChange={(v) => onChange({ ...s, assiHLimit2: v })} />% 이하 G(%1)
+          </td>
+          <td colSpan={3} style={mkNavy}>
+            <NumIn value={s.assiQLimit1 ?? 0} min={0} max={100} color="#fff" width={34} bg="#16365c" onChange={(v) => onChange({ ...s, assiQLimit1: v })} />
+            % 이하 해당(%1) <NumIn value={s.assiQLimit2 ?? 0} min={0} max={100} color="#fff" width={34} bg="#16365c" onChange={(v) => onChange({ ...s, assiQLimit2: v })} />% 이하 G(H1)
+          </td>
         </tr>
       )}
       {/* 12행: 최상위조건설정 헤더 */}
       <tr>
-        <td colSpan={3} style={mkAssistHdr}>최상위조건설정</td>
-        <td colSpan={2} style={mkRed}>연패발생</td>
+        <td colSpan={4} style={mkAssistHdr}>최상위조건설정</td>
+        <td colSpan={1} style={mkRed}>연패발생</td>
         <td colSpan={2} style={{ ...mkRed, background: "#16365c", color: "#015fe5" }}>어시 H픽</td>
         <td colSpan={1} style={{ ...mkRed, background: "#60497b" }}>연패발생</td>
         <td colSpan={2} style={{ ...mkAssistHdr, background: "#60497b", color: "#e5281a" }}>어시Q픽</td>
@@ -883,19 +893,20 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
                 <td style={mkAssistHdr}><NumIn value={s.miss_threshold ?? 5} min={2} max={10} onChange={(v) => onChange({ ...s, miss_threshold: v })} />Miss</td>
                 <td style={mkAssistHdr}>발생<NumIn value={s.miss_occur ?? 2} min={1} max={10} onChange={(v) => onChange({ ...s, miss_occur: v })} />회</td>
                 <td style={mkAssistHdr}><NumIn value={s.miss_wait ?? 9} min={1} max={20} onChange={(v) => onChange({ ...s, miss_wait: v })} />회대기</td>
+                <td style={mkAssistHdr}>섹션종료</td>
               </>
             ) : i >= 1 && i <= 3 ? (
               <td
-                colSpan={3}
+                colSpan={4}
                 style={progressMode === BET_PROGRESS_MODES[i - 1][0] ? { ...mkGreen, cursor: "pointer" } : mkMethod}
                 onClick={() => onChange({ ...s, bet_progress_mode: BET_PROGRESS_MODES[i - 1][0] })}
               >
                 {BET_PROGRESS_MODES[i - 1][1]}
               </td>
             ) : (
-              <td colSpan={3} style={mkCell}></td>
+              <td colSpan={4} style={mkCell}></td>
             )}
-            <td colSpan={2} style={{ ...mkRed, background: "#16365c", color: "#fff" }}>
+            <td colSpan={1} style={{ ...mkRed, background: "#16365c", color: "#fff" }}>
               <NumIn value={p.level ?? (originalIndex + 2)} min={1} max={20} color="#fff" width={38} bg="#16365c" onChange={(v) => setPasi(originalIndex, { level: v })} />패시
             </td>
             <td style={{ ...mkCell, background: "#16365c" }}><AssistSelect value={p.assist1} onChange={(v) => setPasi(originalIndex, { assist1: v })} /></td>
