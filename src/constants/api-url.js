@@ -54,6 +54,7 @@ const GH_GAMES_API = {
   LAST_ACTIVE: "/api/v1/gh/games/last-active",
   LAST_ROUND: (id) => `/api/v1/gh/games/${id}/last-round`,
   STATE: (id) => `/api/v1/gh/games/${id}/state`,
+  NC_REF: (id) => `/api/v1/gh/games/${id}/nc-ref`,
   CRUISE_RESET: (id) => `/api/v1/gh/games/${id}/cruise-reset`,
   CRUISE_PAUSE_TOGGLE: (id) => `/api/v1/gh/games/${id}/cruise-pause-toggle`,
   LABOUCHERE_RESET: (id) => `/api/v1/gh/games/${id}/labouchere-reset`,

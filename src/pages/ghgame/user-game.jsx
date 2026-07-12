@@ -22,6 +22,7 @@ if (typeof document !== "undefined" && !document.getElementById("gh-blink-style"
 const PC_COLOR = "#e040fb";   // 픽체인지: 보라
 const LSC_COLOR = "#000000";  // LSC: 검정 (모든 배경에서 고대비)
 const DS_COLOR = "#FF6600";   // 데칼/그림자: 형광 주황
+const NC_REF_LOCK_KEY = "gh_nc_ref_locked_game_seq";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -206,13 +207,30 @@ export default function GhUserGamePage() {
   const [autoStatus, setAutoStatus] = useState({ running: false, autoSessionId: null });
   const [rejectMsg, setRejectMsg] = useState(null);  // 베팅 거부 레이어 팝업
   const [myPickhandId, setMyPickhandId] = useState(null);
+  const [ncRefDraft, setNcRefDraft] = useState(() => (typeof window !== "undefined" ? localStorage.getItem(NC_REF_LOCK_KEY) || "" : ""));
+  const [ncRefOriginal, setNcRefOriginal] = useState("");
+  const [ncRefLocked, setNcRefLocked] = useState(() => !!(typeof window !== "undefined" && localStorage.getItem(NC_REF_LOCK_KEY)));
+  const [ncRefBusy, setNcRefBusy] = useState(false);
 
   const currentTurn = results.length + 1;
+  const ncRefDirty = String(ncRefDraft || "") !== String(ncRefOriginal || "");
+  const syncNcRefNo = useCallback((snapshot) => {
+    const no = snapshot?.nc_ref_shoe_no;
+    if (no === undefined || no === null) return;
+    const value = String(no);
+    setNcRefOriginal(value);
+    setNcRefDraft(value);
+  }, []);
   const inputLocked = processing;
   // LEGACY COMPAT ONLY: displaySnapshot 별칭은 남은 레거시 보조표용이다.
   // 새 화면/상태 판단/픽 표시/닷 표시에는 사용 금지. 필요한 데이터는 서버에서 roundState에 추가한다.
   const displaySnapshot = picksSnapshot;
   const roundAmountCells = roundState?.round_amount_table?.cells || [];
+  useEffect(() => {
+    const no = displaySnapshot?.nc_ref_shoe_no;
+    if (no === undefined || no === null || ncRefDirty) return;
+    syncNcRefNo(displaySnapshot);
+  }, [displaySnapshot?.nc_ref_shoe_no]); // eslint-disable-line react-hooks/exhaustive-deps
   const amountTableStatusFor = (idx) => {
     const cell = roundAmountCells[idx] || {};
     const pick = cell.pick ?? cell.side;
@@ -252,14 +270,59 @@ export default function GhUserGamePage() {
   })();
   const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
+  const applyGameData = useCallback((data) => {
+    setGameId(data.game_id);
+    setConfig(data.config);
+    setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
+    const seq = data.seq || "";
+    const picks = data.round_picks || [];
+    const statuses = data.round_status || [];
+    const statusesAr = data.round_status_ar || [];
+    const pcMarks = data.round_pick_change || [];
+    const dsMarks = data.round_decal_shadow || [];
+    setResults(seq.split("").map((v, i) => {
+      const pick = picks[i];
+      const status = statuses[i] || "wait";
+      const statusAr = statusesAr[i] || "wait";
+      return { value: v, status, statusAr, aPick: pick || null, pickChanged: !!pcMarks[i], decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
+    }));
+    setGlobalhitData(data.globalhit || []);
+    setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+    syncNcRefNo(data.picks_snapshot);
+    setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+    setUserSummary(data.user_summary || null);
+    setUserMartinDashboard(data.user_martin_dashboard || null);
+    if (data.status === "ending" && data.ending_snapshot) {
+      setEndingMode(true);
+      setEndingSnapshot(data.ending_snapshot);
+    }
+  }, [syncNcRefNo]);
+
   const startGame = useCallback(async () => {
     try {
       const res = await apiCaller.post(GH_GAMES_API.START + "?mode=user");
-      setGameId(res.data.game_id);
-      setConfig(res.data.config);
-      setGlobalhitData(res.data.globalhit || []);
-      setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null); setPickChangePick(res.data.pick_change_pick ?? null);
-      setPicksSnapshot(res.data.picks_snapshot || null); setRoundState(res.data.round_state || null);
+      const lockedNcRef = typeof window !== "undefined" ? localStorage.getItem(NC_REF_LOCK_KEY) : null;
+      let lockedApplied = false;
+      if (lockedNcRef) {
+        try {
+          await apiCaller.post(GH_GAMES_API.NC_REF(res.data.game_id), { game_seq: Number(lockedNcRef) });
+          const stateRes = await apiCaller.get(GH_GAMES_API.STATE(res.data.game_id) + "?mode=user");
+          applyGameData(stateRes.data);
+          lockedApplied = true;
+        } catch (err) {
+          localStorage.removeItem(NC_REF_LOCK_KEY);
+          setNcRefLocked(false);
+          setRejectMsg(err.response?.data?.detail || "고정된 NC 번호를 적용하지 못했습니다.");
+        }
+      }
+      if (!lockedApplied) {
+        setGameId(res.data.game_id);
+        setConfig(res.data.config);
+        setGlobalhitData(res.data.globalhit || []);
+        setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null); setPickChangePick(res.data.pick_change_pick ?? null);
+        setPicksSnapshot(res.data.picks_snapshot || null); setRoundState(res.data.round_state || null);
+        syncNcRefNo(res.data.picks_snapshot);
+      }
       skipRestoreGameIdRef.current = res.data.game_id;
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
     } catch (err) {
@@ -270,7 +333,7 @@ export default function GhUserGamePage() {
         return;
       }
     }
-  }, []);
+  }, [applyGameData, navigate, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -310,34 +373,54 @@ export default function GhUserGamePage() {
   const restoreGame = async (gid) => {
     try {
       const res = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user");
-      const data = res.data;
-      setGameId(data.game_id);
-      setConfig(data.config);
-      setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
-      const seq = data.seq || "";
-      const picks = data.round_picks || [];
-      const statuses = data.round_status || [];
-      const statusesAr = data.round_status_ar || [];
-      const pcMarks = data.round_pick_change || [];
-      const dsMarks = data.round_decal_shadow || [];
-      setResults(seq.split("").map((v, i) => {
-        const pick = picks[i];
-        // hit/miss 여부는 서버가 내려준 round_status를 그대로 사용 (프론트는 색상만 결정)
-        const status = statuses[i] || "wait";
-        const statusAr = statusesAr[i] || "wait";
-        return { value: v, status, statusAr, aPick: pick || null, pickChanged: !!pcMarks[i], decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
-      }));
-      setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
-      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
-      setUserSummary(data.user_summary || null);
-      setUserMartinDashboard(data.user_martin_dashboard || null);      if (data.status === "ending" && data.ending_snapshot) {
-        setEndingMode(true);
-        setEndingSnapshot(data.ending_snapshot);
-      }
+      applyGameData(res.data);
     } catch (err) {
       console.error("Failed to restore, starting new:", err);
       startGame();
+    }
+  };
+
+  const handleNcRefChange = (value) => {
+    setNcRefDraft(value.replace(/[^\d]/g, ""));
+    if (ncRefLocked) {
+      setNcRefLocked(false);
+      if (typeof window !== "undefined") localStorage.removeItem(NC_REF_LOCK_KEY);
+    }
+  };
+
+  const handleNcRefCancel = () => {
+    setNcRefDraft(ncRefOriginal);
+  };
+
+  const handleNcRefConfirm = async () => {
+    if (!gameId || !ncRefDirty || ncRefBusy) return;
+    const nextNo = Number(ncRefDraft);
+    if (!Number.isInteger(nextNo) || nextNo <= 0) {
+      setRejectMsg("NC 번호를 올바르게 입력해주세요.");
+      setNcRefDraft(ncRefOriginal);
+      return;
+    }
+    setNcRefBusy(true);
+    try {
+      await apiCaller.post(GH_GAMES_API.NC_REF(gameId), { game_seq: nextNo });
+      await restoreGame(gameId);
+      setNcRefOriginal(String(nextNo));
+      setNcRefDraft(String(nextNo));
+    } catch (err) {
+      setRejectMsg(err.response?.data?.detail || "NC 번호를 적용하지 못했습니다.");
+      setNcRefDraft(ncRefOriginal);
+    } finally {
+      setNcRefBusy(false);
+    }
+  };
+
+  const handleNcRefLockToggle = () => {
+    if (ncRefDirty || ncRefBusy || !ncRefOriginal) return;
+    const next = !ncRefLocked;
+    setNcRefLocked(next);
+    if (typeof window !== "undefined") {
+      if (next) localStorage.setItem(NC_REF_LOCK_KEY, ncRefOriginal);
+      else localStorage.removeItem(NC_REF_LOCK_KEY);
     }
   };
 
@@ -1198,6 +1281,16 @@ export default function GhUserGamePage() {
             subgameBasis={displaySnapshot?.subgame_basis}
             ncRefShoes={displaySnapshot?.nc_ref_shoes}
             ncRefShoeNo={displaySnapshot?.nc_ref_shoe_no}
+            ncRefControls={{
+              value: ncRefDraft,
+              dirty: ncRefDirty,
+              locked: ncRefLocked,
+              busy: ncRefBusy,
+              onChange: handleNcRefChange,
+              onConfirm: handleNcRefConfirm,
+              onCancel: handleNcRefCancel,
+              onToggleLock: handleNcRefLockToggle,
+            }}
             actualSeq={results.map((r) => r.value).join("")}
           />
           </>

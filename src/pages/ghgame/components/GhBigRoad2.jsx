@@ -162,10 +162,6 @@ function getRoundStateQAssistRows(ctx, key) {
   return getRoundStatePart(ctx, key, "q_assist");
 }
 
-function hasRenderableCells(cells) {
-  return Array.isArray(cells) && cells.some((cell) => cell?.pick || cell?.wait || cell?.rest);
-}
-
 function getQuarterCells(ctx, spec, assist = false) {
   if (!spec || HIDE_QUARTER_KEYS.has(spec)) return null;
   if (!assist) return null;
@@ -419,7 +415,7 @@ function NormalSection({ section, ctx, selectedBasis, onSelectBasis }) {
   const basisForDisplay = selectedBasis || latestBasis || null;
   const qAssistRows = section.rows
     .map(([label, key]) => [label, getQuarterCells(ctx, key, true)])
-    .filter(([, cells]) => hasRenderableCells(cells));
+    .filter(([, cells]) => Array.isArray(cells));
   return (
     <>
       <Block title="original">
@@ -462,7 +458,7 @@ function ForSection({ section, ctx }) {
             <RoadRow label={`${label} source`} cells={sourceCells(ctx.actualSeq, offset, false)} />
             <RoadRow label={`${label} original`} cells={getRowCells(ctx, key, false)} />
             <RoadRow label={`${label} 회차어시스트`} cells={getRowCells(ctx, key, true)} />
-            {hasRenderableCells(qAssistCells) && (
+            {Array.isArray(qAssistCells) && (
               <RoadRow label={`${label} 쿼터어시스트`} cells={qAssistCells} />
             )}
           </Box>
@@ -473,25 +469,60 @@ function ForSection({ section, ctx }) {
 }
 
 function SectionPanel({ section, ctx, selectedBasisMap, onSelectBasis }) {
+  const nc = ctx.ncRefControls || {};
   return (
     <Box sx={{ mt: 1.5, pb: 1, borderBottom: "1px solid #333" }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
         <Box sx={titleSx}>{section.label}</Box>
         {section.id === "NC" && ctx.ncRefShoes && (
-          <Box sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            border: "1px solid #777",
-            borderRadius: "4px",
-            backgroundColor: "#111",
-            color: "#ffeb3b",
-            fontWeight: "bold",
-            fontSize: 12,
-            px: 1,
-            py: 0.35,
-          }}>
-            {ctx.ncRefShoes}
+          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+            <Box
+              component="input"
+              value={nc.value ?? ""}
+              disabled={nc.busy}
+              onChange={(e) => nc.onChange?.(e.target.value)}
+              sx={{
+                width: 72,
+                border: "1px solid #777",
+                borderRadius: "4px",
+                backgroundColor: "#111",
+                color: "#ffeb3b",
+                fontWeight: "bold",
+                fontSize: 12,
+                px: 1,
+                py: 0.35,
+              }}
+            />
+            <Box component="button" type="button" disabled={nc.busy || nc.dirty} onClick={nc.onToggleLock} style={{
+              border: nc.locked ? "1px solid #00e676" : "1px solid #777",
+              borderRadius: 4,
+              background: nc.locked ? "#14351f" : "#111",
+              color: nc.locked ? "#00e676" : "#ddd",
+              fontSize: 12,
+              padding: "3px 7px",
+              cursor: nc.busy || nc.dirty ? "default" : "pointer",
+              opacity: nc.busy || nc.dirty ? 0.45 : 1,
+            }}>고정</Box>
+            <Box component="button" type="button" disabled={nc.busy || !nc.dirty} onClick={nc.onConfirm} style={{
+              border: "1px solid #4caf50",
+              borderRadius: 4,
+              background: "#102416",
+              color: "#9be7a7",
+              fontSize: 12,
+              padding: "3px 7px",
+              cursor: nc.busy || !nc.dirty ? "default" : "pointer",
+              opacity: nc.busy || !nc.dirty ? 0.45 : 1,
+            }}>확인</Box>
+            <Box component="button" type="button" disabled={nc.busy || !nc.dirty} onClick={nc.onCancel} style={{
+              border: "1px solid #777",
+              borderRadius: 4,
+              background: "#111",
+              color: "#ddd",
+              fontSize: 12,
+              padding: "3px 7px",
+              cursor: nc.busy || !nc.dirty ? "default" : "pointer",
+              opacity: nc.busy || !nc.dirty ? 0.45 : 1,
+            }}>취소</Box>
           </Box>
         )}
       </Box>
@@ -512,6 +543,7 @@ export default function GhBigRoad2({
   subgameBasis,
   ncRefShoes,
   ncRefShoeNo,
+  ncRefControls,
   actualSeq,
 }) {
   const [selected, setSelected] = useState({});
@@ -527,6 +559,7 @@ export default function GhBigRoad2({
     roundState,
     subgameBasis,
     ncRefShoes: ncRefShoeNo || ncRefShoes,
+    ncRefControls,
     actualSeq: actualSeq || "",
   };
   return (
