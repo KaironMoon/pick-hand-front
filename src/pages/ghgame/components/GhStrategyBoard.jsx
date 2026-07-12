@@ -330,7 +330,7 @@ const addGobBg = (map, label, color) => {
 const quarterRow = (q, amounts, stepMin = 1) => {
   if (!q) return {};
   const step = q.martin_step ?? q.step;
-  const amount = q.amount ?? (amounts ? betAt(amounts, step, stepMin) : null);
+  const amount = q.amount;
   return {
     qrec: `${q.total_q ?? 0}-${q.win_q ?? 0}/${q.lose_q ?? 0}`,
     qstage: fmtStage(step, 0),
@@ -412,27 +412,7 @@ function buildColData(label, i, data, ctx) {
   m = label.match(/^S([123])$/);
   if (m) return fromSection(ctx, `S${m[1]}`);
   m = label.match(/^SQ([123])$/);
-  if (m) {
-    const sqKey = `SQ${m[1]}`;
-    const qas = qAssistFor(ctx, sqKey);
-    const qs = qAssistStateFor(ctx, qas);
-    const base = fromSection(ctx, sqKey) || {};
-    const q = qas;
-    const qData = qs ? { ...(q || {}), ...qs } : q;
-    if (qData) {
-      const amts = amountsFor(ctx, `SQ${m[1]}`);
-      const step = qData.martin_step ?? qData.step;
-      base.qrec = `${qData.total_q ?? 0}-${qData.win_q ?? 0}/${qData.lose_q ?? 0}`;
-      base.qstage = fmtStage(step, 0);
-      base.qidx1 = qData.amount !== null && qData.amount !== undefined
-        ? fmtMan(qData.amount)
-        : (amts ? fmtMan(betAt(amts, step, stepMinFor(ctx, `SQ${m[1]}`))) : "");
-      base.qidx2 = qData.pnl !== null && qData.pnl !== undefined ? fmtMan(qData.pnl) : "";
-      Object.assign(base, quarterAssistRow(qData, qAssistPickText(qas, qs), qs));
-      base.qAssistSource = qs?.source ?? qas?.source;
-    }
-    return base;
-  }
+  if (m) return fromSection(ctx, `SQ${m[1]}`);
   // AARN(A세트 NEW) → AAR 합성 stats / AARO(A세트 OLD) → AARO stats
   if (label === "AARN") return fromStats(ctx, "AAR");
   if (label === "AARO") return fromStats(ctx, "AARO");

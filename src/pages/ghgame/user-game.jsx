@@ -95,8 +95,8 @@ const controlBtnSx = {
   "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" },
 };
 
-function RoundAmountTable({ snapshot }) {
-  const table = snapshot?.round_amount_table || {};
+function RoundAmountTable({ roundState }) {
+  const table = roundState?.round_amount_table || {};
   const cellCount = 64;
   const cells = table.cells || Array.from({ length: cellCount }, (_, idx) => ({ round: idx + 1, amount: 0, pnl: 0, status: null, actual: null, pick: null }));
   const fmt = (v) => Number(v || 0).toFixed(1);
@@ -194,6 +194,7 @@ export default function GhUserGamePage() {
   const [labSeqOpen, setLabSeqOpen] = useState(false);
   const [labHmPressed, setLabHmPressed] = useState(null); // "H" | "M" | null
   const processingRef = useRef(false);
+  const skipRestoreGameIdRef = useRef(null);
   const [processing, setProcessing] = useState(false);
   const goalAlertedRef = useRef({ a: false, z: false });
 
@@ -211,7 +212,7 @@ export default function GhUserGamePage() {
   // LEGACY COMPAT ONLY: displaySnapshot 별칭은 남은 레거시 보조표용이다.
   // 새 화면/상태 판단/픽 표시/닷 표시에는 사용 금지. 필요한 데이터는 서버에서 roundState에 추가한다.
   const displaySnapshot = picksSnapshot;
-  const roundAmountCells = displaySnapshot?.round_amount_table?.cells || [];
+  const roundAmountCells = roundState?.round_amount_table?.cells || [];
   const amountTableStatusFor = (idx) => {
     const cell = roundAmountCells[idx] || {};
     const pick = cell.pick ?? cell.side;
@@ -258,7 +259,8 @@ export default function GhUserGamePage() {
       setConfig(res.data.config);
       setGlobalhitData(res.data.globalhit || []);
       setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null); setPickChangePick(res.data.pick_change_pick ?? null);
-      setPicksSnapshot(null); setRoundState(null);
+      setPicksSnapshot(res.data.picks_snapshot || null); setRoundState(res.data.round_state || null);
+      skipRestoreGameIdRef.current = res.data.game_id;
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
     } catch (err) {
       console.error("Failed to start game:", err);
@@ -281,7 +283,12 @@ export default function GhUserGamePage() {
       setPicksSnapshot(null); setRoundState(null);
       startGame();
     } else if (urlGameId) {
-      restoreGame(parseInt(urlGameId));
+      const gid = parseInt(urlGameId);
+      if (skipRestoreGameIdRef.current === gid) {
+        skipRestoreGameIdRef.current = null;
+      } else {
+        restoreGame(gid);
+      }
     } else {
       // 직전 게임이 active면 복원 여부 확인
       apiCaller.get(GH_GAMES_API.LAST_ACTIVE + "?mode=user").then(async (res) => {
@@ -706,7 +713,6 @@ export default function GhUserGamePage() {
       setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
       setTopGhSections([]); setTopNextRound(null); setPickChangePick(null);
-      setPicksSnapshot(null); setRoundState(null);
       await startGame();
     } finally {
       setProcessing(false);
@@ -1177,7 +1183,7 @@ export default function GhUserGamePage() {
             );
           })()}
 
-          <RoundAmountTable snapshot={displaySnapshot} />
+          <RoundAmountTable roundState={roundState} />
 
           </Box>
           {/* /1|2 row */}

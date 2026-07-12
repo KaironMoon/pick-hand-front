@@ -172,9 +172,9 @@ function getQuarterCells(ctx, spec, assist = false) {
   const stateKey = stateKeyForSpec(spec);
   const stateRows = getRoundStateQAssistRows(ctx, stateKey);
   const state = getRoundStateQAssist(ctx, stateKey);
-  if (!stateRows) return null;
+  if (!stateRows && state?.pick === undefined && state?.status === undefined) return null;
   return cellsFromStateBigRoad2(
-    stateRows,
+    stateRows || [],
     state?.pick,
     state?.status,
     ctx.actualSeq,
