@@ -480,6 +480,11 @@ const STRAT_BET_TYPES = ["manual", "martin", "cruise", "labouchere"];
 const STRAT_BET_LABELS = { manual: "수동", martin: "마틴", cruise: "크루즈", labouchere: "라보쉐르" };
 const STRAT_DIST_MODES = ["even", "asc", "desc"];
 const STRAT_DIST_LABELS = { even: "균등", asc: "증가", desc: "감소" };
+const BET_PROGRESS_MODES = [
+  ["round", "(1) 회차별 배팅방식"],
+  ["quarter", "(2) 쿼터별 배팅방식"],
+  ["roundNquarter", "(3) 회차 + 쿼터 배팅방식"],
+];
 
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
 const ASSIST_OPTS = [
@@ -533,6 +538,7 @@ const DEFAULT_STRATEGY_SETUP = {
   miss_threshold: 5,    // NMiss
   miss_occur: 2,        // 발생 N회
   miss_wait: 9,         // N회대기
+  bet_progress_mode: "roundNquarter",
   pasi: defaultPasi(),
   assist: false,
 };
@@ -763,6 +769,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
     const pasi = (s.pasi || defaultPasi()).map((p, j) => (j === i ? { ...p, ...patch } : p));
     onChange({ ...s, pasi });
   };
+  const progressMode = s.bet_progress_mode || "roundNquarter";
   const pasi = defaultPasi().map((fallback, i) => ({ ...fallback, ...((s.pasi || [])[i] || {}) }));
   const visiblePasi = pasi
     .slice(0, Math.max(0, stepMax - 2))
@@ -877,6 +884,14 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
                 <td style={mkAssistHdr}>발생<NumIn value={s.miss_occur ?? 2} min={1} max={10} onChange={(v) => onChange({ ...s, miss_occur: v })} />회</td>
                 <td style={mkAssistHdr}><NumIn value={s.miss_wait ?? 9} min={1} max={20} onChange={(v) => onChange({ ...s, miss_wait: v })} />회대기</td>
               </>
+            ) : i >= 1 && i <= 3 ? (
+              <td
+                colSpan={3}
+                style={progressMode === BET_PROGRESS_MODES[i - 1][0] ? { ...mkGreen, cursor: "pointer" } : mkMethod}
+                onClick={() => onChange({ ...s, bet_progress_mode: BET_PROGRESS_MODES[i - 1][0] })}
+              >
+                {BET_PROGRESS_MODES[i - 1][1]}
+              </td>
             ) : (
               <td colSpan={3} style={mkCell}></td>
             )}
