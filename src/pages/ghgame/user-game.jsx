@@ -1079,13 +1079,12 @@ export default function GhUserGamePage() {
                     sx={{ ...uniBtnSx("#2196f3"), cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto" }}
                   >
                     <Typography variant="caption" sx={{ fontSize: 12, color: "#2196f3" }}>new</Typography>
-                  </Box>
-                  {(() => {
-                    // A/AR 비교 추천픽은 서버가 계산(picks_snapshot.center_pick). 프론트는 표시만.
-                    const center = picksSnapshot?.center_pick || "W";
-                    const centerColor = center === "P" ? "#1565c0" : center === "B" ? "#f44336" : "#fff";
-                    return (
-                      <Box sx={uniBtnSx("#67f431")}>
+	                  </Box>
+	                  {(() => {
+	                    const center = roundState?.round_amount_table?.total_side || "W";
+	                    const centerColor = center === "P" ? "#1565c0" : center === "B" ? "#f44336" : "#fff";
+	                    return (
+	                      <Box sx={uniBtnSx("#67f431")}>
                         <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 16, color: centerColor }}>{center}</Typography>
                       </Box>
                     );
