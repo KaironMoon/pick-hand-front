@@ -32,6 +32,7 @@ const GSEP = "2px solid #9a9a9a";
 const BASE = "1px solid #555";
 const GOB_TOP_BG = "rgba(0, 200, 83, 0.55)";
 const GOB_LOW_BG = "rgba(255, 213, 79, 0.62)";
+const AMOUNT_ZONE_COLORS = { blue: "#2f9bff", white: "#fff", red: "#ff5b5b" };
 
 // 셀의 노란 박스/그룹선 테두리 계산 (디자인 edgeCls 포팅, span=1 고정 — 병합 없음)
 function edgeStyle(data, i, pos) {
@@ -157,7 +158,7 @@ function SimpleRow({ data, dataKey, render, pos, label, labelColor, markKey }) {
         const marks = markKey ? (data[markKey] || [])[i] : null;
         const sx = { ...tdSx, ...(bg ? { backgroundColor: bg } : {}), ...edgeStyle(data, i, pos) };
         return v
-          ? <Box component="td" key={i} sx={sx}>{withSourceDots(render(v), marks)}</Box>
+          ? <Box component="td" key={i} sx={sx}>{withSourceDots(render(v, i, data), marks)}</Box>
           : <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
       })}
     </tr>
@@ -246,16 +247,16 @@ function StrategyTable({ data }) {
         <SimpleRow data={data} dataKey="pct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="assistRec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="총전적" labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="idx1" render={(v) => <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>} pos="mid" label="회차P" labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label="누적P" labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="idx1" render={(v, i, row) => amountText(v, row.idx1Zone?.[i])} pos="mid" label="회차P" labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="idx2" render={(v, i, row) => amountText(v, row.idx2Zone?.[i], String(v).startsWith("-") ? "#ef5350" : "#2e9e5b")} pos="mid" label="누적P" labelColor={LBL_RED} />
         <QAssistRow data={data} pos="mid" label="어시Q픽" />
         <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label="연속" />
         <SimpleRow data={data} dataKey="qPct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" />
         {/* 쿼터 블록 */}
         <SimpleRow data={data} dataKey="qrec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="쿼터전적" />
         <SimpleRow data={data} dataKey="qstage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" />
-        <SimpleRow data={data} dataKey="qidx1" render={(v) => <span style={{ color: "#fff", fontWeight: "bold" }}>{v}</span>} pos="mid" label="쿼터P" />
-        <SimpleRow data={data} dataKey="qidx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="last" label="누적P" />
+        <SimpleRow data={data} dataKey="qidx1" render={(v, i, row) => amountText(v, row.qidx1Zone?.[i])} pos="mid" label="쿼터P" />
+        <SimpleRow data={data} dataKey="qidx2" render={(v, i, row) => amountText(v, row.qidx2Zone?.[i], String(v).startsWith("-") ? "#ef5350" : "#2e9e5b")} pos="last" label="누적P" />
       </tbody>
     </Box>
   );
@@ -277,6 +278,10 @@ const fmtMan = (man) => {
   return v.toFixed(1);
 };
 const fmtValue = (v) => (v === "N/A" ? "-" : (v || ""));
+const zoneColor = (zone, fallback = "#fff") => AMOUNT_ZONE_COLORS[zone] || fallback;
+const amountText = (v, zone, fallback = "#fff") => (
+  <span style={{ color: zoneColor(zone, fallback), fontWeight: "bold" }}>{v}</span>
+);
 const betAt = (amounts, step, stepMin = 1) => {
   if (!amounts || !step) return null;
   if (step < (stepMin || 1)) return 0;
@@ -382,9 +387,12 @@ const fromStats = (ctx, key) => {
     stage1: fmtStage(s.step, 0),
     stage: as ? fmtStage(as.step, 0) : "",
     idx1: as ? fmtMan(as.amount ?? (amounts ? betAt(amounts, as.step, stepMin) : null)) : "",
+    idx1Zone: as?.amount_zone,
     idx2: as && as.pnl !== null && as.pnl !== undefined ? fmtMan(as.pnl) : "",
+    idx2Zone: as?.amount_zone,
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : { ...quarterAssistRow(qData, qAssistPickText(qas, qs), qs), qAssistSource: qs?.source ?? qas?.source }),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterRow(qData, amounts, stepMin)),
+    ...(HIDE_QUARTER_KEYS.has(key) ? {} : { qidx1Zone: qData?.amount_zone, qidx2Zone: qData?.amount_zone }),
   };
 };
 const fromSection = (ctx, key) => fromStats(ctx, key);
@@ -429,7 +437,8 @@ function buildColData(label, i, data, ctx) {
 function withLiveData(base, ctx) {
   const keys = ["wait", "pick", "stage1", "pct", "rec", "rec2", "assist", "assistSource", "wait2", "pct2", "assistRec", "stage", "idx1", "idx2",
     "qAssist", "qAssistSource", "qWait2", "qPct2",
-    "qrec", "qstage", "qidx1", "qidx2"];
+    "qrec", "qstage", "qidx1", "qidx2",
+    "idx1Zone", "idx2Zone", "qidx1Zone", "qidx2Zone"];
   const out = { ...base };
   keys.forEach((k) => { out[k] = base.name.map(() => ""); });
   out.waitBg = base.name.map(() => "");

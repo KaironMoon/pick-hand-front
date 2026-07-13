@@ -750,7 +750,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
               %<span style={{ marginLeft: 3 }}>{half === 0 ? "이상" : "이하"}</span>
             </>
           ) : (
-            <span>{condLabel[half]}%<span style={{ marginLeft: 3 }}>{half === 0 ? "이상" : "이하"}</span></span>
+            <span>{condLabel[half].value}%<span style={{ marginLeft: 3 }}>{condLabel[half].op}</span></span>
           )}
         </td>
         {Array.from({ length: 8 }, (_, i) => {
@@ -821,8 +821,8 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
       </tr>
       {/* 3~8행: 조건부 P배열 (흰/파/빨) */}
       {condRows("white", null, null, false)}
-      {condRows("blue", ["0", String(condLo - 1)], "#0066FF", blueOff)}
-      {condRows("red", [String(condHi + 1), "100"], "#FF0000", redOff)}
+      {condRows("blue", [{ value: "0", op: "이상" }, { value: String(condLo), op: "미만" }], "#0066FF", blueOff)}
+      {condRows("red", [{ value: String(condHi), op: "초과" }, { value: "100", op: "이하" }], "#FF0000", redOff)}
       {/* 9행: 목표금액 베팅시작 베팅마감 마감연장 마감미처리 */}
       <tr>
         <td style={mkRed}>목표금액</td>
