@@ -32,6 +32,12 @@ const GSEP = "2px solid #9a9a9a";
 const BASE = "1px solid #555";
 const GOB_TOP_BG = "rgba(0, 200, 83, 0.55)";
 const GOB_LOW_BG = "rgba(255, 213, 79, 0.62)";
+const GOB_RANK_BG = {
+  1: "rgba(212, 175, 55, 0.72)",
+  2: "rgba(174, 180, 189, 0.72)",
+  3: "rgba(184, 115, 51, 0.72)",
+  4: "rgba(111, 120, 130, 0.72)",
+};
 const AMOUNT_ZONE_COLORS = { blue: "#2f9bff", white: "#fff", red: "#ff5b5b" };
 
 // 셀의 노란 박스/그룹선 테두리 계산 (디자인 edgeCls 포팅, span=1 고정 — 병합 없음)
@@ -67,21 +73,21 @@ const G2 = {
   hlRanges: [[0, 2], [3, 5], [6, 10], [11, 13], [14, 14]],
   headColors: [[0, 2, HC_BLUE], [3, 5, HC_RED], [6, 10, HC_BLUE], [11, 13, HC_RED], [14, 14, "#de6a08"]],
 };
-// G3: G(H1~%0)(칸만) + 허니비/W111/M22 세트(정픽/R/SRO/SRN).
-const G3n = ["G(H1)", "G(H0)", "G(%1)", "G(%0)", "허니비", "허니R", "허니SRO", "허니SRN", "W111", "위너R", "위너SRO", "위너SRN", "M22", "메가R", "메가SRO", "메가SRN"];
+// G3: GH시리즈 + G%시리즈 + 허니비/W111 세트(정픽/R/SRO/SRN).
+const G3n = ["G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)", "허니비", "허니R", "허니SRO", "허니SRN", "W111", "위너R", "위너SRO", "위너SRN"];
 const G3 = {
   name: G3n,
   gstart: new Set([4, 8, 12]),
   hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
   headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
 };
-// G4: D112세트 + NC세트(정픽/R/SRO/SRN) + SQ1/2/3(쿼터배팅, S와 픽 공유) + 빈칸 5.
-const G4n = ["D112", "드림R", "드림SRO", "드림SRN", "NC", "NCR", "NCSRO", "NCSRN", "SQ1", "SQ2", "SQ3", "", "", "", "", ""];
+// G4: M22세트 + D112세트 + NC세트(정픽/R/SRO/SRN) + SQ1/2/3(쿼터배팅, S와 픽 공유) + 빈칸 1.
+const G4n = ["M22", "메가R", "메가SRO", "메가SRN", "D112", "드림R", "드림SRO", "드림SRN", "NC", "NCR", "NCSRO", "NCSRN", "SQ1", "SQ2", "SQ3", ""];
 const G4 = {
   name: G4n,
-  gstart: new Set([4, 8]),
-  hlRanges: [[0, 3], [4, 7], [8, 10]],
-  headColors: [[0, 3, HC_RED], [4, 7, HC_BLUE], [8, 10, HC_BLUE]],
+  gstart: new Set([4, 8, 12]),
+  hlRanges: [[0, 3], [4, 7], [8, 11], [12, 14]],
+  headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 14, HC_BLUE]],
 };
 
 // ── 셀 렌더 헬퍼 ──
@@ -169,6 +175,14 @@ function SimpleRow({ data, dataKey, render, pos, label, labelColor, markKey }) {
 // 어시스트 픽은 (임시) 원래 픽(pick)과 동일. 실제 어시스트 로직은 추후 처리.
 const ASSIST_BG = "#16365c";
 const Q_ASSIST_BG = "#60497b";
+const assistSourceTitle = (source) => {
+  if (!source) return undefined;
+  const text = String(source);
+  const prefix = "쿼터휴식:";
+  const body = text.startsWith(prefix) ? text.slice(prefix.length) : text;
+  const formatted = body.includes(":") ? body.replace(":", "|") : body;
+  return text.startsWith(prefix) ? `${prefix}${formatted}` : formatted;
+};
 function AssistRow({ data, pos, label, labelColor }) {
   return (
     <tr>
@@ -176,7 +190,7 @@ function AssistRow({ data, pos, label, labelColor }) {
       {data.name.map((n, i) => {
         const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
         const v = (data.assist || [])[i] || "";
-        const title = (data.assistSource || [])[i] || undefined;
+        const title = assistSourceTitle((data.assistSource || [])[i]);
         if (!v) return <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
         return (
           <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: ASSIST_BG }}>
@@ -195,7 +209,7 @@ function QAssistRow({ data, pos, label, labelColor }) {
       {data.name.map((n, i) => {
         const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
         const v = (data.qAssist || [])[i] || "";
-        const title = (data.qAssistSource || [])[i] || undefined;
+        const title = assistSourceTitle((data.qAssistSource || [])[i]);
         if (!v) return <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
         return (
           <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: Q_ASSIST_BG }}>
@@ -227,7 +241,13 @@ function StrategyTable({ data }) {
         <tr>
           <LblCell text="섹션" edge="head" />
           {data.name.map((n, i) => (
-            <Box component="th" key={i} sx={{ ...thSx, color: headColorOf(data, i, n), backgroundColor: "#000", ...edgeStyle(data, i, "head") }}>
+            <Box component="th" key={i} sx={{
+              ...thSx,
+              color: data.headBg?.[i] ? "#111" : headColorOf(data, i, n),
+              fontWeight: data.headBg?.[i] ? 900 : thSx.fontWeight,
+              backgroundColor: data.headBg?.[i] || "#000",
+              ...edgeStyle(data, i, "head"),
+            }}>
               <Box component="span" sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "3px" }}>
                 {n}
               </Box>
@@ -407,9 +427,8 @@ function buildColData(label, i, data, ctx) {
     "M22", "메가R", "메가SRO", "메가SRN", "D112", "드림R", "드림SRO", "드림SRN",
     "NC", "NCR", "NCSRO", "NCSRN"];
   if (SUBGAME_LABELS.includes(label)) return fromStats(ctx, label);
-  // G(H1/H0/%1/%0) — 다른 섹션 메트릭으로 산출된 픽.
-  const G_LABEL_KEY = { "G(H1)": "G(H1)", "G(H0)": "G(H0)", "G(%1)": "G(%1)", "G(%0)": "G(%0)" };
-  if (G_LABEL_KEY[label]) return fromStats(ctx, G_LABEL_KEY[label]);
+  // G(H1~H4/%1~%4) — 다른 섹션 메트릭으로 산출된 픽.
+  if (/^G\((H|%)[1-4]\)$/.test(label)) return fromStats(ctx, label);
   let m = label.match(/^FOR([123])X$/);
   if (m) return fromSection(ctx, `FOR${m[1]}X`);
   m = label.match(/^FOR([123])$/);
@@ -440,16 +459,26 @@ function withLiveData(base, ctx) {
     "idx1Zone", "qidx1Zone"];
   const out = { ...base };
   keys.forEach((k) => { out[k] = base.name.map(() => ""); });
+  out.headBg = base.name.map(() => "");
   out.waitBg = base.name.map(() => "");
   out.pctBg = base.name.map(() => "");
   const markWaitHit = new Map();
   const markWaitMiss = new Map();
   const markPct = new Map();
   const gobMarks = ctx.roundState?.gob_marks || {};
-  (gobMarks.H1 || []).forEach((key) => addGobBg(markWaitHit, gobLabelOf(key), GOB_TOP_BG));
-  (gobMarks.H0 || []).forEach((key) => addGobBg(markWaitMiss, gobLabelOf(key), GOB_LOW_BG));
-  (gobMarks.PCT1 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_TOP_BG));
-  (gobMarks.PCT0 || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), GOB_LOW_BG));
+  [1, 2, 3, 4].forEach((rank) => {
+    const bg = GOB_RANK_BG[rank] || GOB_TOP_BG;
+    if ((gobMarks[`GH${rank}`] || []).length) {
+      const idx = base.name.indexOf(`G(H${rank})`);
+      if (idx >= 0) out.headBg[idx] = bg;
+    }
+    if ((gobMarks[`GP${rank}`] || []).length) {
+      const idx = base.name.indexOf(`G(%${rank})`);
+      if (idx >= 0) out.headBg[idx] = bg;
+    }
+    (gobMarks[`GH${rank}`] || []).forEach((key) => addGobBg(markWaitHit, gobLabelOf(key), bg));
+    (gobMarks[`GP${rank}`] || []).forEach((key) => addGobBg(markPct, gobLabelOf(key), bg));
+  });
   out.waitSourceMarks = base.name.map(() => []);
   out.pctSourceMarks = base.name.map(() => []);
   const subgameSrnKeys = new Set(["허니SRN", "위너SRN", "메가SRN", "드림SRN", "NCSRN"]);
@@ -476,7 +505,7 @@ function withLiveData(base, ctx) {
     if (!rd) return;
     keys.forEach((k) => { if (rd[k] != null) out[k][i] = rd[k]; });
     const waitValue = String(out.wait[i] || "");
-    if (markWaitHit.has(label) && waitValue.endsWith("H")) {
+    if (markWaitHit.has(label)) {
       out.waitBg[i] = markWaitHit.get(label);
     } else if (markWaitMiss.has(label) && waitValue.endsWith("M")) {
       out.waitBg[i] = markWaitMiss.get(label);

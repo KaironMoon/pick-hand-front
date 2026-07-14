@@ -488,22 +488,24 @@ const BET_PROGRESS_MODES = [
 
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
 const ASSIST_OPTS = [
-  "해당반대", "해당진행", "대기진행",
-  "G(H1)", "G(H0)", "G(%1)", "G(%0)",
-  "A멀티(H1)", "S1멀티(H1)", "S2멀티(H1)", "S3멀티(H1)",
-  "HB멀티(H1)", "WH멀티(H1)", "MH멀티(H1)", "DH멀티(H1)",
+  "해당반대", "해당진행",
+  "G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)",
+  "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)", "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
+  "HB멀티(H1)", "HB멀티(%1)", "WH멀티(H1)", "WH멀티(%1)", "MH멀티(H1)", "MH멀티(%1)", "DH멀티(H1)", "DH멀티(%1)",
 ];
 const isKnownAssistOption = (value) => !value || ASSIST_OPTS.includes(value);
-const normalizeAssistOption = (value) => isKnownAssistOption(value) ? (value || "해당진행") : "해당진행";
+const normalizeAssistOption = (value) => (value === "대기진행" ? "해당진행" : (isKnownAssistOption(value) ? (value || "해당진행") : "해당진행"));
 // 패시 어시스트 행 (2~15패시). 최고 16단계면 15패시까지 표시.
 const PASI_LEVELS = Array.from({ length: 14 }, (_, i) => i + 2);
 function defaultPasi() {
   return PASI_LEVELS.map((lvl) => ({
     level: lvl,
     assist1: "해당진행",
+    assist_h_by_section: {},
     pct: lvl === 2 ? 5 : lvl === 6 ? 55 : 0,
     q_level: lvl,
     assist2: "해당진행",
+    assist_q_by_section: {},
   }));
 }
 
@@ -569,7 +571,7 @@ const STRATEGY_SETUP_BOXES = [
   { key: "FOR", variant: "full", label: "FOR세트", sections: ["FOR1", "FOR2", "FOR3"] },
   { key: "FORX", variant: "full", label: "FORX세트", sections: ["FOR1X", "FOR2X", "FOR3X"] },
   { key: "SQ", variant: "full", label: "SQ세트", sections: ["SQ1", "SQ2", "SQ3"] },
-  { key: "GOB", variant: "full", label: "G시리즈", sections: ["G(H1)", "G(H0)", "G(%1)", "G(%0)"] },
+  { key: "GOB", variant: "full", label: "G시리즈", sections: ["G(H1)", "G(H2)", "G(H3)", "G(H4)"] },
   // 서브게임: full 멀티판 (정/R/SRO/SRN + 공유 배당)
   { key: "허니비", variant: "full", label: "허니비", sections: ["허니비", "허니R", "허니SRO", "허니SRN"] },
   { key: "W111", variant: "full", label: "위너히트", sections: ["W111", "위너R", "위너SRO", "위너SRN"] },
@@ -586,6 +588,13 @@ const STRATEGY_SETUP_BOXES = [
   { key: "J", variant: "short" },
 ];
 
+function normalizeAssistSectionMap(map) {
+  if (!map || typeof map !== "object" || Array.isArray(map)) return {};
+  return Object.fromEntries(
+    Object.entries(map).map(([key, value]) => [key, normalizeAssistOption(value)])
+  );
+}
+
 function normalizeUnknownAssistOptions(cfg) {
   if (!cfg || typeof cfg !== "object") return cfg;
   const next = { ...cfg };
@@ -597,7 +606,9 @@ function normalizeUnknownAssistOptions(cfg) {
       pasi: box.pasi.map((row) => ({
         ...row,
         assist1: normalizeAssistOption(row?.assist1),
+        assist_h_by_section: normalizeAssistSectionMap(row?.assist_h_by_section),
         assist2: normalizeAssistOption(row?.assist2),
+        assist_q_by_section: normalizeAssistSectionMap(row?.assist_q_by_section),
       })),
     };
   });
@@ -681,6 +692,74 @@ function NumIn({ value, onChange, min, max, color = "#0065fe", width = 30, bg = 
       }}
       style={{ width, background: bg, border: "1px solid #2f5b8f", color, fontWeight: "bold",
         textAlign: "center", fontSize: 12, borderRadius: 3, padding: 0 }} />
+  );
+}
+
+function MultiAssistGrid({ sections, visiblePasi, setPasiSectionAssist, setPasi }) {
+  const slots = Array.from({ length: 4 }, (_, i) => (sections || [])[i] || null);
+  const base = { ...mkCell, width: "auto", minWidth: 0, height: 22, padding: "1px 2px" };
+  const hCell = { ...base, background: "#16365c", color: "#fff" };
+  const qCell = { ...base, background: "#60497b", color: "#fff" };
+  const sCellBase = { padding: 0, fontSize: 11, width: 20, minWidth: 20, maxWidth: 20, overflow: "hidden" };
+  const hSCell = { ...hCell, ...sCellBase };
+  const qSCell = { ...qCell, ...sCellBase };
+  const hHdr = { ...hCell, color: "#fff", fontWeight: "bold" };
+  const qHdr = { ...qCell, color: "#fff", fontWeight: "bold" };
+  const disabled = { ...base, background: "#2b2b2b", color: "#777" };
+  const sectionValue = (row, field, section) => normalizeAssistOption((row?.[field] || {})?.[section]);
+
+  const renderAssistCell = (p, originalIndex, field, section, sx, slotIndex) => {
+    if (!section) return <td key={`${field}-empty-${slotIndex}`} style={disabled}></td>;
+    return (
+      <td key={`${field}-${section}-${slotIndex}`} style={sx}>
+        <AssistSelect
+          value={sectionValue(p, field, section)}
+          onChange={(v) => setPasiSectionAssist(originalIndex, field, section, v)}
+          sx={{
+            fontSize: 11,
+            padding: "0 1px",
+            width: "100%",
+            appearance: "none",
+            WebkitAppearance: "none",
+            MozAppearance: "none",
+            ...(sx.background === "#60497b" ? { background: "#60497b", color: "#fff", borderColor: "#8067a0", fontWeight: "bold" } : {}),
+          }}
+        />
+      </td>
+    );
+  };
+
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+      <colgroup>
+        <col style={{ width: 20 }} />
+        <col style={{ width: "calc((100% - 40px) / 8)" }} />
+        <col style={{ width: "calc((100% - 40px) / 8)" }} />
+        <col style={{ width: "calc((100% - 40px) / 8)" }} />
+        <col style={{ width: "calc((100% - 40px) / 8)" }} />
+        <col style={{ width: 20 }} />
+        <col style={{ width: "calc((100% - 40px) / 8)" }} />
+        <col style={{ width: "calc((100% - 40px) / 8)" }} />
+        <col style={{ width: "calc((100% - 40px) / 8)" }} />
+        <col style={{ width: "calc((100% - 40px) / 8)" }} />
+      </colgroup>
+      <tbody>
+        <tr>
+          <td style={hSCell}>S</td>
+          {slots.map((section, i) => <td key={`h-hdr-${i}`} style={section ? hHdr : disabled}>{section || ""}</td>)}
+          <td style={qSCell}>S</td>
+          {slots.map((section, i) => <td key={`q-hdr-${i}`} style={section ? qHdr : disabled}>{section || ""}</td>)}
+        </tr>
+        {visiblePasi.map(({ p, originalIndex }) => (
+          <tr key={`assist-grid-${originalIndex}`}>
+            <td style={hSCell}>{p.level ?? (originalIndex + 2)}S</td>
+            {slots.map((section, slotIndex) => renderAssistCell(p, originalIndex, "assist_h_by_section", section, hCell, slotIndex))}
+            <td style={qSCell}>{p.q_level ?? p.level ?? (originalIndex + 2)}S</td>
+            {slots.map((section, slotIndex) => renderAssistCell(p, originalIndex, "assist_q_by_section", section, qCell, slotIndex))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -771,6 +850,13 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
   const toggleMulti = (k) => onChange({ ...s, multi_sections: { ...(s.multi_sections || {}), [k]: !(s.multi_sections?.[k] ?? true) } });
   const setPasi = (i, patch) => {
     const pasi = (s.pasi || defaultPasi()).map((p, j) => (j === i ? { ...p, ...patch } : p));
+    onChange({ ...s, pasi });
+  };
+  const setPasiSectionAssist = (i, field, section, value) => {
+    const pasi = (s.pasi || defaultPasi()).map((p, j) => {
+      if (j !== i) return p;
+      return { ...p, [field]: { ...(p?.[field] || {}), [section]: value } };
+    });
     onChange({ ...s, pasi });
   };
   const progressMode = s.bet_progress_mode || "roundNquarter";
@@ -875,52 +961,95 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
           </td>
         </tr>
       )}
-      {/* 12행: 최상위조건설정 헤더 */}
-      <tr>
-        <td colSpan={4} style={mkAssistHdr}>최상위조건설정</td>
-        <td colSpan={1} style={mkRed}>연패발생</td>
-        <td colSpan={2} style={{ ...mkRed, background: "#16365c", color: "#015fe5" }}>어시 H픽</td>
-        <td colSpan={1} style={{ ...mkRed, background: "#60497b" }}>연패발생</td>
-        <td colSpan={2} style={{ ...mkAssistHdr, background: "#60497b", color: "#e5281a" }}>어시Q픽</td>
-      </tr>
-      {/* 13행: 5Miss / 발생N회 / N회대기 + 2패시 */}
-      {visiblePasi.map(({ p, originalIndex }, i) => {
-        const isFirst = i === 0;  // 2패시 = 13행 (좌측에 5Miss 블록)
-        return (
-          <tr key={`${name}-pasi-${originalIndex}`}>
-            {isFirst ? (
-              <>
-                <td style={mkAssistHdr}><NumIn value={s.miss_threshold ?? 5} min={2} max={10} onChange={(v) => onChange({ ...s, miss_threshold: v })} />Miss</td>
-                <td style={mkAssistHdr}>발생<NumIn value={s.miss_occur ?? 2} min={1} max={10} onChange={(v) => onChange({ ...s, miss_occur: v })} />회</td>
-                <td style={mkAssistHdr}><NumIn value={s.miss_wait ?? 9} min={1} max={20} onChange={(v) => onChange({ ...s, miss_wait: v })} />회대기</td>
-                <td style={mkAssistHdr}>섹션종료</td>
-              </>
-            ) : i >= 1 && i <= 3 ? (
-              <td
-                colSpan={4}
-                style={progressMode === BET_PROGRESS_MODES[i - 1][0] ? { ...mkGreen, cursor: "pointer" } : mkMethod}
-                onClick={() => onChange({ ...s, bet_progress_mode: BET_PROGRESS_MODES[i - 1][0] })}
-              >
-                {BET_PROGRESS_MODES[i - 1][1]}
-              </td>
-            ) : (
-              <td colSpan={4} style={mkCell}></td>
-            )}
-            <td colSpan={1} style={{ ...mkRed, background: "#16365c", color: "#fff" }}>
-              <NumIn value={p.level ?? (originalIndex + 2)} min={1} max={20} color="#fff" width={38} bg="#16365c" onChange={(v) => setPasi(originalIndex, { level: v })} />패시
+      {isFull ? (
+        <>
+          <tr>
+            <td colSpan={4} style={mkAssistHdr}>최상위조건설정</td>
+            <td colSpan={6} rowSpan={visiblePasi.length + 1} style={{ ...mkCell, padding: 0, verticalAlign: "top" }}>
+              <MultiAssistGrid
+                sections={sections}
+                visiblePasi={visiblePasi}
+                setPasi={setPasi}
+                setPasiSectionAssist={setPasiSectionAssist}
+              />
             </td>
-            <td style={{ ...mkCell, background: "#16365c" }}><AssistSelect value={p.assist1} onChange={(v) => setPasi(originalIndex, { assist1: v })} /></td>
-            <td style={{ ...mkCell, background: "#16365c", color: "#fff" }}>1회</td>
-            <td colSpan={1} style={{ ...mkNavy, background: "#60497b", color: "#fff" }}>
-              <NumIn value={p.q_level ?? p.level ?? (originalIndex + 2)} min={1} max={20} color="#fff" width={38} bg="#60497b" onChange={(v) => setPasi(originalIndex, { q_level: v })} />패시
-            </td>
-            <td style={{ ...mkAssist2, background: "#60497b" }}>
-              <AssistSelect value={p.assist2} onChange={(v) => setPasi(originalIndex, { assist2: v })} sx={{ background: "#60497b", color: "#fff", borderColor: "#8067a0", fontWeight: "bold" }} />
-            </td>
-            <td style={{ ...mkAssist2, background: "#60497b", color: "#fff" }}>1회</td>
           </tr>
-        );
-      })}
+          {visiblePasi.map(({ originalIndex }, i) => {
+            const isFirst = i === 0;
+            return (
+              <tr key={`${name}-pasi-left-${originalIndex}`}>
+                {isFirst ? (
+                  <>
+                    <td style={mkAssistHdr}><NumIn value={s.miss_threshold ?? 5} min={2} max={10} onChange={(v) => onChange({ ...s, miss_threshold: v })} />Miss</td>
+                    <td style={mkAssistHdr}>발생<NumIn value={s.miss_occur ?? 2} min={1} max={10} onChange={(v) => onChange({ ...s, miss_occur: v })} />회</td>
+                    <td style={mkAssistHdr}><NumIn value={s.miss_wait ?? 9} min={1} max={20} onChange={(v) => onChange({ ...s, miss_wait: v })} />회대기</td>
+                    <td style={mkAssistHdr}>섹션종료</td>
+                  </>
+                ) : i >= 1 && i <= 3 ? (
+                  <td
+                    colSpan={4}
+                    style={progressMode === BET_PROGRESS_MODES[i - 1][0] ? { ...mkGreen, cursor: "pointer" } : mkMethod}
+                    onClick={() => onChange({ ...s, bet_progress_mode: BET_PROGRESS_MODES[i - 1][0] })}
+                  >
+                    {BET_PROGRESS_MODES[i - 1][1]}
+                  </td>
+                ) : (
+                  <td colSpan={4} style={mkCell}></td>
+                )}
+              </tr>
+            );
+          })}
+        </>
+      ) : (
+        <>
+          {/* 12행: 최상위조건설정 헤더 */}
+          <tr>
+            <td colSpan={4} style={mkAssistHdr}>최상위조건설정</td>
+            <td colSpan={1} style={mkRed}>연패발생</td>
+            <td colSpan={2} style={{ ...mkRed, background: "#16365c", color: "#015fe5" }}>어시 H픽</td>
+            <td colSpan={1} style={{ ...mkRed, background: "#60497b" }}>연패발생</td>
+            <td colSpan={2} style={{ ...mkAssistHdr, background: "#60497b", color: "#e5281a" }}>어시Q픽</td>
+          </tr>
+          {/* 13행: 5Miss / 발생N회 / N회대기 + 2패시 */}
+          {visiblePasi.map(({ p, originalIndex }, i) => {
+            const isFirst = i === 0;  // 2패시 = 13행 (좌측에 5Miss 블록)
+            return (
+              <tr key={`${name}-pasi-${originalIndex}`}>
+                {isFirst ? (
+                  <>
+                    <td style={mkAssistHdr}><NumIn value={s.miss_threshold ?? 5} min={2} max={10} onChange={(v) => onChange({ ...s, miss_threshold: v })} />Miss</td>
+                    <td style={mkAssistHdr}>발생<NumIn value={s.miss_occur ?? 2} min={1} max={10} onChange={(v) => onChange({ ...s, miss_occur: v })} />회</td>
+                    <td style={mkAssistHdr}><NumIn value={s.miss_wait ?? 9} min={1} max={20} onChange={(v) => onChange({ ...s, miss_wait: v })} />회대기</td>
+                    <td style={mkAssistHdr}>섹션종료</td>
+                  </>
+                ) : i >= 1 && i <= 3 ? (
+                  <td
+                    colSpan={4}
+                    style={progressMode === BET_PROGRESS_MODES[i - 1][0] ? { ...mkGreen, cursor: "pointer" } : mkMethod}
+                    onClick={() => onChange({ ...s, bet_progress_mode: BET_PROGRESS_MODES[i - 1][0] })}
+                  >
+                    {BET_PROGRESS_MODES[i - 1][1]}
+                  </td>
+                ) : (
+                  <td colSpan={4} style={mkCell}></td>
+                )}
+                <td colSpan={1} style={{ ...mkRed, background: "#16365c", color: "#fff" }}>
+                  <NumIn value={p.level ?? (originalIndex + 2)} min={1} max={20} color="#fff" width={38} bg="#16365c" onChange={(v) => setPasi(originalIndex, { level: v })} />패시
+                </td>
+                <td style={{ ...mkCell, background: "#16365c" }}><AssistSelect value={p.assist1} onChange={(v) => setPasi(originalIndex, { assist1: v })} /></td>
+                <td style={{ ...mkCell, background: "#16365c", color: "#fff" }}>1회</td>
+                <td colSpan={1} style={{ ...mkNavy, background: "#60497b", color: "#fff" }}>
+                  <NumIn value={p.q_level ?? p.level ?? (originalIndex + 2)} min={1} max={20} color="#fff" width={38} bg="#60497b" onChange={(v) => setPasi(originalIndex, { q_level: v })} />패시
+                </td>
+                <td style={{ ...mkAssist2, background: "#60497b" }}>
+                  <AssistSelect value={p.assist2} onChange={(v) => setPasi(originalIndex, { assist2: v })} sx={{ background: "#60497b", color: "#fff", borderColor: "#8067a0", fontWeight: "bold" }} />
+                </td>
+                <td style={{ ...mkAssist2, background: "#60497b", color: "#fff" }}>1회</td>
+              </tr>
+            );
+          })}
+        </>
+      )}
     </>
   );
 }

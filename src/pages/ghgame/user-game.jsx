@@ -179,7 +179,6 @@ export default function GhUserGamePage() {
   const [roundState, setRoundState] = useState(null);
   const [batExpanded, setBatExpanded] = useState({}); // {`gi-ri`: true} — Bat 셀 전체 표시 토글
   const [trackStreakHidden, setTrackStreakHidden] = useState({}); // {sckey: true} — 트랙 연승/연패 셀 숨김 토글
-  const [chartGroup, setChartGroup] = useState("A"); // 빅로드2 누적 그래프 표시 그룹
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
@@ -1297,189 +1296,11 @@ export default function GhUserGamePage() {
         );
       })()}
 
-      {/* ===== 빅로드2 누적 그래프 ===== */}
-      {(() => {
-        const N = results.length;
-        const sqTracks = picksSnapshot?.s_tracks?.tracks;
-        const srTracks = picksSnapshot?.sr_tracks?.tracks;
-        const ssrTracks = picksSnapshot?.ssr_tracks?.tracks;
-        const ssroTracks = picksSnapshot?.ssro_tracks?.tracks;
-        const sxTracks = picksSnapshot?.sx_tracks?.tracks;
-        const forTracks = picksSnapshot?.for_tracks?.tracks;
-        const quarterTracks = picksSnapshot?.quarter_tracks?.tracks;
-        const palette = ["#f44336", "#2196f3", "#ffffff", "#00e676", "#ff9800", "#e040fb", "#26c6da", "#ffeb3b", "#9ccc65", "#ef5350", "#5c6bc0", "#8d6e63"];
-        const seriesFromRows = (rows = []) => {
-          const arr = new Array(N).fill(null);
-          for (const r of rows || []) {
-            const idx = (r.round || 0) - 1;
-            if (idx < 0 || idx >= N) continue;
-            if (r.status === "hit" || r.status === "miss") arr[idx] = r.status;
-          }
-          return arr;
-        };
-        const statSeries = (key) => picksSnapshot?.stats?.[key]?.series || [];
-        const assistSeries = (key) => picksSnapshot?.assist_stats?.[key]?.series || [];
-        const qAssistSeries = (key) => {
-          const qas = picksSnapshot?.q_assist_stats?.[key];
-          return qas?.round_data ? seriesFromRows(qas.round_data) : (qas?.series || []);
-        };
-        const trackSeries = (container, sc, quarter = false) => {
-          const track = container?.tracks?.[sc] || container?.[sc];
-          return seriesFromRows(quarter ? track?.bigroad_data : track?.round_data);
-        };
-        const add = (list, key, label, type = "stat") => {
-          let series;
-          if (type === "assist") series = assistSeries(key);
-          else if (type === "qassist") series = qAssistSeries(key);
-          else series = statSeries(key);
-          if (series?.some((v) => v === "hit" || v === "miss")) list.push({ label, series });
-        };
-        const addTrack = (list, container, sc, label, quarter = false) => {
-          const series = trackSeries(container, sc, quarter);
-          if (series?.some((v) => v === "hit" || v === "miss")) list.push({ label, series });
-        };
-        const addAllModes = (list, key, label) => {
-          add(list, key, label);
-          add(list, key, `${label} A`, "assist");
-          add(list, key, `${label} Q`, "qassist");
-        };
-        const addTrackAllModes = (list, container, sc, assistKey, label, quarter = false) => {
-          addTrack(list, container, sc, label, quarter);
-          if (!quarter) add(list, assistKey, `${label} A`, "assist");
-          add(list, assistKey, `${label} Q`, "qassist");
-        };
-        const buildGroups = () => {
-          const groups = {};
-          groups.A = [];
-          ["A", "AR", "AARO", "AAR"].forEach((key) => addAllModes(groups.A, key, key));
-          [["S1", "sc1"], ["S2", "sc2"], ["S3", "sc3"]].forEach(([gid, sc], idx) => {
-            const n = idx + 1;
-            groups[gid] = [];
-            addTrackAllModes(groups[gid], sqTracks, sc, `S${n}`, `S${n}`);
-            addTrackAllModes(groups[gid], srTracks, sc, `SR${n}`, `S${n}R`);
-            addTrackAllModes(groups[gid], ssroTracks, sc, `SSRO${n}`, `SSRO${n}`);
-            addTrackAllModes(groups[gid], ssrTracks, sc, `SSR${n}`, `SSRN${n}`);
-          });
-          groups.FOR = [];
-          [["sc1", "FOR1"], ["sc2", "FOR2"], ["sc3", "FOR3"]].forEach(([sc, key]) => addTrackAllModes(groups.FOR, forTracks, sc, key, key));
-          groups.FORX = [];
-          [["sc1", "FOR1X"], ["sc2", "FOR2X"], ["sc3", "FOR3X"]].forEach(([sc, key]) => addTrackAllModes(groups.FORX, sxTracks, sc, key, key));
-          groups.DGT = [];
-          ["D", "G", "TN", "ONE", "TWO"].forEach((key) => addAllModes(groups.DGT, key, key));
-          groups.PBJ = [];
-          ["P", "B", "J"].forEach((key) => addAllModes(groups.PBJ, key, key));
-          groups.G = [];
-          ["G(H1)", "G(H0)", "G(%1)", "G(%0)"].forEach((key) => addAllModes(groups.G, key, key));
-          groups.HB = [];
-          ["허니비", "허니R", "허니SRO", "허니SRN"].forEach((key) => addAllModes(groups.HB, key, key));
-          groups.WH = [];
-          ["W111", "위너R", "위너SRO", "위너SRN"].forEach((key) => addAllModes(groups.WH, key, key));
-          groups.MH = [];
-          ["M22", "메가R", "메가SRO", "메가SRN"].forEach((key) => addAllModes(groups.MH, key, key));
-          groups.DH = [];
-          ["D112", "드림R", "드림SRO", "드림SRN"].forEach((key) => addAllModes(groups.DH, key, key));
-          groups.NC = [];
-          ["NC", "NCR", "NCSRO", "NCSRN"].forEach((key) => addAllModes(groups.NC, key, key));
-          groups.SQ = [];
-          [["sc1", "SQ1"], ["sc2", "SQ2"], ["sc3", "SQ3"]].forEach(([sc, key]) => addTrackAllModes(groups.SQ, quarterTracks, sc, key, key, true));
-          return Object.fromEntries(Object.entries(groups).filter(([, rows]) => rows.length > 0));
-        };
-        const CHART_GROUPS = buildGroups();
-        const selectedGroup = CHART_GROUPS[chartGroup] ? chartGroup : Object.keys(CHART_GROUPS)[0];
-        const cumulative = (series) => {
-          let sum = 0;
-          return (series || []).map((s) => {
-            if (s === "hit") sum += 1;
-            else if (s === "miss") sum -= 1;
-            return sum;
-          });
-        };
-        const lines = (CHART_GROUPS[selectedGroup] || []).map((row, idx) => ({
-          key: row.label,
-          color: palette[idx % palette.length],
-          data: cumulative(row.series),
-        }));
-        const maxRound = Math.max(78, N || 0);
-        const W = Math.max(1080, maxRound * 16);
-        const H = 260, padL = 28, padR = 12, padT = 12, padB = 24;
-        const innerW = W - padL - padR;
-        const innerH = H - padT - padB;
-        const allVals = lines.flatMap((l) => l.data).filter((v) => v !== null && v !== undefined);
-        const minY = Math.min(0, ...(allVals.length ? allVals : [0]));
-        const maxY = Math.max(0, ...(allVals.length ? allVals : [0]));
-        const yRange = Math.max(1, maxY - minY);
-        const xOf = (i) => padL + (i / Math.max(1, maxRound - 1)) * innerW;
-        const yOf = (v) => padT + (1 - (v - minY) / yRange) * innerH;
-        return (
-          <Box sx={{ mb: 1, display: "flex", flexDirection: "column", gap: 0.5 }}>
-            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-              {Object.keys(CHART_GROUPS).map((g) => (
-                <Box
-                  key={g}
-                  onClick={() => setChartGroup(g)}
-                  sx={{
-                    px: 1.2, py: 0.3, border: "1px solid #555", borderRadius: 0.5,
-                    cursor: "pointer", fontSize: 11, fontWeight: "bold",
-                    backgroundColor: selectedGroup === g ? "#00e676" : "#1a1a2e",
-                    color: selectedGroup === g ? "#000" : "#90caf9",
-                    userSelect: "none",
-                  }}
-                >{g}</Box>
-              ))}
-            </Box>
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
-              {lines.map((l) => (
-                <Box key={`legend-${l.key}`} sx={{ display: "inline-flex", alignItems: "center", gap: 0.35, fontSize: 10, color: "#ddd" }}>
-                  <Box sx={{ width: 14, height: 2, backgroundColor: l.color }} />
-                  {l.key}
-                </Box>
-              ))}
-            </Box>
-            <Box sx={{ overflowX: "auto", border: "1px solid #222", backgroundColor: "#0a0c10" }}>
-              <svg width={W} height={H} style={{ display: "block" }}>
-                {Array.from({ length: maxRound }, (_, i) => i + 1).map((n) => (
-                  <text key={`xl-${n}`} x={xOf(n - 1)} y={H - 7} fontSize={8} fill="#666" textAnchor="middle">{n}</text>
-                ))}
-                <line x1={padL} y1={yOf(0)} x2={W - padR} y2={yOf(0)} stroke="#777" strokeDasharray="2 2" strokeWidth={1} />
-                {lines.map((l) => {
-                  const points = l.data
-                    .map((v, i) => (v !== null && v !== undefined) ? `${xOf(i)},${yOf(v)}` : null)
-                    .filter(Boolean)
-                    .join(" ");
-                  return points ? <polyline key={`line-${l.key}`} points={points} fill="none" stroke={l.color} strokeWidth={1.7} /> : null;
-                })}
-              </svg>
-            </Box>
-          </Box>
-        );
-      })()}
-
       {/* 종료 다이얼로그 */}
       <Dialog open={endingDone} onClose={() => {}}>
         <DialogTitle sx={{ fontWeight: "bold" }}>게임 종료</DialogTitle>
         <DialogContent>
           <Typography>모든 배팅이 완료되었습니다.</Typography>
-          <Box sx={{ mt: 2 }}>
-            {[
-              { name: "마틴A", pnl: cumPnL.user_a },
-              { name: "마틴Z", pnl: cumPnL.user_z },
-              { name: "AllP", pnl: cumPnL.allp },
-              { name: "AllB", pnl: cumPnL.allb },
-              { name: "fail", pnl: cumPnL.fail },
-              { name: "HnH", pnl: cumPnL.hnh },
-              { name: isMobile ? "1-2" : "one-two", pnl: (cumPnL.one || 0) + (cumPnL.two || 0) },
-              { name: "마틴S", pnl: cumPnL.user_s || 0 },
-            ].map((item) => (
-              <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
-                {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
-              </Typography>
-            ))}
-            {(() => { const t = cumPnL.user_a + cumPnL.user_z + (cumPnL.user_s || 0) + cumPnL.allp + cumPnL.allb + cumPnL.fail + cumPnL.hnh + cumPnL.one + cumPnL.two; return (
-              <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
-                Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
-              </Typography>
-            ); })()}
-          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleFinishGame} variant="contained">새 게임 시작</Button>
@@ -1524,131 +1345,6 @@ export default function GhUserGamePage() {
         </DialogActions>
       </Dialog>
 
-      {/* ===== 총금액 요약 5칸 (MA|MZ|AllP|fail|AllB) ===== */}
-      {(() => {
-        const sA = userSummary?.martin_a;
-        const sZ = userSummary?.martin_z;
-        const um = betData?.user_martin;
-        const dash = userMartinDashboard;
-
-        const pnlText = (v) => { const s = v > 0 ? "+" : ""; return `${s}${v.toLocaleString()}P`; };
-        const pnlColor = (v) => v > 0 ? "#4caf50" : v < 0 ? "#f44336" : "#fff";
-
-        // pick_change가 발동하면 마틴A 실제 베팅 방향은 pickChangePick으로 덮어써짐 (A 칩과 일치)
-        const formalADir = pickChangePick || sA?.direction || "wait";
-        const formalZDir = sZ?.direction || "wait";
-        const formalAColor = formalADir === "P" ? "#1565c0" : formalADir === "B" ? "#f44336" : "#888";
-        const formalZColor = formalZDir === "P" ? "#1565c0" : formalZDir === "B" ? "#f44336" : "#888";
-        const martinPnlA = sA?.pnl || 0;
-        const martinPnlZ = sZ?.pnl || 0;
-        const martinActive = (sA?.bet_p || 0) + (sA?.bet_b || 0) > 0;
-        const martinZActive = (sZ?.bet_p || 0) + (sZ?.bet_b || 0) > 0;
-
-        const alwaysInfo = (key) => {
-          const trackData = um?.[key];
-          const dashData = dash?.[key];
-          const dir = trackData?.direction || "wait";
-          const amt = trackData?.amount || 0;
-          const step = dashData?.step || dashData?.step_min || 1;
-          const dirColor = dir === "P" ? "#1565c0" : dir === "B" ? "#f44336" : "#888";
-          const mActive = amt > 0;
-          const failExtra = key === "fail" && dashData ? `f${dashData.fail_count || 2}(${dashData.miss_streak || 0})` : "";
-          return { dir, amt, step, dirColor, mActive, failExtra };
-        };
-
-        const allpInfo = alwaysInfo("allp");
-        const failInfo = alwaysInfo("fail");
-        const allbInfo = alwaysInfo("allb");
-        const hnhInfo = alwaysInfo("hnh");
-        const oneInfo = alwaysInfo("one");
-        const twoInfo = alwaysInfo("two");
-
-        if (isMobile) {
-          const rowSx = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5, borderRadius: 1, px: 0.8, py: 0.3, whiteSpace: "nowrap" };
-          const renderMartin = (label, fDir, fColor, martinPnl, mActive) => (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
-              <Box sx={{ ...rowSx, border: `1px solid ${mActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
-                <Typography variant="caption" sx={{ fontSize: 9, color: "#888" }}>{label}</Typography>
-                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{fDir}</Typography>
-              </Box>
-              <Box sx={{ ...rowSx, backgroundColor: "#00bcd4" }}>
-                <Typography variant="caption" sx={{ fontSize: 9, color: "#000" }}>합계</Typography>
-                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: martinPnl < 0 ? "#f44336" : "#000" }}>{pnlText(martinPnl)}</Typography>
-              </Box>
-            </Box>
-          );
-          const renderAlways = (label, color, pnl, info) => (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
-              <Box sx={{ ...rowSx, border: `1px solid ${info.mActive ? "rgba(255,255,255,0.3)" : "#333"}` }}>
-                <Typography variant="caption" sx={{ fontSize: 9, color: color, fontWeight: "bold" }}>{label}{info.failExtra ? ` ${info.failExtra}` : ""} <span style={{ color: "#888", fontWeight: "normal" }}>{info.step}S</span></Typography>
-                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: info.dirColor }}>{info.dir}</Typography>
-              </Box>
-              <Box sx={{ ...rowSx, backgroundColor: color }}>
-                <Typography variant="caption" sx={{ fontSize: 9, color: "#fff" }}>합계</Typography>
-                <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnl < 0 ? "#ffcdd2" : "#fff" }}>{pnlText(pnl)}</Typography>
-              </Box>
-            </Box>
-          );
-          return (
-            <Box sx={{ mb: 1 }}>
-              <Box sx={{ display: "flex", gap: 0.5 }}>
-                {renderMartin("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
-                {renderMartin("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
-                {renderAlways("AllP", "#6a1b9a", cumPnL.allp, allpInfo)}
-                {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
-              </Box>
-              <Box sx={{ display: "flex", gap: 0.5, mt: 0.5 }}>
-                {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
-                {renderAlways("HnH", "#558b2f", cumPnL.hnh, hnhInfo)}
-                {renderAlways(isMobile ? "1-2" : "one-two", "#00838f", (cumPnL.one || 0) + (cumPnL.two || 0), oneInfo.mActive || twoInfo.mActive ? { ...oneInfo, ...(twoInfo.mActive ? twoInfo : {}), mActive: true } : oneInfo)}
-                {renderMartin("마틴S", formalZDir, formalZColor, cumPnL.user_s || 0, (betData?.user_martin?.martin_s?.amount || 0) > 0)}
-              </Box>
-            </Box>
-          );
-        }
-
-        const renderMartin = (label, fDir, fColor, martinPnl, mActive) => (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
-            <Box sx={{ border: `1px solid ${mActive ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{label}</Typography>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fColor }}>{fDir}</Typography>
-            </Box>
-            <Box sx={{ backgroundColor: "#00bcd4", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: martinPnl < 0 ? "#f44336" : "#000" }}>{pnlText(martinPnl)}</Typography>
-            </Box>
-          </Box>
-        );
-
-        const renderAlways = (label, color, pnl, info) => (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flex: 1 }}>
-            <Box sx={{ border: `1px solid ${info.mActive ? "rgba(255,255,255,0.3)" : "#333"}`, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: color }}>{label}{info.failExtra ? ` ${info.failExtra}` : ""} <span style={{ color: "#888", fontWeight: "normal" }}>{info.step}S</span></Typography>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: info.dirColor }}>{info.dir}</Typography>
-            </Box>
-            <Box sx={{ backgroundColor: color, borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-              <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnl < 0 ? "#ffcdd2" : "#fff" }}>{pnlText(pnl)}</Typography>
-            </Box>
-          </Box>
-        );
-
-        return (
-          <Box sx={{ mb: 1 }}>
-            <Box sx={{ display: "flex", gap: 1 }}>
-              {renderMartin("마틴A", formalADir, formalAColor, martinPnlA, martinActive)}
-              {renderMartin("마틴Z", formalZDir, formalZColor, martinPnlZ, martinZActive)}
-              {renderAlways("AllP", "#6a1b9a", cumPnL.allp, allpInfo)}
-              {renderAlways("fail", "#e65100", cumPnL.fail, failInfo)}
-            </Box>
-            <Box sx={{ display: "flex", gap: 1, mt: 0.5 }}>
-              {renderAlways("AllB", "#00695c", cumPnL.allb, allbInfo)}
-              {renderAlways("HnH", "#558b2f", cumPnL.hnh, hnhInfo)}
-              {renderAlways("one-two", "#00838f", (cumPnL.one || 0) + (cumPnL.two || 0), oneInfo.mActive || twoInfo.mActive ? { ...oneInfo, ...(twoInfo.mActive ? twoInfo : {}), mActive: true } : oneInfo)}
-              {renderMartin("마틴S", formalZDir, formalZColor, cumPnL.user_s || 0, (betData?.user_martin?.martin_s?.amount || 0) > 0)}
-            </Box>
-          </Box>
-        );
-      })()}
-
       {/* ===== 어드민 전용: 대시보드 + 글로벌히트 상세 ===== */}
       {isAdmin && (() => {
         const gh = betData?.globalhit;
@@ -1676,20 +1372,13 @@ export default function GhUserGamePage() {
               const fAColor = fADir === "P" ? "#1565c0" : fADir === "B" ? "#f44336" : "#888";
               const fZDir = zDirRaw;
               const fZColor = fZDir === "P" ? "#1565c0" : fZDir === "B" ? "#f44336" : "#888";
-              const pnlText = (v) => `${v > 0 ? "+" : ""}${v.toLocaleString()}P`;
-              const pnlClr = (v) => v > 0 ? "#4caf50" : v < 0 ? "#f44336" : "#fff";
               const umAHasBet = (umA?.amount || 0) > 0;
               const umZHasBet = (umZ?.amount || 0) > 0;
               const barSx = { border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2, px: 2, py: 0.3, display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1 };
-              const totalPnl = (cumPnL.user_a || 0) + (cumPnL.user_z || 0) + (cumPnL.user_s || 0) + (cumPnL.allp || 0) + (cumPnL.allb || 0) + (cumPnL.fail || 0) + (cumPnL.hnh || 0) + (cumPnL.one || 0) + (cumPnL.two || 0);
               return (
                 <Box sx={{ display: "flex", gap: 0.5, mb: 0.5 }}>
                   <Box sx={{ ...barSx, minWidth: 0, justifyContent: "center" }}>
                     <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: fAColor }}>{`formal(${fADir})`}</Typography>
-                  </Box>
-                  <Box sx={{ ...barSx }}>
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>합계</Typography>
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: pnlClr(totalPnl) }}>{pnlText(totalPnl)}</Typography>
                   </Box>
                 </Box>
               );
@@ -1982,27 +1671,6 @@ export default function GhUserGamePage() {
         <DialogTitle sx={{ fontWeight: "bold" }}>목표금액 도달</DialogTitle>
         <DialogContent>
           <Typography>목표금액에 도달하여 배팅이 정지됩니다.</Typography>
-          <Box sx={{ mt: 2 }}>
-            {[
-              { name: "마틴A", pnl: cumPnL.user_a },
-              { name: "마틴Z", pnl: cumPnL.user_z },
-              { name: "AllP", pnl: cumPnL.allp },
-              { name: "AllB", pnl: cumPnL.allb },
-              { name: "fail", pnl: cumPnL.fail },
-              { name: "HnH", pnl: cumPnL.hnh },
-              { name: isMobile ? "1-2" : "one-two", pnl: (cumPnL.one || 0) + (cumPnL.two || 0) },
-              { name: "마틴S", pnl: cumPnL.user_s || 0 },
-            ].map((item) => (
-              <Typography key={item.name} sx={{ color: item.pnl >= 0 ? "#4caf50" : "#f44336" }}>
-                {item.name}: {item.pnl > 0 ? "+" : ""}{item.pnl.toLocaleString()}P
-              </Typography>
-            ))}
-            {(() => { const t = cumPnL.user_a + cumPnL.user_z + (cumPnL.user_s || 0) + cumPnL.allp + cumPnL.allb + cumPnL.fail + cumPnL.hnh + cumPnL.one + cumPnL.two; return (
-              <Typography sx={{ mt: 1, fontWeight: "bold", color: t >= 0 ? "#4caf50" : "#f44336" }}>
-                Total: {t > 0 ? "+" : ""}{t.toLocaleString()}P
-              </Typography>
-            ); })()}
-          </Box>
           <Box sx={{ mt: 2 }}>
             {goalDialog.msgs.map((m) => (
               <Typography key={m} sx={{ fontSize: "0.85rem", color: "text.secondary" }}>
