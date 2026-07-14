@@ -33,10 +33,10 @@ const BASE = "1px solid #555";
 const GOB_TOP_BG = "rgba(0, 200, 83, 0.55)";
 const GOB_LOW_BG = "rgba(255, 213, 79, 0.62)";
 const GOB_RANK_BG = {
-  1: "rgba(212, 175, 55, 0.72)",
-  2: "rgba(174, 180, 189, 0.72)",
-  3: "rgba(184, 115, 51, 0.72)",
-  4: "rgba(111, 120, 130, 0.72)",
+  1: "rgba(229, 57, 53, 0.72)",
+  2: "rgba(21, 101, 216, 0.72)",
+  3: "rgba(251, 140, 0, 0.72)",
+  4: "rgba(46, 125, 50, 0.72)",
 };
 const AMOUNT_ZONE_COLORS = { blue: "#2f9bff", white: "#fff", red: "#ff5b5b" };
 

@@ -484,6 +484,8 @@ const BET_PROGRESS_MODES = [
   ["round", "(1) 회차별 배팅방식"],
   ["quarter", "(2) 쿼터별 배팅방식"],
   ["roundNquarter", "(3) 회차 + 쿼터 배팅방식"],
+  ["ai", "(4) AI 배팅"],
+  ["aiVariable", "(5) AI 배팅변동"],
 ];
 
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
@@ -985,7 +987,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
                     <td style={mkAssistHdr}><NumIn value={s.miss_wait ?? 9} min={1} max={20} onChange={(v) => onChange({ ...s, miss_wait: v })} />회대기</td>
                     <td style={mkAssistHdr}>섹션종료</td>
                   </>
-                ) : i >= 1 && i <= 3 ? (
+                ) : i >= 1 && i <= BET_PROGRESS_MODES.length ? (
                   <td
                     colSpan={4}
                     style={progressMode === BET_PROGRESS_MODES[i - 1][0] ? { ...mkGreen, cursor: "pointer" } : mkMethod}
@@ -1022,7 +1024,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
                     <td style={mkAssistHdr}><NumIn value={s.miss_wait ?? 9} min={1} max={20} onChange={(v) => onChange({ ...s, miss_wait: v })} />회대기</td>
                     <td style={mkAssistHdr}>섹션종료</td>
                   </>
-                ) : i >= 1 && i <= 3 ? (
+                ) : i >= 1 && i <= BET_PROGRESS_MODES.length ? (
                   <td
                     colSpan={4}
                     style={progressMode === BET_PROGRESS_MODES[i - 1][0] ? { ...mkGreen, cursor: "pointer" } : mkMethod}
