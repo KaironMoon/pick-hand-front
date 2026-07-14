@@ -573,7 +573,8 @@ const STRATEGY_SETUP_BOXES = [
   { key: "FOR", variant: "full", label: "FOR세트", sections: ["FOR1", "FOR2", "FOR3"] },
   { key: "FORX", variant: "full", label: "FORX세트", sections: ["FOR1X", "FOR2X", "FOR3X"] },
   { key: "SQ", variant: "full", label: "SQ세트", sections: ["SQ1", "SQ2", "SQ3"] },
-  { key: "GOB", variant: "full", label: "G시리즈", sections: ["G(H1)", "G(H2)", "G(H3)", "G(H4)"] },
+  { key: "GOBH", legacyKey: "GOB", variant: "full", label: "GH 시리즈", sections: ["G(H1)", "G(H2)", "G(H3)", "G(H4)"] },
+  { key: "GOBP", legacyKey: "GOB", variant: "full", label: "G% 시리즈", sections: ["G(%1)", "G(%2)", "G(%3)", "G(%4)"] },
   // 서브게임: full 멀티판 (정/R/SRO/SRN + 공유 배당)
   { key: "허니비", variant: "full", label: "허니비", sections: ["허니비", "허니R", "허니SRO", "허니SRN"] },
   { key: "W111", variant: "full", label: "위너히트", sections: ["W111", "위너R", "위너SRO", "위너SRN"] },
@@ -1369,7 +1370,7 @@ export default function GhUserSetupPage() {
                 <tbody>
                   <StrategySetupSection
                     name={b.label || b.key} variant={b.variant} aarLabel={b.aarLabel} sections={b.sections}
-                    strat={config[b.key] || defaultStrategySetup()}
+                    strat={config[b.key] || (b.legacyKey ? config[b.legacyKey] : null) || defaultStrategySetup()}
                     onChange={(o) => updateMartin(b.key, o)} />
                 </tbody>
               </table>

@@ -73,7 +73,7 @@ const G2 = {
   hlRanges: [[0, 2], [3, 5], [6, 10], [11, 13], [14, 14]],
   headColors: [[0, 2, HC_BLUE], [3, 5, HC_RED], [6, 10, HC_BLUE], [11, 13, HC_RED], [14, 14, "#de6a08"]],
 };
-// G3: GH시리즈 + G%시리즈 + 허니비/W111 세트(정픽/R/SRO/SRN).
+// G3: GH 시리즈 + G% 시리즈 + 허니비/W111 세트(정픽/R/SRO/SRN).
 const G3n = ["G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)", "허니비", "허니R", "허니SRO", "허니SRN", "W111", "위너R", "위너SRO", "위너SRN"];
 const G3 = {
   name: G3n,
