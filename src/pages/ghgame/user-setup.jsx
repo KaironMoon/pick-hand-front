@@ -547,6 +547,10 @@ const DEFAULT_STRATEGY_SETUP = {
   miss_occur: 2,        // 발생 N회
   miss_wait: 9,         // N회대기
   bet_progress_mode: "roundNquarter",
+  ai_var_red_to_low_miss: 1,
+  ai_var_mid_to_low_miss: 2,
+  ai_var_low_to_mid_hit: 2,
+  ai_var_mid_to_high_hit: 2,
   pasi: defaultPasi(),
   assist: false,
 };
@@ -863,10 +867,32 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
     onChange({ ...s, pasi });
   };
   const progressMode = s.bet_progress_mode || "roundNquarter";
+  const isAiVariable = progressMode === "aiVariable";
   const pasi = defaultPasi().map((fallback, i) => ({ ...fallback, ...((s.pasi || [])[i] || {}) }));
   const visiblePasi = pasi
     .slice(0, Math.max(0, stepMax - 2))
     .map((p, i) => ({ p, originalIndex: i }));
+  const aiVarValue = (key, fallback) => s[key] ?? fallback;
+  const setAiVar = (key, value) => onChange({ ...s, [key]: value });
+  const aiVarRule = (prefix, key, fallback, suffix, colSpan = 2) => (
+    <td colSpan={colSpan} style={isAiVariable ? mkNavy : mkDisabled}>
+      {prefix}
+      {isAiVariable ? (
+        <NumIn
+          value={aiVarValue(key, fallback)}
+          min={1}
+          max={20}
+          color="#fff"
+          width={30}
+          bg="#16365c"
+          onChange={(v) => setAiVar(key, v)}
+        />
+      ) : (
+        <span style={{ display: "inline-block", minWidth: 30 }}>{aiVarValue(key, fallback)}</span>
+      )}
+      {suffix}
+    </td>
+  );
 
   return (
     <>
@@ -912,6 +938,19 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
       {condRows("white", null, null, false)}
       {condRows("blue", [{ value: "0", op: "이상" }, { value: String(condLo), op: "미만" }], "#0066FF", blueOff)}
       {condRows("red", [{ value: String(condHi), op: "초과" }, { value: "100", op: "이하" }], "#FF0000", redOff)}
+      <tr>
+        <td colSpan={2} style={isAiVariable ? mkBlue : mkDisabled}>AI변동 연패</td>
+        {aiVarRule("상배팅 ", "ai_var_red_to_low_miss", 1, "연패 → 하배팅")}
+        {aiVarRule("중배팅 ", "ai_var_mid_to_low_miss", 2, "연패 → 하배팅")}
+        <td colSpan={4} style={mkCell}></td>
+      </tr>
+      <tr>
+        <td colSpan={2} style={isAiVariable ? mkBlue : mkDisabled}>AI변동 연승</td>
+        {aiVarRule("하배팅 ", "ai_var_low_to_mid_hit", 2, "연승 → 중배팅")}
+        {aiVarRule("중배팅 ", "ai_var_mid_to_high_hit", 2, "연승 → 상배팅", 2)}
+        <td colSpan={2} style={mkCell}>하배팅 4연승 → 상배팅</td>
+        <td colSpan={2} style={mkCell}></td>
+      </tr>
       {/* 9행: 목표금액 베팅시작 베팅마감 마감연장 마감미처리 */}
       <tr>
         <td style={mkRed}>목표금액</td>
