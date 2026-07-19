@@ -490,13 +490,25 @@ const BET_PROGRESS_MODES = [
 
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
 const ASSIST_OPTS = [
-  "해당반대", "해당진행",
+  "해당반대", "해당진행", "J",
   "G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)",
   "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)", "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
   "HB멀티(H1)", "HB멀티(%1)", "WH멀티(H1)", "WH멀티(%1)", "MH멀티(H1)", "MH멀티(%1)", "DH멀티(H1)", "DH멀티(%1)",
 ];
+const ASSIST_DISPLAY_PREFIXES = {
+  "A멀티": "A",
+  "S1멀티": "S1",
+  "S2멀티": "S2",
+  "S3멀티": "S3",
+  "HB멀티": "허니비",
+  "WH멀티": "W111",
+  "MH멀티": "M22",
+  "DH멀티": "D112",
+};
+const assistDisplayLabel = (value) => Object.entries(ASSIST_DISPLAY_PREFIXES)
+  .reduce((label, [storedPrefix, displayPrefix]) => label.replace(storedPrefix, displayPrefix), value);
 const isKnownAssistOption = (value) => !value || ASSIST_OPTS.includes(value);
-const normalizeAssistOption = (value) => (value === "대기진행" ? "해당진행" : (isKnownAssistOption(value) ? (value || "해당진행") : "해당진행"));
+const normalizeAssistOption = (value) => (["대기진행", "G(H0)", "G(%0)"].includes(value) ? "해당진행" : (isKnownAssistOption(value) ? (value || "해당진행") : "해당진행"));
 // 패시 어시스트 행 (2~15패시). 최고 16단계면 15패시까지 표시.
 const PASI_LEVELS = Array.from({ length: 14 }, (_, i) => i + 2);
 function defaultPasi() {
@@ -679,11 +691,11 @@ function AssistSelect({ value, onChange, sx }) {
   const selectValue = normalizeAssistOption(value);
   return (
     <select value={selectValue} onChange={(e) => onChange(e.target.value)}
-      title={selectValue}
+      title={assistDisplayLabel(selectValue)}
       style={{ background: "#16365c", color: "#fff", border: "1px solid #2f5b8f", borderRadius: 3,
         fontSize: 12, padding: "1px 2px", width: "96%", cursor: "pointer", outline: "none",
         fontFamily: "D2Coding, Consolas, Menlo, monospace", ...sx }}>
-      {ASSIST_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}
+      {ASSIST_OPTS.map((o) => <option key={o} value={o}>{assistDisplayLabel(o)}</option>)}
     </select>
   );
 }
