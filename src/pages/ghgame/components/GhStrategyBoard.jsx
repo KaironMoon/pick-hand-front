@@ -39,6 +39,7 @@ const GOB_RANK_BG = {
   4: "rgba(46, 125, 50, 0.72)",
 };
 const AMOUNT_ZONE_COLORS = { blue: "#2f9bff", white: "#fff", red: "#ff5b5b" };
+const GENERATED_PICK_BG = "#ffeb3b";
 
 // 셀의 노란 박스/그룹선 테두리 계산 (디자인 edgeCls 포팅, span=1 고정 — 병합 없음)
 function edgeStyle(data, i, pos) {
@@ -161,8 +162,22 @@ function SimpleRow({ data, dataKey, render, pos, label, labelColor, markKey }) {
       {data.name.map((n, i) => {
         const v = (data[dataKey] || [])[i] || "";
         const bg = (data[bgKey] || [])[i];
+        const pickMark = dataKey === "pick" ? (data.pickMark || [])[i] : null;
         const marks = markKey ? (data[markKey] || [])[i] : null;
-        const sx = { ...tdSx, ...(bg ? { backgroundColor: bg } : {}), ...edgeStyle(data, i, pos) };
+        const pickMarkSx = pickMark === "signal"
+          ? {
+              backgroundColor: GENERATED_PICK_BG,
+              color: "#111",
+              animation: "ghGeneratedSignalBg 0.9s steps(2, end) infinite",
+              "@keyframes ghGeneratedSignalBg": {
+                "0%, 100%": { backgroundColor: GENERATED_PICK_BG, boxShadow: "inset 0 0 0 2px #fff" },
+                "50%": { backgroundColor: "#111", boxShadow: "inset 0 0 0 2px #ccff00" },
+              },
+            }
+          : pickMark === "reverse"
+            ? { backgroundColor: GENERATED_PICK_BG }
+            : {};
+        const sx = { ...tdSx, ...(bg ? { backgroundColor: bg } : {}), ...pickMarkSx, ...edgeStyle(data, i, pos) };
         return v
           ? <Box component="td" key={i} sx={sx}>{withSourceDots(render(v, i, data), marks)}</Box>
           : <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
@@ -396,6 +411,7 @@ const fromStats = (ctx, key) => {
   return {
     wait: fmtStreak(s.cur_streak_type, s.cur_streak_count),
     pick: fmtValue(s.pick),
+    pickMark: s.generated_pick_mark,
     assist: fmtValue(hs?.pick),
     assistSource: hs?.source,
     wait2: hs ? fmtStreak(hs.cur_streak_type, hs.cur_streak_count) : (as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined),
@@ -456,7 +472,7 @@ function withLiveData(base, ctx) {
   const keys = ["wait", "pick", "stage1", "pct", "rec", "rec2", "assist", "assistSource", "wait2", "pct2", "assistRec", "stage", "idx1", "idx2",
     "qAssist", "qAssistSource", "qWait2", "qPct2",
     "qrec", "qstage", "qidx1", "qidx2",
-    "idx1Zone", "qidx1Zone"];
+    "idx1Zone", "qidx1Zone", "pickMark"];
   const out = { ...base };
   keys.forEach((k) => { out[k] = base.name.map(() => ""); });
   out.headBg = base.name.map(() => "");

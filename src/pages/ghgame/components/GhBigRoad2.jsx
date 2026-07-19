@@ -8,6 +8,7 @@ const REST_MISS_BG = "#555555";
 const CURRENT_BG = "#ffffff";
 const FUTURE_BG = "#1c1f25";
 const BORDER = "1px solid #3a3a3a";
+const GENERATED_PICK_BORDER = "#00ff66";
 const CELL_W = 23;
 const CELL_H = 19;
 const MAX_CELLS = 78;
@@ -68,11 +69,16 @@ const titleSx = {
 function cellsFromStateBigRoad2(rows, nextPick = null, nextStatus = null, actualSeq = "", showGroupDivider = false) {
   const cells = new Array(MAX_CELLS).fill(null);
   let firstDividerIdx = null;
+  const currentStatus = typeof nextStatus === "object" && nextStatus !== null ? nextStatus.status : nextStatus;
+  const currentGeneratedPickMark = typeof nextStatus === "object" && nextStatus !== null
+    ? (nextStatus.generatedPickMark || nextStatus.generated_pick_mark)
+    : null;
   for (let i = 0; i < Math.min(rows?.length || 0, MAX_CELLS); i++) {
     const r = rows[i] || {};
     const pick = r.pick || null;
     const result = r.result;
     const savedStatus = r.status;
+    const rowGeneratedPickMark = r.generatedPickMark || r.generated_pick_mark || null;
     const waitSlot = pick === "W" && !result;
     const hasSlot = pick || result || waitSlot;
     if (!hasSlot) continue;
@@ -80,11 +86,11 @@ function cellsFromStateBigRoad2(rows, nextPick = null, nextStatus = null, actual
       firstDividerIdx = i;
     }
     if (waitSlot) {
-      cells[i] = { wait: true, pick: "W", status: savedStatus, savedStatus, round: i + 1 };
+      cells[i] = { wait: true, pick: "W", status: savedStatus, savedStatus, round: i + 1, generatedPickMark: rowGeneratedPickMark };
     } else if (result === "hit" || result === "miss") {
-      cells[i] = { pick, status: result, savedStatus, round: i + 1 };
+      cells[i] = { pick, status: result, savedStatus, round: i + 1, generatedPickMark: rowGeneratedPickMark };
     } else {
-      cells[i] = { rest: true, pick, round: i + 1 };
+      cells[i] = { rest: true, pick, round: i + 1, generatedPickMark: rowGeneratedPickMark };
     }
   }
   const idx = (actualSeq?.length || 0);
@@ -94,9 +100,10 @@ function cellsFromStateBigRoad2(rows, nextPick = null, nextStatus = null, actual
     if (showGroupDivider && firstDividerIdx == null && (currentPick === "P" || currentPick === "B")) {
       firstDividerIdx = idx;
     }
-    if (nextStatus === "rest") cells[idx] = { rest: true, pick: currentPick, status: "current", round: idx + 1 };
-    else if (currentPick === "W") cells[idx] = { wait: true, status: "current", round: idx + 1 };
-    else cells[idx] = { pick: currentPick, status: "current", round: idx + 1 };
+    const generatedPickMark = currentGeneratedPickMark || null;
+    if (currentStatus === "rest") cells[idx] = { rest: true, pick: currentPick, status: "current", round: idx + 1, generatedPickMark };
+    else if (currentPick === "W") cells[idx] = { wait: true, status: "current", round: idx + 1, generatedPickMark };
+    else cells[idx] = { pick: currentPick, status: "current", round: idx + 1, generatedPickMark };
   }
   if (showGroupDivider && firstDividerIdx != null) {
     for (let i = firstDividerIdx; i < MAX_CELLS; i++) {
@@ -152,7 +159,7 @@ function getRowCells(ctx, spec, assist = false) {
   const stateKey = stateKeyForSpec(spec);
   const stateRows = getRoundStatePart(ctx, stateKey, assist ? "h_assist" : "picks");
   const state = getRoundStateTrack(ctx, stateKey, assist);
-  return cellsFromStateBigRoad2(stateRows || [], state?.pick, state?.status, ctx.actualSeq);
+  return cellsFromStateBigRoad2(stateRows || [], state?.pick, { status: state?.status, generatedPickMark: state?.generated_pick_mark }, ctx.actualSeq);
 }
 
 function getRoundStateQAssist(ctx, key) {
@@ -185,6 +192,7 @@ function Cell({ cell, onClick }) {
   let color = "#777";
   let insetBorder;
   const title = cell?.pick && cell?.round ? `${cell.round}회차` : undefined;
+  const generatedPickMark = cell?.generatedPickMark || cell?.generated_pick_mark;
   if (cell?.basis) {
     content = "";
   } else if (cell?.rest) {
@@ -231,11 +239,15 @@ function Cell({ cell, onClick }) {
     content = "W";
     color = bg === CURRENT_BG ? "#333" : "#f7f7f7";
   }
+  const glowBorder = generatedPickMark ? `0 0 8px ${GENERATED_PICK_BORDER}` : null;
+  const boxShadow = [insetBorder, glowBorder].filter(Boolean).join(", ") || undefined;
   const box = (
     <Box onClick={onClick} sx={{
       borderRight: cell?.groupDivider ? "2px solid #3f8cff" : BORDER,
       borderBottom: BORDER,
       boxSizing: "border-box",
+      position: "relative",
+      zIndex: generatedPickMark ? 2 : 1,
       minWidth: CELL_W,
       width: CELL_W,
       height: CELL_H,
@@ -243,7 +255,16 @@ function Cell({ cell, onClick }) {
       alignItems: "center",
       justifyContent: "center",
       background: bg,
-      boxShadow: insetBorder,
+      boxShadow,
+      outline: generatedPickMark ? `2px solid ${GENERATED_PICK_BORDER}` : undefined,
+      outlineOffset: "-2px",
+      ...(generatedPickMark === "signal" ? {
+        animation: "ghBigRoadSignalBorder 0.9s steps(2, end) infinite",
+        "@keyframes ghBigRoadSignalBorder": {
+          "0%, 100%": { outlineColor: GENERATED_PICK_BORDER, boxShadow: [insetBorder, `0 0 10px ${GENERATED_PICK_BORDER}`].filter(Boolean).join(", ") },
+          "50%": { outlineColor: "#ffffff", boxShadow: [insetBorder, "0 0 3px #ffffff"].filter(Boolean).join(", ") },
+        },
+      } : {}),
       color,
       fontSize: 10.5,
       fontWeight: content === "P" || content === "B" || content === "W" ? "bold" : undefined,

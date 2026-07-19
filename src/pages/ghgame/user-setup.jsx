@@ -563,6 +563,8 @@ const DEFAULT_STRATEGY_SETUP = {
   ai_var_mid_to_low_miss: 2,
   ai_var_low_to_mid_hit: 2,
   ai_var_mid_to_high_hit: 2,
+  ai_var_section_counts: {},
+  ai_var_pass_count: 0,
   pasi: defaultPasi(),
   assist: false,
 };
@@ -886,6 +888,13 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
     .map((p, i) => ({ p, originalIndex: i }));
   const aiVarValue = (key, fallback) => s[key] ?? fallback;
   const setAiVar = (key, value) => onChange({ ...s, [key]: value });
+  const aiVarSectionCount = (section) => (s.ai_var_section_counts || {})[section] ?? 0;
+  const setAiVarSectionCount = (section, value) => onChange({
+    ...s,
+    ai_var_section_counts: { ...(s.ai_var_section_counts || {}), [section]: value },
+  });
+  const aiVarPassCount = s.ai_var_pass_count ?? 0;
+  const setAiVarPassCount = (value) => onChange({ ...s, ai_var_pass_count: value });
   const aiVarRule = (prefix, key, fallback, suffix, colSpan = 2) => (
     <td colSpan={colSpan} style={isAiVariable ? mkNavy : mkDisabled}>
       {prefix}
@@ -905,6 +914,27 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
       {suffix}
     </td>
   );
+  const aiVarSectionCells = () => {
+    const slots = Array.from({ length: 4 }, (_, i) => (sections || [])[i] || "");
+    return slots.map((section, idx) => (
+      <td key={`ai-var-section-${section || idx}`} style={section ? { ...mkCell, padding: "1px 6px" } : mkDisabled}>
+        {section && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, width: "100%" }}>
+            <span style={{ fontWeight: "bold" }}>{section}</span>
+            <NumIn
+              value={aiVarSectionCount(section)}
+              min={0}
+              max={99}
+              color="#fff"
+              width={30}
+              bg="#16365c"
+              onChange={(v) => setAiVarSectionCount(section, v)}
+            />
+          </div>
+        )}
+      </td>
+    ));
+  };
 
   return (
     <>
@@ -954,14 +984,26 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
         <td colSpan={2} style={isAiVariable ? mkBlue : mkDisabled}>AI변동 연패</td>
         {aiVarRule("상배팅 ", "ai_var_red_to_low_miss", 1, "연패 → 하배팅")}
         {aiVarRule("중배팅 ", "ai_var_mid_to_low_miss", 2, "연패 → 하배팅")}
-        <td colSpan={4} style={mkCell}></td>
+        {aiVarSectionCells()}
       </tr>
       <tr>
         <td colSpan={2} style={isAiVariable ? mkBlue : mkDisabled}>AI변동 연승</td>
         {aiVarRule("하배팅 ", "ai_var_low_to_mid_hit", 2, "연승 → 중배팅")}
         {aiVarRule("중배팅 ", "ai_var_mid_to_high_hit", 2, "연승 → 상배팅", 2)}
         <td colSpan={2} style={mkCell}>하배팅 4연승 → 상배팅</td>
-        <td colSpan={2} style={mkCell}></td>
+        <td style={mkRed}>시그널픽</td>
+        <td style={mkNavy}>
+          <NumIn
+            value={aiVarPassCount}
+            min={0}
+            max={99}
+            color="#fff"
+            width={30}
+            bg="#16365c"
+            onChange={setAiVarPassCount}
+          />
+          패시 1회
+        </td>
       </tr>
       {/* 9행: 목표금액 베팅시작 베팅마감 마감연장 마감미처리 */}
       <tr>

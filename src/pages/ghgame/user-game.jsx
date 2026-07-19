@@ -668,7 +668,24 @@ export default function GhUserGamePage() {
     try {
       const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
-      setResults(results.slice(0, -1));
+      if (data.seq !== undefined && Array.isArray(data.round_picks)) {
+        const seq = data.seq || "";
+        const picks = data.round_picks || [];
+        const statuses = data.round_status || [];
+        const statusesAr = data.round_status_ar || [];
+        const pcMarks = data.round_pick_change || [];
+        const dsMarks = data.round_decal_shadow || [];
+        setResults(seq.split("").map((v, i) => ({
+          value: v,
+          status: statuses[i] || "wait",
+          statusAr: statusesAr[i] || "wait",
+          aPick: picks[i] || null,
+          pickChanged: !!pcMarks[i],
+          decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick),
+        })));
+      } else {
+        setResults(results.slice(0, -1));
+      }
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
       setGlobalhitData(data.globalhit || []);
       setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
