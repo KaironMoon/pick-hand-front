@@ -126,16 +126,6 @@ function sourceCells(actualSeq, offset, reverse = false) {
   return cells;
 }
 
-function basisCells(rows) {
-  const cells = new Array(MAX_CELLS).fill(null);
-  for (const row of rows || []) {
-    const idx = (row.round || 0) - 1;
-    if (idx < 0 || idx >= MAX_CELLS) continue;
-    cells[idx] = { basis: row };
-  }
-  return cells;
-}
-
 function stateKeyForSpec(spec) {
   if (!spec?.startsWith("track:")) return spec;
   const [, family, sc] = spec.split(":");
@@ -180,7 +170,7 @@ function getQuarterCells(ctx, spec, assist = false) {
   return cellsFromStateBigRoad2(
     stateRows || [],
     state?.pick,
-    state?.status,
+    { status: state?.status, generatedPickMark: state?.generated_pick_mark },
     ctx.actualSeq,
     true,
   );
@@ -406,15 +396,13 @@ function RoadRow({ label, cells, basis = false, onCellClick }) {
         overflowX: "auto",
         maxWidth: "calc(100vw - 140px)",
       }}>
-        {pairCells.map((cell, i) => basis
-          ? <BasisCell key={i} cell={cell} />
-          : (
-            <Cell
-              key={i}
-              cell={cell}
-              onClick={onCellClick && cell?.round ? () => onCellClick(cell.round) : undefined}
-            />
-          ))}
+        {pairCells.map((cell, i) => (
+          <Cell
+            key={i}
+            cell={cell}
+            onClick={onCellClick && cell?.round ? () => onCellClick(cell.round) : undefined}
+          />
+        ))}
       </Box>
     </Box>
   );

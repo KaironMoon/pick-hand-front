@@ -153,6 +153,20 @@ function AssistText({ v }) {
   return <span style={{ color: col, fontWeight: "bold" }}>{v}</span>;
 }
 
+const generatedPickSx = (mark) => mark === "signal"
+  ? {
+      backgroundColor: GENERATED_PICK_BG,
+      color: "#111",
+      animation: "ghGeneratedSignalBg 0.9s steps(2, end) infinite",
+      "@keyframes ghGeneratedSignalBg": {
+        "0%, 100%": { backgroundColor: GENERATED_PICK_BG, boxShadow: "inset 0 0 0 2px #fff" },
+        "50%": { backgroundColor: "#111", boxShadow: "inset 0 0 0 2px #ccff00" },
+      },
+    }
+  : mark === "reverse"
+    ? { backgroundColor: GENERATED_PICK_BG }
+    : {};
+
 // 단순(병합 없음) 행. 빈값은 회색 대시(–). label 있으면 맨 앞 라벨 셀.
 function SimpleRow({ data, dataKey, render, pos, label, labelColor, markKey }) {
   const bgKey = `${dataKey}Bg`;
@@ -164,19 +178,7 @@ function SimpleRow({ data, dataKey, render, pos, label, labelColor, markKey }) {
         const bg = (data[bgKey] || [])[i];
         const pickMark = dataKey === "pick" ? (data.pickMark || [])[i] : null;
         const marks = markKey ? (data[markKey] || [])[i] : null;
-        const pickMarkSx = pickMark === "signal"
-          ? {
-              backgroundColor: GENERATED_PICK_BG,
-              color: "#111",
-              animation: "ghGeneratedSignalBg 0.9s steps(2, end) infinite",
-              "@keyframes ghGeneratedSignalBg": {
-                "0%, 100%": { backgroundColor: GENERATED_PICK_BG, boxShadow: "inset 0 0 0 2px #fff" },
-                "50%": { backgroundColor: "#111", boxShadow: "inset 0 0 0 2px #ccff00" },
-              },
-            }
-          : pickMark === "reverse"
-            ? { backgroundColor: GENERATED_PICK_BG }
-            : {};
+        const pickMarkSx = generatedPickSx(pickMark);
         const sx = { ...tdSx, ...(bg ? { backgroundColor: bg } : {}), ...pickMarkSx, ...edgeStyle(data, i, pos) };
         return v
           ? <Box component="td" key={i} sx={sx}>{withSourceDots(render(v, i, data), marks)}</Box>
@@ -205,10 +207,11 @@ function AssistRow({ data, pos, label, labelColor }) {
       {data.name.map((n, i) => {
         const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
         const v = (data.assist || [])[i] || "";
+        const pickMark = (data.assistMark || [])[i];
         const title = assistSourceTitle((data.assistSource || [])[i]);
         if (!v) return <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
         return (
-          <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: ASSIST_BG }}>
+          <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: ASSIST_BG, ...generatedPickSx(pickMark) }}>
             <AssistText v={v} />
           </Box>
         );
@@ -224,10 +227,11 @@ function QAssistRow({ data, pos, label, labelColor }) {
       {data.name.map((n, i) => {
         const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
         const v = (data.qAssist || [])[i] || "";
+        const pickMark = (data.qAssistMark || [])[i];
         const title = assistSourceTitle((data.qAssistSource || [])[i]);
         if (!v) return <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
         return (
-          <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: Q_ASSIST_BG }}>
+          <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: Q_ASSIST_BG, ...generatedPickSx(pickMark) }}>
             <AssistText v={v} />
           </Box>
         );
@@ -285,7 +289,8 @@ function StrategyTable({ data }) {
         <SimpleRow data={data} dataKey="idx1" render={(v, i, row) => amountText(v, row.idx1Zone?.[i])} pos="mid" label="회차P" labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label="누적P" labelColor={LBL_RED} />
         <QAssistRow data={data} pos="mid" label="어시Q픽" />
-        <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label="연속" />
+        <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label="쿼터연속" />
+        <SimpleRow data={data} dataKey="qAssistWait" render={waitCell} pos="mid" label="어시연속" />
         <SimpleRow data={data} dataKey="qPct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" />
         {/* 쿼터 블록 */}
         <SimpleRow data={data} dataKey="qrec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="쿼터전적" />
@@ -413,6 +418,7 @@ const fromStats = (ctx, key) => {
     pick: fmtValue(s.pick),
     pickMark: s.generated_pick_mark,
     assist: fmtValue(hs?.pick),
+    assistMark: hs?.generated_pick_mark,
     assistSource: hs?.source,
     wait2: hs ? fmtStreak(hs.cur_streak_type, hs.cur_streak_count) : (as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined),
     pct2: as ? fmtPct(as.hit ?? 0, assistTotal) : undefined,
@@ -425,7 +431,12 @@ const fromStats = (ctx, key) => {
     idx1: as ? fmtMan(as.amount ?? (amounts ? betAt(amounts, as.step, stepMin) : null)) : "",
     idx1Zone: as?.amount_zone,
     idx2: as && as.pnl !== null && as.pnl !== undefined ? fmtMan(as.pnl) : "",
-    ...(HIDE_QUARTER_KEYS.has(key) ? {} : { ...quarterAssistRow(qData, qAssistPickText(qas, qs), qs), qAssistSource: qs?.source ?? qas?.source }),
+    ...(HIDE_QUARTER_KEYS.has(key) ? {} : {
+      ...quarterAssistRow(qData, qAssistPickText(qas, qs), qs),
+      qAssistSource: qs?.source ?? qas?.source,
+      qAssistMark: qs?.generated_pick_mark,
+      qAssistWait: fmtStreak(qs?.assist_streak_type, qs?.assist_streak_count),
+    }),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterRow(qData, amounts, stepMin)),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : { qidx1Zone: qData?.amount_zone }),
   };
@@ -470,9 +481,9 @@ function buildColData(label, i, data, ctx) {
 // 테이블 정의 + 실데이터 → 값이 채워진 data
 function withLiveData(base, ctx) {
   const keys = ["wait", "pick", "stage1", "pct", "rec", "rec2", "assist", "assistSource", "wait2", "pct2", "assistRec", "stage", "idx1", "idx2",
-    "qAssist", "qAssistSource", "qWait2", "qPct2",
+    "qAssist", "qAssistSource", "qWait2", "qAssistWait", "qPct2",
     "qrec", "qstage", "qidx1", "qidx2",
-    "idx1Zone", "qidx1Zone", "pickMark"];
+    "idx1Zone", "qidx1Zone", "pickMark", "assistMark", "qAssistMark"];
   const out = { ...base };
   keys.forEach((k) => { out[k] = base.name.map(() => ""); });
   out.headBg = base.name.map(() => "");

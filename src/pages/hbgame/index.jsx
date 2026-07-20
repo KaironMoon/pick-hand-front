@@ -150,7 +150,7 @@ export default function HbGamePage() {
       }).catch(() => { if (!cancelled) startGame(); });
     }
     return () => { cancelled = true; };
-  }, [searchParams.get("new"), searchParams.get("gameId")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams.get("new"), searchParams.get("gameId")]);
 
   const restoreGame = async (gid) => {
     try {

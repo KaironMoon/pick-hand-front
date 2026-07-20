@@ -100,7 +100,7 @@ function RoundAmountTable({ roundState }) {
   const table = roundState?.round_amount_table || {};
   const cellCount = 64;
   const cells = table.cells || Array.from({ length: cellCount }, (_, idx) => ({ round: idx + 1, amount: 0, pnl: 0, status: null, actual: null, pick: null }));
-  const fmt = (v) => Number(v || 0).toFixed(1);
+  const fmt = (v) => v === "N/A" ? "-" : Number(v || 0).toFixed(1);
   const finalSide = table.total_side;
   const finalSideColor = finalSide === "P" ? "#1565d8" : finalSide === "B" ? "#e53935" : "#555";
   const cellSx = (idx) => {
@@ -229,7 +229,7 @@ export default function GhUserGamePage() {
     const no = displaySnapshot?.nc_ref_shoe_no;
     if (no === undefined || no === null || ncRefDirty) return;
     syncNcRefNo(displaySnapshot);
-  }, [displaySnapshot?.nc_ref_shoe_no]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [displaySnapshot?.nc_ref_shoe_no]);
   const amountTableStatusFor = (idx) => {
     const cell = roundAmountCells[idx] || {};
     const pick = cell.pick ?? cell.side;
@@ -248,16 +248,26 @@ export default function GhUserGamePage() {
   const roundArList = displaySnapshot?.round_picks?.AR || [];
   const roundJList = displaySnapshot?.round_picks?.J || [];
 
-  const checkGoalAlert = useCallback((summary) => {
-    if (!summary) return;
+  const checkGoalAlert = useCallback((summary, strategyGoals) => {
     const ref = goalAlertedRef.current;
-    const aReached = summary.martin_a?.goal_reached;
-    const zReached = summary.martin_z?.goal_reached;
+    const aReached = summary?.martin_a?.goal_reached;
+    const zReached = summary?.martin_z?.goal_reached;
     const msgs = [];
     if (aReached && !ref.a) msgs.push("마틴 A");
     if (zReached && !ref.z) msgs.push("마틴 Z");
     ref.a = !!aReached;
     ref.z = !!zReached;
+    const goalLabels = {
+      AAR: "A멀티", SSR1: "S1세트", SSR2: "S2세트", SSR3: "S3세트",
+      FOR: "FOR세트", FORX: "FORX세트", SQ: "SQ세트",
+      GOBH: "GH 시리즈", GOBP: "G% 시리즈",
+      "허니비": "허니비", W111: "위너히트", M22: "메가히트", D112: "드림히트", NC: "나이스초이스",
+    };
+    Object.entries(strategyGoals || {}).forEach(([key, goal]) => {
+      const refKey = `strategy:${key}`;
+      if (goal?.reached && !ref[refKey]) msgs.push(goalLabels[key] || key);
+      ref[refKey] = !!goal?.reached;
+    });
     if (msgs.length > 0) setGoalDialog({ open: true, msgs });
   }, []);
 
@@ -299,6 +309,7 @@ export default function GhUserGamePage() {
 
   const startGame = useCallback(async () => {
     try {
+      goalAlertedRef.current = { a: false, z: false };
       const res = await apiCaller.post(GH_GAMES_API.START + "?mode=user");
       const lockedNcRef = typeof window !== "undefined" ? localStorage.getItem(NC_REF_LOCK_KEY) : null;
       let lockedApplied = false;
@@ -367,7 +378,7 @@ export default function GhUserGamePage() {
       }).catch(() => { if (!cancelled) startGame(); });
     }
     return () => { cancelled = true; };
-  }, [searchParams.get("new"), searchParams.get("gameId")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams.get("new"), searchParams.get("gameId")]);
 
   const restoreGame = async (gid) => {
     try {
@@ -582,7 +593,7 @@ export default function GhUserGamePage() {
       clearInterval(pingTimer);
       try { ws && ws.close(); } catch (_) {}
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [autoFeatureAvailable, autoStatus.running]);
 
   const handleAutoToggle = async () => {
@@ -640,7 +651,8 @@ export default function GhUserGamePage() {
       setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
-      setUserMartinDashboard(data.user_martin_dashboard || null);      checkGoalAlert(data.user_summary);
+      setUserMartinDashboard(data.user_martin_dashboard || null);
+      checkGoalAlert(data.user_summary, data.round_state?.strategy_goals);
 
       if (endingMode && endingSnapshot && checkEndingComplete(data)) {
         setEndingDone(true);

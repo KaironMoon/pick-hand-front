@@ -215,7 +215,7 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
     if (Object.keys(upd).length > 0) {
       onChange({ ...martin, ...upd });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [isCruise, martin.bet_type, martin.step_max]);
 
   const sectionDisabled = disabled || !enabled;

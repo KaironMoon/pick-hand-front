@@ -204,7 +204,7 @@ export default function DhGamePage() {
       }).catch(() => { if (!cancelled) startGame(); });
       return () => { cancelled = true; };
     }
-  }, [searchParams.get("new"), searchParams.get("gameId")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams.get("new"), searchParams.get("gameId")]);
 
   // P/B 입력
   const handleInput = async (inputValue) => {

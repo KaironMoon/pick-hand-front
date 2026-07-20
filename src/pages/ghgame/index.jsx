@@ -93,7 +93,7 @@ export default function GhGamePage() {
   const [globalhitData, setGlobalhitData] = useState([]);
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
-  const [config, setConfig] = useState(null); // eslint-disable-line no-unused-vars
+  const [config, setConfig] = useState(null);
   const [cumPnL, setCumPnL] = useState({ gh: 0 });
 
   const [endingMode, setEndingMode] = useState(false);
@@ -148,7 +148,7 @@ export default function GhGamePage() {
       }).catch(() => { if (!cancelled) startGame(); });
     }
     return () => { cancelled = true; };
-  }, [searchParams.get("new"), searchParams.get("gameId")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams.get("new"), searchParams.get("gameId")]);
 
   const restoreGame = async (gid) => {
     try {

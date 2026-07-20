@@ -276,7 +276,7 @@ export default function GamePage() {
       }).catch(() => { if (!cancelled) startGame(); });
       return () => { cancelled = true; };
     }
-  }, [searchParams.get("new")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams.get("new")]);
 
   // P/B 입력 → 서버에 라운드 기록 + 다음 상태 수신
   const handleInput = async (inputValue) => {

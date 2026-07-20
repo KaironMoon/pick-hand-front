@@ -48,14 +48,6 @@ import UsersPage from "../pages/users";
 import AppSettingsPage from "../pages/app-settings";
 import ProtectedRoute from "../pages/components/ProtectedRoute";
 import GameGuard from "../pages/components/GameGuard";
-import { Navigate } from "react-router-dom";
-import { useAtomValue } from "jotai";
-import { userAtom } from "../store/auth-store";
-
-function RootRedirect() {
-  const user = useAtomValue(userAtom);
-  return <Navigate to={user?.role === "admin" ? "/t9game" : "/t9game/user"} replace />;
-}
 
 const ProductLayout = lazy(() => import("../pages/product/ProductLayout"));
 const ProductList = lazy(() => import("../pages/product"));

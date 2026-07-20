@@ -6,7 +6,7 @@ import { userAtom, isAuthenticatedAtom, initAuthAtom } from "@/store/auth-store"
 import { fetchBlockedGamesAtom } from "@/store/app-settings-store";
 import authService from "@/services/auth-service";
 
-// eslint-disable-next-line react/prop-types
+
 function ProtectedRoute({ adminOnly = false }) {
   const user = useAtomValue(userAtom);
   const isAuthenticated = useAtomValue(isAuthenticatedAtom);

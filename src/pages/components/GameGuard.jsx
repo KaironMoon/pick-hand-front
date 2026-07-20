@@ -5,7 +5,7 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { userAtom } from "@/store/auth-store";
 import { blockedGamesAtom, fetchBlockedGamesAtom } from "@/store/app-settings-store";
 
-// eslint-disable-next-line react/prop-types
+
 function GameGuard({ gameType, children }) {
   const user = useAtomValue(userAtom);
   const blockedGames = useAtomValue(blockedGamesAtom);
