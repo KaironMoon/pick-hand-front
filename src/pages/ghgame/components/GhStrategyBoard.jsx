@@ -290,7 +290,6 @@ function StrategyTable({ data }) {
         <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label="누적P" labelColor={LBL_RED} />
         <QAssistRow data={data} pos="mid" label="어시Q픽" />
         <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label="쿼터연속" />
-        <SimpleRow data={data} dataKey="qAssistWait" render={waitCell} pos="mid" label="어시연속" />
         <SimpleRow data={data} dataKey="qPct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" />
         {/* 쿼터 블록 */}
         <SimpleRow data={data} dataKey="qrec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="쿼터전적" />
@@ -435,7 +434,6 @@ const fromStats = (ctx, key) => {
       ...quarterAssistRow(qData, qAssistPickText(qas, qs), qs),
       qAssistSource: qs?.source ?? qas?.source,
       qAssistMark: qs?.generated_pick_mark,
-      qAssistWait: fmtStreak(qs?.assist_streak_type, qs?.assist_streak_count),
     }),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterRow(qData, amounts, stepMin)),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : { qidx1Zone: qData?.amount_zone }),

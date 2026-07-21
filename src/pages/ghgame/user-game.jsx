@@ -213,8 +213,8 @@ export default function GhUserGamePage() {
 
   const currentTurn = results.length + 1;
   const ncRefDirty = String(ncRefDraft || "") !== String(ncRefOriginal || "");
-  const syncNcRefNo = useCallback((snapshot) => {
-    const no = snapshot?.nc_ref_shoe_no;
+  const syncNcRefNo = useCallback((state) => {
+    const no = state?.nc_ref_shoe_no;
     if (no === undefined || no === null) return;
     const value = String(no);
     setNcRefOriginal(value);
@@ -226,10 +226,10 @@ export default function GhUserGamePage() {
   const displaySnapshot = picksSnapshot;
   const roundAmountCells = roundState?.round_amount_table?.cells || [];
   useEffect(() => {
-    const no = displaySnapshot?.nc_ref_shoe_no;
+    const no = roundState?.nc_ref_shoe_no;
     if (no === undefined || no === null || ncRefDirty) return;
-    syncNcRefNo(displaySnapshot);
-  }, [displaySnapshot?.nc_ref_shoe_no]);
+    syncNcRefNo(roundState);
+  }, [roundState?.nc_ref_shoe_no]);
   const amountTableStatusFor = (idx) => {
     const cell = roundAmountCells[idx] || {};
     const pick = cell.pick ?? cell.side;
@@ -297,7 +297,7 @@ export default function GhUserGamePage() {
     }));
     setGlobalhitData(data.globalhit || []);
     setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
-    syncNcRefNo(data.picks_snapshot);
+    syncNcRefNo(data.round_state);
     setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
     setUserSummary(data.user_summary || null);
     setUserMartinDashboard(data.user_martin_dashboard || null);
@@ -331,7 +331,7 @@ export default function GhUserGamePage() {
         setGlobalhitData(res.data.globalhit || []);
         setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null); setPickChangePick(res.data.pick_change_pick ?? null);
         setPicksSnapshot(res.data.picks_snapshot || null); setRoundState(res.data.round_state || null);
-        syncNcRefNo(res.data.picks_snapshot);
+        syncNcRefNo(res.data.round_state);
       }
       skipRestoreGameIdRef.current = res.data.game_id;
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
@@ -1307,8 +1307,8 @@ export default function GhUserGamePage() {
           <GhBigRoad2
             roundState={roundState}
             subgameBasis={displaySnapshot?.subgame_basis}
-            ncRefShoes={displaySnapshot?.nc_ref_shoes}
-            ncRefShoeNo={displaySnapshot?.nc_ref_shoe_no}
+            ncRefShoes={roundState?.nc_ref_shoes}
+            ncRefShoeNo={roundState?.nc_ref_shoe_no}
             ncRefControls={{
               value: ncRefDraft,
               dirty: ncRefDirty,
