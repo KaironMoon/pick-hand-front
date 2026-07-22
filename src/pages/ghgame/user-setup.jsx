@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
-import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
+import { useAtomValue } from "jotai";
+import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from "@mui/material";
 import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
 import { USER_BET_SETTINGS_API } from "@/constants/api-url";
+import { userAtom } from "@/store/auth-store";
 
 const GREEN = "#4caf50";
 const LABEL_COLOR = "#c62828";
@@ -1288,12 +1290,18 @@ const DEFAULT_FAIL = {
 // 260608 리뉴얼용 GH 전용 페이지 — common/user-setup.jsx 복사본 (다른 게임은 common 그대로 사용)
 export default function GhUserSetupPage() {
   const gameType = "gh";
+  const currentUser = useAtomValue(userAtom);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [config, setConfig] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
+  const [copyInputOpen, setCopyInputOpen] = useState(false);
+  const [copyConfirmOpen, setCopyConfirmOpen] = useState(false);
+  const [copySource, setCopySource] = useState("");
+  const [copyError, setCopyError] = useState("");
+  const [copying, setCopying] = useState(false);
 
   const blocker = useBlocker(dirty);
 
@@ -1321,6 +1329,48 @@ export default function GhUserSetupPage() {
     } catch (err) {
       setSnack({ open: true, message: err?.response?.data?.detail || "저장 실패", severity: "error" });
     } finally { setSaving(false); }
+  };
+
+  const openCopyInput = () => {
+    setCopySource("");
+    setCopyError("");
+    setCopyInputOpen(true);
+  };
+
+  const proceedCopyConfirmation = () => {
+    const source = copySource.trim();
+    if (!source) {
+      setCopyError("원본 사용자 아이디를 입력해주세요.");
+      return;
+    }
+    if (source === currentUser?.username) {
+      setCopyError("같은 사용자의 설정은 복사할 수 없습니다.");
+      return;
+    }
+    setCopySource(source);
+    setCopyError("");
+    setCopyInputOpen(false);
+    setCopyConfirmOpen(true);
+  };
+
+  const handleCopyConfirm = async () => {
+    setCopying(true);
+    try {
+      const res = await apiCaller.post(USER_BET_SETTINGS_API.COPY_GH, {
+        source_username: copySource,
+        target_user_id: currentUser.id,
+      });
+      setConfig(res.data.config);
+      setDirty(false);
+      setCopyConfirmOpen(false);
+      setSnack({ open: true, message: "GH 설정을 복사했습니다.", severity: "success" });
+    } catch (err) {
+      setCopyConfirmOpen(false);
+      setCopyError(err?.response?.data?.detail || "GH 설정 복사에 실패했습니다.");
+      setCopyInputOpen(true);
+    } finally {
+      setCopying(false);
+    }
   };
 
   const handleBack = () => {
@@ -1376,6 +1426,12 @@ export default function GhUserSetupPage() {
           sx={{ display: "inline-flex", alignItems: "center", border: `1px solid ${dirty ? GREEN : "rgba(255,255,255,0.2)"}`, borderRadius: 1, px: 1.5, py: 0.5, cursor: dirty ? "pointer" : "default", backgroundColor: dirty ? GREEN : "transparent", color: dirty ? "#fff" : "#666", opacity: saving ? 0.5 : 1, "&:hover": dirty ? { backgroundColor: "#388e3c" } : {} }}>
           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold" }}>{saving ? "저장 중..." : "저장"}</Typography>
         </Box>
+        {currentUser?.role === "admin" && (
+          <Box onClick={copying ? undefined : openCopyInput}
+            sx={{ display: "inline-flex", alignItems: "center", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1.5, py: 0.5, cursor: copying ? "default" : "pointer", backgroundColor: "background.paper", opacity: copying ? 0.5 : 1, "&:hover": copying ? {} : { backgroundColor: "rgba(255,255,255,0.1)" } }}>
+            <Typography variant="caption" sx={{ fontSize: 12 }}>기존 사용자 값 복사</Typography>
+          </Box>
+        )}
       </Box>
 
       {gameType === "gh" && (
@@ -1508,6 +1564,43 @@ export default function GhUserSetupPage() {
         </Box>
       )}
 
+      <Dialog open={copyInputOpen} onClose={() => setCopyInputOpen(false)}
+        PaperProps={{ sx: { backgroundColor: "#1a1a1a", border: "1px solid #333", minWidth: 360 } }}>
+        <DialogTitle sx={{ color: "#fff" }}>기존 사용자 값 복사</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus fullWidth margin="dense" label="원본 사용자 아이디"
+            value={copySource}
+            onChange={(e) => { setCopySource(e.target.value); setCopyError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") proceedCopyConfirmation(); }}
+            error={!!copyError} helperText={copyError}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCopyInputOpen(false)} sx={{ color: "#888" }}>취소</Button>
+          <Button onClick={proceedCopyConfirmation} variant="contained"
+            sx={{ backgroundColor: "#2e7d32", "&:hover": { backgroundColor: "#1b5e20" } }}>확인</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={copyConfirmOpen} onClose={copying ? undefined : () => setCopyConfirmOpen(false)}
+        PaperProps={{ sx: { backgroundColor: "#1a1a1a", border: "1px solid #333", minWidth: 420 } }}>
+        <DialogTitle sx={{ color: "#fff" }}>GH 설정 복사 확인</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "#ccc" }}>
+            <strong style={{ color: "#4caf50" }}>{copySource}</strong> → <strong style={{ color: "#4caf50" }}>{currentUser?.username}</strong>으로 설정을 복사합니다.<br />
+            복원이 불가능하니 신중히 진행 부탁드립니다.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button disabled={copying} onClick={() => setCopyConfirmOpen(false)} sx={{ color: "#888" }}>취소</Button>
+          <Button disabled={copying} onClick={handleCopyConfirm} variant="contained"
+            sx={{ backgroundColor: "#d32f2f", "&:hover": { backgroundColor: "#b71c1c" } }}>
+            {copying ? "복사 중..." : "확인"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* 이탈 경고 */}
       <Dialog open={blocker.state === "blocked"}
         PaperProps={{ sx: { backgroundColor: "#1a1a1a", border: "1px solid #333" } }}>
@@ -1522,9 +1615,11 @@ export default function GhUserSetupPage() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={snack.open} autoHideDuration={3000}
-        onClose={() => setSnack((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+      <Snackbar open={snack.open} autoHideDuration={snack.severity === "error" ? null : 3000}
+        onClose={() => {
+          if (snack.severity !== "error") setSnack((s) => ({ ...s, open: false }));
+        }}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}>
         <Alert severity={snack.severity} onClose={() => setSnack((s) => ({ ...s, open: false }))}>{snack.message}</Alert>
       </Snackbar>
     </Box>

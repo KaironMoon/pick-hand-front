@@ -25,13 +25,17 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Tooltip,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
-import { USERS_API } from "@/constants/api-url";
+import { USERS_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 
 function UsersPage() {
   const theme = useTheme();
@@ -50,6 +54,14 @@ function UsersPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const [copyInputOpen, setCopyInputOpen] = useState(false);
+  const [copyConfirmOpen, setCopyConfirmOpen] = useState(false);
+  const [copyTarget, setCopyTarget] = useState(null);
+  const [copySource, setCopySource] = useState("");
+  const [copyError, setCopyError] = useState("");
+  const [copying, setCopying] = useState(false);
+  const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -124,6 +136,48 @@ function UsersPage() {
       fetchUsers();
     } catch (err) {
       console.error("Failed to delete user:", err);
+    }
+  };
+
+  const handleCopyOpen = (user) => {
+    setCopyTarget(user);
+    setCopySource("");
+    setCopyError("");
+    setCopyInputOpen(true);
+  };
+
+  const proceedCopyConfirmation = () => {
+    const source = copySource.trim();
+    if (!source) {
+      setCopyError("원본 사용자 아이디를 입력해주세요.");
+      return;
+    }
+    if (source === copyTarget?.username) {
+      setCopyError("같은 사용자의 설정은 복사할 수 없습니다.");
+      return;
+    }
+    setCopySource(source);
+    setCopyError("");
+    setCopyInputOpen(false);
+    setCopyConfirmOpen(true);
+  };
+
+  const handleCopyConfirm = async () => {
+    setCopying(true);
+    try {
+      await apiCaller.post(USER_BET_SETTINGS_API.COPY_GH, {
+        source_username: copySource,
+        target_user_id: copyTarget.id,
+      });
+      setCopyConfirmOpen(false);
+      setSnack({ open: true, message: `${copyTarget.username} 사용자의 GH 설정을 복사했습니다.`, severity: "success" });
+      setCopyTarget(null);
+    } catch (err) {
+      setCopyConfirmOpen(false);
+      setCopyError(err.response?.data?.detail || "GH 설정 복사에 실패했습니다.");
+      setCopyInputOpen(true);
+    } finally {
+      setCopying(false);
     }
   };
 
@@ -237,6 +291,11 @@ function UsersPage() {
                   </TableCell>
                   <TableCell sx={cellSx}>{formatDate(user.created_at)}</TableCell>
                   <TableCell sx={{ ...cellSx, textAlign: "center" }}>
+                    <Tooltip title="GH 설정 복사">
+                      <IconButton size="small" onClick={() => handleCopyOpen(user)} sx={{ color: "#42a5f5" }}>
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <IconButton size="small" onClick={() => handleEditOpen(user)} sx={{ color: "#4caf50" }}>
                       <EditIcon fontSize="small" />
                     </IconButton>
@@ -297,6 +356,41 @@ function UsersPage() {
           <Button onClick={() => setAddOpen(false)} sx={{ color: "text.secondary" }}>취소</Button>
           <Button onClick={handleAddSubmit} variant="contained"
             sx={{ backgroundColor: "#2e7d32", "&:hover": { backgroundColor: "#1b5e20" } }}>추가</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* GH Settings Copy Dialog */}
+      <Dialog open={copyInputOpen} onClose={() => setCopyInputOpen(false)} PaperProps={{ sx: dialogPaperSx }}>
+        <DialogTitle sx={{ color: "text.primary" }}>GH 설정 복사 - {copyTarget?.username}</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus fullWidth label="원본 사용자 아이디" value={copySource}
+            onChange={(e) => { setCopySource(e.target.value); setCopyError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") proceedCopyConfirmation(); }}
+            margin="dense" sx={dialogFieldSx} error={!!copyError} helperText={copyError}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCopyInputOpen(false)} sx={{ color: "text.secondary" }}>취소</Button>
+          <Button onClick={proceedCopyConfirmation} variant="contained"
+            sx={{ backgroundColor: "#2e7d32", "&:hover": { backgroundColor: "#1b5e20" } }}>확인</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={copyConfirmOpen} onClose={copying ? undefined : () => setCopyConfirmOpen(false)} PaperProps={{ sx: dialogPaperSx }}>
+        <DialogTitle sx={{ color: "text.primary" }}>GH 설정 복사 확인</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "text.primary" }}>
+            <strong style={{ color: "#4caf50" }}>{copySource}</strong> → <strong style={{ color: "#4caf50" }}>{copyTarget?.username}</strong>으로 설정을 복사합니다.<br />
+            복원이 불가능하니 신중히 진행 부탁드립니다.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button disabled={copying} onClick={() => setCopyConfirmOpen(false)} sx={{ color: "text.secondary" }}>취소</Button>
+          <Button disabled={copying} onClick={handleCopyConfirm} variant="contained"
+            sx={{ backgroundColor: "#d32f2f", "&:hover": { backgroundColor: "#b71c1c" } }}>
+            {copying ? "복사 중..." : "확인"}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -364,6 +458,14 @@ function UsersPage() {
             sx={{ backgroundColor: "#d32f2f", "&:hover": { backgroundColor: "#b71c1c" } }}>삭제</Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar open={snack.open} autoHideDuration={snack.severity === "error" ? null : 3000}
+        onClose={() => {
+          if (snack.severity !== "error") setSnack((s) => ({ ...s, open: false }));
+        }}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+        <Alert severity={snack.severity} onClose={() => setSnack((s) => ({ ...s, open: false }))}>{snack.message}</Alert>
+      </Snackbar>
     </Box>
   );
 }
