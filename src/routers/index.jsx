@@ -16,7 +16,6 @@ import GhSetupPage from "../pages/ghgame/setup.jsx";
 import T9UserSetupPage from "../pages/t9game/user-setup.jsx";
 import HbUserSetupPage from "../pages/hbgame/user-setup.jsx";
 import GhUserSetupPage from "../pages/ghgame/user-setup.jsx";
-import GhPickChangePage from "../pages/ghgame/pick-change.jsx";
 import NcGamePage from "../pages/ncgame";
 import NcUserGamePage from "../pages/ncgame/user-game.jsx";
 import NcSetupPage from "../pages/ncgame/setup.jsx";
@@ -118,10 +117,6 @@ const router = createBrowserRouter([
           {
             path: "/ghgame/user-setup",
             element: <GhUserSetupPage />,
-          },
-          {
-            path: "/ghgame/pick-change",
-            element: <GhPickChangePage />,
           },
           {
             path: "/ncgame/user",

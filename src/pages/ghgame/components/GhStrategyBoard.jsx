@@ -209,7 +209,7 @@ function AssistRow({ data, pos, label, labelColor }) {
         const v = (data.assist || [])[i] || "";
         const pickMark = (data.assistMark || [])[i];
         const title = assistSourceTitle((data.assistSource || [])[i]);
-        if (!v) return <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
+        if (!v) return <Box component="td" key={i} title={title} sx={{ ...sx, color: dimColor }}>–</Box>;
         return (
           <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: ASSIST_BG, ...generatedPickSx(pickMark) }}>
             <AssistText v={v} />
@@ -229,7 +229,7 @@ function QAssistRow({ data, pos, label, labelColor }) {
         const v = (data.qAssist || [])[i] || "";
         const pickMark = (data.qAssistMark || [])[i];
         const title = assistSourceTitle((data.qAssistSource || [])[i]);
-        if (!v) return <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
+        if (!v) return <Box component="td" key={i} title={title} sx={{ ...sx, color: dimColor }}>–</Box>;
         return (
           <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: Q_ASSIST_BG, ...generatedPickSx(pickMark) }}>
             <AssistText v={v} />

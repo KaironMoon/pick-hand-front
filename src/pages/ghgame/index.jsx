@@ -96,9 +96,6 @@ export default function GhGamePage() {
   const [config, setConfig] = useState(null);
   const [cumPnL, setCumPnL] = useState({ gh: 0 });
 
-  const [endingMode, setEndingMode] = useState(false);
-  const [endingSnapshot, setEndingSnapshot] = useState(null);
-  const [endingDone, setEndingDone] = useState(false);
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const processingRef = useRef(false);
   const [processing, setProcessing] = useState(false);
@@ -127,7 +124,6 @@ export default function GhGamePage() {
     const isNew = searchParams.get("new");
     const urlGameId = searchParams.get("gameId");
     if (isNew) {
-      setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
       setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
       setGlobalhitData([]);
       startGame();
@@ -167,11 +163,11 @@ export default function GhGamePage() {
       setResults(restoredResults);
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
-      if (data.status === "ending" && data.ending_snapshot) {
-        setEndingMode(true);
-        setEndingSnapshot(data.ending_snapshot);
-      }
     } catch (err) {
+      if (err.response?.status === 409) {
+        alert(err.response?.data?.detail || "이 게임은 복원할 수 없습니다.");
+        return;
+      }
       console.error("Failed to restore, starting new:", err);
       startGame();
     }
@@ -202,12 +198,12 @@ export default function GhGamePage() {
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
 
-      if (endingMode && endingSnapshot && checkEndingComplete(data)) {
-        setEndingDone(true);
-        setBetData(null);
-      }
     } catch (err) {
       console.error("Failed to record round:", err);
+      if (err.response?.status === 409) {
+        alert(err.response?.data?.detail || "이 게임은 계속 진행할 수 없습니다.");
+        return;
+      }
       if (err.response?.status === 404) {
         alert("게임이 종료되었거나 존재하지 않습니다.");
         navigate("/");
@@ -217,68 +213,6 @@ export default function GhGamePage() {
       processingRef.current = false;
       setProcessing(false);
     }
-  };
-
-  const checkEndingComplete = (data) => {
-    if (!endingSnapshot) return false;
-    const ghTracked = endingSnapshot.gh || [];
-    if (data.globalhit) {
-      for (const key of ghTracked) {
-        const [pat, grp] = key.split("-");
-        const grpNum = parseInt(grp);
-        for (const patData of data.globalhit) {
-          if (patData.pattern === pat) {
-            const g = patData.groups.find((x) => x.group === grpNum - 1);
-            if (g && g.step > 1) return false;
-          }
-        }
-      }
-    }
-    return true;
-  };
-
-  // ED
-  const handleEndingMode = async () => {
-    if (endingMode || !gameId) return;
-    const snapshot = { gh: [] };
-    if (globalhitData) {
-      globalhitData.forEach((pat) => {
-        pat.groups.forEach((g) => {
-          if (g.step > 1) snapshot.gh.push(`${pat.pattern}-${g.group + 1}`);
-        });
-      });
-    }
-
-    if (snapshot.gh.length === 0) {
-      try {
-        await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
-      } catch {}
-      setEndingMode(true); setEndingSnapshot(snapshot); setEndingDone(true);
-      return;
-    }
-
-    try {
-      const res = await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
-      const data = res.data;
-      setGlobalhitData(data.globalhit || []);
-      setBetData(data.bet || null);
-    } catch (err) {
-      console.error("Failed to start ending:", err);
-    }
-    setEndingMode(true); setEndingSnapshot(snapshot);
-  };
-
-  const handleFinishGame = async () => {
-    if (gameId) {
-      try {
-        await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gameId } });
-      } catch {}
-    }
-    setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
-    setGlobalhitData([]);
-    setSearchParams({}, { replace: true });
-    startGame();
   };
 
   // 마지막 1개 삭제
@@ -293,11 +227,6 @@ export default function GhGamePage() {
       setCumPnL(data.cum_pnl || { gh: 0 });
       setGlobalhitData(data.globalhit || []);
       setBetData(data.bet || null);
-      if (data.status === "ending" && data.ending_snapshot) {
-        setEndingMode(true); setEndingSnapshot(data.ending_snapshot);
-      } else {
-        setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-      }
     } catch (err) {
       console.error("Failed to delete last round:", err);
     } finally {
@@ -312,7 +241,6 @@ export default function GhGamePage() {
     setProcessing(true);
     try {
       const res = await apiCaller.post(GH_GAMES_API.NEXT, null, { params: { game_id: gameId } });
-      setEndingDone(false);
       setResults([]); setBetData(null);
       setGlobalhitData(res.data.globalhit || []);
       setGameId(res.data.game_id);
@@ -321,11 +249,6 @@ export default function GhGamePage() {
         setCumPnL(res.data.carry_pnl);
       } else {
         setCumPnL({ gh: 0 });
-      }
-      if (res.data.status === "ending" && res.data.ending_snapshot) {
-        setEndingMode(true); setEndingSnapshot(res.data.ending_snapshot);
-      } else {
-        setEndingMode(false); setEndingSnapshot(null);
       }
     } catch (err) {
       console.error("Failed to next game:", err);
@@ -345,7 +268,6 @@ export default function GhGamePage() {
       if (gameId && results.length > 0) {
         try { await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gameId } }); } catch {}
       }
-      setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
       setResults([]); setCumPnL({ gh: 0 }); setBetData(null);
       setGlobalhitData([]);
       await startGame();
@@ -396,22 +318,6 @@ export default function GhGamePage() {
             </Box>
           );
         })()}
-        {/* ED */}
-        <Box
-          onClick={handleEndingMode}
-          sx={{
-            ...toggleBtnSx,
-            backgroundColor: endingMode ? "#ff6f00" : "#b71c1c",
-            borderRadius: 2, border: endingMode ? "2px solid #ffab00" : "none",
-            px: isMobile ? 1 : 1.5, cursor: "pointer",
-            animation: endingMode ? "pulse 1.5s infinite" : "none",
-            "@keyframes pulse": { "0%": { opacity: 1 }, "50%": { opacity: 0.6 }, "100%": { opacity: 1 } },
-          }}
-        >
-          <Typography variant="caption" sx={{ fontSize: isMobile ? 11 : 13, fontWeight: "bold", color: "#fff" }}>
-            {endingMode ? "ED..." : "ED"}
-          </Typography>
-        </Box>
         {/* BT */}
         <Box sx={{ ...toggleBtnSx, backgroundColor: "#1565c0", borderRadius: 2, border: "none", px: isMobile ? 1 : 1.5 }}>
           <Typography variant="caption" sx={{ fontSize: isMobile ? 11 : 13, fontWeight: "bold", color: "#fff" }}>BT</Typography>
@@ -754,25 +660,6 @@ export default function GhGamePage() {
       </Box>
         );
       })()}
-
-      {/* 종료 다이얼로그 */}
-      <Dialog open={endingDone} onClose={() => {}}>
-        <DialogTitle sx={{ fontWeight: "bold" }}>게임 종료</DialogTitle>
-        <DialogContent>
-          <Typography>모든 배팅이 완료되었습니다.</Typography>
-          <Box sx={{ mt: 2 }}>
-            <Typography sx={{ color: cumPnL.gh >= 0 ? "#4caf50" : "#f44336" }}>
-              Globalhit: {cumPnL.gh > 0 ? "+" : ""}{cumPnL.gh.toLocaleString()}P
-            </Typography>
-            <Typography sx={{ mt: 1, fontWeight: "bold", color: cumPnL.gh >= 0 ? "#4caf50" : "#f44336" }}>
-              Total: {cumPnL.gh > 0 ? "+" : ""}{cumPnL.gh.toLocaleString()}P
-            </Typography>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleFinishGame} variant="contained">새 게임 시작</Button>
-        </DialogActions>
-      </Dialog>
 
       {/* 넥스트 게임 확인 */}
       <Dialog open={showNextConfirm} onClose={() => setShowNextConfirm(false)}>

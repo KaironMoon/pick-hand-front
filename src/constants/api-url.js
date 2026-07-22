@@ -48,7 +48,6 @@ const GH_SETTINGS_API = {
 const GH_GAMES_API = {
   START: "/api/v1/gh/games/start",
   ROUND: "/api/v1/gh/games/round",
-  ENDING: "/api/v1/gh/games/ending",
   END: "/api/v1/gh/games/end",
   NEXT: "/api/v1/gh/games/next",
   LAST_ACTIVE: "/api/v1/gh/games/last-active",

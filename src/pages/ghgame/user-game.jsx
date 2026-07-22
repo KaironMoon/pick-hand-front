@@ -19,7 +19,6 @@ if (typeof document !== "undefined" && !document.getElementById("gh-blink-style"
   document.head.appendChild(style);
 }
 
-const PC_COLOR = "#e040fb";   // 픽체인지: 보라
 const LSC_COLOR = "#000000";  // LSC: 검정 (모든 배경에서 고대비)
 const DS_COLOR = "#FF6600";   // 데칼/그림자: 형광 주황
 const NC_REF_LOCK_KEY = "gh_nc_ref_locked_game_seq";
@@ -58,10 +57,9 @@ const calculateCircleGrid = (results) => {
   for (let i = 0; i < results.length; i++) {
     const current = results[i].value;
     const status = results[i].status || "wait";
-    const pickChanged = !!results[i].pickChanged;
     const decalShadow = !!results[i].decalShadow;
     if (prevValue === null) {
-      grid[row][col] = { type: current, status, idx: i, pickChanged, decalShadow };
+      grid[row][col] = { type: current, status, idx: i, decalShadow };
       verticalStartCol = col;
     } else if (current === prevValue) {
       if (isBent) { col++; }
@@ -69,14 +67,14 @@ const calculateCircleGrid = (results) => {
       else if (grid[row + 1][col]) { col++; isBent = true; }
       else { row++; }
       if (col >= GRID_COLS) break;
-      grid[row][col] = { type: current, status, idx: i, pickChanged, decalShadow };
+      grid[row][col] = { type: current, status, idx: i, decalShadow };
     } else {
       verticalStartCol++;
       col = verticalStartCol;
       row = 0;
       isBent = false;
       if (col >= GRID_COLS) break;
-      grid[row][col] = { type: current, status, idx: i, pickChanged, decalShadow };
+      grid[row][col] = { type: current, status, idx: i, decalShadow };
     }
     prevValue = current;
   }
@@ -161,7 +159,6 @@ export default function GhUserGamePage() {
   const [globalhitData, setGlobalhitData] = useState([]);
   const [topGhSections, setTopGhSections] = useState([]);
   const [topNextRound, setTopNextRound] = useState(null);
-  const [pickChangePick, setPickChangePick] = useState(null);
   const [lscMatches, setLscMatches] = useState([]);
   const [decalPick, setDecalPick] = useState(null);
   const [shadowPick, setShadowPick] = useState(null);
@@ -185,9 +182,6 @@ export default function GhUserGamePage() {
   const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
-  const [endingMode, setEndingMode] = useState(false);
-  const [endingSnapshot, setEndingSnapshot] = useState(null);
-  const [endingDone, setEndingDone] = useState(false);
   const [resumeGame, setResumeGame] = useState(null);
   const [userSummary, setUserSummary] = useState(null);
   const [userMartinDashboard, setUserMartinDashboard] = useState(null);
@@ -287,24 +281,19 @@ export default function GhUserGamePage() {
     const picks = data.round_picks || [];
     const statuses = data.round_status || [];
     const statusesAr = data.round_status_ar || [];
-    const pcMarks = data.round_pick_change || [];
     const dsMarks = data.round_decal_shadow || [];
     setResults(seq.split("").map((v, i) => {
       const pick = picks[i];
       const status = statuses[i] || "wait";
       const statusAr = statusesAr[i] || "wait";
-      return { value: v, status, statusAr, aPick: pick || null, pickChanged: !!pcMarks[i], decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
+      return { value: v, status, statusAr, aPick: pick || null, decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
     }));
     setGlobalhitData(data.globalhit || []);
-    setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+    setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
     syncNcRefNo(data.round_state);
     setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
     setUserSummary(data.user_summary || null);
     setUserMartinDashboard(data.user_martin_dashboard || null);
-    if (data.status === "ending" && data.ending_snapshot) {
-      setEndingMode(true);
-      setEndingSnapshot(data.ending_snapshot);
-    }
   }, [syncNcRefNo]);
 
   const startGame = useCallback(async () => {
@@ -329,7 +318,7 @@ export default function GhUserGamePage() {
         setGameId(res.data.game_id);
         setConfig(res.data.config);
         setGlobalhitData(res.data.globalhit || []);
-        setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null); setPickChangePick(res.data.pick_change_pick ?? null);
+        setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null);
         setPicksSnapshot(res.data.picks_snapshot || null); setRoundState(res.data.round_state || null);
         syncNcRefNo(res.data.round_state);
       }
@@ -352,7 +341,7 @@ export default function GhUserGamePage() {
     if (isNew) {
       setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
-      setTopGhSections([]); setTopNextRound(null); setPickChangePick(null);
+      setTopGhSections([]); setTopNextRound(null);
       setPicksSnapshot(null); setRoundState(null);
       startGame();
     } else if (urlGameId) {
@@ -385,6 +374,10 @@ export default function GhUserGamePage() {
       const res = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user");
       applyGameData(res.data);
     } catch (err) {
+      if (err.response?.status === 409) {
+        setRejectMsg(err.response?.data?.detail || "이 게임은 복원할 수 없습니다.");
+        return;
+      }
       console.error("Failed to restore, starting new:", err);
       startGame();
     }
@@ -627,9 +620,8 @@ export default function GhUserGamePage() {
     setProcessing(true);
 
     // hit/miss 여부는 서버가 판정해 내려준다(응답의 round_status_current). 입력 직후엔 미정(wait)으로 낙관적 추가 후 응답으로 확정.
-    const normalPick = betData?.user_martin?.combined?.direction || betData?.combined?.direction;
-    const effectivePick = pickChangePick || normalPick;
-    setResults((prev) => [...prev, { value: inputValue, status: "wait", statusAr: "wait", aPick: effectivePick && effectivePick !== "wait" ? effectivePick : null, pickChanged: !!pickChangePick, decalShadow: decalPick !== null || shadowPick !== null }]);
+    const effectivePick = betData?.user_martin?.combined?.direction || betData?.combined?.direction;
+    setResults((prev) => [...prev, { value: inputValue, status: "wait", statusAr: "wait", aPick: effectivePick && effectivePick !== "wait" ? effectivePick : null, decalShadow: decalPick !== null || shadowPick !== null }]);
     setBetData(null);
 
     try {
@@ -648,19 +640,19 @@ export default function GhUserGamePage() {
       }
       setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0, labouchere: data.cum_pnl.labouchere || 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);
       checkGoalAlert(data.user_summary, data.round_state?.strategy_goals);
 
-      if (endingMode && endingSnapshot && checkEndingComplete(data)) {
-        setEndingDone(true);
-        setBetData(null); setUserSummary(null);
-      }
     } catch (err) {
       console.error("Failed to record round:", err);
       setResults((prev) => prev.slice(0, -1));
+      if (err.response?.status === 409) {
+        setRejectMsg(err.response?.data?.detail || "이 게임은 계속 진행할 수 없습니다.");
+        return;
+      }
       if (err.response?.status === 404) {
         alert("게임이 종료되었거나 존재하지 않습니다.");
         navigate("/");
@@ -685,14 +677,12 @@ export default function GhUserGamePage() {
         const picks = data.round_picks || [];
         const statuses = data.round_status || [];
         const statusesAr = data.round_status_ar || [];
-        const pcMarks = data.round_pick_change || [];
         const dsMarks = data.round_decal_shadow || [];
         setResults(seq.split("").map((v, i) => ({
           value: v,
           status: statuses[i] || "wait",
           statusAr: statusesAr[i] || "wait",
           aPick: picks[i] || null,
-          pickChanged: !!pcMarks[i],
           decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick),
         })));
       } else {
@@ -700,14 +690,10 @@ export default function GhUserGamePage() {
       }
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
-      setUserMartinDashboard(data.user_martin_dashboard || null);      if (data.status === "ending" && data.ending_snapshot) {
-        setEndingMode(true); setEndingSnapshot(data.ending_snapshot);
-      } else {
-        setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-      }
+      setUserMartinDashboard(data.user_martin_dashboard || null);
     } catch (err) {
       console.error("Failed to delete last round:", err);
     } finally {
@@ -724,7 +710,7 @@ export default function GhUserGamePage() {
       setResults([]); setBetData(null); setUserSummary(null); setPicksSnapshot(null); setRoundState(null);
       setRoundDsList(res.data.round_decal_shadow || []);
       setGlobalhitData(res.data.globalhit || []);
-      setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null); setPickChangePick(res.data.pick_change_pick ?? null);
+      setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null);
       setGameId(res.data.game_id);
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.carry_pnl) {
@@ -732,82 +718,11 @@ export default function GhUserGamePage() {
       } else {
         setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
       }
-      if (res.data.status === "ending" && res.data.ending_snapshot) {
-        setEndingMode(true); setEndingSnapshot(res.data.ending_snapshot);
-      } else {
-        setEndingMode(false); setEndingSnapshot(null);
-      }
     } catch (err) {
       console.error("Failed to next game:", err);
     } finally {
       setProcessing(false);
     }
-  };
-
-  // ED: 종료 모드 진입
-  const handleEndingMode = async () => {
-    if (endingMode || !gameId) return;
-    const snapshot = { gh: [] };
-    if (globalhitData) {
-      globalhitData.forEach((pat) => {
-        pat.groups.forEach((g) => {
-          if (g.step > 1) snapshot.gh.push(`${pat.pattern}-${g.group + 1}`);
-        });
-      });
-    }
-
-    if (snapshot.gh.length === 0) {
-      try {
-        await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
-      } catch {}
-      setEndingMode(true); setEndingSnapshot(snapshot); setEndingDone(true);
-      return;
-    }
-
-    try {
-      const res = await apiCaller.post(GH_GAMES_API.ENDING, { game_id: gameId, snapshot });
-      const data = res.data;
-      setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setPickChangePick(data.pick_change_pick ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
-      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
-      setUserSummary(data.user_summary || null);
-      setUserMartinDashboard(data.user_martin_dashboard || null);    } catch (err) {
-      console.error("Failed to start ending:", err);
-    }
-    setEndingMode(true); setEndingSnapshot(snapshot);
-  };
-
-  const checkEndingComplete = (data) => {
-    if (!endingSnapshot) return false;
-    const ghTracked = endingSnapshot.gh || [];
-    if (data.globalhit) {
-      for (const key of ghTracked) {
-        const [pat, grp] = key.split("-");
-        const grpNum = parseInt(grp);
-        for (const patData of data.globalhit) {
-          if (patData.pattern === pat) {
-            const g = patData.groups.find((x) => x.group === grpNum - 1);
-            if (g && g.step > 1) return false;
-          }
-        }
-      }
-    }
-    return true;
-  };
-
-  const handleFinishGame = async () => {
-    if (gameId) {
-      try {
-        await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gameId } });
-      } catch {}
-    }
-    setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
-    setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
-    setGlobalhitData([]);
-    setTopGhSections([]); setTopNextRound(null); setPickChangePick(null);
-    setPicksSnapshot(null); setRoundState(null);
-    setSearchParams({}, { replace: true });
-    startGame();
   };
 
   // new game: carry-over 없이 새 게임 시작
@@ -820,10 +735,9 @@ export default function GhUserGamePage() {
           await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gameId } });
         } catch {}
       }
-      setEndingMode(false); setEndingSnapshot(null); setEndingDone(false);
       setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
       setGlobalhitData([]);
-      setTopGhSections([]); setTopNextRound(null); setPickChangePick(null);
+      setTopGhSections([]); setTopNextRound(null);
       await startGame();
     } finally {
       setProcessing(false);
@@ -872,14 +786,6 @@ export default function GhUserGamePage() {
                   position: "relative",
                 }}
               >
-                {cell?.pickChanged && (
-                  <Box sx={{
-                    position: "absolute", top: 0, right: 0,
-                    width: 0, height: 0,
-                    borderTop: `${triSize}px solid ${PC_COLOR}`,
-                    borderLeft: `${triSize}px solid transparent`,
-                  }} />
-                )}
                 {isLscMatch && (
                   <Box sx={{
                     position: "absolute", top: 0, left: 0,
@@ -1216,19 +1122,13 @@ export default function GhUserGamePage() {
                   })()}
                 </Box>
 
-                {/* 행4: 셋업 + 픽체인지 + auto + HitPoint */}
+                {/* 행4: 셋업 + auto + HitPoint */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box
                     onClick={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
                     sx={{ ...uniBtnSx("#ff9800"), cursor: "pointer" }}
                   >
                     <Typography variant="caption" sx={{ fontSize: 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
-                  </Box>
-                  <Box
-                    onClick={() => navigate(`/ghgame/pick-change${gameId ? `?gameId=${gameId}` : ""}`)}
-                    sx={{ ...uniBtnSx("#ab47bc"), cursor: "pointer" }}
-                  >
-                    <Typography variant="caption" sx={{ fontSize: 12, color: "#ab47bc", fontWeight: "bold" }}>픽체인지</Typography>
                   </Box>
                   {autoFeatureAvailable && (
                     <Box
@@ -1325,20 +1225,9 @@ export default function GhUserGamePage() {
         );
       })()}
 
-      {/* 종료 다이얼로그 */}
-      <Dialog open={endingDone} onClose={() => {}}>
-        <DialogTitle sx={{ fontWeight: "bold" }}>게임 종료</DialogTitle>
-        <DialogContent>
-          <Typography>모든 배팅이 완료되었습니다.</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleFinishGame} variant="contained">새 게임 시작</Button>
-        </DialogActions>
-      </Dialog>
-
       {/* 새 게임 확인 대화상자 */}
       {/* 이전 게임 복원 확인 */}
-      <Dialog open={!!resumeGame} onClose={async () => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) { try { await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gid } }); } catch {} } startGame(); }}>
+      <Dialog open={!!resumeGame} onClose={() => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) restoreGame(gid); }}>
         <DialogTitle sx={{ fontWeight: "bold" }}>이전 게임 복원</DialogTitle>
         <DialogContent>
           <Typography>진행 중인 게임이 있습니다. (#{resumeGame?.game_id}, {resumeGame?.round_count}회차)</Typography>
@@ -1420,9 +1309,7 @@ export default function GhUserGamePage() {
               const dashA = userMartinDashboard?.martin_a;
               const dashZ = userMartinDashboard?.martin_z;
               const martinTable = (label, um, labelColor, dash, isUnified) => {
-                // 마틴A는 pick_change 발동 시 실제 베팅 방향이 pickChangePick으로 덮어써짐 (A 칩과 일치). 마틴Z는 미적용.
-                const isMartinA = label === "마틴A";
-                const mDir = (isMartinA && pickChangePick) || um?.direction || "wait";
+                const mDir = um?.direction || "wait";
                 const mAmt = um?.amount || 0;
                 const mP = mDir === "P" ? mAmt : 0;
                 const mB = mDir === "B" ? mAmt : 0;
