@@ -23,13 +23,14 @@ const autoService = {
     return resp.data;
   },
 
-  async startAuto({ gameId, pickhandId, tableId, server, gameType = "gh" }) {
+  async startAuto({ gameId, pickhandId, tableId, server, gameType = "gh", playMode = "keep" }) {
     const resp = await apiCaller.post(ABOO_API.AUTO_START, {
       game_id: gameId,
       caller_user_id: pickhandId,
       table_id: tableId,
       server: server || null,
       game_type: gameType,
+      play_mode: playMode,
     });
     return resp.data;
   },

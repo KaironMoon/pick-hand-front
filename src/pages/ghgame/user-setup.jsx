@@ -38,35 +38,41 @@ const fmtP1 = (value) => {
   const n = Number(value || 0);
   return Number.isFinite(n) ? n.toFixed(1) : "0.0";
 };
+const roundP1 = (value) => Math.round((Number(value) + Number.EPSILON) * 10) / 10;
 
-function calcAmounts(amounts, editedIdx, editedVal, betType, stepMin, stepMax) {
+function calcAmounts(amounts, editedIdx, editedVal, betType, stepMin, stepMax, decimalP = false) {
+  const normalize = decimalP ? roundP1 : Math.round;
   const newAmounts = [...amounts];
-  newAmounts[editedIdx] = editedVal;
+  newAmounts[editedIdx] = normalize(editedVal);
   const minIdx = stepMin - 1;
   const maxIdx = stepMax - 1;
   if (betType === "martin" || betType === "kkangbet") {
-    for (let i = editedIdx + 1; i <= maxIdx; i++) newAmounts[i] = newAmounts[i - 1] * 2;
-    for (let i = editedIdx - 1; i >= minIdx; i--) newAmounts[i] = Math.max(Math.round(newAmounts[i + 1] / 2), 1);
+    for (let i = editedIdx + 1; i <= maxIdx; i++) newAmounts[i] = normalize(newAmounts[i - 1] * 2);
+    for (let i = editedIdx - 1; i >= minIdx; i--) {
+      newAmounts[i] = Math.max(normalize(newAmounts[i + 1] / 2), decimalP ? 0.1 : 1);
+    }
   } else if (betType === "fixed") {
-    for (let i = minIdx; i <= maxIdx; i++) newAmounts[i] = editedVal;
+    for (let i = minIdx; i <= maxIdx; i++) newAmounts[i] = normalize(editedVal);
   }
   return newAmounts;
 }
 
-function EditableCell({ value, onChange, prefix = "", suffix = "", style = normalCell, disabled = false }) {
+function EditableCell({ value, onChange, prefix = "", suffix = "", style = normalCell, disabled = false, decimal = false }) {
   const [editing, setEditing] = useState(false);
   const [tempVal, setTempVal] = useState(String(value));
   const handleClick = () => { if (disabled) return; setTempVal(String(value)); setEditing(true); };
   const handleBlur = () => {
     setEditing(false);
-    const num = parseInt(tempVal, 10);
+    const parsed = decimal ? Number.parseFloat(tempVal) : Number.parseInt(tempVal, 10);
+    const num = decimal ? roundP1(parsed) : parsed;
     if (!isNaN(num) && num !== value) onChange(num);
   };
   const handleKeyDown = (e) => { if (e.key === "Enter") e.target.blur(); else if (e.key === "Escape") setEditing(false); };
   if (editing) {
     return (
       <td style={style}>
-        <input autoFocus value={tempVal} onChange={(e) => setTempVal(e.target.value)} onBlur={handleBlur} onKeyDown={handleKeyDown}
+        <input autoFocus inputMode={decimal ? "decimal" : "numeric"}
+          value={tempVal} onChange={(e) => setTempVal(e.target.value)} onBlur={handleBlur} onKeyDown={handleKeyDown}
           size={Math.max(tempVal.length, 1)}
           style={{
             width: `${Math.max(tempVal.length, 1)}ch`, boxSizing: "content-box", padding: 0, margin: 0,
@@ -196,6 +202,7 @@ function cruiseStepLabel(idx) {
 
 function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp }) {
   const isCruise = name === "cruise";
+  const usesDecimalP = name === "martin_a" || name === "martin_z";
   const enabled = martin.enabled;
   // 크루즈는 29 단계(15-2까지)를 위해 6행×5칸 = 30칸 사용, 다른 섹션은 4행×5 = 20
   const totalSteps = isCruise ? 30 : 20;
@@ -209,7 +216,10 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
   const amount = (idx, val) => {
     const base = martin.amounts || [];
     const padded = base.length >= totalSteps ? base : [...base, ...new Array(totalSteps - base.length).fill(0)];
-    const newAmounts = calcAmounts(padded, idx, val, martin.bet_type, martin.step_min || 1, martin.step_max || defaultStepMax);
+    const newAmounts = calcAmounts(
+      padded, idx, val, martin.bet_type,
+      martin.step_min || 1, martin.step_max || defaultStepMax, usesDecimalP,
+    );
     onChange({ ...martin, amounts: newAmounts });
   };
   // 크루즈 섹션: bet_type=cruise + step_max=29 강제
@@ -306,7 +316,8 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
               const amt = paddedAmounts[idx] || 0;
               return (
                 <EditableCell key={idx} value={inRange ? amt : 0} onChange={(v) => amount(idx, v)}
-                  prefix={`${stepLabel}:`} suffix="P" style={inRange ? editableCell : normalCell} disabled={!inRange} />
+                  prefix={`${stepLabel}:`} suffix="P" style={inRange ? editableCell : normalCell}
+                  disabled={!inRange} decimal={usesDecimalP} />
               );
             })}
           </tr>

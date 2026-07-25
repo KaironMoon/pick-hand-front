@@ -94,22 +94,146 @@ const controlBtnSx = {
   "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" },
 };
 
-function RoundAmountTable({ roundState }) {
+function RoundAmountTable({
+  roundState,
+  amountMode,
+  onSetup,
+  onNew,
+  newDisabled = false,
+  labouchere,
+  onLabouchereSequence,
+  labHmDisabled = true,
+  labHmPressed,
+  onLabouchereHit,
+  onLabouchereMiss,
+  gameSlots = [],
+  selectedSlotNo,
+  onSlotSelect,
+  slotBusy = false,
+  onEnd,
+  endDisabled = true,
+  endDisabledReason,
+}) {
   const table = roundState?.round_amount_table || {};
-  const cellCount = 64;
-  const cells = table.cells || Array.from({ length: cellCount }, (_, idx) => ({ round: idx + 1, amount: 0, pnl: 0, status: null, actual: null, pick: null }));
+  const actualTable = roundState?.actual_bet_table || {};
+  const labouchereSequence = Array.isArray(labouchere?.sequence) ? labouchere.sequence : [];
+  const labouchereEnabled = !!labouchere?.enabled;
+  const jBase = roundState?.sections?.J?.base || {};
+  const jTotal = Number(jBase.total || 0);
+  const jHit = Number(jBase.hit || 0);
+  const jRate = jTotal > 0 ? jHit / jTotal : null;
+  const jBlink = jRate !== null && jRate >= 0.6;
+  const toolbarButtons = [
+    {
+      label: `≡${labouchereSequence.length}`,
+      onClick: onLabouchereSequence,
+      disabled: !labouchereEnabled || !onLabouchereSequence,
+      title: labouchereEnabled ? "전체 라보쉐르 시퀀스 보기" : "라보쉐르 비활성",
+    },
+    {
+      label: "J",
+      blink: jBlink,
+      title: jRate === null
+        ? "J 승률: 기록 없음"
+        : `J 승률: ${(jRate * 100).toFixed(1)}% (${jHit}/${jTotal})`,
+    },
+    {
+      label: "H",
+      backgroundColor: "#2e7d32",
+      pressed: labHmPressed === "H",
+      onClick: onLabouchereHit,
+      disabled: labHmDisabled,
+      title: "라보 H: 양끝 제거, PnL +베팅액",
+    },
+    {
+      label: "M",
+      backgroundColor: "#c62828",
+      pressed: labHmPressed === "M",
+      onClick: onLabouchereMiss,
+      disabled: labHmDisabled,
+      title: "라보 M: 끝에 베팅액 추가, PnL -베팅액",
+    },
+    ...Array.from({ length: 6 }, (_, idx) => {
+      const slotNo = idx + 1;
+      const slot = gameSlots.find((item) => item.slot_no === slotNo);
+      const selected = selectedSlotNo === slotNo;
+      const hasError = slot?.phase === "error" || slot?.auto_status === "error";
+      return {
+        label: String(slotNo),
+        active: selected,
+        backgroundColor: selected
+          ? "#16365c"
+          : hasError
+            ? "#5b2020"
+            : slot?.auto_running
+              ? "#17482f"
+              : slot?.occupied
+                ? "#252a31"
+                : "#101318",
+        color: selected ? "#2f9bff" : slot?.auto_running ? "#00e676" : "#fff",
+        blink: hasError,
+        onClick: () => onSlotSelect?.(slotNo),
+        disabled: slotBusy,
+        title: slot?.occupied
+          ? `${slotNo}번 게임 #${slot.game_id}${slot.table_name ? ` / ${slot.table_name}` : ""}`
+          : `${slotNo}번 빈 슬롯 — 새 게임 시작`,
+      };
+    }),
+    { label: "셋", accent: "#ff9800", onClick: onSetup },
+    { label: "뉴", accent: "#2f9bff", onClick: onNew, disabled: newDisabled },
+    {
+      label: "끝",
+      accent: "#d32f2f",
+      onClick: onEnd,
+      disabled: endDisabled,
+      title: endDisabled ? endDisabledReason : "현재 게임 종료 후 슬롯 비우기",
+    },
+  ];
+  const cellCount = 80;
+  const strategyCells = table.cells || [];
+  const actualCells = actualTable.cells || [];
+  const cells = Array.from({ length: cellCount }, (_, idx) => {
+    const strategyCell = strategyCells[idx] || {
+      round: idx + 1,
+      amount: 0,
+      pnl: 0,
+      status: null,
+      actual: null,
+      pick: null,
+    };
+    if (amountMode !== "actual") return strategyCell;
+    const actualCell = actualCells[idx] || {};
+    return {
+      ...strategyCell,
+      amount: Number(actualCell.bet_amount_p || 0),
+      pnl: Number(actualCell.actual_pnl_p || 0),
+      betPlaced: !!actualCell.bet_placed,
+      settled: !!actualCell.settled,
+      failureCode: actualCell.failure_code || null,
+    };
+  });
   const fmt = (v) => v === "N/A" ? "-" : Number(v || 0).toFixed(1);
   const finalSide = table.total_side;
+  const totalAmount = amountMode === "actual"
+    ? Number(actualTable.total_amount_p || 0)
+    : Number(table.total_amount || 0);
+  const totalPnl = amountMode === "actual"
+    ? Number(actualTable.total_pnl_p || 0)
+    : Number(table.total_pnl || 0);
   const finalSideColor = finalSide === "P" ? "#1565d8" : finalSide === "B" ? "#e53935" : "#555";
   const cellSx = (idx) => {
     const cell = cells[idx] || {};
     const hasResult = !!cell.actual;
-    const hasBet = Number(cell.amount || 0) > 0;
+    const hasJudgement = cell.status === "hit" || cell.status === "miss";
     return {
       width: 86,
       height: 30,
       border: "1px solid #3f4650",
-      backgroundColor: hasResult && hasBet ? (cell.status === "hit" ? "#2e9e5b" : "#5b6068") : "#101318",
+      // 실제 배팅 여부와 픽 판정은 별개다. 실 모드에서 금액이 0이어도
+      // 배팅금액판 픽의 hit/miss 결과 색상은 그대로 보여준다.
+      backgroundColor: hasResult && hasJudgement
+        ? (cell.status === "hit" ? "#2e9e5b" : "#5b6068")
+        : "#101318",
       display: "grid",
       gridTemplateColumns: "22px 1fr",
       alignItems: "center",
@@ -124,24 +248,379 @@ function RoundAmountTable({ roundState }) {
   };
   return (
     <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 0.4, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1 }}>
-      <Box sx={{ display: "flex", gap: 0.5, justifyContent: "flex-end", width: "100%" }}>
+      <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5, width: "100%" }}>
+        {toolbarButtons.map(({
+          label,
+          color,
+          active,
+          accent,
+          backgroundColor,
+          pressed,
+          blink,
+          onClick,
+          disabled,
+          title,
+        }) => (
+          <Box
+            key={label}
+            aria-label={label}
+            title={title}
+            role={onClick ? "button" : undefined}
+            tabIndex={onClick && !disabled ? 0 : undefined}
+            onClick={onClick && !disabled ? onClick : undefined}
+            onKeyDown={onClick && !disabled ? (event) => {
+              if (event.key === "Enter" || event.key === " ") onClick();
+            } : undefined}
+            sx={{
+              width: 32,
+              minWidth: 32,
+              height: 32,
+              border: `1px solid ${accent || "#707781"}`,
+              borderRadius: 1,
+              backgroundColor: pressed
+                ? "#ffeb3b"
+                : backgroundColor || (active ? "#16365c" : accent ? `${accent}33` : "#101318"),
+              color: pressed ? "#1b1b1b" : color || (active ? "#2f9bff" : "#fff"),
+              boxShadow: pressed ? "0 0 8px #ffeb3b, 0 0 16px rgba(255,235,59,0.6)" : "none",
+              transform: pressed ? "scale(0.95)" : "none",
+              transition: "background-color 0.15s, box-shadow 0.15s, transform 0.15s, color 0.15s",
+              ...(blink ? { animation: "blink 0.8s infinite" } : {}),
+              fontSize: label.length > 2 ? 10 : 13,
+              fontWeight: "bold",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              userSelect: "none",
+              cursor: disabled ? "not-allowed" : onClick ? "pointer" : "default",
+              opacity: disabled ? 0.4 : 1,
+            }}
+          >
+            {label}
+          </Box>
+        ))}
         <Box sx={{ width: 30, border: "1px solid #3f4650", backgroundColor: finalSideColor, color: "#fff", fontSize: 13, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {finalSide || "-"}
         </Box>
-        <Box sx={{ width: 150, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 1, py: 0.35, display: "flex", justifyContent: "space-between" }}>
-          <span>합산</span><span>{fmt(table.total_amount)}</span>
+        <Box sx={{ flex: 1, minWidth: 120, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 1, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>합산</span><span>{fmt(totalAmount)}</span>
         </Box>
-        <Box sx={{ width: 150, border: "1px solid #3f4650", backgroundColor: "#111821", color: Number(table.total_pnl || 0) >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 1, py: 0.35, display: "flex", justifyContent: "space-between" }}>
-          <span>PnL</span><span>{fmt(table.total_pnl)}</span>
+        <Box sx={{ flex: 1, minWidth: 120, border: "1px solid #3f4650", backgroundColor: "#111821", color: totalPnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 1, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>PnL</span><span>{fmt(totalPnl)}</span>
         </Box>
       </Box>
-      <Box sx={{ display: "grid", gridTemplateRows: "repeat(8, 30px)", gridAutoFlow: "column", gridAutoColumns: "86px", gap: "2px" }}>
+      <Box sx={{ display: "grid", gridTemplateRows: "repeat(10, 30px)", gridAutoFlow: "column", gridAutoColumns: "86px", gap: "2px" }}>
         {Array.from({ length: cellCount }, (_, idx) => (
-          <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${fmt(cells[idx]?.amount)} / PnL ${fmt(cells[idx]?.pnl)}`}>
+          <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P / PnL ${fmt(cells[idx]?.pnl)}P`}>
             <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
             <Box sx={{ color: "#fff", fontSize: 11, fontWeight: "bold", textAlign: "right", pr: 0.4 }}>{fmt(cells[idx]?.amount)}</Box>
           </Box>
         ))}
+      </Box>
+    </Box>
+  );
+}
+
+function applyActualBetAttempt(roundState, data) {
+  if (!roundState) return roundState;
+  const table = roundState.actual_bet_table || {};
+  const cells = Array.from({ length: 80 }, (_, idx) => (
+    table.cells?.[idx] || {
+      round: idx + 1,
+      bet_amount_won: 0,
+      bet_amount_p: 0,
+      actual_pnl_won: 0,
+      actual_pnl_p: 0,
+      bet_placed: false,
+      settled: false,
+    }
+  ));
+  const idx = Math.min(Math.max(0, Number(roundState.round_num || 0)), cells.length - 1);
+  const previous = cells[idx] || {};
+  const placed = !!data.placed;
+  const amountWon = placed ? Number(data.amount_won || 0) : 0;
+  const amountP = placed ? Number(data.amount_p || 0) : 0;
+  cells[idx] = {
+    ...previous,
+    round: idx + 1,
+    external_game_id: data.ext_game_id || null,
+    bet_side: data.direction || null,
+    bet_amount_won: amountWon,
+    bet_amount_p: amountP,
+    actual_pnl_won: 0,
+    actual_pnl_p: 0,
+    bet_placed: placed,
+    settled: false,
+    failure_code: data.code || null,
+  };
+  return {
+    ...roundState,
+    actual_bet_table: {
+      ...table,
+      has_auto_history: true,
+      cells,
+      total_amount_won: Number(table.total_amount_won || 0)
+        - Number(previous.bet_amount_won || 0)
+        + amountWon,
+      total_amount_p: Number(table.total_amount_p || 0)
+        - Number(previous.bet_amount_p || 0)
+        + amountP,
+    },
+  };
+}
+
+function applyActualBetSettlement(roundState, data) {
+  if (!roundState?.actual_bet_table?.cells) return roundState;
+  const table = roundState.actual_bet_table;
+  const cells = [...table.cells];
+  const idx = cells.findIndex(
+    (cell) => cell?.external_game_id === data.external_game_id,
+  );
+  if (idx < 0) return roundState;
+  const previous = cells[idx] || {};
+  const pnlWon = Number(data.actual_pnl_won || 0);
+  const pnlP = Number(data.actual_pnl_p || 0);
+  cells[idx] = {
+    ...previous,
+    actual_pnl_won: pnlWon,
+    actual_pnl_p: pnlP,
+    settled: true,
+  };
+  return {
+    ...roundState,
+    actual_bet_table: {
+      ...table,
+      cells,
+      total_pnl_won: Number(table.total_pnl_won || 0)
+        - Number(previous.actual_pnl_won || 0)
+        + pnlWon,
+      total_pnl_p: Number(table.total_pnl_p || 0)
+        - Number(previous.actual_pnl_p || 0)
+        + pnlP,
+    },
+  };
+}
+
+function GhBettingSummaryPanel({
+  roundState,
+  selectedMode,
+  onModeChange,
+  autoStatus,
+  onPlay,
+  autoError,
+  disabled = false,
+}) {
+  const storedShoeResults = roundState?.shoe_results;
+  const normalizedResults = (
+    Array.isArray(storedShoeResults)
+      ? storedShoeResults
+      : typeof storedShoeResults === "string"
+        ? storedShoeResults.split("")
+        : []
+  )
+    .map((item) => typeof item === "string" ? item : item?.actual)
+    .filter((value) => value === "P" || value === "B" || value === "T");
+  const counts = normalizedResults.reduce(
+    (acc, value) => ({ ...acc, [value]: acc[value] + 1 }),
+    { P: 0, B: 0, T: 0 },
+  );
+  const pickMartin = roundState?.pick_martin;
+  const step = pickMartin?.step || 1;
+  const amount = pickMartin?.amount ?? 0;
+  const pickMartinBorder = pickMartin?.direction === "P"
+    ? "#1565c0"
+    : pickMartin?.direction === "B"
+      ? "#f44336"
+      : "#7f7f7f";
+  const yukmaeBoardRows = 6;
+  const yukmaeBoardColumns = 13;
+  const markerColor = { P: "#1565d8", B: "#f44336", T: "#00a85a" };
+  const hasAutoError = autoStatus?.phase === "error" || !!autoError;
+  const errorCode = autoStatus?.error_code || autoError?.code || "auto_error";
+  const errorDetail = autoStatus?.error_detail || autoError?.detail || "자동게임 처리 중 오류가 발생했습니다.";
+  const autoStateCell = hasAutoError
+    ? { text: "error", error: true, tooltip: `[${errorCode}] ${errorDetail}` }
+    : autoStatus?.running
+      ? { text: "ok", autoOk: true }
+      : { text: "" };
+  const phaseAbbr = {
+    monitoring: "MON",
+    betting: "BET",
+    clearing: "CLR",
+    completed: "DONE",
+    error: "ERR",
+    stopped: "STOP",
+  };
+  const autoPhase = hasAutoError ? "ERR" : phaseAbbr[autoStatus?.phase] || "—";
+  const autoPnl = Number(autoStatus?.pnl_actual_p || 0);
+  const autoPnlText = `${autoPnl.toLocaleString(undefined, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })}P`;
+  const statusCells = [
+    { text: "guide" },
+    { text: "one", selection: "one" },
+    autoStateCell,
+    { text: `${autoPhase} ${autoPnlText}`, autoInfo: true },
+    { text: "keep", selection: "keep" },
+    {
+      text: autoStatus?.running ? "stop" : "play",
+      play: true,
+      stop: !!autoStatus?.running,
+    },
+  ];
+
+  return (
+    <Box sx={{ width: "fit-content", maxWidth: "100%", mb: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "stretch", gap: 1, mb: 1 }}>
+        <Box sx={{ width: 135, display: "flex", flexDirection: "column", gap: 0.5 }}>
+          <Box sx={{
+            width: "100%",
+            height: 38,
+            border: `2px solid ${pickMartinBorder}`,
+            borderRadius: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-around",
+            backgroundColor: "#080a0d",
+            color: "#aaa",
+            fontSize: 13,
+            fontWeight: "bold",
+          }}>
+            <span>{step}S</span>
+            <span>{Number(amount || 0).toFixed(1)}P</span>
+          </Box>
+
+          <Box sx={{
+            width: "100%",
+            height: 36,
+            border: "2px solid #9aa2ad",
+            backgroundColor: "#080a0d",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 0.5,
+            fontSize: 17,
+            fontWeight: "bold",
+          }}>
+            <span style={{ color: "#fff" }}>{normalizedResults.length}</span>
+            <span style={{ color: "#2f80ed" }}>-</span>
+            <span style={{ color: "#2f80ed" }}>{counts.P}</span>
+            <span style={{ color: "#2f80ed" }}>-</span>
+            <span style={{ color: "#f44336" }}>{counts.B}</span>
+            <span style={{ color: "#2f80ed" }}>-</span>
+            <span style={{ color: "#00a85a" }}>{counts.T}</span>
+          </Box>
+        </Box>
+
+        <Box sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 76px)",
+          gridTemplateRows: "repeat(2, 38px)",
+          borderTop: "1px solid #707781",
+          borderLeft: "1px solid #707781",
+          backgroundColor: "#080a0d",
+        }}>
+          {statusCells.map((cell, idx) => {
+            const selected = cell.selection === selectedMode;
+            const selectable = !!cell.selection && !autoStatus?.running;
+            const clickable = !disabled && (selectable || !!cell.play);
+            const activate = () => {
+              if (selectable) onModeChange?.(cell.selection);
+              if (cell.play) onPlay?.();
+            };
+            return (
+              <Tooltip key={idx} title={cell.tooltip || ""} enterTouchDelay={0} arrow>
+              <Box
+                role={clickable ? "button" : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                aria-pressed={selectable ? selected : undefined}
+                onClick={clickable ? activate : undefined}
+                onKeyDown={clickable ? (event) => {
+                  if (event.key === "Enter" || event.key === " ") activate();
+                } : undefined}
+                sx={{
+                  borderRight: "1px solid #707781",
+                  borderBottom: "1px solid #707781",
+                  backgroundColor: cell.stop ? "#4a1717" : selected || cell.autoOk ? "#16365c" : cell.error ? "#ffeb3b" : "#080a0d",
+                  color: cell.stop ? "#ff5b5b" : selected || cell.autoOk ? "#2f80ed" : cell.error ? "#111" : "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: cell.autoInfo ? 10 : 15,
+                  fontWeight: cell.autoInfo ? "bold" : undefined,
+                  cursor: clickable ? "pointer" : cell.error ? "help" : "default",
+                  opacity: disabled && cell.play ? 0.4 : 1,
+                  userSelect: "none",
+                  ...(cell.error && {
+                    fontWeight: "bold",
+                    animation: "autoErrorBlink 0.8s steps(2, end) infinite",
+                    "@keyframes autoErrorBlink": {
+                      "0%, 100%": { backgroundColor: "#ffeb3b", color: "#111" },
+                      "50%": { backgroundColor: "#080a0d", color: "#ffeb3b" },
+                    },
+                  }),
+                }}
+              >
+                {cell.text}
+              </Box>
+              </Tooltip>
+            );
+          })}
+        </Box>
+      </Box>
+
+      {/* 육매판 — P/B/T 결과 로드맵 (6행 × 13열) */}
+      <Box sx={{
+        width: "fit-content",
+        p: 1.25,
+        borderRadius: 4,
+        backgroundColor: "#fff",
+        overflowX: "auto",
+      }}>
+        <Box sx={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${yukmaeBoardColumns}, 27px)`,
+          gridTemplateRows: `repeat(${yukmaeBoardRows}, 27px)`,
+          gridAutoFlow: "column",
+          borderTop: "1px solid #d6d9dd",
+          borderLeft: "1px solid #d6d9dd",
+          width: "fit-content",
+        }}>
+          {Array.from({ length: yukmaeBoardColumns * yukmaeBoardRows }, (_, idx) => {
+            const value = normalizedResults[idx];
+            return (
+              <Box
+                key={idx}
+                sx={{
+                  width: 27,
+                  height: 27,
+                  borderRight: "1px solid #d6d9dd",
+                  borderBottom: "1px solid #d6d9dd",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {value && (
+                  <Box sx={{
+                    width: 23,
+                    height: 23,
+                    borderRadius: "50%",
+                    backgroundColor: markerColor[value],
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 13,
+                    fontWeight: "bold",
+                  }}>
+                    {value}
+                  </Box>
+                )}
+              </Box>
+            );
+          })}
+        </Box>
       </Box>
     </Box>
   );
@@ -180,13 +659,16 @@ export default function GhUserGamePage() {
   const [gameId, setGameId] = useState(null);
   const [config, setConfig] = useState(null);
   const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
-  const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showNewConfirm, setShowNewConfirm] = useState(false);
   const [resumeGame, setResumeGame] = useState(null);
   const [userSummary, setUserSummary] = useState(null);
   const [userMartinDashboard, setUserMartinDashboard] = useState(null);
   const [labSeqOpen, setLabSeqOpen] = useState(false);
   const [labHmPressed, setLabHmPressed] = useState(null); // "H" | "M" | null
+  const [gameSlots, setGameSlots] = useState([]);
+  const [selectedSlotNo, setSelectedSlotNo] = useState(null);
+  const [slotBusy, setSlotBusy] = useState(false);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
   const processingRef = useRef(false);
   const skipRestoreGameIdRef = useRef(null);
   const [processing, setProcessing] = useState(false);
@@ -198,6 +680,9 @@ export default function GhUserGamePage() {
   const [autoFeatureAvailable, setAutoFeatureAvailable] = useState(true);
   const [autoDialogOpen, setAutoDialogOpen] = useState(false);
   const [autoStatus, setAutoStatus] = useState({ running: false, autoSessionId: null });
+  const [autoPlayMode, setAutoPlayMode] = useState("one");
+  const [amountViewMode, setAmountViewMode] = useState("calculated");
+  const [autoError, setAutoError] = useState(null);
   const [rejectMsg, setRejectMsg] = useState(null);  // 베팅 거부 레이어 팝업
   const [myPickhandId, setMyPickhandId] = useState(null);
   const [ncRefDraft, setNcRefDraft] = useState(() => (typeof window !== "undefined" ? localStorage.getItem(NC_REF_LOCK_KEY) || "" : ""));
@@ -296,10 +781,20 @@ export default function GhUserGamePage() {
     setUserMartinDashboard(data.user_martin_dashboard || null);
   }, [syncNcRefNo]);
 
-  const startGame = useCallback(async () => {
+  const refreshGameSlots = useCallback(async () => {
+    const res = await apiCaller.get(GH_GAMES_API.SLOTS);
+    const slots = Array.isArray(res.data?.slots) ? res.data.slots : [];
+    setGameSlots(slots);
+    return slots;
+  }, []);
+
+  const startGame = useCallback(async ({ slotNo = null, replaceGameId = null } = {}) => {
     try {
       goalAlertedRef.current = { a: false, z: false };
-      const res = await apiCaller.post(GH_GAMES_API.START + "?mode=user");
+      const body = slotNo
+        ? { slot_no: slotNo, replace_game_id: replaceGameId || null }
+        : null;
+      const res = await apiCaller.post(GH_GAMES_API.START + "?mode=user", body);
       const lockedNcRef = typeof window !== "undefined" ? localStorage.getItem(NC_REF_LOCK_KEY) : null;
       let lockedApplied = false;
       if (lockedNcRef) {
@@ -324,6 +819,9 @@ export default function GhUserGamePage() {
       }
       skipRestoreGameIdRef.current = res.data.game_id;
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
+      if (res.data.slot_no) setSelectedSlotNo(res.data.slot_no);
+      await refreshGameSlots();
+      return res.data;
     } catch (err) {
       console.error("Failed to start game:", err);
       if (err.response?.status === 400) {
@@ -331,43 +829,54 @@ export default function GhUserGamePage() {
         navigate("/ghgame/user-setup");
         return;
       }
+      throw err;
     }
-  }, [applyGameData, navigate, setSearchParams]);
+  }, [applyGameData, navigate, refreshGameSlots, setSearchParams, syncNcRefNo]);
 
   useEffect(() => {
     let cancelled = false;
     const isNew = searchParams.get("new");
     const urlGameId = searchParams.get("gameId");
-    if (isNew) {
-      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
-      setGlobalhitData([]);
-      setTopGhSections([]); setTopNextRound(null);
-      setPicksSnapshot(null); setRoundState(null);
-      startGame();
-    } else if (urlGameId) {
-      const gid = parseInt(urlGameId);
-      if (skipRestoreGameIdRef.current === gid) {
-        skipRestoreGameIdRef.current = null;
-      } else {
-        restoreGame(gid);
-      }
-    } else {
-      // 직전 게임이 active면 복원 여부 확인
-      apiCaller.get(GH_GAMES_API.LAST_ACTIVE + "?mode=user").then(async (res) => {
+    const urlSlotNo = Number(searchParams.get("slot"));
+    const initialize = async () => {
+      try {
+        const slots = await refreshGameSlots();
         if (cancelled) return;
-        const game = res.data?.game;
-        if (game && game.round_count > 0) {
-          setResumeGame(game);
-        } else {
-          if (game) {
-            try { await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: game.game_id } }); } catch {}
-          }
-          if (!cancelled) startGame();
+        if (isNew) {
+          const empty = slots.find((slot) => !slot.occupied);
+          if (empty) await startGame({ slotNo: empty.slot_no });
+          return;
         }
-      }).catch(() => { if (!cancelled) startGame(); });
-    }
+        if (urlGameId) {
+          const gid = parseInt(urlGameId);
+          const slot = slots.find((item) => item.game_id === gid);
+          setSelectedSlotNo(slot?.slot_no ?? null);
+          if (skipRestoreGameIdRef.current === gid) {
+            skipRestoreGameIdRef.current = null;
+          } else {
+            await restoreGame(gid);
+          }
+          return;
+        }
+        if (Number.isInteger(urlSlotNo) && urlSlotNo >= 1 && urlSlotNo <= 6) {
+          setSelectedSlotNo(urlSlotNo);
+          const selected = slots.find((slot) => slot.slot_no === urlSlotNo);
+          if (!selected?.occupied) clearCurrentGameView();
+          return;
+        }
+        const firstOccupied = slots.find((slot) => slot.occupied);
+        if (firstOccupied) {
+          setSelectedSlotNo(firstOccupied.slot_no);
+          setSearchParams({ gameId: firstOccupied.game_id }, { replace: true });
+          await restoreGame(firstOccupied.game_id);
+        }
+      } catch (err) {
+        if (!cancelled) console.error("Failed to initialize game slots:", err);
+      }
+    };
+    initialize();
     return () => { cancelled = true; };
-  }, [searchParams.get("new"), searchParams.get("gameId")]);
+  }, [searchParams.get("new"), searchParams.get("gameId"), searchParams.get("slot")]);
 
   const restoreGame = async (gid) => {
     try {
@@ -378,8 +887,9 @@ export default function GhUserGamePage() {
         setRejectMsg(err.response?.data?.detail || "이 게임은 복원할 수 없습니다.");
         return;
       }
-      console.error("Failed to restore, starting new:", err);
-      startGame();
+      console.error("Failed to restore game:", err);
+      setRejectMsg("게임판을 불러오지 못했습니다. 슬롯 상태를 다시 확인해주세요.");
+      refreshGameSlots().catch(() => {});
     }
   };
 
@@ -434,6 +944,27 @@ export default function GhUserGamePage() {
     setMyPickhandId(user?.pickhand_id || user?.username || null);
   }, [user]);
 
+  useEffect(() => {
+    setAmountViewMode(autoStatus.running ? "actual" : "calculated");
+  }, [autoStatus.running]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const slots = await refreshGameSlots();
+        if (!cancelled && gameId) {
+          const current = slots.find((slot) => slot.game_id === Number(gameId));
+          if (current) setSelectedSlotNo(current.slot_no);
+        }
+      } catch (err) {
+        if (!cancelled) console.error("Failed to refresh game slots:", err);
+      }
+    };
+    const id = setInterval(tick, 5000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [gameId, refreshGameSlots]);
+
   // Auto 상태 폴링 (1초)
   useEffect(() => {
     if (!gameId || !autoFeatureAvailable) return undefined;
@@ -442,6 +973,13 @@ export default function GhUserGamePage() {
       try {
         const st = await autoService.getAutoStatus(gameId);
         if (!cancelled) {
+          if (st.running && (st.play_mode === "one" || st.play_mode === "keep")) {
+            setAutoPlayMode(st.play_mode);
+          }
+          setAutoError(st.phase === "error" ? {
+            code: st.error_code || "auto_error",
+            detail: st.error_detail || "자동게임 처리 중 오류가 발생했습니다.",
+          } : null);
           setAutoStatus((prev) => ({
             ...prev,
             running: !!st.running,
@@ -456,13 +994,20 @@ export default function GhUserGamePage() {
             clear_stage: st.clear_stage ?? prev.clear_stage,
             pnl_total: st.pnl_total ?? prev.pnl_total,
             pnl_actual: st.pnl_actual ?? prev.pnl_actual,
+            pnl_total_p: st.pnl_total_p ?? prev.pnl_total_p,
+            pnl_actual_p: st.pnl_actual_p ?? prev.pnl_actual_p,
             round_count: st.round_count ?? prev.round_count,
             table_name: st.table_name ?? prev.table_name,
+            play_mode: st.play_mode ?? prev.play_mode,
+            error_code: st.error_code ?? null,
+            error_detail: st.error_detail ?? null,
           }));
         }
       } catch (e) {
         if (e?.response?.status === 503) {
           setAutoFeatureAvailable(false);
+        } else {
+          setAutoError({ code: "status_lookup_failed", detail: "자동게임 상태를 확인하지 못했습니다." });
         }
       }
     };
@@ -491,6 +1036,7 @@ export default function GhUserGamePage() {
       if (cancelled) return;
       ws = new WebSocket(wsUrl);
       ws.onopen = () => {
+        setAutoError(null);
         // keepalive ping 30초마다
         pingTimer = setInterval(() => {
           try { ws.send("ping"); } catch (_) {}
@@ -501,6 +1047,19 @@ export default function GhUserGamePage() {
           const msg = JSON.parse(evt.data);
           const t = msg.type;
           const data = msg.data || {};
+          if (t !== "pong") {
+            const currentGameId = Number(gameId);
+            const eventGameId = Number(data.game_id);
+            const sourceGameId = Number(data.source_game_id);
+            const currentSessionId = autoStatus.autoSessionId;
+            const belongsToCurrentAuto = (
+              (Number.isFinite(eventGameId) && eventGameId === currentGameId)
+              || (Number.isFinite(sourceGameId) && sourceGameId === currentGameId)
+              || (currentSessionId && data.auto_session_id === currentSessionId)
+              || (currentSessionId && data.source_auto_session_id === currentSessionId)
+            );
+            if (!belongsToCurrentAuto) return;
+          }
           if (t === "round_committed") {
             // 라운드 추가 → restoreGame 호출이 가장 안전 (전체 state 동기화)
             if (data.game_id) restoreGame(data.game_id);
@@ -511,13 +1070,20 @@ export default function GhUserGamePage() {
               round_count: data.round_count ?? prev.round_count,
               pnl_total: data.pnl_total ?? prev.pnl_total,
               pnl_actual: data.pnl_actual ?? prev.pnl_actual,
+              pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
+              pnl_actual_p: data.pnl_actual_p ?? prev.pnl_actual_p,
             }));
+          } else if (t === "shoe_result_recorded") {
+            // Tie는 전략 회차를 만들지 않으므로 최신 round_state만 다시 불러온다.
+            if (data.game_id) restoreGame(data.game_id);
           } else if (t === "phase_changed") {
             setAutoStatus((prev) => ({
               ...prev,
               phase: data.phase,
               pnl_total: data.pnl_total ?? prev.pnl_total,
               pnl_actual: data.pnl_actual ?? prev.pnl_actual,
+              pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
+              pnl_actual_p: data.pnl_actual_p ?? prev.pnl_actual_p,
               goal_amount: data.goal_amount ?? prev.goal_amount,
               end_round: data.end_round ?? prev.end_round,
               clear_stage: data.clear_stage ?? prev.clear_stage,
@@ -544,10 +1110,16 @@ export default function GhUserGamePage() {
               round_count: 0,
               pnl_total: 0,
               pnl_actual: 0,
+              pnl_total_p: 0,
+              pnl_actual_p: 0,
             }));
             console.info(`[Auto] 재시작: new_session=${data.auto_session_id} game=${data.game_id}`);
           } else if (t === "goal_reached") {
             console.info(`[Auto] 목표 달성: 실 PnL ${data.final_pnl_actual} / 목표 ${data.goal_amount}`);
+          } else if (t === "bet_attempt") {
+            setRoundState((prev) => applyActualBetAttempt(prev, data));
+          } else if (t === "bet_settled") {
+            setRoundState((prev) => applyActualBetSettlement(prev, data));
           } else if (t === "session_ended") {
             const reasonMap = {
               goal_reached: "목표액 도달",
@@ -562,8 +1134,8 @@ export default function GhUserGamePage() {
           } else if (t === "bet_rejected") {
             // 카지노가 베팅을 받지 않음(미체결) → 실 PnL 보정됨. 레이어 팝업 안내.
             setRejectMsg("베팅이 거부되었습니다 (카지노 미체결)");
+            if (data.game_id) restoreGame(data.game_id);
           }
-          // bet_attempt 는 별도 UI 없으면 생략
         } catch (e) {
           // ignore
         }
@@ -576,6 +1148,7 @@ export default function GhUserGamePage() {
         }
       };
       ws.onerror = () => {
+        setAutoError({ code: "realtime_connection_error", detail: "자동게임 실시간 연결에 문제가 발생했습니다." });
         try { ws.close(); } catch (_) {}
       };
     };
@@ -587,7 +1160,7 @@ export default function GhUserGamePage() {
       try { ws && ws.close(); } catch (_) {}
     };
 
-  }, [autoFeatureAvailable, autoStatus.running]);
+  }, [autoFeatureAvailable, autoStatus.running, autoStatus.autoSessionId, gameId]);
 
   const handleAutoToggle = async () => {
     if (!autoFeatureAvailable) return;
@@ -595,8 +1168,11 @@ export default function GhUserGamePage() {
       try {
         await autoService.stopAuto(autoStatus.autoSessionId);
         setAutoStatus({ running: false, autoSessionId: null });
+        setAutoError(null);
+        await refreshGameSlots();
       } catch (e) {
         console.warn("auto stop failed", e);
+        setAutoError({ code: "auto_stop_failed", detail: "자동게임을 정지하지 못했습니다." });
       }
     } else {
       // 새 게임에서 시작하는 게 안전 — 진행 중인 게임이면 경고
@@ -702,56 +1278,181 @@ export default function GhUserGamePage() {
     }
   }, [gameId, results]);
 
-  const handleNextGame = async () => {
-    if (!gameId || results.length === 0) return;
+  const clearCurrentGameView = () => {
+    setGameId(null);
+    setResults([]);
+    setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
+    setBetData(null);
+    setUserSummary(null);
+    setUserMartinDashboard(null);
+    setGlobalhitData([]);
+    setTopGhSections([]);
+    setTopNextRound(null);
+    setPicksSnapshot(null);
+    setRoundState(null);
+    setAutoStatus({ running: false, autoSessionId: null });
+    setAutoError(null);
+  };
+
+  const syncAutoStatusFromSlot = (slot) => {
+    setAutoStatus({
+      running: !!slot?.auto_running,
+      autoSessionId: slot?.auto_session_id || null,
+      phase: slot?.phase || null,
+      table_name: slot?.table_name || null,
+      play_mode: slot?.play_mode || "one",
+    });
+    setAutoError(slot?.phase === "error" ? {
+      code: slot.error_code || "auto_error",
+      detail: slot.error_detail || "자동게임 처리 중 오류가 발생했습니다.",
+    } : null);
+  };
+
+  const handleSlotSelect = async (slotNo) => {
+    if (slotBusy) return;
+    const slot = gameSlots.find((item) => item.slot_no === slotNo);
+    setSlotBusy(true);
+    try {
+      setSelectedSlotNo(slotNo);
+      if (slot?.occupied) {
+        syncAutoStatusFromSlot(slot);
+        skipRestoreGameIdRef.current = slot.game_id;
+        setSearchParams({ gameId: slot.game_id }, { replace: true });
+        await restoreGame(slot.game_id);
+      } else {
+        clearCurrentGameView();
+        await startGame({ slotNo });
+      }
+      await refreshGameSlots();
+    } catch (err) {
+      const code = err.response?.data?.detail?.error;
+      setRejectMsg(
+        code === "game_slot_occupied"
+          ? "다른 요청에서 슬롯이 먼저 사용됐습니다. 슬롯 상태를 새로고침합니다."
+          : "게임 슬롯을 전환하지 못했습니다.",
+      );
+      await refreshGameSlots().catch(() => {});
+    } finally {
+      setSlotBusy(false);
+    }
+  };
+
+  // new game: 현재 슬롯에서 carry-over 없이 교체
+  const handleNewGameConfirm = async () => {
+    setShowNewConfirm(false);
+    if (!gameId || !selectedSlotNo || autoStatus.running) return;
     setProcessing(true);
     try {
-      const res = await apiCaller.post(GH_GAMES_API.NEXT + "?game_id=" + gameId);
-      setResults([]); setBetData(null); setUserSummary(null); setPicksSnapshot(null); setRoundState(null);
-      setRoundDsList(res.data.round_decal_shadow || []);
-      setGlobalhitData(res.data.globalhit || []);
-      setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null);
-      setGameId(res.data.game_id);
-      setSearchParams({ gameId: res.data.game_id }, { replace: true });
-      if (res.data.carry_pnl) {
-        setCumPnL({ gh: res.data.carry_pnl.gh || 0, user_a: res.data.carry_pnl.user_a || 0, user_z: res.data.carry_pnl.user_z || 0, user_s: res.data.carry_pnl.user_s || 0, allp: res.data.carry_pnl.allp || 0, allb: res.data.carry_pnl.allb || 0, fail: res.data.carry_pnl.fail || 0, hnh: res.data.carry_pnl.hnh || 0, one: res.data.carry_pnl.one || 0, two: res.data.carry_pnl.two || 0, labouchere: res.data.carry_pnl.labouchere || 0 });
-      } else {
-        setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
-      }
+      await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gameId } });
+      await startGame({ slotNo: selectedSlotNo, replaceGameId: gameId });
+      await refreshGameSlots();
     } catch (err) {
-      console.error("Failed to next game:", err);
+      const code = err.response?.data?.detail?.error;
+      setRejectMsg(
+        code === "auto_running_stop_first"
+          ? "오토를 먼저 정지한 뒤 새 게임을 시작해주세요."
+          : "새 게임으로 교체하지 못했습니다.",
+      );
     } finally {
       setProcessing(false);
     }
   };
 
-  // new game: carry-over 없이 새 게임 시작
-  const handleNewGameConfirm = async () => {
-    setShowNewConfirm(false);
-    setProcessing(true);
+  const handleCloseSlotConfirm = async () => {
+    setShowEndConfirm(false);
+    if (!selectedSlotNo || !gameId || autoStatus.running || slotBusy) return;
+    setSlotBusy(true);
     try {
-      if (gameId && results.length > 0) {
-        try {
-          await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gameId } });
-        } catch {}
+      await apiCaller.post(GH_GAMES_API.SLOT_CLOSE(selectedSlotNo));
+      clearCurrentGameView();
+      const remainingSlots = await refreshGameSlots();
+      const nextSlot = (
+        remainingSlots.find((slot) => slot.occupied && slot.auto_running)
+        || remainingSlots.find((slot) => slot.occupied)
+      );
+      if (nextSlot) {
+        setSelectedSlotNo(nextSlot.slot_no);
+        syncAutoStatusFromSlot(nextSlot);
+        skipRestoreGameIdRef.current = nextSlot.game_id;
+        setSearchParams({ gameId: nextSlot.game_id }, { replace: true });
+        await restoreGame(nextSlot.game_id);
       }
-      setResults([]); setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 }); setBetData(null); setUserSummary(null); setUserMartinDashboard(null);
-      setGlobalhitData([]);
-      setTopGhSections([]); setTopNextRound(null);
-      await startGame();
+    } catch (err) {
+      const code = err.response?.data?.detail?.error;
+      setRejectMsg(
+        code === "auto_running_stop_first"
+          ? "오토를 먼저 정지해야 게임을 종료할 수 있습니다."
+          : code === "primary_game_slot_required"
+            ? "1번 슬롯은 종료할 수 없습니다."
+          : code === "last_game_slot_required"
+            ? "마지막 게임 슬롯은 종료할 수 없습니다."
+          : "게임을 종료하지 못했습니다.",
+      );
     } finally {
-      setProcessing(false);
+      setSlotBusy(false);
     }
   };
+
+  const labouchere = betData?.user_martin?.labouchere;
+  const labouchereSequence = Array.isArray(labouchere?.sequence) ? labouchere.sequence : [];
+  const labHmDisabled = (
+    !gameId
+    || !labouchere?.enabled
+    || !!labouchere?.paused
+    || labouchereSequence.length === 0
+    || Number(labouchere?.amount || 0) <= 0
+    || processing
+    || labHmPressed !== null
+  );
+  const triggerLabouchereResult = async (which) => {
+    if (labHmDisabled) return;
+    const url = which === "H"
+      ? GH_GAMES_API.LABOUCHERE_HIT(gameId)
+      : GH_GAMES_API.LABOUCHERE_MISS(gameId);
+    setLabHmPressed(which);
+    try {
+      await apiCaller.post(url);
+      const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
+      const data = res.data;
+      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+      if (data.cum_pnl) {
+        setCumPnL((prev) => ({ ...prev, ...data.cum_pnl }));
+      }
+    } catch (err) {
+      console.error(`Labouchere ${which} failed:`, err);
+    } finally {
+      setTimeout(() => setLabHmPressed(null), 500);
+    }
+  };
+  const selectedGameSlot = gameSlots.find((slot) => slot.slot_no === selectedSlotNo);
+  const occupiedSlotCount = gameSlots.filter((slot) => slot.occupied).length;
+  const endDisabled = (
+    processing
+    || slotBusy
+    || autoStatus.running
+    || !gameId
+    || !selectedSlotNo
+    || selectedSlotNo === 1
+    || occupiedSlotCount <= 1
+  );
+  const endDisabledReason = selectedSlotNo === 1
+    ? "1번 슬롯은 종료할 수 없습니다"
+    : autoStatus.running
+      ? "오토를 먼저 정지해야 게임을 종료할 수 있습니다"
+      : occupiedSlotCount <= 1
+        ? "마지막 게임 슬롯은 종료할 수 없습니다"
+        : processing || slotBusy
+          ? "현재 요청을 처리 중입니다"
+          : "종료할 게임 슬롯이 없습니다";
 
   return (
     <Box sx={{ p: isMobile ? 0.5 : 2 }}>
       <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
         <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>글로벌히트</span>
         {gameId && <span style={{ fontSize: 11, color: "#888" }}>#{gameId}</span>}
-        {autoStatus.running && autoStatus.table_name && (
+        {(selectedGameSlot?.table_name || autoStatus.table_name) && (
           <span style={{ fontSize: 11, color: "#66bb6a", fontWeight: "bold", marginLeft: 8 }}>
-            {autoStatus.table_name}
+            {selectedGameSlot?.table_name || autoStatus.table_name}
           </span>
         )}
       </Box>
@@ -836,6 +1537,7 @@ export default function GhUserGamePage() {
           {/* 1|2 row */}
           <Box sx={{ display: "flex", flexDirection: "row", gap: 1, alignItems: "flex-start", mb: 2 }}>
 
+          <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1 }}>
           {/* ===== 1: 배팅부 (구 디자인 스타일에 맞춰 정적 자리만) ===== */}
           {(() => {
             // 구 디자인 토큰
@@ -852,7 +1554,6 @@ export default function GhUserGamePage() {
               "&:active": { transform: "scale(0.95)" },
             });
             const ctrlBtnSx = (borderColor, fg) => ({ ...controlBtnSx, border: `2px solid ${borderColor}`, color: fg || "#fff", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 50 });
-            const uniBtnSx = (borderColor, fg) => ({ ...controlBtnSx, border: `2px solid ${borderColor}`, color: fg || "#fff", display: "flex", alignItems: "center", justifyContent: "center", width: 50, height: 32, minWidth: 50, px: 0, py: 0 });
 
             return (
               <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1, px: 0, py: 0.5 }}>
@@ -880,7 +1581,6 @@ export default function GhUserGamePage() {
                     const lb = betData.user_martin.labouchere;
                     const lbAmt = lb?.amount || 0;
                     const lbPaused = !!lb?.paused;
-                    const lbSeq = Array.isArray(lb?.sequence) ? lb.sequence : [];
                     const refreshState = async () => {
                       const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
                       const data = res.data;
@@ -910,41 +1610,6 @@ export default function GhUserGamePage() {
                     };
                     const tagBg = lbPaused ? "#555" : "#8e24aa";
                     const amtColor = lbPaused ? "#666" : "#4caf50";
-                    const hmBusy = labHmPressed !== null;
-                    const hmDisabled = lbPaused || lbSeq.length === 0 || lbAmt <= 0 || processing || hmBusy;
-                    const trigger = async (which, url) => {
-                      console.log(`[LAB ${which}] click gameId=${gameId} disabled=${hmDisabled} amt=${lbAmt} paused=${lbPaused} seqLen=${lbSeq.length} processing=${processing} busy=${hmBusy}`);
-                      if (!gameId || hmDisabled) return;
-                      setLabHmPressed(which);
-                      try {
-                        const res = await apiCaller.post(url);
-                        console.log(`[LAB ${which}] response`, res.data);
-                        await refreshState();
-                      } catch (err) {
-                        console.error(`Labouchere ${which} failed:`, err);
-                      } finally {
-                        setTimeout(() => setLabHmPressed(null), 500);
-                      }
-                    };
-                    const handleHit = () => trigger("H", GH_GAMES_API.LABOUCHERE_HIT(gameId));
-                    const handleMiss = () => trigger("M", GH_GAMES_API.LABOUCHERE_MISS(gameId));
-                    const hmBtnSx = (bg, which) => {
-                      const pressed = labHmPressed === which;
-                      return {
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        minWidth: 26, height: 24, borderRadius: 1,
-                        backgroundColor: pressed ? "#ffeb3b" : bg,
-                        color: pressed ? "#1b1b1b" : "#fff",
-                        boxShadow: pressed ? "0 0 8px #ffeb3b, 0 0 16px rgba(255,235,59,0.6)" : "none",
-                        transform: pressed ? "scale(0.95)" : "none",
-                        transition: "background-color 0.15s, box-shadow 0.15s, transform 0.15s, color 0.15s",
-                        fontSize: 12, fontWeight: "bold",
-                        cursor: hmDisabled ? "not-allowed" : "pointer",
-                        opacity: hmDisabled && !pressed ? 0.4 : 1,
-                        pointerEvents: hmDisabled ? "none" : "auto",
-                        "&:hover": { opacity: hmDisabled ? 0.4 : 0.85 },
-                      };
-                    };
                     return (
                       <React.Fragment>
                         <Box sx={{ ...tagSx(tagBg), cursor: "pointer" }} onClick={handlePauseToggle} title={lbPaused ? "다시 활성화" : "라보쉐르 일시정지"}>
@@ -954,15 +1619,6 @@ export default function GhUserGamePage() {
                           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: amtColor }}>
                             {lbAmt.toLocaleString()}
                           </Typography>
-                        </Box>
-                        <Box sx={hmBtnSx("#2e7d32", "H")} onClick={handleHit} title="라보 H: 양끝 제거, PnL +베팅액">H</Box>
-                        <Box sx={hmBtnSx("#c62828", "M")} onClick={handleMiss} title="라보 M: 끝 추가, PnL -베팅액">M</Box>
-                        <Box
-                          onClick={() => setLabSeqOpen(true)}
-                          sx={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 33, height: 24, border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 0.6, py: 0.3, cursor: "pointer", "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}
-                          title="전체 시퀀스 보기"
-                        >
-                          <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb" }}>≡{lbSeq.length}</Typography>
                         </Box>
                       </React.Fragment>
                     );
@@ -1040,7 +1696,7 @@ export default function GhUserGamePage() {
                   })()}
                 </Box>
 
-                {/* 행2: 회차 + P + step+ + B + step+ + del */}
+                {/* 행2: 회차 + P/B 횟수 + del + 계산/실제 금액 토글 */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box sx={turnBoxSx}>
                     <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 16 }}>{currentTurn}</Typography>
@@ -1076,124 +1732,63 @@ export default function GhUserGamePage() {
                       </Box>
                     );
                   })()}
-                </Box>
-
-                {/* 행3: next + new + P 박스 + 1S 0 필드 */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {(() => {
-                    const enabled = results.length > 0 && !processing;
-                    return (
-                      <Box
-                        onClick={enabled ? () => setShowNextConfirm(true) : undefined}
-                        sx={{ ...uniBtnSx("rgba(255,255,255,0.3)", "#666"), cursor: processing ? "not-allowed" : enabled ? "pointer" : "default", opacity: processing ? 0.4 : enabled ? 1 : 0.4, pointerEvents: processing ? "none" : "auto" }}
-                      >
-                        <Typography variant="caption" sx={{ fontSize: 12 }}>next</Typography>
-                      </Box>
-                    );
-                  })()}
                   <Box
-                    onClick={!processing ? () => setShowNewConfirm(true) : undefined}
-                    sx={{ ...uniBtnSx("#2196f3"), cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto" }}
+                    role="button"
+                    tabIndex={0}
+                    title={amountViewMode === "actual" ? "실제 베팅 금액 표시 중" : "전략 계산 금액 표시 중"}
+                    onClick={() => setAmountViewMode((prev) => prev === "actual" ? "calculated" : "actual")}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        setAmountViewMode((prev) => prev === "actual" ? "calculated" : "actual");
+                      }
+                    }}
+                    sx={{
+                      ...ctrlBtnSx(amountViewMode === "actual" ? "#00a85a" : "#2f80ed"),
+                      color: amountViewMode === "actual" ? "#00e676" : "#64b5f6",
+                      cursor: "pointer",
+                      userSelect: "none",
+                    }}
                   >
-                    <Typography variant="caption" sx={{ fontSize: 12, color: "#2196f3" }}>new</Typography>
-	                  </Box>
-	                  {(() => {
-	                    const center = roundState?.round_amount_table?.total_side || "W";
-	                    const centerColor = center === "P" ? "#1565c0" : center === "B" ? "#f44336" : "#fff";
-	                    return (
-	                      <Box sx={uniBtnSx("#67f431")}>
-                        <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 16, color: centerColor }}>{center}</Typography>
-                      </Box>
-                    );
-                  })()}
-                  {(() => {
-                    const mz = betData?.user_martin?.martin_z;
-                    // raw_amount: 라보/크루즈 활성, 방향 없음 등과 무관한 단계별 원본 금액
-                    const mzAmt = mz?.raw_amount ?? mz?.amount ?? 0;
-                    const mzStep = mz?.step || 1;
-                    return (
-                      <Box sx={{ ...fieldSx, width: 128, minWidth: 128, height: 32, border: "2px solid #67f431" }}>
-                        <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{mzStep}S</Typography>
-                        <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: mzAmt > 0 ? "#4caf50" : "#666" }}>
-                          {mzAmt > 0 ? mzAmt.toLocaleString() : "0"}
-                        </Typography>
-                      </Box>
-                    );
-                  })()}
-                </Box>
-
-                {/* 행4: 셋업 + auto + HitPoint */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box
-                    onClick={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
-                    sx={{ ...uniBtnSx("#ff9800"), cursor: "pointer" }}
-                  >
-                    <Typography variant="caption" sx={{ fontSize: 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
+                    <Typography variant="caption" sx={{ fontSize: 13, fontWeight: "bold" }}>
+                      {amountViewMode === "actual" ? "실" : "계"}
+                    </Typography>
                   </Box>
-                  {autoFeatureAvailable && (
-                    <Box
-                      onClick={handleAutoToggle}
-                      sx={{
-                        ...uniBtnSx(autoStatus.running ? "#66bb6a" : "#cc3499"),
-                        cursor: "pointer",
-                        backgroundColor: autoStatus.running ? "#2e7d32" : undefined,
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        sx={{ fontSize: 12, color: autoStatus.running ? "#fff" : "#cc3499", fontWeight: "bold" }}
-                      >
-                        {autoStatus.running ? "auto●" : "auto"}
-                      </Typography>
-                    </Box>
-                  )}
-                  {autoFeatureAvailable ? (() => {
-                    const phaseAbbr = {
-                      monitoring: "MON",
-                      betting: "BET",
-                      clearing: "CLR",
-                      completed: "DONE",
-                      error: "ERR",
-                      stopped: "STOP",
-                    };
-                    const abbr = phaseAbbr[autoStatus.phase] || "—";
-                    const pa = autoStatus.pnl_actual ?? 0;
-                    return (
-                      <Box sx={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5,
-                        width: 128, minWidth: 128, px: 1, height: 32, borderRadius: 1,
-                        border: autoStatus.running ? "2px solid #66bb6a" : "2px solid #7f7f7f",
-                        backgroundColor: autoStatus.running ? "rgba(102,187,106,0.1)" : "transparent",
-                        opacity: autoStatus.running ? 1 : 0.75,
-                        whiteSpace: "nowrap", overflow: "hidden",
-                      }}>
-                        <Typography variant="caption" sx={{ fontSize: 11, color: autoStatus.running ? "#66bb6a" : "#888", fontWeight: "bold" }}>
-                          {abbr}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontSize: 11,
-                            color: pa > 0 ? "#66bb6a" : pa < 0 ? "#ef5350" : "#ccc",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {pa.toLocaleString()}
-                          {autoStatus.goal_amount ? `/${Number(autoStatus.goal_amount).toLocaleString()}` : ""}
-                        </Typography>
-                      </Box>
-                    );
-                  })() : (
-                    <Box sx={{ ...fieldSx, width: 128, minWidth: 128, justifyContent: "flex-start", height: 32, border: "2px solid #7f7f7f", whiteSpace: "nowrap", overflow: "hidden" }}>
-                      <Typography variant="caption" sx={{ fontSize: 11, color: "#fff", whiteSpace: "nowrap" }}>HP:&nbsp;&nbsp;220000 P</Typography>
-                    </Box>
-                  )}
                 </Box>
+
               </Box>
             );
           })()}
+          <GhBettingSummaryPanel
+            roundState={roundState}
+            selectedMode={autoPlayMode}
+            onModeChange={setAutoPlayMode}
+            autoStatus={autoStatus}
+            onPlay={handleAutoToggle}
+            autoError={autoError}
+            disabled={slotBusy || !gameId}
+          />
+          </Box>
 
-          <RoundAmountTable roundState={roundState} />
+          <RoundAmountTable
+            roundState={roundState}
+            amountMode={amountViewMode}
+            onSetup={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
+            onNew={() => setShowNewConfirm(true)}
+            newDisabled={processing || slotBusy || autoStatus.running || !gameId || !selectedSlotNo}
+            labouchere={labouchere}
+            onLabouchereSequence={gameId ? () => setLabSeqOpen(true) : null}
+            labHmDisabled={labHmDisabled}
+            labHmPressed={labHmPressed}
+            onLabouchereHit={() => triggerLabouchereResult("H")}
+            onLabouchereMiss={() => triggerLabouchereResult("M")}
+            gameSlots={gameSlots}
+            selectedSlotNo={selectedSlotNo}
+            onSlotSelect={handleSlotSelect}
+            slotBusy={slotBusy}
+            onEnd={() => setShowEndConfirm(true)}
+            endDisabled={endDisabled}
+            endDisabledReason={endDisabledReason}
+          />
 
           </Box>
           {/* /1|2 row */}
@@ -1251,15 +1846,15 @@ export default function GhUserGamePage() {
         </DialogActions>
       </Dialog>
 
-      {/* 넥스트 게임 확인 */}
-      <Dialog open={showNextConfirm} onClose={() => setShowNextConfirm(false)}>
-        <DialogTitle>다음 게임</DialogTitle>
+      <Dialog open={showEndConfirm} onClose={() => setShowEndConfirm(false)}>
+        <DialogTitle sx={{ fontWeight: "bold" }}>게임 종료</DialogTitle>
         <DialogContent>
-          <Typography variant="body2">현재 게임을 종료하고 다음 게임으로 넘어가시겠습니까?</Typography>
+          <Typography>{selectedSlotNo}번 게임을 종료하고 빈 슬롯으로 만듭니다.</Typography>
+          <Typography>게임 기록은 삭제하지 않고 보존합니다.</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowNextConfirm(false)}>취소</Button>
-          <Button onClick={() => { setShowNextConfirm(false); handleNextGame(); }} color="primary" variant="contained">확인</Button>
+          <Button onClick={() => setShowEndConfirm(false)}>취소</Button>
+          <Button onClick={handleCloseSlotConfirm} color="error" variant="contained">종료</Button>
         </DialogActions>
       </Dialog>
 
@@ -1647,10 +2242,22 @@ export default function GhUserGamePage() {
       <AutoStartDialog
         open={autoDialogOpen}
         onClose={() => setAutoDialogOpen(false)}
-        onStarted={(resp) => setAutoStatus({ running: true, autoSessionId: resp.auto_session_id })}
+        onStarted={(resp) => {
+          setAutoError(null);
+          setAutoStatus({
+            running: true,
+            autoSessionId: resp.auto_session_id,
+            phase: resp.phase,
+            play_mode: resp.play_mode,
+          });
+          if (resp.slot_no) setSelectedSlotNo(resp.slot_no);
+          refreshGameSlots().catch(() => {});
+        }}
+        onError={setAutoError}
         gameId={gameId}
         pickhandId={myPickhandId}
         gameType="gh"
+        playMode={autoPlayMode}
       />
 
       {/* 베팅 거부 레이어 팝업 */}

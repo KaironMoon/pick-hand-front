@@ -68,7 +68,7 @@ const formatAge = (sec) => {
   return `${Math.floor(sec / 3600)}시간 전`;
 };
 
-const AutoStartDialog = ({ open, onClose, onStarted, gameId, pickhandId, gameType = "gh" }) => {
+const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId, gameType = "gh", playMode = "keep" }) => {
   const [sessionInfo, setSessionInfo] = useState(null);
   const [tableId, setTableId] = useState("");
   const [server, setServer] = useState("");
@@ -166,20 +166,31 @@ const AutoStartDialog = ({ open, onClose, onStarted, gameId, pickhandId, gameTyp
         tableId: tableId.trim(),
         server: server.trim() || null,
         gameType,
+        playMode,
       });
       onStarted?.(resp);
       onClose?.();
     } catch (e) {
       const detail = e?.response?.data?.detail;
+      let message;
       if (detail?.error === "session_required") {
-        setError("JSESSIONID가 만료되었습니다. 모바일 앱에서 재캡처하세요");
-      } else if (detail?.error === "auto_session_already_running") {
-        setError("이미 자동 베팅이 실행 중입니다");
+        message = "JSESSIONID가 만료되었습니다. 모바일 앱에서 재캡처하세요";
+      } else if (detail?.error === "auto_session_limit_reached") {
+        message = "자동게임은 한 계정에서 최대 6개까지 실행할 수 있습니다";
+      } else if (detail?.error === "auto_game_already_running") {
+        message = "이 게임의 자동 베팅이 이미 실행 중입니다";
+      } else if (detail?.error === "auto_table_already_running") {
+        message = "이 테이블의 자동 베팅이 이미 실행 중입니다";
+      } else if (detail?.error === "caller_user_mismatch") {
+        message = "로그인 계정과 Pick Hand ID가 일치하지 않습니다";
       } else if (e?.response?.status === 503) {
         setFeatureDisabled(true);
+        message = "자동 베팅 기능이 비활성화되어 있습니다";
       } else {
-        setError(detail?.error || "시작 실패");
+        message = detail?.error || "시작 실패";
       }
+      setError(message);
+      onError?.({ code: detail?.error || "auto_start_failed", detail: message });
     } finally {
       setBusy(false);
     }

@@ -49,6 +49,8 @@ const GH_GAMES_API = {
   START: "/api/v1/gh/games/start",
   ROUND: "/api/v1/gh/games/round",
   END: "/api/v1/gh/games/end",
+  SLOTS: "/api/v1/gh/games/slots",
+  SLOT_CLOSE: (slotNo) => `/api/v1/gh/games/slots/${slotNo}/close`,
   NEXT: "/api/v1/gh/games/next",
   LAST_ACTIVE: "/api/v1/gh/games/last-active",
   LAST_ROUND: (id) => `/api/v1/gh/games/${id}/last-round`,
