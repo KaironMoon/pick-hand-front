@@ -33,12 +33,15 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import SettingsIcon from "@mui/icons-material/Settings";
+import { useNavigate } from "react-router-dom";
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
 import { USERS_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 
 function UsersPage() {
   const theme = useTheme();
+  const navigate = useNavigate();
   const currentUser = useAtomValue(userAtom);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -291,6 +294,17 @@ function UsersPage() {
                   </TableCell>
                   <TableCell sx={cellSx}>{formatDate(user.created_at)}</TableCell>
                   <TableCell sx={{ ...cellSx, textAlign: "center" }}>
+                    <Tooltip title="GH 설정 편집">
+                      <IconButton
+                        size="small"
+                        onClick={() => navigate(
+                          `/ghgame/user-setup?targetUserId=${user.id}&targetUsername=${encodeURIComponent(user.username)}&from=users`,
+                        )}
+                        sx={{ color: "#ff9800" }}
+                      >
+                        <SettingsIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="GH 설정 복사">
                       <IconButton size="small" onClick={() => handleCopyOpen(user)} sx={{ color: "#42a5f5" }}>
                         <ContentCopyIcon fontSize="small" />

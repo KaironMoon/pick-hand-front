@@ -1411,6 +1411,13 @@ export default function GhUserSetupPage() {
   const currentUser = useAtomValue(userAtom);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const targetUserId = Number(searchParams.get("targetUserId"));
+  const targetUsername = searchParams.get("targetUsername") || "";
+  const editingTargetUser = (
+    currentUser?.role === "admin"
+    && Number.isInteger(targetUserId)
+    && targetUserId > 0
+  );
   const [config, setConfig] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1431,19 +1438,31 @@ export default function GhUserSetupPage() {
   }, [dirty]);
 
   useEffect(() => {
-    apiCaller.get(USER_BET_SETTINGS_API.GET(gameType)).then((res) => {
+    const url = editingTargetUser
+      ? USER_BET_SETTINGS_API.ADMIN_GET_GH(targetUserId)
+      : USER_BET_SETTINGS_API.GET(gameType);
+    apiCaller.get(url).then((res) => {
       setConfig(res.data.config);
     });
-  }, [gameType]);
+  }, [editingTargetUser, gameType, targetUserId]);
 
   const handleSave = async () => {
     if (!dirty) return;
     setSaving(true);
     try {
-      const res = await apiCaller.put(USER_BET_SETTINGS_API.SAVE(gameType), { config: normalizeUnknownAssistOptions(config) });
+      const url = editingTargetUser
+        ? USER_BET_SETTINGS_API.ADMIN_SAVE_GH(targetUserId)
+        : USER_BET_SETTINGS_API.SAVE(gameType);
+      const res = await apiCaller.put(url, { config: normalizeUnknownAssistOptions(config) });
       setConfig(res.data.config);
       setDirty(false);
-      setSnack({ open: true, message: "설정이 저장되었습니다.", severity: "success" });
+      setSnack({
+        open: true,
+        message: editingTargetUser
+          ? `${targetUsername || `사용자 #${targetUserId}`}의 설정을 저장했습니다.`
+          : "설정이 저장되었습니다.",
+        severity: "success",
+      });
     } catch (err) {
       setSnack({ open: true, message: err?.response?.data?.detail || "저장 실패", severity: "error" });
     } finally { setSaving(false); }
@@ -1461,7 +1480,7 @@ export default function GhUserSetupPage() {
       setCopyError("원본 사용자 아이디를 입력해주세요.");
       return;
     }
-    if (source === currentUser?.username) {
+    if (source === (editingTargetUser ? targetUsername : currentUser?.username)) {
       setCopyError("같은 사용자의 설정은 복사할 수 없습니다.");
       return;
     }
@@ -1476,7 +1495,7 @@ export default function GhUserSetupPage() {
     try {
       const res = await apiCaller.post(USER_BET_SETTINGS_API.COPY_GH, {
         source_username: copySource,
-        target_user_id: currentUser.id,
+        target_user_id: editingTargetUser ? targetUserId : currentUser.id,
       });
       setConfig(res.data.config);
       setDirty(false);
@@ -1492,6 +1511,10 @@ export default function GhUserSetupPage() {
   };
 
   const handleBack = () => {
+    if (searchParams.get("from") === "users") {
+      navigate("/users");
+      return;
+    }
     const backPaths = GAME_BACK_PATHS[gameType];
     const path = backPaths.user;
     const gid = searchParams.get("gameId");
@@ -1544,6 +1567,11 @@ export default function GhUserSetupPage() {
           sx={{ display: "inline-flex", alignItems: "center", border: `1px solid ${dirty ? GREEN : "rgba(255,255,255,0.2)"}`, borderRadius: 1, px: 1.5, py: 0.5, cursor: dirty ? "pointer" : "default", backgroundColor: dirty ? GREEN : "transparent", color: dirty ? "#fff" : "#666", opacity: saving ? 0.5 : 1, "&:hover": dirty ? { backgroundColor: "#388e3c" } : {} }}>
           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold" }}>{saving ? "저장 중..." : "저장"}</Typography>
         </Box>
+        {editingTargetUser && (
+          <Typography variant="caption" sx={{ color: "#ffb74d", fontSize: 13, fontWeight: "bold" }}>
+            {targetUsername || `사용자 #${targetUserId}`}의 GH 설정 편집 중
+          </Typography>
+        )}
         {currentUser?.role === "admin" && (
           <Box onClick={copying ? undefined : openCopyInput}
             sx={{ display: "inline-flex", alignItems: "center", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1.5, py: 0.5, cursor: copying ? "default" : "pointer", backgroundColor: "background.paper", opacity: copying ? 0.5 : 1, "&:hover": copying ? {} : { backgroundColor: "rgba(255,255,255,0.1)" } }}>

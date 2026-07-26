@@ -129,6 +129,7 @@ function RoundAmountTable({
   roundState,
   amountMode,
   onSetup,
+  setupDisabled = false,
   onNew,
   newDisabled = false,
   labHmDisabled = true,
@@ -188,7 +189,13 @@ function RoundAmountTable({
           : `${slotNo}번 빈 슬롯 — 새 게임 시작`,
       };
     }),
-    { label: "셋", accent: "#ff9800", onClick: onSetup },
+    {
+      label: "셋",
+      accent: "#ff9800",
+      onClick: onSetup,
+      disabled: setupDisabled,
+      title: setupDisabled ? "관리자 전용 설정" : "배팅 설정",
+    },
     { label: "뉴", accent: "#2f9bff", onClick: onNew, disabled: newDisabled },
     {
       label: "끝",
@@ -1885,6 +1892,7 @@ export default function GhUserGamePage() {
             roundState={roundState}
             amountMode={amountViewMode}
             onSetup={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
+            setupDisabled={!isAdmin}
             onNew={() => setShowNewConfirm(true)}
             newDisabled={processing || slotBusy || autoStatus.running || !gameId || !selectedSlotNo}
             labouchere={labouchere}

@@ -67,6 +67,8 @@ const GH_GAMES_API = {
 const USER_BET_SETTINGS_API = {
   GET: (gameType) => `/api/v1/user-settings/${gameType}`,
   SAVE: (gameType) => `/api/v1/user-settings/${gameType}`,
+  ADMIN_GET_GH: (userId) => `/api/v1/user-settings/admin/${userId}/gh`,
+  ADMIN_SAVE_GH: (userId) => `/api/v1/user-settings/admin/${userId}/gh`,
   COPY_GH: "/api/v1/user-settings/gh/copy",
 };
 
