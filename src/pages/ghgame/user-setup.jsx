@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAtomValue } from "jotai";
-import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from "@mui/material";
+import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
 import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
 import { USER_BET_SETTINGS_API } from "@/constants/api-url";
@@ -503,7 +503,7 @@ const BET_PROGRESS_MODES = [
 
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
 const ASSIST_OPTS = [
-  "해당반대", "해당진행", "J",
+  "해당반대", "해당진행", "고정P", "고정B", "이전3회", "J",
   "G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)",
   "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)", "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
   "HB멀티(H1)", "HB멀티(%1)", "WH멀티(H1)", "WH멀티(%1)", "MH멀티(H1)", "MH멀티(%1)", "DH멀티(H1)", "DH멀티(%1)",
@@ -578,6 +578,7 @@ const DEFAULT_STRATEGY_SETUP = {
   ai_var_mid_to_high_hit: 2,
   ai_var_section_counts: {},
   ai_var_pass_count: 0,
+  assist_lock_by_section: {},
   pasi: defaultPasi(),
   assist: false,
 };
@@ -729,7 +730,45 @@ function NumIn({ value, onChange, min, max, color = "#0065fe", width = 30, bg = 
   );
 }
 
-function MultiAssistGrid({ sections, visiblePasi, setPasiSectionAssist, setPasi }) {
+function AssistLockHeader({ section, assistType, locked, onToggle, style, colSpan, children }) {
+  const typeLabel = assistType === "q" ? "쿼터어시" : "회차어시";
+  const lockedBackground = assistType === "q" ? "#60497b" : "#16365c";
+  const unlockedBackground = assistType === "q" ? "#8a6da3" : "#496b8a";
+  const tooltip = locked
+    ? `${section} ${typeLabel} 연속락 사용 중 · 클릭하면 매 판 재산출`
+    : `${section} ${typeLabel} 연속락 해제 · 클릭하면 연속 어시스트 고정`;
+  const toggle = () => onToggle(section, assistType);
+  return (
+    <Tooltip title={tooltip} enterTouchDelay={0} arrow>
+      <td
+        colSpan={colSpan}
+        role="button"
+        tabIndex={0}
+        aria-label={tooltip}
+        aria-pressed={locked}
+        onClick={toggle}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggle();
+          }
+        }}
+        style={{
+          ...style,
+          position: "relative",
+          cursor: "pointer",
+          background: locked ? lockedBackground : unlockedBackground,
+          color: "#fff",
+          userSelect: "none",
+        }}
+      >
+        {children}
+      </td>
+    </Tooltip>
+  );
+}
+
+function MultiAssistGrid({ sections, visiblePasi, setPasiSectionAssist, assistLockBySection, toggleAssistLock }) {
   const slots = Array.from({ length: 4 }, (_, i) => (sections || [])[i] || null);
   const base = { ...mkCell, width: "auto", minWidth: 0, height: 22, padding: "1px 2px" };
   const hCell = { ...base, background: "#16365c", color: "#fff" };
@@ -741,6 +780,11 @@ function MultiAssistGrid({ sections, visiblePasi, setPasiSectionAssist, setPasi 
   const qHdr = { ...qCell, color: "#fff", fontWeight: "bold" };
   const disabled = { ...base, background: "#2b2b2b", color: "#777" };
   const sectionValue = (row, field, section) => normalizeAssistOption((row?.[field] || {})?.[section]);
+  const lockValue = (section, assistType) => {
+    const saved = assistLockBySection?.[section];
+    if (typeof saved === "boolean") return saved;
+    return saved?.[assistType] !== false;
+  };
 
   const renderAssistCell = (p, originalIndex, field, section, sx, slotIndex) => {
     if (!section) return <td key={`${field}-empty-${slotIndex}`} style={disabled}></td>;
@@ -780,9 +824,31 @@ function MultiAssistGrid({ sections, visiblePasi, setPasiSectionAssist, setPasi 
       <tbody>
         <tr>
           <td style={hSCell}>S</td>
-          {slots.map((section, i) => <td key={`h-hdr-${i}`} style={section ? hHdr : disabled}>{section || ""}</td>)}
+          {slots.map((section, i) => section ? (
+            <AssistLockHeader
+              key={`h-hdr-${i}`}
+              section={section}
+              assistType="h"
+              locked={lockValue(section, "h")}
+              onToggle={toggleAssistLock}
+              style={hHdr}
+            >
+              {section}
+            </AssistLockHeader>
+          ) : <td key={`h-hdr-${i}`} style={disabled}></td>)}
           <td style={qSCell}>S</td>
-          {slots.map((section, i) => <td key={`q-hdr-${i}`} style={section ? qHdr : disabled}>{section || ""}</td>)}
+          {slots.map((section, i) => section ? (
+            <AssistLockHeader
+              key={`q-hdr-${i}`}
+              section={section}
+              assistType="q"
+              locked={lockValue(section, "q")}
+              onToggle={toggleAssistLock}
+              style={qHdr}
+            >
+              {section}
+            </AssistLockHeader>
+          ) : <td key={`q-hdr-${i}`} style={disabled}></td>)}
         </tr>
         {visiblePasi.map(({ p, originalIndex }) => (
           <tr key={`assist-grid-${originalIndex}`}>
@@ -805,6 +871,28 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
   const stepMin = s.step_min || 1;
   const stepMax = s.step_max || 16;
   const count = s.count || 10;
+  const assistLockBySection = s.assist_lock_by_section || {};
+  const assistLockValue = (section, assistType) => {
+    const saved = assistLockBySection[section];
+    if (typeof saved === "boolean") return saved;
+    return saved?.[assistType] !== false;
+  };
+  const toggleAssistLock = (section, assistType) => {
+    const saved = assistLockBySection[section];
+    const previous = typeof saved === "boolean"
+      ? { h: saved, q: saved }
+      : { h: saved?.h !== false, q: saved?.q !== false };
+    onChange({
+      ...s,
+      assist_lock_by_section: {
+        ...assistLockBySection,
+        [section]: {
+          ...previous,
+          [assistType]: !assistLockValue(section, assistType),
+        },
+      },
+    });
+  };
 
   // 조건부 P배열: 흰색 lo/hi 직접 입력, 파랑/빨강 파생.
   const condLo = s.cond_lo ?? 0;
@@ -1078,8 +1166,9 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
               <MultiAssistGrid
                 sections={sections}
                 visiblePasi={visiblePasi}
-                setPasi={setPasi}
                 setPasiSectionAssist={setPasiSectionAssist}
+                assistLockBySection={assistLockBySection}
+                toggleAssistLock={toggleAssistLock}
               />
             </td>
           </tr>
@@ -1115,9 +1204,27 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
           <tr>
             <td colSpan={4} style={mkAssistHdr}>최상위조건설정</td>
             <td colSpan={1} style={mkRed}>연패발생</td>
-            <td colSpan={2} style={{ ...mkRed, background: "#16365c", color: "#015fe5" }}>어시 H픽</td>
+            <AssistLockHeader
+              colSpan={2}
+              section={name}
+              assistType="h"
+              locked={assistLockValue(name, "h")}
+              onToggle={toggleAssistLock}
+              style={{ ...mkRed, background: "#16365c", color: "#015fe5" }}
+            >
+              어시 H픽
+            </AssistLockHeader>
             <td colSpan={1} style={{ ...mkRed, background: "#60497b" }}>연패발생</td>
-            <td colSpan={2} style={{ ...mkAssistHdr, background: "#60497b", color: "#e5281a" }}>어시Q픽</td>
+            <AssistLockHeader
+              colSpan={2}
+              section={name}
+              assistType="q"
+              locked={assistLockValue(name, "q")}
+              onToggle={toggleAssistLock}
+              style={{ ...mkAssistHdr, background: "#60497b", color: "#e5281a" }}
+            >
+              어시Q픽
+            </AssistLockHeader>
           </tr>
           {/* 13행: 5Miss / 발생N회 / N회대기 + 2패시 */}
           {visiblePasi.map(({ p, originalIndex }, i) => {
@@ -1448,56 +1555,47 @@ export default function GhUserSetupPage() {
       {gameType === "gh" && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2, p: 1, border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1 }}>
           <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>오토 운영 옵션</Typography>
-
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>목표액 (원)</Typography>
-            <input
-              type="number"
-              value={config.auto_goal_amount ?? 0}
-              onChange={(e) => {
-                const v = parseInt(e.target.value || "0", 10) || 0;
-                setConfig((prev) => ({ ...prev, auto_goal_amount: v }));
-                setDirty(true);
-              }}
-              style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
-            />
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>실배팅 배율</Typography>
+            {[1, 0.1].map((scale) => {
+              const selected = Number(config.auto_actual_bet_scale ?? 1) === scale;
+              return (
+                <Box
+                  key={scale}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setConfig((prev) => ({ ...prev, auto_actual_bet_scale: scale }));
+                    setDirty(true);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      setConfig((prev) => ({ ...prev, auto_actual_bet_scale: scale }));
+                      setDirty(true);
+                    }
+                  }}
+                  sx={{
+                    minWidth: 58,
+                    px: 1,
+                    py: 0.45,
+                    borderRadius: 1,
+                    border: `1px solid ${selected ? "#00a85a" : "#555"}`,
+                    backgroundColor: selected ? "#17482f" : "#171a1f",
+                    color: selected ? "#00e676" : "#aaa",
+                    textAlign: "center",
+                    fontSize: 12,
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                >
+                  ×{scale}
+                </Box>
+              );
+            })}
             <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              0이면 무제한. 누적 PnL이 이 값 이상이면 자동 종료.
+              전략 계산액은 유지하고 실제 카지노 주문액에만 적용
             </Typography>
-          </Box>
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>종료 회차</Typography>
-            <input
-              type="number"
-              value={config.auto_end_round ?? 0}
-              onChange={(e) => {
-                const v = parseInt(e.target.value || "0", 10) || 0;
-                setConfig((prev) => ({ ...prev, auto_end_round: v }));
-                setDirty(true);
-              }}
-              style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
-            />
-            <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              0이면 무제한. 베팅 시작 후 이 회차에 도달하면 종료.
-            </Typography>
-          </Box>
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>단계 해소</Typography>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={!!config.auto_clear_stage}
-                onChange={(e) => {
-                  setConfig((prev) => ({ ...prev, auto_clear_stage: e.target.checked }));
-                  setDirty(true);
-                }}
-              />
-              <Typography variant="caption" sx={{ fontSize: 12, color: "#ddd" }}>
-                종료회차 도달 시 단계가 1단계 아니면 적중까지 연장
-              </Typography>
-            </label>
           </Box>
         </Box>
       )}

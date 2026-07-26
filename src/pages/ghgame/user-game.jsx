@@ -94,14 +94,43 @@ const controlBtnSx = {
   "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" },
 };
 
+const buildResultRows = ({
+  seq = "",
+  roundState,
+  picks = [],
+  statuses = [],
+  statusesAr = [],
+  dsMarks = [],
+}) => {
+  const storedShoeResults = roundState?.shoe_results;
+  const shoeValues = Array.isArray(storedShoeResults)
+    ? storedShoeResults
+      .map((item) => typeof item === "string" ? item : item?.actual)
+      .filter((value) => value === "P" || value === "B" || value === "T")
+    : [];
+  const values = shoeValues.length > 0 ? shoeValues : String(seq || "").split("");
+  let strategyIdx = 0;
+  return values.map((value) => {
+    if (value === "T") {
+      return { value, status: "wait", statusAr: "wait", aPick: null, decalShadow: false };
+    }
+    const idx = strategyIdx++;
+    return {
+      value,
+      status: statuses[idx] || "wait",
+      statusAr: statusesAr[idx] || "wait",
+      aPick: picks[idx] || null,
+      decalShadow: !!(dsMarks[idx]?.decal_pick || dsMarks[idx]?.shadow_pick),
+    };
+  });
+};
+
 function RoundAmountTable({
   roundState,
   amountMode,
   onSetup,
   onNew,
   newDisabled = false,
-  labouchere,
-  onLabouchereSequence,
   labHmDisabled = true,
   labHmPressed,
   onLabouchereHit,
@@ -116,27 +145,7 @@ function RoundAmountTable({
 }) {
   const table = roundState?.round_amount_table || {};
   const actualTable = roundState?.actual_bet_table || {};
-  const labouchereSequence = Array.isArray(labouchere?.sequence) ? labouchere.sequence : [];
-  const labouchereEnabled = !!labouchere?.enabled;
-  const jBase = roundState?.sections?.J?.base || {};
-  const jTotal = Number(jBase.total || 0);
-  const jHit = Number(jBase.hit || 0);
-  const jRate = jTotal > 0 ? jHit / jTotal : null;
-  const jBlink = jRate !== null && jRate >= 0.6;
   const toolbarButtons = [
-    {
-      label: `≡${labouchereSequence.length}`,
-      onClick: onLabouchereSequence,
-      disabled: !labouchereEnabled || !onLabouchereSequence,
-      title: labouchereEnabled ? "전체 라보쉐르 시퀀스 보기" : "라보쉐르 비활성",
-    },
-    {
-      label: "J",
-      blink: jBlink,
-      title: jRate === null
-        ? "J 승률: 기록 없음"
-        : `J 승률: ${(jRate * 100).toFixed(1)}% (${jHit}/${jTotal})`,
-    },
     {
       label: "H",
       backgroundColor: "#2e7d32",
@@ -226,8 +235,8 @@ function RoundAmountTable({
     const hasResult = !!cell.actual;
     const hasJudgement = cell.status === "hit" || cell.status === "miss";
     return {
-      width: 86,
-      height: 30,
+      width: 84,
+      height: 31,
       border: "1px solid #3f4650",
       // 실제 배팅 여부와 픽 판정은 별개다. 실 모드에서 금액이 0이어도
       // 배팅금액판 픽의 hit/miss 결과 색상은 그대로 보여준다.
@@ -247,7 +256,7 @@ function RoundAmountTable({
     return "#777";
   };
   return (
-    <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 0.4, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1 }}>
+    <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1.4, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1 }}>
       <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5, width: "100%" }}>
         {toolbarButtons.map(({
           label,
@@ -298,17 +307,17 @@ function RoundAmountTable({
             {label}
           </Box>
         ))}
-        <Box sx={{ width: 30, border: "1px solid #3f4650", backgroundColor: finalSideColor, color: "#fff", fontSize: 13, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Box sx={{ width: 28, border: "1px solid #3f4650", backgroundColor: finalSideColor, color: "#fff", fontSize: 13, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {finalSide || "-"}
         </Box>
-        <Box sx={{ flex: 1, minWidth: 120, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 1, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>합산</span><span>{fmt(totalAmount)}</span>
         </Box>
-        <Box sx={{ flex: 1, minWidth: 120, border: "1px solid #3f4650", backgroundColor: "#111821", color: totalPnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 1, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: totalPnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>PnL</span><span>{fmt(totalPnl)}</span>
         </Box>
       </Box>
-      <Box sx={{ display: "grid", gridTemplateRows: "repeat(10, 30px)", gridAutoFlow: "column", gridAutoColumns: "86px", gap: "2px" }}>
+      <Box sx={{ display: "grid", gridTemplateRows: "repeat(10, 31px)", gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
         {Array.from({ length: cellCount }, (_, idx) => (
           <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P / PnL ${fmt(cells[idx]?.pnl)}P`}>
             <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
@@ -431,6 +440,11 @@ function GhBettingSummaryPanel({
     : pickMartin?.direction === "B"
       ? "#f44336"
       : "#7f7f7f";
+  const pickMartinBackground = pickMartin?.direction === "P"
+    ? "rgba(21, 101, 192, 0.32)"
+    : pickMartin?.direction === "B"
+      ? "rgba(244, 67, 54, 0.32)"
+      : "#080a0d";
   const yukmaeBoardRows = 6;
   const yukmaeBoardColumns = 13;
   const markerColor = { P: "#1565d8", B: "#f44336", T: "#00a85a" };
@@ -481,7 +495,7 @@ function GhBettingSummaryPanel({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-around",
-            backgroundColor: "#080a0d",
+            backgroundColor: pickMartinBackground,
             color: "#aaa",
             fontSize: 13,
             fontWeight: "bold",
@@ -648,11 +662,13 @@ export default function GhUserGamePage() {
   const [roundLscList, setRoundLscList] = useState([]);
   const [twoPick, setTwoPick] = useState(null);
   const [roundTwoList, setRoundTwoList] = useState([]);
-  // DO NOT USE FOR NEW UI: picks_snapshot은 서버 roundState 갱신 입력 전용 레거시 payload다.
-  // 화면 표시/빅로드/전략보드/API 표시 기준 데이터는 반드시 roundState만 사용한다.
+  // DO NOT USE FOR NEW UI: picks_snapshot은 서버 상태 갱신 입력 전용 레거시 payload다.
+  // 상단 운영 화면과 하단 분석 화면은 각각 분리된 round_state 응답만 사용한다.
   // 기존 보조 컴포넌트가 아직 남아 있어 state로 보관하지만, 신규 참조를 추가하지 말 것.
   const [picksSnapshot, setPicksSnapshot] = useState(null);
-  const [roundState, setRoundState] = useState(null);
+  const [roundStateUpper, setRoundStateUpper] = useState(null);
+  const [roundStateLower, setRoundStateLower] = useState(null);
+  const roundState = roundStateUpper;
   const [batExpanded, setBatExpanded] = useState({}); // {`gi-ri`: true} — Bat 셀 전체 표시 토글
   const [trackStreakHidden, setTrackStreakHidden] = useState({}); // {sckey: true} — 트랙 연승/연패 셀 숨김 토글
   const [betData, setBetData] = useState(null);
@@ -684,13 +700,15 @@ export default function GhUserGamePage() {
   const [amountViewMode, setAmountViewMode] = useState("calculated");
   const [autoError, setAutoError] = useState(null);
   const [rejectMsg, setRejectMsg] = useState(null);  // 베팅 거부 레이어 팝업
+  const [legacyRestoreBlocked, setLegacyRestoreBlocked] = useState(false);
   const [myPickhandId, setMyPickhandId] = useState(null);
   const [ncRefDraft, setNcRefDraft] = useState(() => (typeof window !== "undefined" ? localStorage.getItem(NC_REF_LOCK_KEY) || "" : ""));
   const [ncRefOriginal, setNcRefOriginal] = useState("");
   const [ncRefLocked, setNcRefLocked] = useState(() => !!(typeof window !== "undefined" && localStorage.getItem(NC_REF_LOCK_KEY)));
   const [ncRefBusy, setNcRefBusy] = useState(false);
 
-  const currentTurn = results.length + 1;
+  const strategyResults = results.filter((result) => result.value === "P" || result.value === "B");
+  const currentTurn = strategyResults.length + 1;
   const ncRefDirty = String(ncRefDraft || "") !== String(ncRefOriginal || "");
   const syncNcRefNo = useCallback((state) => {
     const no = state?.nc_ref_shoe_no;
@@ -699,7 +717,7 @@ export default function GhUserGamePage() {
     setNcRefOriginal(value);
     setNcRefDraft(value);
   }, []);
-  const inputLocked = processing;
+  const inputLocked = processing || legacyRestoreBlocked;
   // LEGACY COMPAT ONLY: displaySnapshot 별칭은 남은 레거시 보조표용이다.
   // 새 화면/상태 판단/픽 표시/닷 표시에는 사용 금지. 필요한 데이터는 서버에서 roundState에 추가한다.
   const displaySnapshot = picksSnapshot;
@@ -712,7 +730,7 @@ export default function GhUserGamePage() {
   const amountTableStatusFor = (idx) => {
     const cell = roundAmountCells[idx] || {};
     const pick = cell.pick ?? cell.side;
-    const actual = cell.actual ?? results[idx]?.value;
+    const actual = cell.actual ?? strategyResults[idx]?.value;
     if (cell.status === "hit" || cell.status === "miss") return cell.status;
     if ((pick === "P" || pick === "B") && (actual === "P" || actual === "B")) {
       return pick === actual ? "hit" : "miss";
@@ -720,7 +738,7 @@ export default function GhUserGamePage() {
     return "wait";
   };
   // 빅로드1: 지난 회차의 실제 결과 P/B를 표시하고, 배경색은 금액 합산표의 적/미적으로 결정한다.
-  const gridResults = results.map((r, i) => ({ ...r, status: amountTableStatusFor(i) }));
+  const gridResults = strategyResults.map((r, i) => ({ ...r, status: amountTableStatusFor(i) }));
   const grid = calculateCircleGrid(gridResults);
 
   // LEGACY COMPAT ONLY: 하단 보조 표시용. 현재 판/전략보드/빅로드 표시는 roundState 사용.
@@ -759,6 +777,7 @@ export default function GhUserGamePage() {
   const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
   const applyGameData = useCallback((data) => {
+    setLegacyRestoreBlocked(false);
     setGameId(data.game_id);
     setConfig(data.config);
     setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
@@ -767,15 +786,17 @@ export default function GhUserGamePage() {
     const statuses = data.round_status || [];
     const statusesAr = data.round_status_ar || [];
     const dsMarks = data.round_decal_shadow || [];
-    setResults(seq.split("").map((v, i) => {
-      const pick = picks[i];
-      const status = statuses[i] || "wait";
-      const statusAr = statusesAr[i] || "wait";
-      return { value: v, status, statusAr, aPick: pick || null, decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick) };
+    setResults(buildResultRows({
+      seq,
+      roundState: data.round_state_upper,
+      picks,
+      statuses,
+      statusesAr,
+      dsMarks,
     }));
     setGlobalhitData(data.globalhit || []);
-    setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
-    syncNcRefNo(data.round_state);
+    setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundStateUpper(data.round_state_upper || null); setRoundStateLower(data.round_state_lower || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+    syncNcRefNo(data.round_state_upper);
     setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
     setUserSummary(data.user_summary || null);
     setUserMartinDashboard(data.user_martin_dashboard || null);
@@ -810,12 +831,13 @@ export default function GhUserGamePage() {
         }
       }
       if (!lockedApplied) {
+        setLegacyRestoreBlocked(false);
         setGameId(res.data.game_id);
         setConfig(res.data.config);
         setGlobalhitData(res.data.globalhit || []);
         setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null);
-        setPicksSnapshot(res.data.picks_snapshot || null); setRoundState(res.data.round_state || null);
-        syncNcRefNo(res.data.round_state);
+        setPicksSnapshot(res.data.picks_snapshot || null); setRoundStateUpper(res.data.round_state_upper || null); setRoundStateLower(res.data.round_state_lower || null);
+        syncNcRefNo(res.data.round_state_upper);
       }
       skipRestoreGameIdRef.current = res.data.game_id;
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
@@ -884,6 +906,14 @@ export default function GhUserGamePage() {
       applyGameData(res.data);
     } catch (err) {
       if (err.response?.status === 409) {
+        setGameId(gid);
+        setLegacyRestoreBlocked(true);
+        setResults([]);
+        setBetData(null);
+        setUserSummary(null);
+        setUserMartinDashboard(null);
+        setRoundStateUpper(null);
+        setRoundStateLower(null);
         setRejectMsg(err.response?.data?.detail || "이 게임은 복원할 수 없습니다.");
         return;
       }
@@ -989,9 +1019,7 @@ export default function GhUserGamePage() {
             betsSucceeded: st.bets_succeeded,
             betsFailed: st.bets_failed,
             phase: st.phase ?? prev.phase,
-            goal_amount: st.goal_amount ?? prev.goal_amount,
-            end_round: st.end_round ?? prev.end_round,
-            clear_stage: st.clear_stage ?? prev.clear_stage,
+            actual_bet_scale: st.actual_bet_scale ?? prev.actual_bet_scale ?? 1,
             pnl_total: st.pnl_total ?? prev.pnl_total,
             pnl_actual: st.pnl_actual ?? prev.pnl_actual,
             pnl_total_p: st.pnl_total_p ?? prev.pnl_total_p,
@@ -1084,17 +1112,11 @@ export default function GhUserGamePage() {
               pnl_actual: data.pnl_actual ?? prev.pnl_actual,
               pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
               pnl_actual_p: data.pnl_actual_p ?? prev.pnl_actual_p,
-              goal_amount: data.goal_amount ?? prev.goal_amount,
-              end_round: data.end_round ?? prev.end_round,
-              clear_stage: data.clear_stage ?? prev.clear_stage,
               round_count: data.round_count ?? prev.round_count,
             }));
             if (data.game_id && data.game_id !== gameId) {
               setGameId(data.game_id);
               setSearchParams({ gameId: data.game_id }, { replace: true });
-            }
-            if (data.phase === "clearing") {
-              console.info("[Auto] 단계해소 모드 진입 — 적중까지 연장");
             }
           } else if (t === "game_switched") {
             setGameId(data.new_game_id);
@@ -1114,17 +1136,12 @@ export default function GhUserGamePage() {
               pnl_actual_p: 0,
             }));
             console.info(`[Auto] 재시작: new_session=${data.auto_session_id} game=${data.game_id}`);
-          } else if (t === "goal_reached") {
-            console.info(`[Auto] 목표 달성: 실 PnL ${data.final_pnl_actual} / 목표 ${data.goal_amount}`);
           } else if (t === "bet_attempt") {
-            setRoundState((prev) => applyActualBetAttempt(prev, data));
+            setRoundStateUpper((prev) => applyActualBetAttempt(prev, data));
           } else if (t === "bet_settled") {
-            setRoundState((prev) => applyActualBetSettlement(prev, data));
+            setRoundStateUpper((prev) => applyActualBetSettlement(prev, data));
           } else if (t === "session_ended") {
             const reasonMap = {
-              goal_reached: "목표액 도달",
-              end_round_reached: "종료회차 도달",
-              stage_cleared: "단계해소 완료",
               casino_shoe_ended: "카지노 슈 종료",
             };
             console.info(
@@ -1203,9 +1220,15 @@ export default function GhUserGamePage() {
     try {
       const res = await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
       const data = res.data;
-      if (data.round_num !== undefined && data.round_num !== results.length + 1) {
+      const nextStrategyRound = results.filter((result) => result.value === "P" || result.value === "B").length + 1;
+      if (inputValue !== "T" && data.round_num !== undefined && data.round_num !== nextStrategyRound) {
         alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
         window.location.reload();
+        return;
+      }
+      if (inputValue === "T") {
+        setRoundStateUpper(data.round_state_upper || null);
+        setRoundStateLower(data.round_state_lower || null);
         return;
       }
       // 방금 입력한 라운드의 hit/miss를 서버 판정값으로 확정 (프론트 자체 계산 안 함)
@@ -1216,11 +1239,11 @@ export default function GhUserGamePage() {
       }
       setCumPnL({ gh: data.cum_pnl.gh, user_a: data.cum_pnl.user_a || 0, user_z: data.cum_pnl.user_z || 0, user_s: data.cum_pnl.user_s || 0, allp: data.cum_pnl.allp || 0, allb: data.cum_pnl.allb || 0, fail: data.cum_pnl.fail || 0, hnh: data.cum_pnl.hnh || 0, one: data.cum_pnl.one || 0, two: data.cum_pnl.two || 0, labouchere: data.cum_pnl.labouchere || 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundStateUpper(data.round_state_upper || null); setRoundStateLower(data.round_state_lower || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);
-      checkGoalAlert(data.user_summary, data.round_state?.strategy_goals);
+      checkGoalAlert(data.user_summary, data.round_state_upper?.strategy_goals);
 
     } catch (err) {
       console.error("Failed to record round:", err);
@@ -1248,25 +1271,32 @@ export default function GhUserGamePage() {
     try {
       const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
       const data = res.data;
+      if (data.tie_deleted) {
+        setResults((prev) => prev.slice(0, -1));
+        setRoundStateUpper(data.round_state_upper || null);
+        setRoundStateLower(data.round_state_lower || null);
+        return;
+      }
       if (data.seq !== undefined && Array.isArray(data.round_picks)) {
         const seq = data.seq || "";
         const picks = data.round_picks || [];
         const statuses = data.round_status || [];
         const statusesAr = data.round_status_ar || [];
         const dsMarks = data.round_decal_shadow || [];
-        setResults(seq.split("").map((v, i) => ({
-          value: v,
-          status: statuses[i] || "wait",
-          statusAr: statusesAr[i] || "wait",
-          aPick: picks[i] || null,
-          decalShadow: !!(dsMarks[i]?.decal_pick || dsMarks[i]?.shadow_pick),
-        })));
+        setResults(buildResultRows({
+          seq,
+          roundState: data.round_state_upper,
+          picks,
+          statuses,
+          statusesAr,
+          dsMarks,
+        }));
       } else {
         setResults(results.slice(0, -1));
       }
       setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
       setGlobalhitData(data.globalhit || []);
-      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundState(data.round_state || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+      setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundStateUpper(data.round_state_upper || null); setRoundStateLower(data.round_state_lower || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
       setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);
@@ -1289,7 +1319,9 @@ export default function GhUserGamePage() {
     setTopGhSections([]);
     setTopNextRound(null);
     setPicksSnapshot(null);
-    setRoundState(null);
+    setRoundStateUpper(null);
+    setRoundStateLower(null);
+    setLegacyRestoreBlocked(false);
     setAutoStatus({ running: false, autoSessionId: null });
     setAutoError(null);
   };
@@ -1301,6 +1333,7 @@ export default function GhUserGamePage() {
       phase: slot?.phase || null,
       table_name: slot?.table_name || null,
       play_mode: slot?.play_mode || "one",
+      actual_bet_scale: slot?.actual_bet_scale || 1,
     });
     setAutoError(slot?.phase === "error" ? {
       code: slot.error_code || "auto_error",
@@ -1397,6 +1430,7 @@ export default function GhUserGamePage() {
   const labouchereSequence = Array.isArray(labouchere?.sequence) ? labouchere.sequence : [];
   const labHmDisabled = (
     !gameId
+    || legacyRestoreBlocked
     || !labouchere?.enabled
     || !!labouchere?.paused
     || labouchereSequence.length === 0
@@ -1430,6 +1464,7 @@ export default function GhUserGamePage() {
     processing
     || slotBusy
     || autoStatus.running
+    || legacyRestoreBlocked
     || !gameId
     || !selectedSlotNo
     || selectedSlotNo === 1
@@ -1554,6 +1589,21 @@ export default function GhUserGamePage() {
               "&:active": { transform: "scale(0.95)" },
             });
             const ctrlBtnSx = (borderColor, fg) => ({ ...controlBtnSx, border: `2px solid ${borderColor}`, color: fg || "#fff", display: "flex", alignItems: "center", justifyContent: "center", minWidth: 50 });
+            const compactBtnSx = (borderColor, fg = "#fff") => ({
+              width: 32,
+              minWidth: 32,
+              height: 32,
+              border: `1px solid ${borderColor}`,
+              borderRadius: 1,
+              backgroundColor: "#101318",
+              color: fg,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 13,
+              fontWeight: "bold",
+              userSelect: "none",
+            });
 
             return (
               <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1, px: 0, py: 0.5 }}>
@@ -1685,18 +1735,100 @@ export default function GhUserGamePage() {
                         <Box sx={tagSx("#c62828")}>
                           <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>마틴Z</Typography>
                         </Box>
-                        <Box sx={fieldSx}>
+                        <Box sx={{ ...fieldSx, minWidth: 80, px: 0.6 }}>
                           <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{step}S</Typography>
-                          <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
                             {amt > 0 ? `${amt.toLocaleString()}${dir}` : "0"}
                           </Typography>
                         </Box>
                       </React.Fragment>
                     );
                   })()}
+                  {(() => {
+                    const enabled = !!labouchere?.enabled && !!gameId;
+                    return (
+                      <Box
+                        role={enabled ? "button" : undefined}
+                        tabIndex={enabled ? 0 : undefined}
+                        title={enabled ? "전체 라보쉐르 시퀀스 보기" : "라보쉐르 비활성"}
+                        onClick={enabled ? () => setLabSeqOpen(true) : undefined}
+                        onKeyDown={enabled ? (event) => {
+                          if (event.key === "Enter" || event.key === " ") setLabSeqOpen(true);
+                        } : undefined}
+                        sx={{
+                          ...compactBtnSx("#8e24aa"),
+                          cursor: enabled ? "pointer" : "not-allowed",
+                          opacity: enabled ? 1 : 0.4,
+                        }}
+                      >
+                        ≡{labouchereSequence.length}
+                      </Box>
+                    );
+                  })()}
+                  {(() => {
+                    const jBase = roundState?.j_summary || {};
+                    const total = Number(jBase.total || 0);
+                    const hit = Number(jBase.hit || 0);
+                    const rate = total > 0 ? hit / total : null;
+                    const blink = rate !== null && rate >= 0.6;
+                    return (
+                      <Box
+                        title={rate === null ? "J 승률: 기록 없음" : `J 승률: ${(rate * 100).toFixed(1)}% (${hit}/${total})`}
+                        sx={{
+                          ...compactBtnSx("#707781"),
+                          ...(blink ? {
+                            animation: "jBlink 0.8s infinite",
+                            "@keyframes jBlink": { "0%, 100%": { opacity: 1 }, "50%": { opacity: 0.3 } },
+                          } : {}),
+                        }}
+                      >
+                        J
+                      </Box>
+                    );
+                  })()}
+                  <Box
+                    role="button"
+                    tabIndex={0}
+                    title={amountViewMode === "actual" ? "실제 베팅 금액 표시 중" : "전략 계산 금액 표시 중"}
+                    onClick={() => setAmountViewMode((prev) => prev === "actual" ? "calculated" : "actual")}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        setAmountViewMode((prev) => prev === "actual" ? "calculated" : "actual");
+                      }
+                    }}
+                    sx={{
+                      ...compactBtnSx(amountViewMode === "actual" ? "#00a85a" : "#2f80ed"),
+                      color: amountViewMode === "actual" ? "#00e676" : "#64b5f6",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {amountViewMode === "actual" ? "실" : "계"}
+                  </Box>
+                  {Number(autoStatus.actual_bet_scale) === 0.1 && (
+                    <Box
+                      title="실제 카지노 주문액에 ×0.1 적용 중"
+                      sx={{
+                        width: 38,
+                        minWidth: 38,
+                        height: 32,
+                        border: "1px solid #00a85a",
+                        borderRadius: 1,
+                        backgroundColor: "#10271d",
+                        color: "#00e676",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 10,
+                        fontWeight: "bold",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      ×0.1
+                    </Box>
+                  )}
                 </Box>
 
-                {/* 행2: 회차 + P/B 횟수 + del + 계산/실제 금액 토글 */}
+                {/* 행2: 회차 + P/B/T 결과 입력 + 횟수 + del */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box sx={turnBoxSx}>
                     <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 16 }}>{currentTurn}</Typography>
@@ -1718,6 +1850,7 @@ export default function GhUserGamePage() {
                         <Box sx={{ ...turnBoxSx, width: 38, height: 38, ...(bBlink ? blinkSx : {}) }}>
                           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{bCount}</Typography>
                         </Box>
+                        <Box sx={pbBtnSx("#00a85a")} onClick={() => handleInput("T")}>T</Box>
                       </>
                     );
                   })()}
@@ -1732,27 +1865,6 @@ export default function GhUserGamePage() {
                       </Box>
                     );
                   })()}
-                  <Box
-                    role="button"
-                    tabIndex={0}
-                    title={amountViewMode === "actual" ? "실제 베팅 금액 표시 중" : "전략 계산 금액 표시 중"}
-                    onClick={() => setAmountViewMode((prev) => prev === "actual" ? "calculated" : "actual")}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        setAmountViewMode((prev) => prev === "actual" ? "calculated" : "actual");
-                      }
-                    }}
-                    sx={{
-                      ...ctrlBtnSx(amountViewMode === "actual" ? "#00a85a" : "#2f80ed"),
-                      color: amountViewMode === "actual" ? "#00e676" : "#64b5f6",
-                      cursor: "pointer",
-                      userSelect: "none",
-                    }}
-                  >
-                    <Typography variant="caption" sx={{ fontSize: 13, fontWeight: "bold" }}>
-                      {amountViewMode === "actual" ? "실" : "계"}
-                    </Typography>
-                  </Box>
                 </Box>
 
               </Box>
@@ -1765,7 +1877,7 @@ export default function GhUserGamePage() {
             autoStatus={autoStatus}
             onPlay={handleAutoToggle}
             autoError={autoError}
-            disabled={slotBusy || !gameId}
+            disabled={slotBusy || !gameId || legacyRestoreBlocked}
           />
           </Box>
 
@@ -1793,29 +1905,33 @@ export default function GhUserGamePage() {
           </Box>
           {/* /1|2 row */}
 
-          {/* ===== 전략별 현황 전광판 (배팅 판 ↔ S1/S2/S3 사이) ===== */}
-          <GhStrategyBoard
-            roundState={roundState}
-          />
+          {isAdmin && roundStateLower && (
+            <>
+              {/* ===== 어드민 전용 하단 전략별 현황 전광판 ===== */}
+              <GhStrategyBoard
+                roundState={roundStateLower}
+              />
 
-          {/* ===== 빅로드2 ===== */}
-          <GhBigRoad2
-            roundState={roundState}
-            subgameBasis={displaySnapshot?.subgame_basis}
-            ncRefShoes={roundState?.nc_ref_shoes}
-            ncRefShoeNo={roundState?.nc_ref_shoe_no}
-            ncRefControls={{
-              value: ncRefDraft,
-              dirty: ncRefDirty,
-              locked: ncRefLocked,
-              busy: ncRefBusy,
-              onChange: handleNcRefChange,
-              onConfirm: handleNcRefConfirm,
-              onCancel: handleNcRefCancel,
-              onToggleLock: handleNcRefLockToggle,
-            }}
-            actualSeq={results.map((r) => r.value).join("")}
-          />
+              {/* ===== 어드민 전용 하단 빅로드2 ===== */}
+              <GhBigRoad2
+                roundState={roundStateLower}
+                subgameBasis={displaySnapshot?.subgame_basis}
+                ncRefShoes={roundStateLower?.nc_ref_shoes}
+                ncRefShoeNo={roundStateLower?.nc_ref_shoe_no}
+                ncRefControls={{
+                  value: ncRefDraft,
+                  dirty: ncRefDirty,
+                  locked: ncRefLocked,
+                  busy: ncRefBusy,
+                  onChange: handleNcRefChange,
+                  onConfirm: handleNcRefConfirm,
+                  onCancel: handleNcRefCancel,
+                  onToggleLock: handleNcRefLockToggle,
+                }}
+                actualSeq={strategyResults.map((r) => r.value).join("")}
+              />
+            </>
+          )}
           </>
         );
       })()}
@@ -2249,6 +2365,7 @@ export default function GhUserGamePage() {
             autoSessionId: resp.auto_session_id,
             phase: resp.phase,
             play_mode: resp.play_mode,
+            actual_bet_scale: resp.actual_bet_scale || 1,
           });
           if (resp.slot_no) setSelectedSlotNo(resp.slot_no);
           refreshGameSlots().catch(() => {});
