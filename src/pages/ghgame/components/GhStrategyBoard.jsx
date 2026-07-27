@@ -253,12 +253,13 @@ function LblCell({ text, color = "#fff", edge }) {
   return <Box component={Tag} sx={sx}>{text}</Box>;
 }
 
-function StrategyTable({ data }) {
+function StrategyTable({ data, showLabels = true }) {
+  const rowLabel = (text) => showLabels ? text : undefined;
   return (
-    <Box component="table" sx={{ borderCollapse: "collapse", backgroundColor: "#000", tableLayout: "fixed", width: 1020 }}>
+    <Box component="table" sx={{ borderCollapse: "collapse", backgroundColor: "#000", tableLayout: "fixed", width: showLabels ? 1020 : 960 }}>
       <thead>
         <tr>
-          <LblCell text="섹션" edge="head" />
+          {showLabels && <LblCell text="섹션" edge="head" />}
           {data.name.map((n, i) => (
             <Box component="th" key={i} sx={{
               ...thSx,
@@ -275,27 +276,27 @@ function StrategyTable({ data }) {
         </tr>
       </thead>
       <tbody>
-        <SimpleRow data={data} dataKey="wait" render={waitCell} pos="mid" label="연속" markKey="waitSourceMarks" />
-        <SimpleRow data={data} dataKey="pick" render={(v) => <Chip v={v} />} pos="mid" label="생성" />
-        <SimpleRow data={data} dataKey="stage1" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" />
-        <SimpleRow data={data} dataKey="pct" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" markKey="pctSourceMarks" />
-        <SimpleRow data={data} dataKey="rec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="총전적" />
-        <SimpleRow data={data} dataKey="rec2" render={(v) => <span>{rec2HTML(v)}</span>} pos="mid" label="최다" />
-        <AssistRow data={data} pos="mid" label="어시H픽" labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="wait2" render={waitCell} pos="mid" label="연속" labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="pct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="assistRec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="총전적" labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="idx1" render={(v, i, row) => amountText(v, row.idx1Zone?.[i])} pos="mid" label="회차P" labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label="누적P" labelColor={LBL_RED} />
-        <QAssistRow data={data} pos="mid" label="어시Q픽" />
-        <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label="쿼터연속" />
-        <SimpleRow data={data} dataKey="qPct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label="적중율" />
+        <SimpleRow data={data} dataKey="wait" render={waitCell} pos="mid" label={rowLabel("연속")} markKey="waitSourceMarks" />
+        <SimpleRow data={data} dataKey="pick" render={(v) => <Chip v={v} />} pos="mid" label={rowLabel("생성")} />
+        <SimpleRow data={data} dataKey="stage1" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label={rowLabel("단계-AS")} />
+        <SimpleRow data={data} dataKey="pct" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("적중율")} markKey="pctSourceMarks" />
+        <SimpleRow data={data} dataKey="rec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label={rowLabel("총전적")} />
+        <SimpleRow data={data} dataKey="rec2" render={(v) => <span>{rec2HTML(v)}</span>} pos="mid" label={rowLabel("최다")} />
+        <AssistRow data={data} pos="mid" label={rowLabel("어시H픽")} labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="wait2" render={waitCell} pos="mid" label={rowLabel("연속")} labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="pct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("적중율")} labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="assistRec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label={rowLabel("총전적")} labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label={rowLabel("단계-AS")} labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="idx1" render={(v, i, row) => amountText(v, row.idx1Zone?.[i])} pos="mid" label={rowLabel("회차P")} labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("누적P")} labelColor={LBL_RED} />
+        <QAssistRow data={data} pos="mid" label={rowLabel("어시Q픽")} />
+        <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label={rowLabel("쿼터연속")} />
+        <SimpleRow data={data} dataKey="qPct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("적중율")} />
         {/* 쿼터 블록 */}
-        <SimpleRow data={data} dataKey="qrec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label="쿼터전적" />
-        <SimpleRow data={data} dataKey="qstage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label="단계-AS" />
-        <SimpleRow data={data} dataKey="qidx1" render={(v, i, row) => amountText(v, row.qidx1Zone?.[i])} pos="mid" label="쿼터P" />
-        <SimpleRow data={data} dataKey="qidx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="last" label="누적P" />
+        <SimpleRow data={data} dataKey="qrec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label={rowLabel("쿼터전적")} />
+        <SimpleRow data={data} dataKey="qstage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label={rowLabel("단계-AS")} />
+        <SimpleRow data={data} dataKey="qidx1" render={(v, i, row) => amountText(v, row.qidx1Zone?.[i])} pos="mid" label={rowLabel("쿼터P")} />
+        <SimpleRow data={data} dataKey="qidx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="last" label={rowLabel("누적P")} />
       </tbody>
     </Box>
   );
@@ -545,8 +546,8 @@ export default function GhStrategyBoard({ roundState }) {
   const tables = [G1, G2, G3, G4].map((t) => (hasData ? withLiveData(t, ctx) : t));
   return (
     <Box sx={{ overflowX: "auto", mb: 2 }}>
-      <Box sx={{ display: "inline-block", backgroundColor: "#000" }}>
-        {tables.map((t, idx) => <StrategyTable key={idx} data={t} />)}
+      <Box sx={{ display: "inline-grid", gridTemplateColumns: "repeat(2, max-content)", backgroundColor: "#000" }}>
+        {tables.map((t, idx) => <StrategyTable key={idx} data={t} showLabels={idx % 2 === 0} />)}
       </Box>
     </Box>
   );
