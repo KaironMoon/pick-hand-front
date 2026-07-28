@@ -503,7 +503,7 @@ const BET_PROGRESS_MODES = [
 
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
 const ASSIST_OPTS = [
-  "해당반대", "해당진행", "고정P", "고정B", "이전3회", "J",
+  "해당반대", "해당진행", "고정P", "고정B", "이전3회", "J", "6M", "6MX",
   "G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)",
   "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)", "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
   "HB멀티(H1)", "HB멀티(%1)", "WH멀티(H1)", "WH멀티(%1)", "MH멀티(H1)", "MH멀티(%1)", "DH멀티(H1)", "DH멀티(%1)",
@@ -522,8 +522,9 @@ const assistDisplayLabel = (value) => Object.entries(ASSIST_DISPLAY_PREFIXES)
   .reduce((label, [storedPrefix, displayPrefix]) => label.replace(storedPrefix, displayPrefix), value);
 const isKnownAssistOption = (value) => !value || ASSIST_OPTS.includes(value);
 const normalizeAssistOption = (value) => (["대기진행", "G(H0)", "G(%0)"].includes(value) ? "해당진행" : (isKnownAssistOption(value) ? (value || "해당진행") : "해당진행"));
-// 패시 어시스트 행 (2~15패시). 최고 16단계면 15패시까지 표시.
-const PASI_LEVELS = Array.from({ length: 14 }, (_, i) => i + 2);
+const SIX_M_ASSISTS = new Set(["6M", "6MX"]);
+// 패시 어시스트 행 (2~20패시). 설정한 최고 단계까지 표시.
+const PASI_LEVELS = Array.from({ length: 19 }, (_, i) => i + 2);
 function defaultPasi() {
   return PASI_LEVELS.map((lvl) => ({
     level: lvl,
@@ -534,6 +535,84 @@ function defaultPasi() {
     assist2: "해당진행",
     assist_q_by_section: {},
   }));
+}
+
+const assistLineValue = (row, field, section) => section == null
+  ? row?.[field]
+  : row?.[field]?.[section];
+
+const setAssistLineValue = (row, field, section, value) => {
+  if (section == null) {
+    if (value == null) delete row[field];
+    else row[field] = value;
+    return;
+  }
+  row[field] = { ...(row[field] || {}) };
+  if (value == null) delete row[field][section];
+  else row[field][section] = value;
+};
+
+function updateSixMAssistBundle(source, rowIndex, valueField, metaField, section, value, stepMax) {
+  const pasi = source.map((row) => ({ ...row }));
+  const levelField = valueField === "assist2" || valueField === "assist_q_by_section" ? "q_level" : "level";
+  const levelOf = (row, index) => Number(row?.[levelField] ?? row?.level ?? index + 2);
+  const resetBundle = (start) => {
+    if (!Number.isInteger(start)) return;
+    pasi.forEach((row) => {
+      if (assistLineValue(row, metaField, section) !== start) return;
+      setAssistLineValue(row, valueField, section, "해당진행");
+      setAssistLineValue(row, metaField, section, null);
+    });
+  };
+
+  resetBundle(assistLineValue(pasi[rowIndex], metaField, section));
+  if (!SIX_M_ASSISTS.has(value)) {
+    setAssistLineValue(pasi[rowIndex], valueField, section, value);
+    return pasi;
+  }
+
+  const start = levelOf(pasi[rowIndex], rowIndex);
+  const targets = Array.from({ length: 6 }, (_, offset) =>
+    pasi.findIndex((row, index) => levelOf(row, index) === start + offset));
+  if (start + 5 > stepMax || targets.some((index) => index < 0)) return pasi;
+  targets.forEach((index) => resetBundle(assistLineValue(pasi[index], metaField, section)));
+  targets.forEach((index) => {
+    setAssistLineValue(pasi[index], valueField, section, value);
+    setAssistLineValue(pasi[index], metaField, section, start);
+  });
+  return pasi;
+}
+
+function trimSixMAssistBundles(source, stepMax) {
+  let pasi = source.map((row) => ({ ...row }));
+  const lineDefs = [
+    ["assist1", "assist1_6m_bundle_start", null],
+    ["assist2", "assist2_6m_bundle_start", null],
+    ["assist_h_by_section", "assist_h_6m_bundle_by_section", "sections"],
+    ["assist_q_by_section", "assist_q_6m_bundle_by_section", "sections"],
+  ];
+  lineDefs.forEach(([valueField, metaField, mode]) => {
+    const sections = mode
+      ? [...new Set(pasi.flatMap((row) => Object.keys(row?.[valueField] || {})))]
+      : [null];
+    sections.forEach((section) => {
+      const invalidStarts = new Set();
+      pasi.forEach((row) => {
+        const start = assistLineValue(row, metaField, section);
+        if (Number.isInteger(start) && start + 5 > stepMax) invalidStarts.add(start);
+      });
+      invalidStarts.forEach((start) => {
+        pasi = pasi.map((row) => {
+          if (assistLineValue(row, metaField, section) !== start) return row;
+          const next = { ...row };
+          setAssistLineValue(next, valueField, section, "해당진행");
+          setAssistLineValue(next, metaField, section, null);
+          return next;
+        });
+      });
+    });
+  });
+  return pasi;
 }
 
 const DEFAULT_STRATEGY_SETUP = {
@@ -621,6 +700,7 @@ const STRATEGY_SETUP_BOXES = [
   { key: "P", variant: "short" },
   { key: "B", variant: "short" },
   { key: "J", variant: "short" },
+  { key: "6MX", variant: "full", label: "6MX", sections: ["6M", "6MX"] },
 ];
 
 function normalizeAssistSectionMap(map) {
@@ -703,7 +783,7 @@ const mkDim = { ...mkCell, color: "#777" };
 const mkCondOff = { color: "#666" };  // 구간 없음(회색)
 
 // 어시스트 셀렉트 (목업 assistSelectHTML)
-function AssistSelect({ value, onChange, sx }) {
+function AssistSelect({ value, onChange, sx, sixMDisabled = false }) {
   const selectValue = normalizeAssistOption(value);
   return (
     <select value={selectValue} onChange={(e) => onChange(e.target.value)}
@@ -711,7 +791,7 @@ function AssistSelect({ value, onChange, sx }) {
       style={{ background: "#16365c", color: "#fff", border: "1px solid #2f5b8f", borderRadius: 3,
         fontSize: 12, padding: "1px 2px", width: "96%", cursor: "pointer", outline: "none",
         fontFamily: "D2Coding, Consolas, Menlo, monospace", ...sx }}>
-      {ASSIST_OPTS.map((o) => <option key={o} value={o}>{assistDisplayLabel(o)}</option>)}
+      {ASSIST_OPTS.map((o) => <option key={o} value={o} disabled={sixMDisabled && SIX_M_ASSISTS.has(o)}>{assistDisplayLabel(o)}</option>)}
     </select>
   );
 }
@@ -768,7 +848,7 @@ function AssistLockHeader({ section, assistType, locked, onToggle, style, colSpa
   );
 }
 
-function MultiAssistGrid({ sections, visiblePasi, setPasiSectionAssist, assistLockBySection, toggleAssistLock }) {
+function MultiAssistGrid({ sections, visiblePasi, setPasiSectionAssist, assistLockBySection, toggleAssistLock, stepMax }) {
   const slots = Array.from({ length: 4 }, (_, i) => (sections || [])[i] || null);
   const base = { ...mkCell, width: "auto", minWidth: 0, height: 22, padding: "1px 2px" };
   const hCell = { ...base, background: "#16365c", color: "#fff" };
@@ -788,11 +868,13 @@ function MultiAssistGrid({ sections, visiblePasi, setPasiSectionAssist, assistLo
 
   const renderAssistCell = (p, originalIndex, field, section, sx, slotIndex) => {
     if (!section) return <td key={`${field}-empty-${slotIndex}`} style={disabled}></td>;
+    const level = Number(field === "assist_q_by_section" ? (p.q_level ?? p.level) : p.level);
     return (
       <td key={`${field}-${section}-${slotIndex}`} style={sx}>
         <AssistSelect
           value={sectionValue(p, field, section)}
           onChange={(v) => setPasiSectionAssist(originalIndex, field, section, v)}
+          sixMDisabled={level + 5 > stepMax}
           sx={{
             fontSize: 11,
             padding: "0 1px",
@@ -970,22 +1052,41 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
   };
 
   const toggleMulti = (k) => onChange({ ...s, multi_sections: { ...(s.multi_sections || {}), [k]: !(s.multi_sections?.[k] ?? true) } });
-  const setPasi = (i, patch) => {
-    const pasi = (s.pasi || defaultPasi()).map((p, j) => (j === i ? { ...p, ...patch } : p));
+  const setPasiAssist = (i, valueField, value) => {
+    const metaField = valueField === "assist2"
+      ? "assist2_6m_bundle_start"
+      : "assist1_6m_bundle_start";
+    const pasi = updateSixMAssistBundle(
+      defaultPasi().map((fallback, index) => ({ ...fallback, ...((s.pasi || [])[index] || {}) })),
+      i,
+      valueField,
+      metaField,
+      null,
+      value,
+      stepMax,
+    );
     onChange({ ...s, pasi });
   };
   const setPasiSectionAssist = (i, field, section, value) => {
-    const pasi = (s.pasi || defaultPasi()).map((p, j) => {
-      if (j !== i) return p;
-      return { ...p, [field]: { ...(p?.[field] || {}), [section]: value } };
-    });
+    const metaField = field === "assist_q_by_section"
+      ? "assist_q_6m_bundle_by_section"
+      : "assist_h_6m_bundle_by_section";
+    const pasi = updateSixMAssistBundle(
+      defaultPasi().map((fallback, index) => ({ ...fallback, ...((s.pasi || [])[index] || {}) })),
+      i,
+      field,
+      metaField,
+      section,
+      value,
+      stepMax,
+    );
     onChange({ ...s, pasi });
   };
   const progressMode = s.bet_progress_mode || "roundNquarter";
   const isAiVariable = progressMode === "aiVariable";
   const pasi = defaultPasi().map((fallback, i) => ({ ...fallback, ...((s.pasi || [])[i] || {}) }));
   const visiblePasi = pasi
-    .slice(0, Math.max(0, stepMax - 2))
+    .slice(0, Math.max(0, stepMax - 1))
     .map((p, i) => ({ p, originalIndex: i }));
   const aiVarValue = (key, fallback) => s[key] ?? fallback;
   const setAiVar = (key, value) => onChange({ ...s, [key]: value });
@@ -1071,7 +1172,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
         }} />
         <td style={mkGreen}>최고</td>
         <MkInput value={stepMax} suffix="단계" range={[1, 16]} style={mkGreen} onChange={(v) => {
-          const upd = { ...s, step_max: v };
+          const upd = { ...s, step_max: v, pasi: trimSixMAssistBundles(pasi, v) };
           if (v < stepMin) upd.step_min = v;
           onChange(upd);
         }} />
@@ -1169,6 +1270,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
                 setPasiSectionAssist={setPasiSectionAssist}
                 assistLockBySection={assistLockBySection}
                 toggleAssistLock={toggleAssistLock}
+                stepMax={stepMax}
               />
             </td>
           </tr>
@@ -1250,15 +1352,15 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
                   <td colSpan={4} style={mkCell}></td>
                 )}
                 <td colSpan={1} style={{ ...mkRed, background: "#16365c", color: "#fff" }}>
-                  <NumIn value={p.level ?? (originalIndex + 2)} min={1} max={20} color="#fff" width={38} bg="#16365c" onChange={(v) => setPasi(originalIndex, { level: v })} />패시
+                  {originalIndex + 2}패시
                 </td>
-                <td style={{ ...mkCell, background: "#16365c" }}><AssistSelect value={p.assist1} onChange={(v) => setPasi(originalIndex, { assist1: v })} /></td>
+                <td style={{ ...mkCell, background: "#16365c" }}><AssistSelect value={p.assist1} onChange={(v) => setPasiAssist(originalIndex, "assist1", v)} sixMDisabled={Number(p.level) + 5 > stepMax} /></td>
                 <td style={{ ...mkCell, background: "#16365c", color: "#fff" }}>1회</td>
                 <td colSpan={1} style={{ ...mkNavy, background: "#60497b", color: "#fff" }}>
-                  <NumIn value={p.q_level ?? p.level ?? (originalIndex + 2)} min={1} max={20} color="#fff" width={38} bg="#60497b" onChange={(v) => setPasi(originalIndex, { q_level: v })} />패시
+                  {originalIndex + 2}패시
                 </td>
                 <td style={{ ...mkAssist2, background: "#60497b" }}>
-                  <AssistSelect value={p.assist2} onChange={(v) => setPasi(originalIndex, { assist2: v })} sx={{ background: "#60497b", color: "#fff", borderColor: "#8067a0", fontWeight: "bold" }} />
+                  <AssistSelect value={p.assist2} onChange={(v) => setPasiAssist(originalIndex, "assist2", v)} sixMDisabled={Number(p.q_level ?? p.level) + 5 > stepMax} sx={{ background: "#60497b", color: "#fff", borderColor: "#8067a0", fontWeight: "bold" }} />
                 </td>
                 <td style={{ ...mkAssist2, background: "#60497b", color: "#fff" }}>1회</td>
               </tr>

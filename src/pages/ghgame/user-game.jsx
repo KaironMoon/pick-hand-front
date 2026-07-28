@@ -434,10 +434,10 @@ function GhBettingSummaryPanel({
         : []
   )
     .map((item) => typeof item === "string" ? item : item?.actual)
-    .filter((value) => value === "P" || value === "B" || value === "T");
+    .filter((value) => value === "P" || value === "B");
   const counts = normalizedResults.reduce(
     (acc, value) => ({ ...acc, [value]: acc[value] + 1 }),
-    { P: 0, B: 0, T: 0 },
+    { P: 0, B: 0 },
   );
   const pickMartin = roundState?.pick_martin;
   const step = pickMartin?.step || 1;
@@ -454,7 +454,7 @@ function GhBettingSummaryPanel({
       : "#080a0d";
   const yukmaeBoardRows = 6;
   const yukmaeBoardColumns = 13;
-  const markerColor = { P: "#1565d8", B: "#f44336", T: "#00a85a" };
+  const markerColor = { P: "#1565d8", B: "#f44336" };
   const hasAutoError = autoStatus?.phase === "error" || !!autoError;
   const errorCode = autoStatus?.error_code || autoError?.code || "auto_error";
   const errorDetail = autoStatus?.error_detail || autoError?.detail || "자동게임 처리 중 오류가 발생했습니다.";
@@ -528,8 +528,6 @@ function GhBettingSummaryPanel({
             <span style={{ color: "#2f80ed" }}>{counts.P}</span>
             <span style={{ color: "#2f80ed" }}>-</span>
             <span style={{ color: "#f44336" }}>{counts.B}</span>
-            <span style={{ color: "#2f80ed" }}>-</span>
-            <span style={{ color: "#00a85a" }}>{counts.T}</span>
           </Box>
         </Box>
 
@@ -590,7 +588,7 @@ function GhBettingSummaryPanel({
         </Box>
       </Box>
 
-      {/* 육매판 — P/B/T 결과 로드맵 (6행 × 13열) */}
+      {/* 육매판 — P/B 결과 로드맵 (6행 × 13열) */}
       <Box sx={{
         width: "fit-content",
         p: 1.25,
@@ -1857,7 +1855,6 @@ export default function GhUserGamePage() {
                         <Box sx={{ ...turnBoxSx, width: 38, height: 38, ...(bBlink ? blinkSx : {}) }}>
                           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{bCount}</Typography>
                         </Box>
-                        <Box sx={pbBtnSx("#00a85a")} onClick={() => handleInput("T")}>T</Box>
                       </>
                     );
                   })()}

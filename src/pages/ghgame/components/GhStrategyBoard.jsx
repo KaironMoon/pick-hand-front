@@ -6,7 +6,7 @@ import { Box } from "@mui/material";
 //     / pick2(보조픽) / pct2(적중률2) / assistRec(어시 총전적) / stage(단계) / idx1(배팅액) / idx2(PnL)
 // R쌍 분리(병합 없음). 각 전략 세트 뒤 OLD/NEW 컬럼.
 //   NEW = 합성본(A세트→AAR, S세트→SSR#, 드림R세트→실데이터). OLD = 위치만(빈칸, 추후 연결).
-// 실데이터: A/AR/AAR/D/G/TN/ONE/TWO/P/B/J(stats) + SQ/SR/SSR/SX(트랙). 그 외(허니비/W111/NC/6MX 등)는 칸만.
+// 실데이터: A/AR/AAR/D/G/TN/ONE/TWO/P/B/J/6M/6MX(stats) + SQ/SR/SSR/SX(트랙).
 
 const HC_BLUE = "#2f9bff";
 const HC_RED = "#ff5b5b";
@@ -16,7 +16,7 @@ const COLOR = {
   S1: "#0063d6", S2: "#0063d6", S3: "#0063d6",
   S1R: "#c0504d", S2R: "#c0504d", S3R: "#c0504d",
   SX: "#0063d6", D: "#c0504d", G: "#0063d6",
-  허니비: "#c0504d", pattern: "#00a11a", "6MX": "#de6a08",
+  허니비: "#c0504d", pattern: "#00a11a", "6M": "#b96a12", "6MX": "#de6a08",
 };
 const colorOf = (n) => COLOR[n] || (n.endsWith("R") ? "#c0504d" : "#0063d6");
 // 헤더 색: 그룹 범위(headColors) 우선, 없으면 colorOf 폴백.
@@ -65,14 +65,14 @@ const G1 = {
   hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
   headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
 };
-// G2: FOR1/2/3(따라) + FOR1X/2X/3X(반대) + D/G/TN/ONE/TWO + P/B/J/6MX + 빈칸1
+// G2: FOR1/2/3(따라) + FOR1X/2X/3X(반대) + D/G/TN/ONE/TWO + P/B/J/6M/6MX
 // FOR1/2/3·FOR1X/2X/3X 각각 한 묶음(노란박스). 헤더색은 묶음별 번갈아(파/빨).
-const G2n = ["FOR1", "FOR2", "FOR3", "FOR1X", "FOR2X", "FOR3X", "D", "G", "TN", "ONE", "TWO", "P", "B", "J", "6MX", ""];
+const G2n = ["FOR1", "FOR2", "FOR3", "FOR1X", "FOR2X", "FOR3X", "D", "G", "TN", "ONE", "TWO", "P", "B", "J", "6M", "6MX"];
 const G2 = {
   name: G2n,
   gstart: new Set([3, 6, 11, 14]),
-  hlRanges: [[0, 2], [3, 5], [6, 10], [11, 13], [14, 14]],
-  headColors: [[0, 2, HC_BLUE], [3, 5, HC_RED], [6, 10, HC_BLUE], [11, 13, HC_RED], [14, 14, "#de6a08"]],
+  hlRanges: [[0, 2], [3, 5], [6, 10], [11, 13], [14, 15]],
+  headColors: [[0, 2, HC_BLUE], [3, 5, HC_RED], [6, 10, HC_BLUE], [11, 13, HC_RED], [14, 15, "#de6a08"]],
 };
 // G3: GH 시리즈 + G% 시리즈 + 허니비/W111 세트(정픽/R/SRO/SRN).
 const G3n = ["G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)", "허니비", "허니R", "허니SRO", "허니SRN", "W111", "위너R", "위너SRO", "위너SRN"];
@@ -446,7 +446,7 @@ const fromSection = (ctx, key) => fromStats(ctx, key);
 // OLD는 항상 null(위치만). NEW는 직전 세트 합성본을 연결.
 function buildColData(label, i, data, ctx) {
   // stats 직접 매핑 (서브게임 허니비/W111/M22/D112 포함 — 정픽만, R쌍은 위치만)
-  const STAT_KEYS = { A: "A", AR: "AR", D: "D", G: "G", TN: "TN", ONE: "ONE", TWO: "TWO", J: "J", P: "P", B: "B" };
+  const STAT_KEYS = { A: "A", AR: "AR", D: "D", G: "G", TN: "TN", ONE: "ONE", TWO: "TWO", J: "J", P: "P", B: "B", "6M": "6M", "6MX": "6MX" };
   if (STAT_KEYS[label]) return fromStats(ctx, STAT_KEYS[label]);
   // 서브게임 세트: 정픽/R/SRO/SRN — stats 키가 라벨과 동일. (허니비/허니R/허니SRO/허니SRN 등 + NC계열)
   const SUBGAME_LABELS = ["허니비", "허니R", "허니SRO", "허니SRN", "W111", "위너R", "위너SRO", "위너SRN",
@@ -473,7 +473,7 @@ function buildColData(label, i, data, ctx) {
   if (m) return fromSection(ctx, `SSR${m[1]}`);
   m = label.match(/^SSRO([123])$/);
   if (m) return fromSection(ctx, `SSRO${m[1]}`);
-  // OLD/NEW(G3 등 다른 테이블) 및 그 외(허니비/W111/NC/6MX/G(H1)): 위치만
+  // 아직 별도 매핑이 없는 컬럼은 위치만 유지한다.
   return null;
 }
 
