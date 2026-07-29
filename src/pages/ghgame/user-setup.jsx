@@ -503,11 +503,15 @@ const BET_PROGRESS_MODES = [
 
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
 const ASSIST_OPTS = [
-  "해당반대", "해당진행", "고정P", "고정B", "이전3회", "J", "6M", "6MX",
+  "해당반대", "해당진행", "고정P", "고정B", "이전3회", "J", "BF6", "BF6X", "6M", "6MX",
   "G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)",
   "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)", "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
   "HB멀티(H1)", "HB멀티(%1)", "WH멀티(H1)", "WH멀티(%1)", "MH멀티(H1)", "MH멀티(%1)", "DH멀티(H1)", "DH멀티(%1)",
 ];
+const ASSIST_DISPLAY_LABELS = {
+  BF6: "육전",
+  BF6X: "육전X",
+};
 const ASSIST_DISPLAY_PREFIXES = {
   "A멀티": "A",
   "S1멀티": "S1",
@@ -518,7 +522,7 @@ const ASSIST_DISPLAY_PREFIXES = {
   "MH멀티": "M22",
   "DH멀티": "D112",
 };
-const assistDisplayLabel = (value) => Object.entries(ASSIST_DISPLAY_PREFIXES)
+const assistDisplayLabel = (value) => ASSIST_DISPLAY_LABELS[value] || Object.entries(ASSIST_DISPLAY_PREFIXES)
   .reduce((label, [storedPrefix, displayPrefix]) => label.replace(storedPrefix, displayPrefix), value);
 const isKnownAssistOption = (value) => !value || ASSIST_OPTS.includes(value);
 const normalizeAssistOption = (value) => (["대기진행", "G(H0)", "G(%0)"].includes(value) ? "해당진행" : (isKnownAssistOption(value) ? (value || "해당진행") : "해당진행"));

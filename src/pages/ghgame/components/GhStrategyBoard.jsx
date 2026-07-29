@@ -197,7 +197,10 @@ const assistSourceTitle = (source) => {
   const text = String(source);
   const prefix = "쿼터휴식:";
   const body = text.startsWith(prefix) ? text.slice(prefix.length) : text;
-  const formatted = body.includes(":") ? body.replace(":", "|") : body;
+  const displayBody = body
+    .replace(/^BF6X(?=:|$)/, "육전X")
+    .replace(/^BF6(?=:|$)/, "육전");
+  const formatted = displayBody.includes(":") ? displayBody.replace(":", "|") : displayBody;
   return text.startsWith(prefix) ? `${prefix}${formatted}` : formatted;
 };
 function AssistRow({ data, pos, label, labelColor }) {
