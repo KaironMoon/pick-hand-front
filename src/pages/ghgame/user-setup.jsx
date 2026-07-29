@@ -1727,6 +1727,62 @@ export default function GhUserSetupPage() {
               전략 계산액은 유지하고 실제 카지노 주문액에만 적용
             </Typography>
           </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
+              전체 목표금액 (P)
+            </Typography>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={config.auto_goal_amount ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
+                setConfig((prev) => ({ ...prev, auto_goal_amount: value }));
+                setDirty(true);
+              }}
+              style={{
+                width: 140,
+                padding: "4px 6px",
+                background: "#16213e",
+                color: "#fff",
+                border: "1px solid #2a3a5a",
+                borderRadius: 4,
+                fontSize: 12,
+              }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
+              0이면 사용 안 함. 전체 PNL이 목표에 도달하면 다음 회차부터 모든 배팅 중지
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
+              미달 마감 회차
+            </Typography>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={config.auto_end_round ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, parseInt(event.target.value || "0", 10) || 0);
+                setConfig((prev) => ({ ...prev, auto_end_round: value }));
+                setDirty(true);
+              }}
+              style={{
+                width: 140,
+                padding: "4px 6px",
+                background: "#16213e",
+                color: "#fff",
+                border: "1px solid #2a3a5a",
+                borderRadius: 4,
+                fontSize: 12,
+              }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
+              0이면 사용 안 함. 설정 회차까지 배팅하고 다음 회차부터 모든 배팅 중지
+            </Typography>
+          </Box>
         </Box>
       )}
 

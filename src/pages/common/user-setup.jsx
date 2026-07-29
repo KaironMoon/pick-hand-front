@@ -700,24 +700,26 @@ export default function UserSetupPage({ gameType }) {
           <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>오토 운영 옵션</Typography>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>목표액 (원)</Typography>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>전체 목표금액 (P)</Typography>
             <input
               type="number"
+              min="0"
+              step="0.1"
               value={config.auto_goal_amount ?? 0}
               onChange={(e) => {
-                const v = parseInt(e.target.value || "0", 10) || 0;
+                const v = Math.max(0, parseFloat(e.target.value || "0") || 0);
                 setConfig((prev) => ({ ...prev, auto_goal_amount: v }));
                 setDirty(true);
               }}
               style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
             <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              0이면 무제한. 누적 PnL이 이 값 이상이면 자동 종료.
+              0이면 사용 안 함. 모든 실제 체결 PNL 합계가 목표에 도달하면 배팅 중지.
             </Typography>
           </Box>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>종료 회차</Typography>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>미달 마감 회차</Typography>
             <input
               type="number"
               value={config.auto_end_round ?? 0}
@@ -729,25 +731,8 @@ export default function UserSetupPage({ gameType }) {
               style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
             <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              0이면 무제한. 베팅 시작 후 이 회차에 도달하면 종료.
+              0이면 사용 안 함. 설정 회차까지 배팅하고 다음 회차부터 중지.
             </Typography>
-          </Box>
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>단계 해소</Typography>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={!!config.auto_clear_stage}
-                onChange={(e) => {
-                  setConfig((prev) => ({ ...prev, auto_clear_stage: e.target.checked }));
-                  setDirty(true);
-                }}
-              />
-              <Typography variant="caption" sx={{ fontSize: 12, color: "#ddd" }}>
-                종료회차 도달 시 단계가 1단계 아니면 적중까지 연장
-              </Typography>
-            </label>
           </Box>
         </Box>
       )}

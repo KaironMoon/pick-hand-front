@@ -8,6 +8,11 @@ import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
 import GhBigRoad2 from "./components/GhBigRoad2";
+import {
+  createEmptyAutoStatus,
+  mergePolledAutoStatus,
+} from "./auto-status";
+import { claimOverallStopAlert } from "./overall-stop-alert";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 
 // blink 애니메이션
@@ -472,6 +477,12 @@ function GhBettingSummaryPanel({
     stopped: "STOP",
   };
   const autoPhase = hasAutoError ? "ERR" : phaseAbbr[autoStatus?.phase] || "—";
+  const stopReason = autoStatus?.stop_reason || roundState?.overall_stop?.reason;
+  const monitoringReason = stopReason === "goal_reached"
+    ? "목표중지"
+    : stopReason === "end_round_reached"
+      ? "마감중지"
+      : null;
   const autoPnl = Number(autoStatus?.pnl_actual_p || 0);
   const autoPnlText = `${autoPnl.toLocaleString(undefined, {
     minimumFractionDigits: 1,
@@ -481,7 +492,13 @@ function GhBettingSummaryPanel({
     { text: "guide" },
     { text: "one", selection: "one" },
     autoStateCell,
-    { text: `${autoPhase} ${autoPnlText}`, autoInfo: true },
+    {
+      text: `${monitoringReason || autoPhase} ${autoPnlText}`,
+      autoInfo: true,
+      tooltip: monitoringReason
+        ? `${monitoringReason}: 현재 게임은 결과만 기록하며 킵 모드는 다음 게임에서 배팅을 재개합니다.`
+        : undefined,
+    },
     { text: "keep", selection: "keep" },
     {
       text: autoStatus?.running ? "stop" : "play",
@@ -694,8 +711,15 @@ export default function GhUserGamePage() {
   const skipRestoreGameIdRef = useRef(null);
   const [processing, setProcessing] = useState(false);
   const goalAlertedRef = useRef({ a: false, z: false });
+  const overallStopAlertedRef = useRef(new Set());
 
   const [goalDialog, setGoalDialog] = useState({ open: false, msgs: [] });
+  const [overallStopDialog, setOverallStopDialog] = useState({
+    open: false,
+    title: "",
+    detail: "",
+    modeLabel: "",
+  });
 
   // Auto 모드 (pick-aboo 통합) — t9game/index.jsx에서 포팅
   const [autoFeatureAvailable, setAutoFeatureAvailable] = useState(true);
@@ -773,6 +797,16 @@ export default function GhUserGamePage() {
     if (msgs.length > 0) setGoalDialog({ open: true, msgs });
   }, []);
 
+  const showOverallStopAlert = useCallback((targetGameId, reason, mode) => {
+    const alert = claimOverallStopAlert(
+      overallStopAlertedRef.current,
+      targetGameId,
+      reason,
+      mode,
+    );
+    if (alert) setOverallStopDialog({ open: true, ...alert });
+  }, []);
+
   const displayPick = (() => {
     const umComb = betData?.user_martin?.combined?.direction;
     if (umComb && umComb !== "wait") return umComb;
@@ -821,6 +855,8 @@ export default function GhUserGamePage() {
         ? { slot_no: slotNo, replace_game_id: replaceGameId || null }
         : null;
       const res = await apiCaller.post(GH_GAMES_API.START + "?mode=user", body);
+      setAutoError(null);
+      setAutoStatus(createEmptyAutoStatus());
       const lockedNcRef = typeof window !== "undefined" ? localStorage.getItem(NC_REF_LOCK_KEY) : null;
       let lockedApplied = false;
       if (lockedNcRef) {
@@ -1015,26 +1051,7 @@ export default function GhUserGamePage() {
             code: st.error_code || "auto_error",
             detail: st.error_detail || "자동게임 처리 중 오류가 발생했습니다.",
           } : null);
-          setAutoStatus((prev) => ({
-            ...prev,
-            running: !!st.running,
-            autoSessionId: st.auto_session_id || null,
-            lastEventAt: st.last_event_at,
-            betsAttempted: st.bets_attempted,
-            betsSucceeded: st.bets_succeeded,
-            betsFailed: st.bets_failed,
-            phase: st.phase ?? prev.phase,
-            actual_bet_scale: st.actual_bet_scale ?? prev.actual_bet_scale ?? 1,
-            pnl_total: st.pnl_total ?? prev.pnl_total,
-            pnl_actual: st.pnl_actual ?? prev.pnl_actual,
-            pnl_total_p: st.pnl_total_p ?? prev.pnl_total_p,
-            pnl_actual_p: st.pnl_actual_p ?? prev.pnl_actual_p,
-            round_count: st.round_count ?? prev.round_count,
-            table_name: st.table_name ?? prev.table_name,
-            play_mode: st.play_mode ?? prev.play_mode,
-            error_code: st.error_code ?? null,
-            error_detail: st.error_detail ?? null,
-          }));
+          setAutoStatus((prev) => mergePolledAutoStatus(prev, st));
         }
       } catch (e) {
         if (e?.response?.status === 503) {
@@ -1105,7 +1122,13 @@ export default function GhUserGamePage() {
               pnl_actual: data.pnl_actual ?? prev.pnl_actual,
               pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
               pnl_actual_p: data.pnl_actual_p ?? prev.pnl_actual_p,
+              stop_reason: data.stop_reason ?? prev.stop_reason,
             }));
+            showOverallStopAlert(
+              data.game_id || gameId,
+              data.stop_reason,
+              "auto",
+            );
           } else if (t === "shoe_result_recorded") {
             // Tie는 전략 회차를 만들지 않으므로 최신 round_state만 다시 불러온다.
             if (data.game_id) restoreGame(data.game_id);
@@ -1118,7 +1141,15 @@ export default function GhUserGamePage() {
               pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
               pnl_actual_p: data.pnl_actual_p ?? prev.pnl_actual_p,
               round_count: data.round_count ?? prev.round_count,
+              stop_reason: data.reason === "goal_reached" || data.reason === "end_round_reached"
+                ? data.reason
+                : prev.stop_reason,
             }));
+            showOverallStopAlert(
+              data.game_id || gameId,
+              data.reason,
+              "auto",
+            );
             if (data.game_id && data.game_id !== gameId) {
               setGameId(data.game_id);
               setSearchParams({ gameId: data.game_id }, { replace: true });
@@ -1139,6 +1170,7 @@ export default function GhUserGamePage() {
               pnl_actual: 0,
               pnl_total_p: 0,
               pnl_actual_p: 0,
+              stop_reason: null,
             }));
             console.info(`[Auto] 재시작: new_session=${data.auto_session_id} game=${data.game_id}`);
           } else if (t === "bet_attempt") {
@@ -1182,7 +1214,7 @@ export default function GhUserGamePage() {
       try { ws && ws.close(); } catch (_) {}
     };
 
-  }, [autoFeatureAvailable, autoStatus.running, autoStatus.autoSessionId, gameId]);
+  }, [autoFeatureAvailable, autoStatus.running, autoStatus.autoSessionId, gameId, showOverallStopAlert]);
 
   const handleAutoToggle = async () => {
     if (!autoFeatureAvailable) return;
@@ -1249,6 +1281,11 @@ export default function GhUserGamePage() {
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);
       checkGoalAlert(data.user_summary, data.round_state_upper?.strategy_goals);
+      showOverallStopAlert(
+        gameId,
+        data.round_state_upper?.overall_stop?.reason,
+        "manual",
+      );
 
     } catch (err) {
       console.error("Failed to record round:", err);
@@ -1327,7 +1364,7 @@ export default function GhUserGamePage() {
     setRoundStateUpper(null);
     setRoundStateLower(null);
     setLegacyRestoreBlocked(false);
-    setAutoStatus({ running: false, autoSessionId: null });
+    setAutoStatus(createEmptyAutoStatus());
     setAutoError(null);
   };
 
@@ -2313,6 +2350,29 @@ export default function GhUserGamePage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setGoalDialog({ open: false, msgs: [] })} variant="contained">확인</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={overallStopDialog.open}
+        onClose={() => setOverallStopDialog((prev) => ({ ...prev, open: false }))}
+      >
+        <DialogTitle sx={{ fontWeight: "bold" }}>
+          {overallStopDialog.title}
+        </DialogTitle>
+        <DialogContent>
+          <Typography>{overallStopDialog.detail}</Typography>
+          <Typography sx={{ mt: 1, fontSize: "0.85rem", color: "text.secondary" }}>
+            {overallStopDialog.modeLabel} 게임 · 픽 계산과 결과 기록은 계속됩니다.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setOverallStopDialog((prev) => ({ ...prev, open: false }))}
+            variant="contained"
+          >
+            확인
+          </Button>
         </DialogActions>
       </Dialog>
 
