@@ -43,9 +43,24 @@ test("goal reason wins when callers report only the server-selected reason", () 
   assert.equal(alert.title, "전체 목표금액 달성");
 });
 
+test("active POT limit alert explains that only betting stopped", () => {
+  const alert = claimOverallStopAlert(
+    new Set(),
+    103,
+    "active_pot_limit_reached",
+    "auto",
+  );
+
+  assert.deepEqual(alert, {
+    title: "잔여 POT 종료",
+    detail: "활성 배팅 POT 수가 설정값 이하가 되어 배팅이 정지되었습니다.",
+    modeLabel: "오토",
+  });
+});
+
 test("section goals and unknown reasons do not open the overall alert", () => {
   assert.equal(
-    claimOverallStopAlert(new Set(), 103, "strategy_goal_reached", "manual"),
+    claimOverallStopAlert(new Set(), 104, "strategy_goal_reached", "manual"),
     null,
   );
 });

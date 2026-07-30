@@ -482,6 +482,8 @@ function GhBettingSummaryPanel({
     ? "목표중지"
     : stopReason === "end_round_reached"
       ? "마감중지"
+      : stopReason === "active_pot_limit_reached"
+        ? "POT중지"
       : null;
   const autoPnl = Number(autoStatus?.pnl_actual_p || 0);
   const autoPnlText = `${autoPnl.toLocaleString(undefined, {
@@ -806,6 +808,15 @@ export default function GhUserGamePage() {
     );
     if (alert) setOverallStopDialog({ open: true, ...alert });
   }, []);
+
+  useEffect(() => {
+    if (Number(roundState?.round_num || 0) !== 0) return;
+    showOverallStopAlert(
+      gameId,
+      roundState?.overall_stop?.reason,
+      "manual",
+    );
+  }, [gameId, roundState?.round_num, roundState?.overall_stop?.reason, showOverallStopAlert]);
 
   const displayPick = (() => {
     const umComb = betData?.user_martin?.combined?.direction;
@@ -1141,9 +1152,11 @@ export default function GhUserGamePage() {
               pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
               pnl_actual_p: data.pnl_actual_p ?? prev.pnl_actual_p,
               round_count: data.round_count ?? prev.round_count,
-              stop_reason: data.reason === "goal_reached" || data.reason === "end_round_reached"
+              stop_reason: ["goal_reached", "end_round_reached", "active_pot_limit_reached"].includes(data.reason)
                 ? data.reason
                 : prev.stop_reason,
+              active_pot_count: data.active_pot_count ?? prev.active_pot_count,
+              pot_stop_count: data.pot_stop_count ?? prev.pot_stop_count,
             }));
             showOverallStopAlert(
               data.game_id || gameId,
@@ -1164,14 +1177,21 @@ export default function GhUserGamePage() {
               ...prev,
               running: true,
               autoSessionId: data.auto_session_id,
-              phase: "betting",
+              phase: data.phase || "betting",
               round_count: 0,
               pnl_total: 0,
               pnl_actual: 0,
               pnl_total_p: 0,
               pnl_actual_p: 0,
-              stop_reason: null,
+              stop_reason: data.stop_reason || null,
+              active_pot_count: data.active_pot_count ?? null,
+              pot_stop_count: data.pot_stop_count ?? prev.pot_stop_count ?? 0,
             }));
+            showOverallStopAlert(
+              data.game_id,
+              data.stop_reason,
+              "auto",
+            );
             console.info(`[Auto] 재시작: new_session=${data.auto_session_id} game=${data.game_id}`);
           } else if (t === "bet_attempt") {
             setRoundStateUpper((prev) => applyActualBetAttempt(prev, data));
@@ -2431,7 +2451,15 @@ export default function GhUserGamePage() {
             phase: resp.phase,
             play_mode: resp.play_mode,
             actual_bet_scale: resp.actual_bet_scale || 1,
+            stop_reason: resp.stop_reason || null,
+            active_pot_count: resp.active_pot_count ?? null,
+            pot_stop_count: resp.pot_stop_count ?? 0,
           });
+          showOverallStopAlert(
+            gameId,
+            resp.stop_reason,
+            "auto",
+          );
           if (resp.slot_no) setSelectedSlotNo(resp.slot_no);
           refreshGameSlots().catch(() => {});
         }}

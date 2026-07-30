@@ -11,6 +11,9 @@ test("new game status starts without the previous auto error", () => {
     running: false,
     autoSessionId: null,
     phase: null,
+    stop_reason: null,
+    active_pot_count: null,
+    pot_stop_count: 0,
     error_code: null,
     error_detail: null,
   });
@@ -56,4 +59,22 @@ test("polling an errored auto session still exposes its real error", () => {
   assert.equal(result.phase, "error");
   assert.equal(result.error_code, "casino_bet_rejected");
   assert.equal(result.error_detail, "rejected");
+});
+
+test("polling preserves POT stop details for the active game", () => {
+  const result = mergePolledAutoStatus(
+    createEmptyAutoStatus(),
+    {
+      running: true,
+      auto_session_id: "pot-session",
+      phase: "monitoring",
+      stop_reason: "active_pot_limit_reached",
+      active_pot_count: 3,
+      pot_stop_count: 3,
+    },
+  );
+
+  assert.equal(result.stop_reason, "active_pot_limit_reached");
+  assert.equal(result.active_pot_count, 3);
+  assert.equal(result.pot_stop_count, 3);
 });

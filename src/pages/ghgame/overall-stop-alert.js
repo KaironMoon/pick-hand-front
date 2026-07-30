@@ -7,6 +7,10 @@ const STOP_ALERTS = {
     title: "미달마감 도달",
     detail: "미달마감 회차에 도달하여 배팅이 정지되었습니다.",
   },
+  active_pot_limit_reached: {
+    title: "잔여 POT 종료",
+    detail: "활성 배팅 POT 수가 설정값 이하가 되어 배팅이 정지되었습니다.",
+  },
 };
 
 export const claimOverallStopAlert = (

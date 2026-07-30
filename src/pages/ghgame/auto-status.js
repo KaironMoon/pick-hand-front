@@ -2,6 +2,9 @@ export const createEmptyAutoStatus = () => ({
   running: false,
   autoSessionId: null,
   phase: null,
+  stop_reason: null,
+  active_pot_count: null,
+  pot_stop_count: 0,
   error_code: null,
   error_detail: null,
 });
@@ -26,6 +29,12 @@ export const mergePolledAutoStatus = (previous, status) => {
     round_count: status?.round_count ?? previous?.round_count,
     table_name: status?.table_name ?? previous?.table_name,
     play_mode: status?.play_mode ?? previous?.play_mode,
+    stop_reason:
+      status?.stop_reason ?? previous?.stop_reason ?? null,
+    active_pot_count:
+      status?.active_pot_count ?? previous?.active_pot_count ?? null,
+    pot_stop_count:
+      status?.pot_stop_count ?? previous?.pot_stop_count ?? 0,
     error_code: hasSession ? status?.error_code ?? null : null,
     error_detail: hasSession ? status?.error_detail ?? null : null,
   };

@@ -713,8 +713,11 @@ export default function UserSetupPage({ gameType }) {
               }}
               style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
+            {Number(config.auto_goal_amount || 0) === 0 && (
+              <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
+            )}
             <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              0이면 사용 안 함. 모든 실제 체결 PNL 합계가 목표에 도달하면 배팅 중지.
+              모든 실제 체결 PNL 합계가 목표에 도달하면 배팅 중지.
             </Typography>
           </Box>
 
@@ -730,8 +733,33 @@ export default function UserSetupPage({ gameType }) {
               }}
               style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
+            {Number(config.auto_end_round || 0) === 0 && (
+              <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
+            )}
             <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              0이면 사용 안 함. 설정 회차까지 배팅하고 다음 회차부터 중지.
+              설정 회차까지 배팅하고 다음 회차부터 중지.
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>잔여 POT 종료 수</Typography>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={config.auto_pot_stop_count ?? 0}
+              onChange={(e) => {
+                const v = Math.max(0, parseInt(e.target.value || "0", 10) || 0);
+                setConfig((prev) => ({ ...prev, auto_pot_stop_count: v }));
+                setDirty(true);
+              }}
+              style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+            />
+            {Number(config.auto_pot_stop_count || 0) === 0 && (
+              <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
+            )}
+            <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
+              목표가 설정된 활성 POT 수가 이 값 이하가 되면 배팅 중지.
             </Typography>
           </Box>
         </Box>
