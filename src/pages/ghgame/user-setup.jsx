@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
 import { USER_BET_SETTINGS_API } from "@/constants/api-url";
 import { userAtom } from "@/store/auth-store";
+import { updatePbjStrategy } from "./pbj-goal.js";
 
 const GREEN = "#4caf50";
 const LABEL_COLOR = "#c62828";
@@ -701,9 +702,9 @@ const STRATEGY_SETUP_BOXES = [
   { key: "TN", variant: "short" },
   { key: "ONE", variant: "short" },
   { key: "TWO", variant: "short" },
-  { key: "P", variant: "short" },
-  { key: "B", variant: "short" },
-  { key: "J", variant: "short" },
+  { key: "P", variant: "short", targetLabel: "목표금액(PBJ)" },
+  { key: "B", variant: "short", targetLabel: "목표금액(PBJ)" },
+  { key: "J", variant: "short", targetLabel: "목표금액(PBJ)" },
   { key: "6MX", variant: "full", label: "6MX", sections: ["6M", "6MX"] },
 ];
 
@@ -949,7 +950,7 @@ function MultiAssistGrid({ sections, visiblePasi, setPasiSectionAssist, assistLo
   );
 }
 
-function StrategySetupSection({ name, strat, onChange, variant, sections }) {
+function StrategySetupSection({ name, strat, onChange, variant, sections, targetLabel = "목표금액" }) {
   // 단위: 만원. 입력값 그대로 저장(1=1만원, 0.1=1천원). 전광판/백엔드도 만원 단위로 통일.
   const s = strat || defaultStrategySetup();
   const isFull = variant === "full";
@@ -1213,7 +1214,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections }) {
       </tr>
       {/* 9행: 목표금액 베팅시작 베팅마감 마감연장 마감미처리 */}
       <tr>
-        <td style={mkRed}>목표금액</td>
+        <td style={mkRed}>{targetLabel}</td>
         <MkInput value={s.target_man || 0} suffix="P" style={mkTeal}
           onChange={(v) => isLab ? regenLab({ target_man: v }) : onChange({ ...s, target_man: v })} />
         <td style={mkRed}>베팅시작</td>
@@ -1628,7 +1629,7 @@ export default function GhUserSetupPage() {
   };
 
   const updateMartin = (key, martin) => {
-    setConfig((prev) => ({ ...prev, [key]: martin }));
+    setConfig((prev) => updatePbjStrategy(prev, key, martin));
     setDirty(true);
   };
 
@@ -1861,6 +1862,7 @@ export default function GhUserSetupPage() {
                 <tbody>
                   <StrategySetupSection
                     name={b.label || b.key} variant={b.variant} aarLabel={b.aarLabel} sections={b.sections}
+                    targetLabel={b.targetLabel}
                     strat={config[b.key] || (b.legacyKey ? config[b.legacyKey] : null) || defaultStrategySetup()}
                     onChange={(o) => updateMartin(b.key, o)} />
                 </tbody>
