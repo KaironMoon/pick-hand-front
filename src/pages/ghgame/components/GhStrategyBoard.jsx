@@ -5,7 +5,7 @@ import { Box } from "@mui/material";
 // 행: wait(대기 H녹/M노랑) / pick(P·B 칩) / pct(적중률%) / rec(전적) / rec2(보조)
 //     / pick2(보조픽) / pct2(적중률2) / assistRec(어시 총전적) / stage(단계) / idx1(배팅액) / idx2(PnL)
 // R쌍 분리(병합 없음). 각 전략 세트 뒤 OLD/NEW 컬럼.
-//   NEW = 합성본(A세트→AAR, S세트→SSR#, 드림R세트→실데이터). OLD = 위치만(빈칸, 추후 연결).
+//   NEW = 합성본(A세트→AAR, S세트→SSR#, 서브게임 R2세트→실데이터). OLD = 위치만(빈칸, 추후 연결).
 // 실데이터: A/AR/AAR/D/G/TN/ONE/TWO/P/B/J/6M/6MX(stats) + SQ/SR/SSR/SX(트랙).
 
 const HC_BLUE = "#2f9bff";
@@ -75,7 +75,7 @@ const G2 = {
   headColors: [[0, 2, HC_BLUE], [3, 5, HC_RED], [6, 10, HC_BLUE], [11, 13, HC_RED], [14, 15, "#de6a08"]],
 };
 // G3: GH 시리즈 + G% 시리즈 + 허니비/W111 세트(정픽/R/SRO/SRN).
-const G3n = ["G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)", "허니비", "허니R", "허니SRO", "허니SRN", "W111", "위너R", "위너SRO", "위너SRN"];
+const G3n = ["G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)", "허니비", "허니R2", "허니SR2O", "허니SRN", "W111", "위너R2", "위너SR2O", "위너SRN"];
 const G3 = {
   name: G3n,
   gstart: new Set([4, 8, 12]),
@@ -83,7 +83,7 @@ const G3 = {
   headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
 };
 // G4: M22세트 + D112세트 + NC세트(정픽/R/SRO/SRN) + SQ1/2/3(쿼터배팅, S와 픽 공유) + 빈칸 1.
-const G4n = ["M22", "메가R", "메가SRO", "메가SRN", "D112", "드림R", "드림SRO", "드림SRN", "NC", "NCR", "NCSRO", "NCSRN", "SQ1", "SQ2", "SQ3", ""];
+const G4n = ["M22", "메가R2", "메가SR2O", "메가SRN", "D112", "드림R2", "드림SR2O", "드림SRN", "NC", "NCR", "NCSRO", "NCSRN", "SQ1", "SQ2", "SQ3", ""];
 const G4 = {
   name: G4n,
   gstart: new Set([4, 8, 12]),
@@ -451,9 +451,9 @@ function buildColData(label, i, data, ctx) {
   // stats 직접 매핑 (서브게임 허니비/W111/M22/D112 포함 — 정픽만, R쌍은 위치만)
   const STAT_KEYS = { A: "A", AR: "AR", D: "D", G: "G", TN: "TN", ONE: "ONE", TWO: "TWO", J: "J", P: "P", B: "B", "6M": "6M", "6MX": "6MX" };
   if (STAT_KEYS[label]) return fromStats(ctx, STAT_KEYS[label]);
-  // 서브게임 세트: 정픽/R/SRO/SRN — stats 키가 라벨과 동일. (허니비/허니R/허니SRO/허니SRN 등 + NC계열)
-  const SUBGAME_LABELS = ["허니비", "허니R", "허니SRO", "허니SRN", "W111", "위너R", "위너SRO", "위너SRN",
-    "M22", "메가R", "메가SRO", "메가SRN", "D112", "드림R", "드림SRO", "드림SRN",
+  // 서브게임 세트: 정픽/R2/SR2O/SRN — stats 키가 라벨과 동일. NC 계열은 기존 키 유지.
+  const SUBGAME_LABELS = ["허니비", "허니R2", "허니SR2O", "허니SRN", "W111", "위너R2", "위너SR2O", "위너SRN",
+    "M22", "메가R2", "메가SR2O", "메가SRN", "D112", "드림R2", "드림SR2O", "드림SRN",
     "NC", "NCR", "NCSRO", "NCSRN"];
   if (SUBGAME_LABELS.includes(label)) return fromStats(ctx, label);
   // G(H1~H4/%1~%4) — 다른 섹션 메트릭으로 산출된 픽.
@@ -511,7 +511,7 @@ function withLiveData(base, ctx) {
   out.waitSourceMarks = base.name.map(() => []);
   out.pctSourceMarks = base.name.map(() => []);
   const subgameSrnKeys = new Set(["허니SRN", "위너SRN", "메가SRN", "드림SRN", "NCSRN"]);
-  const subgameSroKeys = new Set(["허니SRO", "위너SRO", "메가SRO", "드림SRO", "NCSRO"]);
+  const subgameSroKeys = new Set(["허니SR2O", "위너SR2O", "메가SR2O", "드림SR2O", "NCSRO"]);
   const addSourceMark = (target, src, key, label) => {
     const selected = src?.tie === "x" ? src?.x : src?.tie === "xr" ? src?.xr : null;
     if (!selected) return;

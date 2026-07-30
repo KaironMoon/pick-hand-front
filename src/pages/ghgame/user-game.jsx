@@ -15,6 +15,7 @@ import {
   shouldDisplayAutoError,
   shouldDisplaySlotAutoError,
 } from "./auto-status";
+import { getRoundStateSubgameBasis } from "./subgame-basis.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 
@@ -1980,7 +1981,7 @@ export default function GhUserGamePage() {
               {/* ===== 어드민 전용 하단 빅로드2 ===== */}
               <GhBigRoad2
                 roundState={roundStateLower}
-                subgameBasis={displaySnapshot?.subgame_basis}
+                subgameBasis={getRoundStateSubgameBasis(roundStateLower)}
                 ncRefShoes={roundStateLower?.nc_ref_shoes}
                 ncRefShoeNo={roundStateLower?.nc_ref_shoe_no}
                 ncRefControls={{
