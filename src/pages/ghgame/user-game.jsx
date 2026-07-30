@@ -9,8 +9,11 @@ import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
 import GhBigRoad2 from "./components/GhBigRoad2";
 import {
+  autoStatusLookupError,
   createEmptyAutoStatus,
   mergePolledAutoStatus,
+  shouldDisplayAutoError,
+  shouldDisplaySlotAutoError,
 } from "./auto-status";
 import { claimOverallStopAlert } from "./overall-stop-alert";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
@@ -172,7 +175,7 @@ function RoundAmountTable({
       const slotNo = idx + 1;
       const slot = gameSlots.find((item) => item.slot_no === slotNo);
       const selected = selectedSlotNo === slotNo;
-      const hasError = slot?.phase === "error" || slot?.auto_status === "error";
+      const hasError = shouldDisplaySlotAutoError(slot);
       return {
         label: String(slotNo),
         active: selected,
@@ -460,7 +463,7 @@ function GhBettingSummaryPanel({
   const yukmaeBoardRows = 6;
   const yukmaeBoardColumns = 13;
   const markerColor = { P: "#1565d8", B: "#f44336" };
-  const hasAutoError = autoStatus?.phase === "error" || !!autoError;
+  const hasAutoError = shouldDisplayAutoError(autoStatus, autoError);
   const errorCode = autoStatus?.error_code || autoError?.code || "auto_error";
   const errorDetail = autoStatus?.error_detail || autoError?.detail || "자동게임 처리 중 오류가 발생했습니다.";
   const autoStateCell = hasAutoError
@@ -1068,14 +1071,14 @@ export default function GhUserGamePage() {
         if (e?.response?.status === 503) {
           setAutoFeatureAvailable(false);
         } else {
-          setAutoError({ code: "status_lookup_failed", detail: "자동게임 상태를 확인하지 못했습니다." });
+          setAutoError(autoStatusLookupError(autoStatus));
         }
       }
     };
     tick();
     const id = setInterval(tick, 5000);  // auto-status 폴링 1s → 5s로 완화 (호출량 감소 260603)
     return () => { cancelled = true; clearInterval(id); };
-  }, [gameId, autoFeatureAvailable]);
+  }, [gameId, autoFeatureAvailable, autoStatus.running]);
 
   // ── Auto WebSocket 구독 (실시간 이벤트 푸시) ───────────
   useEffect(() => {

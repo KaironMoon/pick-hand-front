@@ -9,6 +9,25 @@ export const createEmptyAutoStatus = () => ({
   error_detail: null,
 });
 
+export const shouldDisplayAutoError = (status, error = null) => Boolean(
+  status?.running
+  && (status?.phase === "error" || error)
+);
+
+export const shouldDisplaySlotAutoError = (slot) => Boolean(
+  slot?.auto_running
+  && (slot?.phase === "error" || slot?.auto_status === "error")
+);
+
+export const autoStatusLookupError = (status) => (
+  status?.running
+    ? {
+        code: "status_lookup_failed",
+        detail: "자동게임 상태를 확인하지 못했습니다.",
+      }
+    : null
+);
+
 export const mergePolledAutoStatus = (previous, status) => {
   const hasSession = Boolean(status?.auto_session_id);
   return {
