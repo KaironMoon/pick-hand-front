@@ -17,9 +17,30 @@ test("new game status starts without the previous auto error", () => {
     stop_reason: null,
     active_pot_count: null,
     pot_stop_count: 0,
+    goal_amount: 0,
     error_code: null,
     error_detail: null,
+    pending_direction: null,
+    pending_amount_p: 0,
+    pending_amount_won: 0,
   });
+});
+
+test("polling exposes the exact pending casino order for pre-display", () => {
+  const result = mergePolledAutoStatus(
+    createEmptyAutoStatus(),
+    {
+      running: true,
+      auto_session_id: "pending-session",
+      pending_direction: "P",
+      pending_amount_p: 1,
+      pending_amount_won: 10000,
+    },
+  );
+
+  assert.equal(result.pending_direction, "P");
+  assert.equal(result.pending_amount_p, 1);
+  assert.equal(result.pending_amount_won, 10000);
 });
 
 test("polling a game without an auto session clears inherited error state", () => {

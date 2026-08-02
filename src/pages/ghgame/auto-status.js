@@ -5,8 +5,12 @@ export const createEmptyAutoStatus = () => ({
   stop_reason: null,
   active_pot_count: null,
   pot_stop_count: 0,
+  goal_amount: 0,
   error_code: null,
   error_detail: null,
+  pending_direction: null,
+  pending_amount_p: 0,
+  pending_amount_won: 0,
 });
 
 export const shouldDisplayAutoError = (status, error = null) => Boolean(
@@ -54,6 +58,14 @@ export const mergePolledAutoStatus = (previous, status) => {
       status?.active_pot_count ?? previous?.active_pot_count ?? null,
     pot_stop_count:
       status?.pot_stop_count ?? previous?.pot_stop_count ?? 0,
+    goal_amount:
+      status?.goal_amount ?? previous?.goal_amount ?? 0,
+    pending_direction:
+      status?.pending_direction ?? null,
+    pending_amount_p:
+      status?.pending_amount_p ?? 0,
+    pending_amount_won:
+      status?.pending_amount_won ?? 0,
     error_code: hasSession ? status?.error_code ?? null : null,
     error_detail: hasSession ? status?.error_detail ?? null : null,
   };

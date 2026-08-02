@@ -17,6 +17,7 @@ import {
 } from "./auto-status";
 import { getRoundStateSubgameBasis } from "./subgame-basis.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
+import { buildGoalStatusItems, formatGoalTarget } from "./goal-status.js";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 
 // blink 애니메이션
@@ -34,6 +35,55 @@ const NC_REF_LOCK_KEY = "gh_nc_ref_locked_game_seq";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
+
+function GoalStatusBar({ roundState, autoStatus }) {
+  const items = buildGoalStatusItems(
+    roundState?.strategy_goals,
+    roundState?.overall_stop,
+    autoStatus,
+  );
+
+  return (
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 2 }}>
+      {items.map((item) => {
+        const text = item.target > 0
+          ? `${item.label} ${formatGoalTarget(item.target)}`
+          : item.label;
+        const title = item.target > 0
+          ? `${item.label}: ${formatGoalTarget(item.pnl)} / ${formatGoalTarget(item.target)}P${item.reached ? " (목표 달성)" : ""}`
+          : `${item.label}: 목표금액 없음`;
+        return (
+          <Box
+            key={item.key}
+            title={title}
+            sx={{
+              minWidth: 42,
+              height: 28,
+              px: 0.9,
+              border: `1px solid ${item.reached ? "#00e676" : "#59616d"}`,
+              borderRadius: 1,
+              backgroundColor: item.reached ? "#0e5635" : "#11161d",
+              color: item.reached ? "#b9ffd5" : "#fff",
+              boxShadow: item.reached
+                ? "0 0 7px #00e676, inset 0 0 7px rgba(0,230,118,0.35)"
+                : "none",
+              opacity: item.dimmed ? 0.28 : 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 11,
+              fontWeight: "bold",
+              whiteSpace: "nowrap",
+              userSelect: "none",
+            }}
+          >
+            {text}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
 
 const CELL_BG = {
   hit: "#00e676",
@@ -199,15 +249,15 @@ function RoundAmountTable({
       };
     }),
     {
-      label: "셋",
+      label: "UP",
       accent: "#ff9800",
       onClick: onSetup,
       disabled: setupDisabled,
       title: setupDisabled ? "관리자 전용 설정" : "배팅 설정",
     },
-    { label: "뉴", accent: "#2f9bff", onClick: onNew, disabled: newDisabled },
+    { label: "NW", accent: "#2f9bff", onClick: onNew, disabled: newDisabled },
     {
-      label: "끝",
+      label: "ED",
       accent: "#d32f2f",
       onClick: onEnd,
       disabled: endDisabled,
@@ -327,7 +377,7 @@ function RoundAmountTable({
           {finalSide || "-"}
         </Box>
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>합산</span><span>{fmt(totalAmount)}</span>
+          <span>To</span><span>{fmt(totalAmount)}</span>
         </Box>
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: totalPnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>PnL</span><span>{fmt(totalPnl)}</span>
@@ -450,15 +500,20 @@ function GhBettingSummaryPanel({
   );
   const pickMartin = roundState?.pick_martin;
   const step = pickMartin?.step || 1;
-  const amount = pickMartin?.amount ?? 0;
-  const pickMartinBorder = pickMartin?.direction === "P"
+  const amount = autoStatus?.running
+    ? Number(autoStatus?.pending_amount_p || 0)
+    : (pickMartin?.amount ?? 0);
+  const displayedDirection = autoStatus?.running
+    ? autoStatus?.pending_direction
+    : pickMartin?.direction;
+  const pickMartinBorder = displayedDirection === "P"
     ? "#1565c0"
-    : pickMartin?.direction === "B"
+    : displayedDirection === "B"
       ? "#f44336"
       : "#7f7f7f";
-  const pickMartinBackground = pickMartin?.direction === "P"
+  const pickMartinBackground = displayedDirection === "P"
     ? "rgba(21, 101, 192, 0.32)"
-    : pickMartin?.direction === "B"
+    : displayedDirection === "B"
       ? "rgba(244, 67, 54, 0.32)"
       : "#080a0d";
   const yukmaeBoardRows = 6;
@@ -1138,6 +1193,9 @@ export default function GhUserGamePage() {
               pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
               pnl_actual_p: data.pnl_actual_p ?? prev.pnl_actual_p,
               stop_reason: data.stop_reason ?? prev.stop_reason,
+              pending_direction: data.pending_direction ?? null,
+              pending_amount_p: data.pending_amount_p ?? 0,
+              pending_amount_won: data.pending_amount_won ?? 0,
             }));
             showOverallStopAlert(
               data.game_id || gameId,
@@ -1549,14 +1607,15 @@ export default function GhUserGamePage() {
   return (
     <Box sx={{ p: isMobile ? 0.5 : 2 }}>
       <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
-        <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>글로벌히트</span>
+        <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>Globalhit</span>
         {gameId && <span style={{ fontSize: 11, color: "#888" }}>#{gameId}</span>}
-        {(selectedGameSlot?.table_name || autoStatus.table_name) && (
+        {autoStatus.running && (selectedGameSlot?.table_name || autoStatus.table_name) && (
           <span style={{ fontSize: 11, color: "#66bb6a", fontWeight: "bold", marginLeft: 8 }}>
             {selectedGameSlot?.table_name || autoStatus.table_name}
           </span>
         )}
       </Box>
+      <GoalStatusBar roundState={roundState} autoStatus={autoStatus} />
       {/* ===== 상단: 6x40 빅로드 격자 ===== */}
       <Box
         sx={{
@@ -1682,7 +1741,7 @@ export default function GhUserGamePage() {
                     return (
                       <React.Fragment>
                         <Box sx={tagSx("#1565c0")}>
-                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>마틴A</Typography>
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>A</Typography>
                         </Box>
                         <Box sx={{ ...fieldSx, minWidth: 55 }}>
                           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
@@ -1799,7 +1858,7 @@ export default function GhUserGamePage() {
                     return (
                       <React.Fragment>
                         <Box sx={tagSx("#c62828")}>
-                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>마틴Z</Typography>
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>Z</Typography>
                         </Box>
                         <Box sx={{ ...fieldSx, minWidth: 80, px: 0.6 }}>
                           <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{step}S</Typography>
@@ -1868,7 +1927,7 @@ export default function GhUserGamePage() {
                       cursor: "pointer",
                     }}
                   >
-                    {amountViewMode === "actual" ? "실" : "계"}
+                    {amountViewMode === "actual" ? "BT" : "RE"}
                   </Box>
                   {Number(autoStatus.actual_bet_scale) === 0.1 && (
                     <Box
@@ -2458,6 +2517,7 @@ export default function GhUserGamePage() {
             stop_reason: resp.stop_reason || null,
             active_pot_count: resp.active_pot_count ?? null,
             pot_stop_count: resp.pot_stop_count ?? 0,
+            goal_amount: resp.goal_amount ?? 0,
           });
           showOverallStopAlert(
             gameId,

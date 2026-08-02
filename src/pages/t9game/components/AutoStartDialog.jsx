@@ -60,6 +60,17 @@ const extractMaxBet = (t) => {
 };
 
 const MIN_BET_TARGET = 1000;
+const SESSION_EXPIRED_MESSAGE = "JSESSIONID가 만료되었습니다. 다시 캡처해 주세요.";
+
+const getErrorCode = (error) => {
+  const detail = error?.response?.data?.detail;
+  return typeof detail === "string" ? detail : detail?.error;
+};
+
+const isSessionExpiredError = (error) => {
+  const code = getErrorCode(error);
+  return code === "invalid_session" || code === "session_required";
+};
 
 const formatAge = (sec) => {
   if (sec == null) return "";
@@ -98,12 +109,19 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId
       } catch (e) {
         if (cancelled) return;
         const detail = e?.response?.data?.detail;
+        const sessionExpired = isSessionExpiredError(e);
         setTablesError(
-          typeof detail === "string"
+          sessionExpired
+            ? SESSION_EXPIRED_MESSAGE
+            : typeof detail === "string"
             ? detail
             : detail?.error || "테이블 목록 조회 실패"
         );
         setTables([]);
+        setTableId("");
+        if (sessionExpired) {
+          setSessionInfo((current) => ({ ...current, captured: true, status: "expired" }));
+        }
       } finally {
         if (!cancelled) setTablesLoading(false);
       }
@@ -120,9 +138,17 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId
       setTables(Array.isArray(res?.tables) ? res.tables : []);
     } catch (e) {
       const detail = e?.response?.data?.detail;
+      const sessionExpired = isSessionExpiredError(e);
+      setTables([]);
+      setTableId("");
       setTablesError(
-        typeof detail === "string" ? detail : detail?.error || "재조회 실패"
+        sessionExpired
+          ? SESSION_EXPIRED_MESSAGE
+          : typeof detail === "string" ? detail : detail?.error || "재조회 실패"
       );
+      if (sessionExpired) {
+        setSessionInfo((current) => ({ ...current, captured: true, status: "expired" }));
+      }
     } finally {
       setTablesLoading(false);
     }
@@ -173,8 +199,11 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId
     } catch (e) {
       const detail = e?.response?.data?.detail;
       let message;
-      if (detail?.error === "session_required") {
-        message = "JSESSIONID가 만료되었습니다. 모바일 앱에서 재캡처하세요";
+      if (isSessionExpiredError(e)) {
+        message = SESSION_EXPIRED_MESSAGE;
+        setTables([]);
+        setTableId("");
+        setSessionInfo((current) => ({ ...current, captured: true, status: "expired" }));
       } else if (detail?.error === "auto_session_limit_reached") {
         message = "자동게임은 한 계정에서 최대 6개까지 실행할 수 있습니다";
       } else if (detail?.error === "auto_game_already_running") {
