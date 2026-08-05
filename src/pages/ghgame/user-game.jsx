@@ -301,8 +301,9 @@ function RoundAmountTable({
   });
   const fmt = (v) => v === "N/A" ? "-" : Number(v || 0).toFixed(1);
   const finalSide = table.total_side;
+  const currentRoundIdx = Math.max(0, Number(roundState?.round_num || 0));
   const totalAmount = amountMode === "actual"
-    ? Number(actualTable.total_amount_p || 0)
+    ? Number(actualCells[currentRoundIdx]?.bet_amount_p || 0)
     : Number(table.total_amount || 0);
   const totalPnl = amountMode === "actual"
     ? Number(actualTable.total_pnl_p || 0)
@@ -389,7 +390,7 @@ function RoundAmountTable({
           {finalSide || "-"}
         </Box>
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>To</span><span>{fmt(totalAmount)}</span>
+          <span>BET</span><span>{fmt(totalAmount)}</span>
         </Box>
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: totalPnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>PnL</span><span>{fmt(totalPnl)}</span>
@@ -787,6 +788,13 @@ export default function GhUserGamePage() {
   const [shoeCopyLoading, setShoeCopyLoading] = useState(false);
   const [shoeCopyExecuting, setShoeCopyExecuting] = useState(false);
   const [shoeCopyProgress, setShoeCopyProgress] = useState({ active: false, completed: 0, total: 0 });
+  const [replayOpen, setReplayOpen] = useState(false);
+  const [replayGameInput, setReplayGameInput] = useState("");
+  const [replayPreview, setReplayPreview] = useState(null);
+  const [replayLoading, setReplayLoading] = useState(false);
+  const [replayError, setReplayError] = useState("");
+  const [replay, setReplay] = useState({ active: false, external: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
+  const [replayRoundInput, setReplayRoundInput] = useState("");
   const processingRef = useRef(false);
   const skipRestoreGameIdRef = useRef(null);
   const [processing, setProcessing] = useState(false);
@@ -817,6 +825,11 @@ export default function GhUserGamePage() {
   const [ncRefBusy, setNcRefBusy] = useState(false);
 
   const strategyResults = results.filter((result) => result.value === "P" || result.value === "B");
+
+  useEffect(() => {
+    const displayedRound = replay.active ? replay.roundNum : strategyResults.length;
+    setReplayRoundInput(displayedRound > 0 ? String(displayedRound) : "");
+  }, [replay.active, replay.roundNum, strategyResults.length]);
   const currentTurn = strategyResults.length + 1;
   const ncRefDirty = String(ncRefDraft || "") !== String(ncRefOriginal || "");
   const syncNcRefNo = useCallback((state) => {
@@ -826,7 +839,7 @@ export default function GhUserGamePage() {
     setNcRefOriginal(value);
     setNcRefDraft(value);
   }, []);
-  const inputLocked = processing || legacyRestoreBlocked;
+  const inputLocked = processing || legacyRestoreBlocked || (replay.active && replay.external);
   // LEGACY COMPAT ONLY: displaySnapshot 별칭은 남은 레거시 보조표용이다.
   // 새 화면/상태 판단/픽 표시/닷 표시에는 사용 금지. 필요한 데이터는 서버에서 roundState에 추가한다.
   const displaySnapshot = picksSnapshot;
@@ -904,9 +917,9 @@ export default function GhUserGamePage() {
   })();
   const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
-  const applyGameData = useCallback((data) => {
+  const applyGameData = useCallback((data, { preserveGameId = false } = {}) => {
     setLegacyRestoreBlocked(false);
-    setGameId(data.game_id);
+    if (!preserveGameId) setGameId(data.game_id);
     setConfig(data.config);
     setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
     const seq = data.seq || "";
@@ -1347,11 +1360,18 @@ export default function GhUserGamePage() {
 
   const handleInput = async (inputValue) => {
     if (!gameId || processingRef.current) return;
+    if (replay.active && replay.external) return;
+    const wasCurrentReplay = replay.active;
     processingRef.current = true;
     setProcessing(true);
 
+    if (wasCurrentReplay) {
+      await restoreGame(gameId);
+      setReplay({ active: false, external: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
+    }
+
     // hit/miss 여부는 서버가 판정해 내려준다(응답의 round_status_current). 입력 직후엔 미정(wait)으로 낙관적 추가 후 응답으로 확정.
-    const effectivePick = betData?.user_martin?.combined?.direction || betData?.combined?.direction;
+    const effectivePick = wasCurrentReplay ? null : betData?.user_martin?.combined?.direction || betData?.combined?.direction;
     setResults((prev) => [...prev, { value: inputValue, status: "wait", statusAr: "wait", aPick: effectivePick && effectivePick !== "wait" ? effectivePick : null, decalShadow: decalPick !== null || shadowPick !== null }]);
     setBetData(null);
 
@@ -1359,7 +1379,7 @@ export default function GhUserGamePage() {
       const res = await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
       const data = res.data;
       const nextStrategyRound = results.filter((result) => result.value === "P" || result.value === "B").length + 1;
-      if (inputValue !== "T" && data.round_num !== undefined && data.round_num !== nextStrategyRound) {
+      if (!wasCurrentReplay && inputValue !== "T" && data.round_num !== undefined && data.round_num !== nextStrategyRound) {
         alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
         window.location.reload();
         return;
@@ -1367,6 +1387,10 @@ export default function GhUserGamePage() {
       if (inputValue === "T") {
         setRoundStateUpper(data.round_state_upper || null);
         setRoundStateLower(data.round_state_lower || null);
+        return;
+      }
+      if (wasCurrentReplay) {
+        applyGameData(data);
         return;
       }
       // 방금 입력한 라운드의 hit/miss를 서버 판정값으로 확정 (프론트 자체 계산 안 함)
@@ -1519,6 +1543,7 @@ export default function GhUserGamePage() {
     if (!gameId || !selectedSlotNo || autoStatus.running) return;
     setProcessing(true);
     try {
+      setReplay((prev) => ({ ...prev, active: false }));
       await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gameId } });
       await startGame({ slotNo: selectedSlotNo, replaceGameId: gameId });
       await refreshGameSlots();
@@ -1531,6 +1556,107 @@ export default function GhUserGamePage() {
       );
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const applyReplayState = useCallback((data, external) => {
+    applyGameData(data, { preserveGameId: true });
+    setReplay({
+      active: true,
+      external,
+      sourceGameId: data.game_id,
+      roundNum: data.round_num,
+      totalRounds: data.total_rounds,
+    });
+  }, [applyGameData]);
+
+  const fetchReplayState = useCallback(async (sourceGameId, targetRound, external) => {
+    const params = targetRound == null ? {} : { round_num: targetRound };
+    const res = await apiCaller.get(GH_GAMES_API.REPLAY(sourceGameId), params);
+    applyReplayState(res.data, external);
+    return res.data;
+  }, [applyReplayState]);
+
+  const openReplay = () => {
+    setReplayGameInput("");
+    setReplayPreview(null);
+    setReplayError("");
+    setReplayOpen(true);
+  };
+
+  const loadReplayPreview = async () => {
+    const entered = replayGameInput.trim();
+    const external = entered !== "";
+    const sourceGameId = external ? Number(entered) : gameId;
+    if (!Number.isInteger(sourceGameId) || sourceGameId <= 0) {
+      setReplayError("올바른 게임번호를 입력하세요.");
+      return;
+    }
+    setReplayLoading(true);
+    setReplayError("");
+    try {
+      const res = await apiCaller.get(GH_GAMES_API.REPLAY(sourceGameId));
+      setReplayPreview({ data: res.data, external });
+    } catch (err) {
+      setReplayPreview(null);
+      setReplayError(err.response?.data?.detail || "리플레이 데이터를 불러오지 못했습니다.");
+    } finally {
+      setReplayLoading(false);
+    }
+  };
+
+  const confirmReplay = () => {
+    if (!replayPreview) return;
+    applyReplayState(replayPreview.data, replayPreview.external);
+    setReplayOpen(false);
+  };
+
+  const moveReplay = async (delta) => {
+    if (replayLoading || !gameId) return;
+    const sourceGameId = replay.active ? replay.sourceGameId : gameId;
+    const external = replay.active ? replay.external : false;
+    const currentRound = replay.active ? replay.roundNum : strategyResults.length;
+    const totalRounds = replay.active ? replay.totalRounds : strategyResults.length;
+    const targetRound = Math.max(1, Math.min(totalRounds, currentRound + delta));
+    if (replay.active && targetRound === currentRound) return;
+    setReplayLoading(true);
+    try {
+      await fetchReplayState(sourceGameId, targetRound, external);
+    } catch (err) {
+      setRejectMsg(err.response?.data?.detail || "리플레이 회차를 불러오지 못했습니다.");
+    } finally {
+      setReplayLoading(false);
+    }
+  };
+
+  const moveReplayTo = async (value = replayRoundInput) => {
+    if (replayLoading || !gameId) return;
+    const sourceGameId = replay.active ? replay.sourceGameId : gameId;
+    const external = replay.active ? replay.external : false;
+    const totalRounds = replay.active ? replay.totalRounds : strategyResults.length;
+    const targetRound = Number(value);
+    if (!Number.isInteger(targetRound) || targetRound < 1 || targetRound > totalRounds) {
+      setRejectMsg(`회차는 1~${totalRounds} 사이로 입력해주세요.`);
+      return;
+    }
+    setReplayLoading(true);
+    try {
+      await fetchReplayState(sourceGameId, targetRound, external);
+    } catch (err) {
+      setRejectMsg(err.response?.data?.detail || "리플레이 회차를 불러오지 못했습니다.");
+    } finally {
+      setReplayLoading(false);
+    }
+  };
+
+  const exitReplay = async () => {
+    if (!replay.active) return;
+    setReplayLoading(true);
+    try {
+      await restoreGame(gameId);
+      setReplay({ active: false, external: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
+    } finally {
+      setReplayLoading(false);
     }
   };
 
@@ -1707,6 +1833,7 @@ export default function GhUserGamePage() {
     || labouchereSequence.length === 0
     || Number(labouchere?.amount || 0) <= 0
     || processing
+    || replay.active
     || labHmPressed !== null
   );
   const triggerLabouchereResult = async (which) => {
@@ -1736,6 +1863,7 @@ export default function GhUserGamePage() {
     || slotBusy
     || autoStatus.running
     || legacyRestoreBlocked
+    || replay.active
     || !gameId
     || !selectedSlotNo
     || selectedSlotNo === 1
@@ -1743,6 +1871,8 @@ export default function GhUserGamePage() {
   );
   const endDisabledReason = selectedSlotNo === 1
     ? "1번 슬롯은 종료할 수 없습니다"
+    : replay.active
+      ? "리플레이를 먼저 종료해주세요"
     : autoStatus.running
       ? "오토를 먼저 정지해야 게임을 종료할 수 있습니다"
       : occupiedSlotCount <= 1
@@ -1756,6 +1886,11 @@ export default function GhUserGamePage() {
       <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
         <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>Globalhit</span>
         {gameId && <span style={{ fontSize: 11, color: "#888" }}>#{gameId}</span>}
+        {replay.active && (
+          <span style={{ fontSize: 12, color: "#ffb300", fontWeight: "bold", marginLeft: 8 }}>
+            {`리플레이 중 #${replay.sourceGameId} · ${replay.roundNum}/${replay.totalRounds}회차`}
+          </span>
+        )}
         {autoStatus.running && (selectedGameSlot?.table_name || autoStatus.table_name) && (
           <span style={{ fontSize: 11, color: "#66bb6a", fontWeight: "bold", marginLeft: 8 }}>
             {selectedGameSlot?.table_name || autoStatus.table_name}
@@ -2126,7 +2261,7 @@ export default function GhUserGamePage() {
                     );
                   })()}
                   {(() => {
-                    const enabled = results.length > 0 && !processing;
+                    const enabled = results.length > 0 && !processing && !replay.active;
                     return (
                       <Box
                         onClick={enabled ? handleDeleteOne : undefined}
@@ -2148,7 +2283,7 @@ export default function GhUserGamePage() {
             autoStatus={autoStatus}
             onPlay={handleAutoToggle}
             autoError={autoError}
-            disabled={slotBusy || !gameId || legacyRestoreBlocked}
+            disabled={slotBusy || !gameId || legacyRestoreBlocked || replay.active}
           />
           </Box>
 
@@ -2156,9 +2291,9 @@ export default function GhUserGamePage() {
             roundState={roundState}
             amountMode={amountViewMode}
             onSetup={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
-            setupDisabled={!isAdmin}
+            setupDisabled={!isAdmin || replay.active}
             onNew={() => setShowNewConfirm(true)}
-            newDisabled={processing || slotBusy || autoStatus.running || !gameId || !selectedSlotNo}
+            newDisabled={processing || slotBusy || autoStatus.running || !gameId || !selectedSlotNo || (replay.active && !replay.external)}
             labouchere={labouchere}
             onLabouchereSequence={gameId ? () => setLabSeqOpen(true) : null}
             labHmDisabled={labHmDisabled}
@@ -2168,7 +2303,7 @@ export default function GhUserGamePage() {
             gameSlots={gameSlots}
             selectedSlotNo={selectedSlotNo}
             onSlotSelect={handleSlotSelect}
-            slotBusy={slotBusy}
+            slotBusy={slotBusy || replay.active}
             onEnd={() => setShowEndConfirm(true)}
             endDisabled={endDisabled}
             endDisabledReason={endDisabledReason}
@@ -2188,7 +2323,7 @@ export default function GhUserGamePage() {
                 size="small"
                 variant="outlined"
                 color="warning"
-                disabled={processing || slotBusy || autoStatus.running || !gameId || !selectedSlotNo}
+                disabled={processing || slotBusy || autoStatus.running || replay.active || !gameId || !selectedSlotNo}
                 onClick={openShoeCopy}
               >
                 기존 슈 입력
@@ -2201,6 +2336,33 @@ export default function GhUserGamePage() {
                   {shoeCopyProgress.active ? "기존 슈 입력 중" : "기존 슈 입력 완료"}
                   {` ${shoeCopyProgress.completed}/${shoeCopyProgress.total}`}
                 </Typography>
+              )}
+              <Button size="small" variant="outlined" onClick={openReplay} disabled={processing || replayLoading || !gameId}>
+                리플레이
+              </Button>
+              {(replay.active || strategyResults.length > 0) && (
+                <>
+                  <Button size="small" onClick={() => moveReplay(-10)} disabled={replayLoading || (replay.active ? replay.roundNum : strategyResults.length) <= 1}>-10</Button>
+                  <Button size="small" onClick={() => moveReplay(-1)} disabled={replayLoading || (replay.active ? replay.roundNum : strategyResults.length) <= 1}>이전</Button>
+                  <Button size="small" onClick={() => moveReplay(1)} disabled={!replay.active || replayLoading || replay.roundNum >= replay.totalRounds}>다음</Button>
+                  <Button size="small" onClick={() => moveReplay(10)} disabled={!replay.active || replayLoading || replay.roundNum >= replay.totalRounds}>+10</Button>
+                  <TextField
+                    size="small"
+                    type="number"
+                    value={replayRoundInput}
+                    onChange={(event) => setReplayRoundInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") moveReplayTo();
+                    }}
+                    inputProps={{ min: 1, max: replay.active ? replay.totalRounds : strategyResults.length }}
+                    sx={{ width: 82 }}
+                    disabled={replayLoading}
+                  />
+                  <Button size="small" onClick={() => moveReplayTo()} disabled={replayLoading || !replayRoundInput}>이동</Button>
+                  {replay.active && (
+                    <Button size="small" color="warning" onClick={exitReplay} disabled={replayLoading}>리플레이 종료</Button>
+                  )}
+                </>
               )}
             </Box>
           )}
@@ -2222,7 +2384,7 @@ export default function GhUserGamePage() {
                   value: ncRefDraft,
                   dirty: ncRefDirty,
                   locked: ncRefLocked,
-                  busy: ncRefBusy,
+                  busy: ncRefBusy || replay.active,
                   onChange: handleNcRefChange,
                   onConfirm: handleNcRefConfirm,
                   onCancel: handleNcRefCancel,
@@ -2271,6 +2433,82 @@ export default function GhUserGamePage() {
         <DialogActions>
           <Button onClick={() => setShowEndConfirm(false)}>취소</Button>
           <Button onClick={handleCloseSlotConfirm} color="error" variant="contained">종료</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={replayOpen} onClose={() => !replayLoading && setReplayOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>게임 리플레이</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>
+            게임번호를 비우면 현재 게임을, 입력하면 해당 게임을 리플레이합니다.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            size="small"
+            type="number"
+            label="다른 게임번호 (선택)"
+            value={replayGameInput}
+            disabled={replayLoading}
+            onChange={(event) => {
+              setReplayGameInput(event.target.value);
+              setReplayPreview(null);
+              setReplayError("");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") loadReplayPreview();
+            }}
+          />
+          <Button variant="outlined" sx={{ mt: 1 }} disabled={replayLoading} onClick={loadReplayPreview}>
+            {replayLoading ? "조회 중..." : "조회"}
+          </Button>
+          {replayError && (
+            <Typography variant="body2" sx={{ color: "#f44336", mt: 1 }}>{replayError}</Typography>
+          )}
+          {replayPreview && (() => {
+            const state = replayPreview.data.round_state_upper;
+            const actuals = (state?.shoe_results || [])
+              .map((item) => typeof item === "string" ? item : item?.actual)
+              .filter((actual) => actual === "P" || actual === "B" || actual === "T");
+            const previewGrid = buildShoePreviewGrid(actuals);
+            const previewCols = previewGrid[0]?.length || 1;
+            return (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  {`게임 #${replayPreview.data.game_id} · ${replayPreview.data.status} · ${replayPreview.data.total_rounds}회차`}
+                </Typography>
+                <Box sx={{ overflowX: "auto", pb: 1 }}>
+                  <Box sx={{
+                    display: "grid", gridTemplateColumns: `repeat(${previewCols}, 24px)`,
+                    gridTemplateRows: `repeat(${GRID_ROWS}, 24px)`, gridAutoFlow: "column",
+                    gap: "1px", width: "fit-content", backgroundColor: "#616161", border: "1px solid #616161",
+                  }}>
+                    {Array.from({ length: previewCols }, (_, col) =>
+                      Array.from({ length: GRID_ROWS }, (__, row) => {
+                        const actual = previewGrid[row][col];
+                        const color = actual === "P" ? "#1565c0" : actual === "B" ? "#f44336" : "#2e7d32";
+                        return (
+                          <Box key={`${row}-${col}`} sx={{ width: 24, height: 24, backgroundColor: "background.default", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {actual && (
+                              <Box sx={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: color, color: "#fff", fontSize: 10, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                {actual}
+                              </Box>
+                            )}
+                          </Box>
+                        );
+                      })
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+            );
+          })()}
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={replayLoading} onClick={() => setReplayOpen(false)}>취소</Button>
+          <Button variant="contained" disabled={replayLoading || !replayPreview} onClick={confirmReplay}>
+            리플레이 시작
+          </Button>
         </DialogActions>
       </Dialog>
 
