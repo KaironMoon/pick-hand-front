@@ -536,9 +536,11 @@ function GhBettingSummaryPanel({
   const yukmaeBoardColumns = 13;
   const markerColor = { P: "#1565d8", B: "#f44336" };
   const hasAutoError = shouldDisplayAutoError(autoStatus, autoError);
-  const replayRoundIdx = Math.max(0, Number(roundState?.round_num || 1) - 1);
+  const replayRoundNum = Math.max(1, Number(roundState?.round_num || 1));
+  const replayCells = roundState?.actual_bet_table?.cells || [];
   const replayFailure = replayActive
-    ? roundState?.actual_bet_table?.cells?.[replayRoundIdx]
+    ? [replayCells[replayRoundNum], replayCells[replayRoundNum - 1]]
+      .find((cell) => cell?.failure_code)
     : null;
   const hasReplayBetError = !!replayFailure?.failure_code;
   const errorCode = hasAutoError
