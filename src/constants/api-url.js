@@ -53,6 +53,8 @@ const GH_GAMES_API = {
   SLOT_CLOSE: (slotNo) => `/api/v1/gh/games/slots/${slotNo}/close`,
   NEXT: "/api/v1/gh/games/next",
   LAST_ACTIVE: "/api/v1/gh/games/last-active",
+  SHOE_COPY_PROCESS: "/api/v1/gh/games/shoe-copy/process",
+  SHOE_COPY_PREVIEW: (id) => `/api/v1/gh/games/shoe-copy/${id}`,
   LAST_ROUND: (id) => `/api/v1/gh/games/${id}/last-round`,
   STATE: (id) => `/api/v1/gh/games/${id}/state`,
   NC_REF: (id) => `/api/v1/gh/games/${id}/nc-ref`,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, Tooltip, Snackbar, Alert } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip, Snackbar, Alert } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
@@ -32,6 +32,18 @@ if (typeof document !== "undefined" && !document.getElementById("gh-blink-style"
 const LSC_COLOR = "#000000";  // LSC: 검정 (모든 배경에서 고대비)
 const DS_COLOR = "#FF6600";   // 데칼/그림자: 형광 주황
 const NC_REF_LOCK_KEY = "gh_nc_ref_locked_game_seq";
+
+const buildShoePreviewGrid = (actuals) => {
+  const cols = Math.max(1, Math.ceil((actuals?.length || 0) / GRID_ROWS));
+  return Array.from({ length: GRID_ROWS }, (_, row) =>
+    Array.from({ length: cols }, (__, col) => actuals?.[col * GRID_ROWS + row] || null)
+  );
+};
+
+const getShoeResultCount = (data) => {
+  const shoeResults = data?.round_state_upper?.shoe_results;
+  return Array.isArray(shoeResults) ? shoeResults.length : (data?.seq || "").length;
+};
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -768,6 +780,13 @@ export default function GhUserGamePage() {
   const [selectedSlotNo, setSelectedSlotNo] = useState(null);
   const [slotBusy, setSlotBusy] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [shoeCopyOpen, setShoeCopyOpen] = useState(false);
+  const [sourceGameInput, setSourceGameInput] = useState("");
+  const [shoePreview, setShoePreview] = useState(null);
+  const [shoeCopyError, setShoeCopyError] = useState("");
+  const [shoeCopyLoading, setShoeCopyLoading] = useState(false);
+  const [shoeCopyExecuting, setShoeCopyExecuting] = useState(false);
+  const [shoeCopyProgress, setShoeCopyProgress] = useState({ active: false, completed: 0, total: 0 });
   const processingRef = useRef(false);
   const skipRestoreGameIdRef = useRef(null);
   const [processing, setProcessing] = useState(false);
@@ -1515,6 +1534,134 @@ export default function GhUserGamePage() {
     }
   };
 
+  const openShoeCopy = () => {
+    if (autoStatus.running) {
+      setRejectMsg("오토 실행 중에는 기존 슈 입력 기능을 사용할 수 없습니다.");
+      return;
+    }
+    setSourceGameInput("");
+    setShoePreview(null);
+    setShoeCopyError("");
+    setShoeCopyOpen(true);
+  };
+
+  const loadShoePreview = async () => {
+    const sourceGameId = Number(sourceGameInput);
+    if (!Number.isInteger(sourceGameId) || sourceGameId <= 0) {
+      setShoeCopyError("올바른 게임번호를 입력하세요.");
+      return;
+    }
+    setShoeCopyLoading(true);
+    setShoeCopyError("");
+    try {
+      const res = await apiCaller.get(GH_GAMES_API.SHOE_COPY_PREVIEW(sourceGameId));
+      setShoePreview(res.data);
+    } catch (err) {
+      setShoePreview(null);
+      setShoeCopyError(err.response?.data?.detail || "기존 슈를 조회하지 못했습니다.");
+    } finally {
+      setShoeCopyLoading(false);
+    }
+  };
+
+  const executeShoeCopy = async () => {
+    if (!shoePreview || !gameId || !selectedSlotNo || shoeCopyExecuting) return;
+    if (autoStatus.running) {
+      setShoeCopyOpen(false);
+      setRejectMsg("오토 실행 중에는 기존 슈 입력 기능을 사용할 수 없습니다.");
+      return;
+    }
+    setShoeCopyExecuting(true);
+    setProcessing(true);
+    setShoeCopyError("");
+    setShoeCopyProgress({
+      active: true,
+      completed: Math.min(getShoeResultCount({ round_state_upper: roundStateUpper }), shoePreview.result_count),
+      total: shoePreview.result_count,
+    });
+    let stateRefreshTimer = null;
+    let stateRefreshPromise = null;
+    let keepRefreshing = false;
+    try {
+      setShoeCopyOpen(false);
+
+      keepRefreshing = true;
+      const scheduleStateRefresh = () => {
+        stateRefreshTimer = window.setTimeout(() => {
+          stateRefreshPromise = apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user")
+            .then((stateRes) => {
+              applyGameData(stateRes.data);
+              setShoeCopyProgress((prev) => ({
+                ...prev,
+                completed: Math.min(getShoeResultCount(stateRes.data), prev.total),
+              }));
+            })
+            .catch(() => {})
+            .finally(() => {
+              stateRefreshPromise = null;
+              if (keepRefreshing) scheduleStateRefresh();
+            });
+        }, 5000);
+      };
+      scheduleStateRefresh();
+
+      const processRes = await apiCaller.post(
+        GH_GAMES_API.SHOE_COPY_PROCESS,
+        {
+          source_game_id: shoePreview.source_game_id,
+          game_id: gameId,
+        },
+        { timeout: 5 * 60 * 1000 },
+      );
+      const data = processRes.data;
+      keepRefreshing = false;
+      if (stateRefreshTimer) window.clearTimeout(stateRefreshTimer);
+      if (stateRefreshPromise) await stateRefreshPromise;
+      await restoreGame(gameId);
+      await refreshGameSlots();
+      setShoeCopyProgress({
+        active: false,
+        completed: data.completed_results,
+        total: data.total_results,
+      });
+      if (!data.completed) {
+        const detail = typeof data.error === "string" ? data.error : JSON.stringify(data.error);
+        window.alert(
+          `기존 슈 입력 중 오류가 발생했습니다.\n` +
+          `${data.completed_results}개 결과 입력 완료 / ${data.failed_result_index}번째 결과 처리 실패\n` +
+          `사유: ${detail}`
+        );
+      } else {
+        window.alert(`기존 슈 입력 완료 (${data.completed_results}/${data.total_results})`);
+      }
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      const code = typeof detail === "object" ? detail?.error : null;
+      if (code === "auto_running_stop_first") {
+        setShoeCopyProgress((prev) => ({ ...prev, active: false }));
+        setShoeCopyOpen(false);
+        setRejectMsg("오토 실행 중에는 기존 슈 입력 기능을 사용할 수 없습니다.");
+      } else if (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT") {
+        try {
+          await restoreGame(gameId);
+          setShoeCopyProgress((prev) => ({ ...prev, active: false }));
+          setRejectMsg("처리 응답이 지연되고 있습니다. 현재 게임 상태를 갱신했습니다.");
+        } catch {
+          setShoeCopyProgress((prev) => ({ ...prev, active: false }));
+          setShoeCopyError("처리 응답이 지연되고 있습니다. 잠시 후 슬롯 상태를 다시 확인해주세요.");
+        }
+      } else {
+        setShoeCopyProgress((prev) => ({ ...prev, active: false }));
+        setShoeCopyError(typeof detail === "string" ? detail : "기존 슈 입력을 실행하지 못했습니다.");
+      }
+    } finally {
+      keepRefreshing = false;
+      if (stateRefreshTimer) window.clearTimeout(stateRefreshTimer);
+      setShoeCopyExecuting(false);
+      setProcessing(false);
+    }
+  };
+
   const handleCloseSlotConfirm = async () => {
     setShowEndConfirm(false);
     if (!selectedSlotNo || !gameId || autoStatus.running || slotBusy) return;
@@ -2030,6 +2177,34 @@ export default function GhUserGamePage() {
           </Box>
           {/* /1|2 row */}
 
+          {isAdmin && (
+            <Box sx={{
+              display: "flex", alignItems: "center", gap: 1, mb: 1.5, px: 1, py: 0.7,
+              border: "1px solid rgba(255,193,7,0.45)", borderRadius: 1,
+              backgroundColor: "rgba(255,193,7,0.06)", flexWrap: "wrap",
+            }}>
+              <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: "bold" }}>어드민 도구</Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                color="warning"
+                disabled={processing || slotBusy || autoStatus.running || !gameId || !selectedSlotNo}
+                onClick={openShoeCopy}
+              >
+                기존 슈 입력
+              </Button>
+              {autoStatus.running && (
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>오토 실행 중에는 사용할 수 없습니다.</Typography>
+              )}
+              {shoeCopyProgress.total > 0 && (
+                <Typography variant="caption" sx={{ color: shoeCopyProgress.active ? "#ffc107" : "#4caf50", fontWeight: "bold" }}>
+                  {shoeCopyProgress.active ? "기존 슈 입력 중" : "기존 슈 입력 완료"}
+                  {` ${shoeCopyProgress.completed}/${shoeCopyProgress.total}`}
+                </Typography>
+              )}
+            </Box>
+          )}
+
           {isAdmin && roundStateLower && (
             <>
               {/* ===== 어드민 전용 하단 전략별 현황 전광판 ===== */}
@@ -2096,6 +2271,86 @@ export default function GhUserGamePage() {
         <DialogActions>
           <Button onClick={() => setShowEndConfirm(false)}>취소</Button>
           <Button onClick={handleCloseSlotConfirm} color="error" variant="contained">종료</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={shoeCopyOpen}
+        onClose={() => !shoeCopyExecuting && setShoeCopyOpen(false)}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>기존 슈 입력</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 0.5, mb: 2 }}>
+            <TextField
+              autoFocus
+              size="small"
+              label="기존 게임번호"
+              type="number"
+              value={sourceGameInput}
+              disabled={shoeCopyExecuting}
+              onChange={(event) => {
+                setSourceGameInput(event.target.value);
+                setShoePreview(null);
+                setShoeCopyError("");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") loadShoePreview();
+              }}
+            />
+            <Button variant="outlined" disabled={shoeCopyLoading || shoeCopyExecuting} onClick={loadShoePreview}>
+              {shoeCopyLoading ? "조회 중..." : "조회"}
+            </Button>
+          </Box>
+
+          {shoeCopyError && (
+            <Typography variant="body2" sx={{ color: "#f44336", mb: 1 }}>{shoeCopyError}</Typography>
+          )}
+
+          {shoePreview && (() => {
+            const previewGrid = buildShoePreviewGrid(shoePreview.actuals);
+            const previewCols = previewGrid[0]?.length || 1;
+            return (
+              <>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  {`게임 #${shoePreview.source_game_id} · ${shoePreview.round_count}회차 · 전체 결과 ${shoePreview.result_count}개`}
+                </Typography>
+                <Box sx={{ overflowX: "auto", pb: 1 }}>
+                  <Box sx={{
+                    display: "grid", gridTemplateColumns: `repeat(${previewCols}, 24px)`,
+                    gridTemplateRows: `repeat(${GRID_ROWS}, 24px)`, gridAutoFlow: "column",
+                    gap: "1px", width: "fit-content", backgroundColor: "#616161", border: "1px solid #616161",
+                  }}>
+                    {Array.from({ length: previewCols }, (_, col) =>
+                      Array.from({ length: GRID_ROWS }, (__, row) => {
+                        const actual = previewGrid[row][col];
+                        const color = actual === "P" ? "#1565c0" : actual === "B" ? "#f44336" : "#2e7d32";
+                        return (
+                          <Box key={`${row}-${col}`} sx={{ width: 24, height: 24, backgroundColor: "background.default", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {actual && (
+                              <Box sx={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: color, color: "#fff", fontSize: 10, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                {actual}
+                              </Box>
+                            )}
+                          </Box>
+                        );
+                      })
+                    )}
+                  </Box>
+                </Box>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  현재 게임에 입력된 결과 수만큼 건너뛰고, 그다음 결과부터 이어서 입력합니다.
+                </Typography>
+              </>
+            );
+          })()}
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={shoeCopyExecuting} onClick={() => setShoeCopyOpen(false)}>취소</Button>
+          <Button variant="contained" color="warning" disabled={!shoePreview || shoeCopyExecuting} onClick={executeShoeCopy}>
+            {shoeCopyExecuting ? "입력 중..." : "현재 게임에 이어서 입력"}
+          </Button>
         </DialogActions>
       </Dialog>
 
