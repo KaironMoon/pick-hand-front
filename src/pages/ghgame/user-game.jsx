@@ -297,6 +297,7 @@ function RoundAmountTable({
       betPlaced: !!actualCell.bet_placed,
       settled: !!actualCell.settled,
       failureCode: actualCell.failure_code || null,
+      failureDetail: actualCell.failure_detail || null,
     };
   });
   const fmt = (v) => v === "N/A" ? "-" : Number(v || 0).toFixed(1);
@@ -439,6 +440,7 @@ function applyActualBetAttempt(roundState, data) {
     bet_placed: placed,
     settled: false,
     failure_code: data.code || null,
+    failure_detail: data.detail || null,
   };
   return {
     ...roundState,
@@ -495,6 +497,7 @@ function GhBettingSummaryPanel({
   autoStatus,
   onPlay,
   autoError,
+  replayActive = false,
   disabled = false,
 }) {
   const storedShoeResults = roundState?.shoe_results;
@@ -533,9 +536,18 @@ function GhBettingSummaryPanel({
   const yukmaeBoardColumns = 13;
   const markerColor = { P: "#1565d8", B: "#f44336" };
   const hasAutoError = shouldDisplayAutoError(autoStatus, autoError);
-  const errorCode = autoStatus?.error_code || autoError?.code || "auto_error";
-  const errorDetail = autoStatus?.error_detail || autoError?.detail || "자동게임 처리 중 오류가 발생했습니다.";
-  const autoStateCell = hasAutoError
+  const replayRoundIdx = Math.max(0, Number(roundState?.round_num || 1) - 1);
+  const replayFailure = replayActive
+    ? roundState?.actual_bet_table?.cells?.[replayRoundIdx]
+    : null;
+  const hasReplayBetError = !!replayFailure?.failure_code;
+  const errorCode = hasAutoError
+    ? autoStatus?.error_code || autoError?.code || "auto_error"
+    : replayFailure?.failure_code || "auto_error";
+  const errorDetail = hasAutoError
+    ? autoStatus?.error_detail || autoError?.detail || "자동게임 처리 중 오류가 발생했습니다."
+    : replayFailure?.failure_detail || "해당 회차의 카지노 배팅에 실패했습니다.";
+  const autoStateCell = hasAutoError || hasReplayBetError
     ? { text: "error", error: true, tooltip: `[${errorCode}] ${errorDetail}` }
     : autoStatus?.running
       ? { text: "ok", autoOk: true }
@@ -2283,6 +2295,7 @@ export default function GhUserGamePage() {
             autoStatus={autoStatus}
             onPlay={handleAutoToggle}
             autoError={autoError}
+            replayActive={replay.active}
             disabled={slotBusy || !gameId || legacyRestoreBlocked || replay.active}
           />
           </Box>
