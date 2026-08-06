@@ -555,6 +555,7 @@ function GhBettingSummaryPanel({
       ? { text: "ok", autoOk: true }
       : { text: "" };
   const phaseAbbr = {
+    standby: "STB",
     monitoring: "MON",
     betting: "BET",
     clearing: "CLR",
