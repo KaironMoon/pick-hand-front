@@ -1,4 +1,7 @@
+import { useEffect, useRef, useState } from "react";
 import { Box } from "@mui/material";
+
+import { isMaxMissAtLeast, isMissStreakAtLeast } from "./strategy-board-alerts.js";
 
 // ── 전략별 현황 전광판 (design-260615-gh-calc.html 260623 신버전 포팅) ──
 // 4개 테이블(G1~G4) · 각 16컬럼 · 10행.
@@ -40,6 +43,16 @@ const GOB_RANK_BG = {
 };
 const AMOUNT_ZONE_COLORS = { blue: "#2f9bff", white: "#fff", red: "#ff5b5b" };
 const GENERATED_PICK_BG = "#ffeb3b";
+const MISS_STREAK_BLINK_MIN = 7;
+const MAX_MISS_BLINK_MIN = 9;
+const MAX_BLINK_DURATION_MS = 5000;
+const alertBlinkSx = {
+  animation: "ghStrategyAlertBlink 0.8s steps(2, end) infinite",
+  "@keyframes ghStrategyAlertBlink": {
+    "0%, 100%": { backgroundColor: "#ffeb3b", color: "#111" },
+    "50%": { backgroundColor: "#111", color: "#ffeb3b" },
+  },
+};
 
 // 셀의 노란 박스/그룹선 테두리 계산 (디자인 edgeCls 포팅, span=1 고정 — 병합 없음)
 function edgeStyle(data, i, pos) {
@@ -168,18 +181,44 @@ const generatedPickSx = (mark) => mark === "signal"
     : {};
 
 // 단순(병합 없음) 행. 빈값은 회색 대시(–). label 있으면 맨 앞 라벨 셀.
-function SimpleRow({ data, dataKey, render, pos, label, labelColor, markKey }) {
+function SimpleRow({
+  data,
+  dataKey,
+  render,
+  pos,
+  label,
+  labelColor,
+  markKey,
+  labelOnClick,
+  labelTitle,
+  shouldBlink,
+}) {
   const bgKey = `${dataKey}Bg`;
   return (
     <tr>
-      {label != null && <LblCell text={label} color={labelColor} edge={pos === "last" ? "last" : undefined} />}
+      {label != null && (
+        <LblCell
+          text={label}
+          color={labelColor}
+          edge={pos === "last" ? "last" : undefined}
+          onClick={labelOnClick}
+          title={labelTitle}
+        />
+      )}
       {data.name.map((n, i) => {
         const v = (data[dataKey] || [])[i] || "";
         const bg = (data[bgKey] || [])[i];
         const pickMark = dataKey === "pick" ? (data.pickMark || [])[i] : null;
         const marks = markKey ? (data[markKey] || [])[i] : null;
         const pickMarkSx = generatedPickSx(pickMark);
-        const sx = { ...tdSx, ...(bg ? { backgroundColor: bg } : {}), ...pickMarkSx, ...edgeStyle(data, i, pos) };
+        const blink = shouldBlink?.(v, i, data) || false;
+        const sx = {
+          ...tdSx,
+          ...(bg ? { backgroundColor: bg } : {}),
+          ...pickMarkSx,
+          ...(blink ? alertBlinkSx : {}),
+          ...edgeStyle(data, i, pos),
+        };
         return v
           ? <Box component="td" key={i} sx={sx}>{withSourceDots(render(v, i, data), marks)}</Box>
           : <Box component="td" key={i} sx={{ ...sx, color: dimColor }}>–</Box>;
@@ -248,15 +287,15 @@ const LBL_RED = "#ff5252";
 const lblSx = { ...tdSx, color: "#fff", fontWeight: "bold", background: "#141414", textAlign: "right",
   position: "sticky", left: 0, zIndex: 2,
   borderLeft: `3px solid ${HL}`, borderRight: `3px solid ${HL}` };
-function LblCell({ text, color = "#fff", edge }) {
-  const sx = { ...lblSx, color };
+function LblCell({ text, color = "#fff", edge, onClick, title }) {
+  const sx = { ...lblSx, color, ...(onClick ? { cursor: "pointer", userSelect: "none" } : {}) };
   if (edge === "head") sx.borderTop = `3px solid ${HL}`;
   if (edge === "last") sx.borderBottom = `3px solid ${HL}`;
   const Tag = edge === "head" ? "th" : "td";
-  return <Box component={Tag} sx={sx}>{text}</Box>;
+  return <Box component={Tag} sx={sx} onClick={onClick} title={title}>{text}</Box>;
 }
 
-function StrategyTable({ data, showLabels = true }) {
+function StrategyTable({ data, showLabels = true, maxBlinkActive, onMaxLabelClick }) {
   const rowLabel = (text) => showLabels ? text : undefined;
   return (
     <Box component="table" sx={{ borderCollapse: "collapse", backgroundColor: "#000", tableLayout: "fixed", width: showLabels ? 1020 : 960 }}>
@@ -286,17 +325,25 @@ function StrategyTable({ data, showLabels = true }) {
         <SimpleRow data={data} dataKey="rec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label={rowLabel("총전적")} />
         <SimpleRow data={data} dataKey="rec2" render={(v) => <span>{rec2HTML(v)}</span>} pos="mid" label={rowLabel("최다")} />
         <AssistRow data={data} pos="mid" label={rowLabel("어시H픽")} labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="wait2" render={waitCell} pos="mid" label={rowLabel("연속")} labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="wait2" render={waitCell} pos="mid" label={rowLabel("연속")} labelColor={LBL_RED}
+          shouldBlink={(v) => isMissStreakAtLeast(v, MISS_STREAK_BLINK_MIN)} />
         <SimpleRow data={data} dataKey="pct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("적중율")} labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="assistRec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label={rowLabel("총전적")} labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="assistRec2" render={(v) => <span>{rec2HTML(v)}</span>} pos="mid" label={rowLabel("최다")} labelColor={LBL_RED}
+          labelOnClick={showLabels ? onMaxLabelClick : undefined} labelTitle="회차·쿼터 최다 9M 이상을 5초간 점멸"
+          shouldBlink={(v) => maxBlinkActive && isMaxMissAtLeast(v, MAX_MISS_BLINK_MIN)} />
         <SimpleRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label={rowLabel("단계-AS")} labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="idx1" render={(v, i, row) => amountText(v, row.idx1Zone?.[i])} pos="mid" label={rowLabel("회차P")} labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("누적P")} labelColor={LBL_RED} />
         <QAssistRow data={data} pos="mid" label={rowLabel("어시Q픽")} />
-        <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label={rowLabel("쿼터연속")} />
+        <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label={rowLabel("쿼터연속")}
+          shouldBlink={(v) => isMissStreakAtLeast(v, MISS_STREAK_BLINK_MIN)} />
         <SimpleRow data={data} dataKey="qPct2" render={(v) => <span style={{ color: "#69f0ae", fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("적중율")} />
         {/* 쿼터 블록 */}
         <SimpleRow data={data} dataKey="qrec" render={(v) => <span style={{ color: "#eaeaea" }}>{recHTML(v)}</span>} pos="mid" label={rowLabel("쿼터전적")} />
+        <SimpleRow data={data} dataKey="qrec2" render={(v) => <span>{rec2HTML(v)}</span>} pos="mid" label={rowLabel("최다")}
+          labelOnClick={showLabels ? onMaxLabelClick : undefined} labelTitle="회차·쿼터 최다 9M 이상을 5초간 점멸"
+          shouldBlink={(v) => maxBlinkActive && isMaxMissAtLeast(v, MAX_MISS_BLINK_MIN)} />
         <SimpleRow data={data} dataKey="qstage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label={rowLabel("단계-AS")} />
         <SimpleRow data={data} dataKey="qidx1" render={(v, i, row) => amountText(v, row.qidx1Zone?.[i])} pos="mid" label={rowLabel("쿼터P")} />
         <SimpleRow data={data} dataKey="qidx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="last" label={rowLabel("누적P")} />
@@ -381,6 +428,7 @@ const quarterRow = (q, amounts, stepMin = 1) => {
   const amount = q.amount;
   return {
     qrec: `${q.total_q ?? 0}-${q.win_q ?? 0}/${q.lose_q ?? 0}`,
+    qrec2: fmtRec2(q.max_hit_streak ?? 0, q.max_miss_streak ?? 0),
     qstage: fmtStage(step, 0),
     qidx1: amount !== null && amount !== undefined ? fmtMan(amount) : "",
     qidx2: q.pnl !== null && q.pnl !== undefined ? fmtMan(q.pnl) : "",
@@ -426,6 +474,7 @@ const fromStats = (ctx, key) => {
     wait2: hs ? fmtStreak(hs.cur_streak_type, hs.cur_streak_count) : (as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined),
     pct2: as ? fmtPct(as.hit ?? 0, assistTotal) : undefined,
     assistRec: as ? fmtRec(assistTotal, as.hit ?? 0, as.miss ?? 0) : undefined,
+    assistRec2: as ? fmtRec2(as.max_hit_streak ?? 0, as.max_miss_streak ?? 0) : undefined,
     pct: fmtPct(s.hit ?? 0, total),
     rec: fmtRec(total, s.hit ?? 0, s.miss ?? 0),
     rec2: fmtRec2(s.max_hit_streak ?? 0, s.max_miss_streak ?? 0),
@@ -482,9 +531,9 @@ function buildColData(label, i, data, ctx) {
 
 // 테이블 정의 + 실데이터 → 값이 채워진 data
 function withLiveData(base, ctx) {
-  const keys = ["wait", "pick", "stage1", "pct", "rec", "rec2", "assist", "assistSource", "wait2", "pct2", "assistRec", "stage", "idx1", "idx2",
+  const keys = ["wait", "pick", "stage1", "pct", "rec", "rec2", "assist", "assistSource", "wait2", "pct2", "assistRec", "assistRec2", "stage", "idx1", "idx2",
     "qAssist", "qAssistSource", "qWait2", "qAssistWait", "qPct2",
-    "qrec", "qstage", "qidx1", "qidx2",
+    "qrec", "qrec2", "qstage", "qidx1", "qidx2",
     "idx1Zone", "qidx1Zone", "pickMark", "assistMark", "qAssistMark"];
   const out = { ...base };
   keys.forEach((k) => { out[k] = base.name.map(() => ""); });
@@ -544,13 +593,32 @@ function withLiveData(base, ctx) {
 }
 
 export default function GhStrategyBoard({ roundState }) {
+  const [maxBlinkActive, setMaxBlinkActive] = useState(false);
+  const maxBlinkTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(maxBlinkTimerRef.current), []);
+  const handleMaxLabelClick = () => {
+    clearTimeout(maxBlinkTimerRef.current);
+    setMaxBlinkActive(true);
+    maxBlinkTimerRef.current = setTimeout(() => {
+      setMaxBlinkActive(false);
+      maxBlinkTimerRef.current = null;
+    }, MAX_BLINK_DURATION_MS);
+  };
   const hasData = !!roundState?.sections;
   const ctx = { roundState };
   const tables = [G1, G2, G3, G4].map((t) => (hasData ? withLiveData(t, ctx) : t));
   return (
     <Box sx={{ overflowX: "auto", mb: 2 }}>
       <Box sx={{ display: "inline-grid", gridTemplateColumns: "repeat(2, max-content)", backgroundColor: "#000" }}>
-        {tables.map((t, idx) => <StrategyTable key={idx} data={t} showLabels={idx % 2 === 0} />)}
+        {tables.map((t, idx) => (
+          <StrategyTable
+            key={idx}
+            data={t}
+            showLabels={idx % 2 === 0}
+            maxBlinkActive={maxBlinkActive}
+            onMaxLabelClick={handleMaxLabelClick}
+          />
+        ))}
       </Box>
     </Box>
   );
