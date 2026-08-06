@@ -19,8 +19,7 @@ export const shouldDisplayAutoError = (status, error = null) => Boolean(
 );
 
 export const shouldDisplaySlotAutoError = (slot) => Boolean(
-  slot?.auto_running
-  && (slot?.phase === "error" || slot?.auto_status === "error")
+  slot?.phase === "error" || slot?.auto_status === "error"
 );
 
 export const autoStatusLookupError = (status) => (

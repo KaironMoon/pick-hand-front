@@ -127,14 +127,14 @@ test("status lookup failure lights Error only while Auto is running", () => {
   );
 });
 
-test("slot Error blink also requires a running Auto game", () => {
+test("slot Error blink remains visible after Auto stops with an error", () => {
   assert.equal(
     shouldDisplaySlotAutoError({
       auto_running: false,
       auto_status: "error",
       phase: "error",
     }),
-    false,
+    true,
   );
   assert.equal(
     shouldDisplaySlotAutoError({

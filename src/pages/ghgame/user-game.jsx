@@ -242,16 +242,16 @@ function RoundAmountTable({
       return {
         label: String(slotNo),
         active: selected,
-        backgroundColor: selected
-          ? "#16365c"
-          : hasError
-            ? "#5b2020"
+        backgroundColor: hasError
+          ? "#ffeb3b"
+          : slot?.auto_running && slot?.phase === "monitoring"
+            ? "#c62828"
             : slot?.auto_running
-              ? "#17482f"
+              ? "#2e7d32"
               : slot?.occupied
                 ? "#252a31"
                 : "#101318",
-        color: selected ? "#2f9bff" : slot?.auto_running ? "#00e676" : "#fff",
+        color: hasError ? "#111" : "#fff",
         blink: hasError,
         onClick: () => onSlotSelect?.(slotNo),
         disabled: slotBusy,
@@ -364,13 +364,18 @@ function RoundAmountTable({
               width: 32,
               minWidth: 32,
               height: 32,
-              border: `1px solid ${accent || "#707781"}`,
+              border: `${active ? 2 : 1}px solid ${active ? "#39ff14" : accent || "#707781"}`,
+              boxSizing: "border-box",
               borderRadius: 1,
               backgroundColor: pressed
                 ? "#ffeb3b"
                 : backgroundColor || (active ? "#16365c" : accent ? `${accent}33` : "#101318"),
               color: pressed ? "#1b1b1b" : color || (active ? "#2f9bff" : "#fff"),
-              boxShadow: pressed ? "0 0 8px #ffeb3b, 0 0 16px rgba(255,235,59,0.6)" : "none",
+              boxShadow: pressed
+                ? "0 0 8px #ffeb3b, 0 0 16px rgba(255,235,59,0.6)"
+                : active
+                  ? "0 0 8px #39ff14, inset 0 0 4px rgba(57,255,20,0.55)"
+                  : "none",
               transform: pressed ? "scale(0.95)" : "none",
               transition: "background-color 0.15s, box-shadow 0.15s, transform 0.15s, color 0.15s",
               ...(blink ? { animation: "blink 0.8s infinite" } : {}),
