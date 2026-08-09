@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControlLabel, TextField, Typography, useMediaQuery, useTheme,
+  FormControlLabel, MenuItem, TextField, Typography, useMediaQuery, useTheme,
 } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -17,6 +17,13 @@ const zoneColor = { blue: "#42a5f5", white: "#fff", red: "#ef5350" };
 const resultCellColor = { hit: "#00e676", miss: "#ffeb3b", wait: "#fff" };
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
+
+const buildShoePreviewGrid = (actuals) => {
+  const cols = Math.max(1, Math.ceil((actuals?.length || 0) / GRID_ROWS));
+  return Array.from({ length: GRID_ROWS }, (_, row) =>
+    Array.from({ length: cols }, (__, col) => actuals?.[col * GRID_ROWS + row] || null)
+  );
+};
 
 function PickChip({ value }) {
   if (!value) return null;
@@ -111,7 +118,38 @@ export default function Nc2UserGamePage() {
   const [replay, setReplay] = useState({ active: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
   const [roundInput, setRoundInput] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  const [shoeCopyOpen, setShoeCopyOpen] = useState(false);
+  const [shoeSourceType, setShoeSourceType] = useState("nc2");
+  const [shoeSourceId, setShoeSourceId] = useState("");
+  const [shoePreview, setShoePreview] = useState(null);
+  const [shoeCopyLoading, setShoeCopyLoading] = useState(false);
+  const [shoeCopyError, setShoeCopyError] = useState("");
   const state = game?.round_state;
+
+  const loadShoePreview = async () => {
+    const sourceId = Number(shoeSourceId);
+    if (!Number.isInteger(sourceId) || sourceId <= 0) { setShoeCopyError("올바른 게임번호를 입력하세요."); return; }
+    setShoeCopyLoading(true); setShoeCopyError("");
+    try {
+      const response = await apiCaller.get(NC2_GAMES_API.SHOE_COPY_PREVIEW(sourceId), { source_game_type: shoeSourceType });
+      setShoePreview(response.data);
+    } catch (err) { setShoePreview(null); setShoeCopyError(err.response?.data?.detail || "기존 슈를 조회하지 못했습니다."); }
+    finally { setShoeCopyLoading(false); }
+  };
+
+  const executeShoeCopy = async () => {
+    if (!shoePreview || !game?.game_id) return;
+    setShoeCopyLoading(true); setLoading(true); setShoeCopyError("");
+    try {
+      const response = await apiCaller.post(NC2_GAMES_API.SHOE_COPY_PROCESS, {
+        source_game_type: shoePreview.source_game_type, source_game_id: shoePreview.source_game_id, game_id: game.game_id,
+      }, { timeout: 5 * 60 * 1000 });
+      await restore(game.game_id);
+      if (response.data.completed) { setShoeCopyOpen(false); window.alert(`기존 슈 입력 완료 (${response.data.completed_results}/${response.data.total_results})`); }
+      else setShoeCopyError(`${response.data.completed_results}개 입력 후 실패: ${response.data.error}`);
+    } catch (err) { setShoeCopyError(err.response?.data?.detail || "기존 슈 입력을 실행하지 못했습니다."); }
+    finally { setShoeCopyLoading(false); setLoading(false); }
+  };
 
   const applyGame = useCallback((data) => {
     setGame(data);
@@ -441,6 +479,7 @@ export default function Nc2UserGamePage() {
           sx={{ width: 142, "& .MuiInputBase-root": { height: 32 }, "& .MuiInputBase-input": { fontSize: 12, py: .5 } }}
         />
         <Button size="small" variant="outlined" color="warning" onClick={() => setNewOpen(true)} disabled={!sourceGameId || loading || autoStatus.running || replay.active}>이 조합으로 새 게임</Button>
+        <Button size="small" variant="outlined" color="warning" onClick={() => { setShoeSourceType("nc2"); setShoeSourceId(""); setShoePreview(null); setShoeCopyError(""); setShoeCopyOpen(true); }} disabled={loading || autoStatus.running || replay.active || !game?.game_id}>기존 슈 불러오기</Button>
         <Button size="small" variant="outlined" onClick={() => setReplayControls((value) => !value)} disabled={loading || !game?.game_id}>리플레이</Button>
         {autoStatus.running && <Typography variant="caption" sx={{ color: "text.secondary" }}>오토 실행 중에는 NC 조합을 변경할 수 없습니다.</Typography>}
         {(replayControls || replay.active) && <>
@@ -465,6 +504,25 @@ export default function Nc2UserGamePage() {
         <DialogTitle>NC2 새 게임</DialogTitle>
         <DialogContent><Typography>{sourceGameId ? `게임 #${sourceGameId}의 NC 조합을 사용합니다.` : keepCombination ? "현재 NC 조합을 유지합니다." : "128개 NC를 새로 선정합니다."}</Typography></DialogContent>
         <DialogActions><Button onClick={() => setNewOpen(false)}>취소</Button><Button variant="contained" onClick={newGame}>시작</Button></DialogActions>
+      </Dialog>
+      <Dialog open={shoeCopyOpen} onClose={() => !shoeCopyLoading && setShoeCopyOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>기존 슈 불러오기</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", gap: 1, mt: .5, mb: 2, flexWrap: "wrap" }}>
+            <TextField select size="small" label="원본 게임" value={shoeSourceType} onChange={(event) => { setShoeSourceType(event.target.value); setShoePreview(null); }} sx={{ minWidth: 150 }}>
+              <MenuItem value="nc2">나이스초이스2</MenuItem><MenuItem value="gh">글로벌히트</MenuItem>
+            </TextField>
+            <TextField size="small" type="number" label="기존 게임번호" value={shoeSourceId} onChange={(event) => { setShoeSourceId(event.target.value); setShoePreview(null); }} />
+            <Button variant="outlined" disabled={shoeCopyLoading} onClick={loadShoePreview}>조회</Button>
+          </Box>
+          {shoeCopyError && <Alert severity="error" sx={{ mb: 1 }}>{shoeCopyError}</Alert>}
+          {shoePreview && (() => {
+            const previewGrid = buildShoePreviewGrid(shoePreview.actuals);
+            const previewCols = previewGrid[0]?.length || 1;
+            return <><Typography variant="body2" sx={{ mb: 1 }}>{`${shoePreview.source_game_label} #${shoePreview.source_game_id} · ${shoePreview.round_count}회차 · 전체 결과 ${shoePreview.result_count}개`}</Typography><Box sx={{ overflowX: "auto", pb: 1 }}><Box sx={{ display: "grid", gridTemplateColumns: `repeat(${previewCols}, 24px)`, gridTemplateRows: `repeat(${GRID_ROWS}, 24px)`, gridAutoFlow: "column", gap: "1px", width: "fit-content", backgroundColor: "#616161", border: "1px solid #616161" }}>{Array.from({ length: previewCols }, (_, col) => Array.from({ length: GRID_ROWS }, (__, row) => { const actual = previewGrid[row][col]; const color = actual === "P" ? "#1565c0" : actual === "B" ? "#f44336" : "#2e7d32"; return <Box key={`${row}-${col}`} sx={{ width: 24, height: 24, backgroundColor: "background.default", display: "flex", alignItems: "center", justifyContent: "center" }}>{actual && <Box sx={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: color, color: "#fff", fontSize: 10, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>{actual}</Box>}</Box>; }))}</Box></Box></>;
+          })()}
+        </DialogContent>
+        <DialogActions><Button onClick={() => setShoeCopyOpen(false)} disabled={shoeCopyLoading}>취소</Button><Button variant="contained" color="warning" onClick={executeShoeCopy} disabled={!shoePreview || shoeCopyLoading}>현재 게임에 이어서 입력</Button></DialogActions>
       </Dialog>
     </Box>
   );

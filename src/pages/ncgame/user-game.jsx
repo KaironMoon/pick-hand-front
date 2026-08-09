@@ -949,7 +949,6 @@ export default function NcUserGamePage() {
           <Button onClick={handleFinishGame} variant="contained">새 게임 시작</Button>
         </DialogActions>
       </Dialog>
-
       {/* 넥스트 게임 확인 */}
       <Dialog open={showNextConfirm} onClose={() => setShowNextConfirm(false)}>
         <DialogTitle sx={{ fontWeight: "bold" }}>다음 게임</DialogTitle>
@@ -1005,6 +1004,7 @@ export default function NcUserGamePage() {
           <Button onClick={() => setGoalDialog({ open: false, msgs: [] })} variant="contained">확인</Button>
         </DialogActions>
       </Dialog>
+
     </Box>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip, Snackbar, Alert } from "@mui/material";
+import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip, Snackbar, Alert, MenuItem } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/store/auth-store";
@@ -802,6 +802,7 @@ export default function GhUserGamePage() {
   const [slotBusy, setSlotBusy] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [shoeCopyOpen, setShoeCopyOpen] = useState(false);
+  const [shoeSourceType, setShoeSourceType] = useState("gh");
   const [sourceGameInput, setSourceGameInput] = useState("");
   const [shoePreview, setShoePreview] = useState(null);
   const [shoeCopyError, setShoeCopyError] = useState("");
@@ -1712,6 +1713,7 @@ export default function GhUserGamePage() {
       setRejectMsg("오토 실행 중에는 기존 슈 입력 기능을 사용할 수 없습니다.");
       return;
     }
+    setShoeSourceType("gh");
     setSourceGameInput("");
     setShoePreview(null);
     setShoeCopyError("");
@@ -1727,7 +1729,9 @@ export default function GhUserGamePage() {
     setShoeCopyLoading(true);
     setShoeCopyError("");
     try {
-      const res = await apiCaller.get(GH_GAMES_API.SHOE_COPY_PREVIEW(sourceGameId));
+      const res = await apiCaller.get(GH_GAMES_API.SHOE_COPY_PREVIEW(sourceGameId), {
+        source_game_type: shoeSourceType,
+      });
       setShoePreview(res.data);
     } catch (err) {
       setShoePreview(null);
@@ -1781,6 +1785,7 @@ export default function GhUserGamePage() {
       const processRes = await apiCaller.post(
         GH_GAMES_API.SHOE_COPY_PROCESS,
         {
+          source_game_type: shoePreview.source_game_type,
           source_game_id: shoePreview.source_game_id,
           game_id: gameId,
         },
@@ -2577,7 +2582,23 @@ export default function GhUserGamePage() {
       >
         <DialogTitle>기존 슈 입력</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 0.5, mb: 2 }}>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 0.5, mb: 2, flexWrap: "wrap" }}>
+            <TextField
+              select
+              size="small"
+              label="원본 게임"
+              value={shoeSourceType}
+              disabled={shoeCopyExecuting}
+              onChange={(event) => {
+                setShoeSourceType(event.target.value);
+                setShoePreview(null);
+                setShoeCopyError("");
+              }}
+              sx={{ minWidth: 150 }}
+            >
+              <MenuItem value="gh">글로벌히트</MenuItem>
+              <MenuItem value="nc2">나이스초이스2</MenuItem>
+            </TextField>
             <TextField
               autoFocus
               size="small"
@@ -2609,7 +2630,7 @@ export default function GhUserGamePage() {
             return (
               <>
                 <Typography variant="body2" sx={{ mb: 1 }}>
-                  {`게임 #${shoePreview.source_game_id} · ${shoePreview.round_count}회차 · 전체 결과 ${shoePreview.result_count}개`}
+                  {`${shoePreview.source_game_label || "글로벌히트"} #${shoePreview.source_game_id} · ${shoePreview.round_count}회차 · 전체 결과 ${shoePreview.result_count}개`}
                 </Typography>
                 <Box sx={{ overflowX: "auto", pb: 1 }}>
                   <Box sx={{

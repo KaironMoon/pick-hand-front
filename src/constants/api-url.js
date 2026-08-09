@@ -93,6 +93,8 @@ const NC2_GAMES_API = {
   STATE: (id) => `/api/v1/nc2/games/${id}/state`,
   END: (id) => `/api/v1/nc2/games/${id}/end`,
   REPLAY: (id) => `/api/v1/nc2/games/${id}/replay`,
+  SHOE_COPY_PROCESS: "/api/v1/nc2/games/shoe-copy/process",
+  SHOE_COPY_PREVIEW: (id) => `/api/v1/nc2/games/shoe-copy/${id}`,
 };
 
 const NC_SETTINGS_API = {
