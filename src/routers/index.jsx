@@ -22,6 +22,8 @@ import NcSetupPage from "../pages/ncgame/setup.jsx";
 import NcCurrentSetupPage from "../pages/ncgame/current-setup.jsx";
 import NcUserSetupPage from "../pages/ncgame/user-setup.jsx";
 import NcPatternPage from "../pages/ncgame/pattern.jsx";
+import Nc2UserGamePage from "../pages/nc2game/user-game.jsx";
+import Nc2UserSetupPage from "../pages/nc2game/user-setup.jsx";
 import WhGamePage from "../pages/whgame";
 import WhUserGamePage from "../pages/whgame/user-game.jsx";
 import WhSetupPage from "../pages/whgame/setup.jsx";
@@ -45,6 +47,8 @@ import PageLayout from "../pages/PageLayout";
 import LoginPage from "../pages/login";
 import UsersPage from "../pages/users";
 import AppSettingsPage from "../pages/app-settings";
+import MaintenancePage from "../pages/maintenance";
+import MaintenanceAdminPage from "../pages/maintenance-admin";
 import ProtectedRoute from "../pages/components/ProtectedRoute";
 import GameGuard from "../pages/components/GameGuard";
 
@@ -91,6 +95,10 @@ const router = createBrowserRouter([
             element: <Info />,
           },
           {
+            path: "/maintenance",
+            element: <MaintenancePage />,
+          },
+          {
             path: "/t9game/user",
             element: <GameGuard gameType="t9"><UserGamePage /></GameGuard>,
           },
@@ -129,6 +137,14 @@ const router = createBrowserRouter([
           {
             path: "/ncgame/user-setup",
             element: <NcUserSetupPage />,
+          },
+          {
+            path: "/nc2game/user",
+            element: <GameGuard gameType="nc2"><Nc2UserGamePage /></GameGuard>,
+          },
+          {
+            path: "/nc2game/user-setup",
+            element: <Nc2UserSetupPage />,
           },
           {
             path: "/whgame/user",
@@ -188,6 +204,10 @@ const router = createBrowserRouter([
               {
                 path: "/app-settings",
                 element: <AppSettingsPage />,
+              },
+              {
+                path: "/maintenance-admin",
+                element: <MaintenanceAdminPage />,
               },
               {
                 path: "/hbgame",

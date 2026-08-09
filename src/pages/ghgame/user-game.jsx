@@ -8,6 +8,7 @@ import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
 import GhBigRoad2 from "./components/GhBigRoad2";
+import GhMaxMissDialog from "./components/GhMaxMissDialog";
 import {
   autoStatusLookupError,
   createEmptyAutoStatus,
@@ -103,7 +104,7 @@ const CELL_BG = {
   wait: "#ffffff",
 };
 
-const Circle = ({ type, filled = true, size = 24, label }) => {
+const GhCircle = ({ type, filled = true, size = 24, label }) => {
   const colors = { P: "#1565c0", B: "#f44336" };
   const display = label != null ? label : type;
   return (
@@ -120,7 +121,7 @@ const Circle = ({ type, filled = true, size = 24, label }) => {
   );
 };
 
-const calculateCircleGrid = (results) => {
+const calculateGhCircleGrid = (results) => {
   const grid = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
   if (!results || results.length === 0) return grid;
 
@@ -196,7 +197,7 @@ const buildResultRows = ({
   });
 };
 
-function RoundAmountTable({
+function GhRoundAmountTable({
   roundState,
   amountMode,
   onSetup,
@@ -809,12 +810,14 @@ export default function GhUserGamePage() {
   const [shoeCopyExecuting, setShoeCopyExecuting] = useState(false);
   const [shoeCopyProgress, setShoeCopyProgress] = useState({ active: false, completed: 0, total: 0 });
   const [replayOpen, setReplayOpen] = useState(false);
+  const [replayControlsOpen, setReplayControlsOpen] = useState(false);
   const [replayGameInput, setReplayGameInput] = useState("");
   const [replayPreview, setReplayPreview] = useState(null);
   const [replayLoading, setReplayLoading] = useState(false);
   const [replayError, setReplayError] = useState("");
   const [replay, setReplay] = useState({ active: false, external: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
   const [replayRoundInput, setReplayRoundInput] = useState("");
+  const [maxMissOpen, setMaxMissOpen] = useState(false);
   const processingRef = useRef(false);
   const skipRestoreGameIdRef = useRef(null);
   const [processing, setProcessing] = useState(false);
@@ -881,7 +884,7 @@ export default function GhUserGamePage() {
   };
   // 빅로드1: 지난 회차의 실제 결과 P/B를 표시하고, 배경색은 금액 합산표의 적/미적으로 결정한다.
   const gridResults = strategyResults.map((r, i) => ({ ...r, status: amountTableStatusFor(i) }));
-  const grid = calculateCircleGrid(gridResults);
+  const grid = calculateGhCircleGrid(gridResults);
 
   // LEGACY COMPAT ONLY: 하단 보조 표시용. 현재 판/전략보드/빅로드 표시는 roundState 사용.
   const roundArList = displaySnapshot?.round_picks?.AR || [];
@@ -1965,7 +1968,7 @@ export default function GhUserGamePage() {
                     borderRight: `${triSize}px solid transparent`,
                   }} />
                 )}
-                {cell && <Circle type={cell.type} filled={true} size={isMobile ? 12 : 22} label={cell.idx + 1} />}
+                {cell && <GhCircle type={cell.type} filled={true} size={isMobile ? 12 : 22} label={cell.idx + 1} />}
               </Box>
             );
           })
@@ -2308,7 +2311,7 @@ export default function GhUserGamePage() {
           />
           </Box>
 
-          <RoundAmountTable
+          <GhRoundAmountTable
             roundState={roundState}
             amountMode={amountViewMode}
             onSetup={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
@@ -2358,10 +2361,18 @@ export default function GhUserGamePage() {
                   {` ${shoeCopyProgress.completed}/${shoeCopyProgress.total}`}
                 </Typography>
               )}
-              <Button size="small" variant="outlined" onClick={openReplay} disabled={processing || replayLoading || !gameId}>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => setReplayControlsOpen((open) => !open)}
+                disabled={processing || replayLoading || !gameId}
+              >
                 리플레이
               </Button>
-              {(replay.active || strategyResults.length > 0) && (
+              <Button size="small" variant="outlined" color="secondary" onClick={() => setMaxMissOpen(true)} disabled={!roundStateLower}>
+                고연패 현황
+              </Button>
+              {(replay.active || replayControlsOpen) && (
                 <>
                   <Button size="small" onClick={() => moveReplay(-10)} disabled={replayLoading || (replay.active ? replay.roundNum : strategyResults.length) <= 1}>-10</Button>
                   <Button size="small" onClick={() => moveReplay(-1)} disabled={replayLoading || (replay.active ? replay.roundNum : strategyResults.length) <= 1}>이전</Button>
@@ -2380,6 +2391,7 @@ export default function GhUserGamePage() {
                     disabled={replayLoading}
                   />
                   <Button size="small" onClick={() => moveReplayTo()} disabled={replayLoading || !replayRoundInput}>이동</Button>
+                  <Button size="small" onClick={openReplay} disabled={replayLoading}>다른 게임</Button>
                   {replay.active && (
                     <Button size="small" color="warning" onClick={exitReplay} disabled={replayLoading}>리플레이 종료</Button>
                   )}
@@ -2387,6 +2399,13 @@ export default function GhUserGamePage() {
               )}
             </Box>
           )}
+
+          <GhMaxMissDialog
+            open={maxMissOpen}
+            onClose={() => setMaxMissOpen(false)}
+            roundState={roundStateLower}
+            gameId={replay.active ? replay.sourceGameId : gameId}
+          />
 
           {isAdmin && roundStateLower && (
             <>

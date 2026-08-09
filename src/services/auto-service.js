@@ -40,8 +40,8 @@ const autoService = {
     return resp.data;
   },
 
-  async getAutoStatus(gameId) {
-    const resp = await apiCaller.get(ABOO_API.AUTO_STATUS, { game_id: gameId });
+  async getAutoStatus(gameId, gameType = "gh") {
+    const resp = await apiCaller.get(ABOO_API.AUTO_STATUS, { game_id: gameId, game_type: gameType });
     return resp.data;
   },
 

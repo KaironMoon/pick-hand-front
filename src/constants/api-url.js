@@ -86,6 +86,15 @@ const NC_GAMES_API = {
   STATE: (id) => `/api/v1/nc/games/${id}/state`,
 };
 
+const NC2_GAMES_API = {
+  START: "/api/v1/nc2/games/start",
+  ROUND: "/api/v1/nc2/games/round",
+  LAST_ACTIVE: "/api/v1/nc2/games/last-active",
+  STATE: (id) => `/api/v1/nc2/games/${id}/state`,
+  END: (id) => `/api/v1/nc2/games/${id}/end`,
+  REPLAY: (id) => `/api/v1/nc2/games/${id}/replay`,
+};
+
 const NC_SETTINGS_API = {
   BASE: "/api/v1/nc/settings",
   GAME_PAUSE: "/api/v1/nc/settings/game/pause",
@@ -152,6 +161,12 @@ const APP_SETTINGS_API = {
   BLOCKED_GAMES: "/api/v1/app-settings/blocked-games",
 };
 
+const MAINTENANCE_API = {
+  STATUS: "/api/v1/maintenance/status",
+  RUNNING_USERS: "/api/v1/maintenance/running-users",
+  FORCE_STOP_USER: (userId) => `/api/v1/maintenance/running-users/${userId}/force-stop`,
+};
+
 // pick-aboo 통합 — mvp-aboo-integration.md §6.2
 const ABOO_API = {
   SESSION_STATUS: "/api/v1/auth/session-status",
@@ -163,4 +178,4 @@ const ABOO_API = {
   DISCOVER_TABLES: "/api/v1/games/auto/discover-tables",
 };
 
-export { API_URL, AUTH_API, USERS_API, SETTINGS_API, HB_SETTINGS_API, HB_GAMES_API, GH_SETTINGS_API, GH_GAMES_API, NC_GAMES_API, NC_SETTINGS_API, WH_GAMES_API, WH_SETTINGS_API, MH_GAMES_API, MH_SETTINGS_API, DH_GAMES_API, DH_SETTINGS_API, USER_BET_SETTINGS_API, APP_SETTINGS_API, ABOO_API };
+export { API_URL, AUTH_API, USERS_API, SETTINGS_API, HB_SETTINGS_API, HB_GAMES_API, GH_SETTINGS_API, GH_GAMES_API, NC_GAMES_API, NC2_GAMES_API, NC_SETTINGS_API, WH_GAMES_API, WH_SETTINGS_API, MH_GAMES_API, MH_SETTINGS_API, DH_GAMES_API, DH_SETTINGS_API, USER_BET_SETTINGS_API, APP_SETTINGS_API, MAINTENANCE_API, ABOO_API };

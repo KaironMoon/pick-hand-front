@@ -14,6 +14,7 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
 import SettingsIcon from "@mui/icons-material/Settings";
+import ConstructionIcon from "@mui/icons-material/Construction";
 import LogoutIcon from "@mui/icons-material/Logout";
 
 import { useNavigate } from "react-router-dom";
@@ -57,6 +58,9 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
     <Box
       sx={{
         height: "100%",
+        minHeight: 0,
+        overflowY: "auto",
+        overflowX: "hidden",
         display: "flex",
         flexDirection: "column",
         backgroundColor: theme.palette.background.leftMenu,
@@ -175,6 +179,26 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
             </ListItem>
           </List>
           <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          {/* 나이스초이스2 */}
+          <List dense>
+            <ListItem disablePadding>
+              <ListItemButton disabled sx={{ pb: 0 }}>
+                <ListItemIcon><StarIcon /></ListItemIcon>
+                <ListItemText primary="나이스초이스2" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/nc2game/user")} sx={{ pl: 7 }}>
+                <ListItemText primary="유저" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/nc2game/user-setup")} sx={{ pl: 7 }}>
+                <ListItemText primary="설정" primaryTypographyProps={{ fontSize: "0.85rem" }} />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
           {/* 위너히트 */}
           <List dense>
             <ListItem disablePadding>
@@ -275,6 +299,15 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
           <Divider sx={{ bgcolor: "military.border", my: 1 }} />
           <List>
             <ListItem disablePadding>
+              <ListItemButton onClick={() => handleUserGameClick("nc2", "/nc2game/user")}>
+                <ListItemIcon><StarIcon /></ListItemIcon>
+                <ListItemText primary="나이스초이스2" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+          <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+          <List>
+            <ListItem disablePadding>
               <ListItemButton onClick={() => handleUserGameClick("wh", "/whgame/user")}>
                 <ListItemIcon><EmojiEventsIcon /></ListItemIcon>
                 <ListItemText primary="위너히트" />
@@ -315,6 +348,12 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
               <ListItemButton onClick={() => handleNavClick("/app-settings")}>
                 <ListItemIcon><SettingsIcon /></ListItemIcon>
                 <ListItemText primary="앱 설정" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/maintenance-admin")}>
+                <ListItemIcon><ConstructionIcon /></ListItemIcon>
+                <ListItemText primary="점검 관리" />
               </ListItemButton>
             </ListItem>
           </List>

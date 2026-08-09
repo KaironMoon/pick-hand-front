@@ -8,6 +8,7 @@ import PageHeader from "@/pages/components/layout/PageHeader";
 import PageLeftMenu from "@/pages/components/layout/PageLeftMenu";
 import PageFooter from "@/pages/components/layout/PageFooter";
 import GameBlockedDialog from "@/pages/components/GameBlockedDialog";
+import MaintenanceGate from "@/pages/components/MaintenanceGate";
 
 const DRAWER_WIDTH = 200;
 
@@ -69,7 +70,7 @@ function PageLayout() {
             overflow: "auto",
           }}
         >
-          <Outlet />
+          <MaintenanceGate><Outlet /></MaintenanceGate>
         </Box>
       </Box>
       {!isMobile && (

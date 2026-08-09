@@ -504,7 +504,7 @@ const BET_PROGRESS_MODES = [
 
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
 const ASSIST_OPTS = [
-  "해당반대", "해당진행", "고정P", "고정B", "이전3회", "J", "BF6", "BF6X", "6M", "6MX",
+  "해당반대", "해당진행", "3회 쉬기", "6회 쉬기", "고정P", "고정B", "이전3회", "J", "BF6", "BF6X", "6M", "6MX",
   "G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)",
   "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)", "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
   "HB멀티(H1)", "HB멀티(%1)", "WH멀티(H1)", "WH멀티(%1)", "MH멀티(H1)", "MH멀티(%1)", "DH멀티(H1)", "DH멀티(%1)",
@@ -945,6 +945,61 @@ function MultiAssistGrid({ sections, visiblePasi, setPasiSectionAssist, assistLo
             {slots.map((section, slotIndex) => renderAssistCell(p, originalIndex, "assist_q_by_section", section, qCell, slotIndex))}
           </tr>
         ))}
+      </tbody>
+    </table>
+  );
+}
+
+export function GhConditionalAmountSetup({ name, strat, onChange }) {
+  const s = strat || defaultStrategySetup();
+  const stepMin = s.step_min || 1;
+  const stepMax = s.step_max || 16;
+  const condLo = s.cond_lo ?? 0;
+  const condHi = s.cond_hi ?? 100;
+  const groupKey = { white: "amounts_white", blue: "amounts_blue", red: "amounts_red" };
+  const editP = (group, idx, val) => {
+    const key = groupKey[group];
+    const arr = [...(s[key] || new Array(16).fill(0))];
+    arr[idx] = roundP1(val);
+    onChange({ ...s, [key]: arr });
+  };
+  const rows = (group, color, off = false) => [0, 1].map((half) => {
+    const arr = s[groupKey[group]] || new Array(16).fill(0);
+    const boundary = group === "blue"
+      ? (half === 0 ? "0% 이상" : `${condLo}% 미만`)
+      : group === "red"
+        ? (half === 0 ? `${condHi}% 초과` : "100% 이하")
+        : null;
+    return (
+      <tr key={`${group}-${half}`}>
+        <td colSpan={2} style={{ ...mkCell, whiteSpace: "nowrap", color: off ? "#555" : color || "#fff" }}>
+          {group === "white" ? <><input type="number" min={0} max={100} value={half === 0 ? condLo : condHi} onChange={(event) => {
+            const value = Math.max(0, Math.min(100, Number(event.target.value || 0)));
+            onChange({ ...s, [half === 0 ? "cond_lo" : "cond_hi"]: value });
+          }} style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />% {half === 0 ? "이상" : "이하"}</> : boundary}
+        </td>
+        {Array.from({ length: 8 }, (_, i) => {
+          const idx = half * 8 + i;
+          const active = idx + 1 >= stepMin && idx + 1 <= stepMax;
+          return active ? <MkInput key={idx} value={arr[idx] || 0} onChange={(value) => editP(group, idx, value)} render={(value) => `${fmtP1(value)}P`} style={{ ...mkCell, cursor: "pointer", color: off ? "#555" : color || "#fff" }} /> : <td key={idx} style={mkEmpty}></td>;
+        })}
+      </tr>
+    );
+  });
+  return (
+    <table style={{ borderCollapse: "collapse", color: "#fff", minWidth: 850 }}>
+      <tbody>
+        <tr><td style={mkRed}>{name}</td><td style={mkGreen}>사용함</td><td colSpan={8} style={mkMethod}>128개 NC 공통 조건부 배팅표</td></tr>
+        <tr>
+          <td style={mkBlue}>P설정</td><td style={mkGreen}>최저</td>
+          <MkInput value={stepMin} suffix="단계" range={[1, 16]} style={mkGreen} onChange={(value) => onChange({ ...s, step_min: Math.min(value, stepMax) })} />
+          <td style={mkGreen}>최고</td>
+          <MkInput value={stepMax} suffix="단계" range={[1, 16]} style={mkGreen} onChange={(value) => onChange({ ...s, step_max: Math.max(value, stepMin) })} />
+          <td colSpan={5} style={mkCell}></td>
+        </tr>
+        {rows("white", null)}
+        {rows("blue", "#0066FF", condLo <= 0)}
+        {rows("red", "#FF0000", condHi >= 100)}
       </tbody>
     </table>
   );
