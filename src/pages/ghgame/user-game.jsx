@@ -8,7 +8,6 @@ import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
 import GhBigRoad2 from "./components/GhBigRoad2";
-import GhMaxMissDialog from "./components/GhMaxMissDialog";
 import {
   autoStatusLookupError,
   createEmptyAutoStatus,
@@ -817,9 +816,9 @@ export default function GhUserGamePage() {
   const [replayError, setReplayError] = useState("");
   const [replay, setReplay] = useState({ active: false, external: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
   const [replayRoundInput, setReplayRoundInput] = useState("");
-  const [maxMissOpen, setMaxMissOpen] = useState(false);
   const processingRef = useRef(false);
   const skipRestoreGameIdRef = useRef(null);
+  const maxMissPopupRef = useRef(null);
   const [processing, setProcessing] = useState(false);
   const goalAlertedRef = useRef({ a: false, z: false });
   const overallStopAlertedRef = useRef(new Set());
@@ -1088,6 +1087,31 @@ export default function GhUserGamePage() {
       refreshGameSlots().catch(() => {});
     }
   };
+
+  const openMaxMissPopup = () => {
+    const targetGameId = replay.active ? replay.sourceGameId : gameId;
+    if (!targetGameId) return;
+    const roundQuery = replay.active ? `&round=${encodeURIComponent(replay.roundNum)}` : "";
+    const popup = window.open(
+      `/ghgame/max-miss?gameId=${encodeURIComponent(targetGameId)}${roundQuery}`,
+      "gh-max-miss",
+      "popup=yes,width=1120,height=720,resizable=yes,scrollbars=yes",
+    );
+    if (popup) {
+      maxMissPopupRef.current = popup;
+      popup.focus();
+    }
+    else setRejectMsg("팝업이 차단되었습니다. 이 사이트의 팝업을 허용해주세요.");
+  };
+
+  useEffect(() => {
+    const popup = maxMissPopupRef.current;
+    if (!popup || popup.closed) return;
+    const targetGameId = replay.active ? replay.sourceGameId : gameId;
+    if (!targetGameId) return;
+    const roundQuery = replay.active ? `&round=${encodeURIComponent(replay.roundNum)}` : "";
+    popup.location.replace(`/ghgame/max-miss?gameId=${encodeURIComponent(targetGameId)}${roundQuery}`);
+  }, [gameId, replay.active, replay.roundNum, replay.sourceGameId]);
 
   const handleNcRefChange = (value) => {
     setNcRefDraft(value.replace(/[^\d]/g, ""));
@@ -2369,7 +2393,7 @@ export default function GhUserGamePage() {
               >
                 리플레이
               </Button>
-              <Button size="small" variant="outlined" color="secondary" onClick={() => setMaxMissOpen(true)} disabled={!roundStateLower}>
+              <Button size="small" variant="outlined" color="secondary" onClick={openMaxMissPopup} disabled={!roundStateLower}>
                 고연패 현황
               </Button>
               {(replay.active || replayControlsOpen) && (
@@ -2399,13 +2423,6 @@ export default function GhUserGamePage() {
               )}
             </Box>
           )}
-
-          <GhMaxMissDialog
-            open={maxMissOpen}
-            onClose={() => setMaxMissOpen(false)}
-            roundState={roundStateLower}
-            gameId={replay.active ? replay.sourceGameId : gameId}
-          />
 
           {isAdmin && roundStateLower && (
             <>

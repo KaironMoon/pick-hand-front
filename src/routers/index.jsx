@@ -12,6 +12,7 @@ import HbUserGamePage from "../pages/hbgame/user-game.jsx";
 import HbSetupPage from "../pages/hbgame/setup.jsx";
 import GhGamePage from "../pages/ghgame";
 import GhUserGamePage from "../pages/ghgame/user-game.jsx";
+import GhMaxMissPopupPage from "../pages/ghgame/max-miss-popup.jsx";
 import GhSetupPage from "../pages/ghgame/setup.jsx";
 import T9UserSetupPage from "../pages/t9game/user-setup.jsx";
 import HbUserSetupPage from "../pages/hbgame/user-setup.jsx";
@@ -82,6 +83,10 @@ const router = createBrowserRouter([
     path: "/",
     element: <ProtectedRoute />,
     children: [
+      {
+        path: "/ghgame/max-miss",
+        element: <GameGuard gameType="gh"><GhMaxMissPopupPage /></GameGuard>,
+      },
       {
         path: "/",
         element: <PageLayout />,

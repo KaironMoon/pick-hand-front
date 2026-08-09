@@ -1,9 +1,6 @@
 import { useState } from "react";
 import {
   Box,
-  Dialog,
-  DialogContent,
-  DialogTitle,
   FormControl,
   MenuItem,
   Select,
@@ -11,6 +8,8 @@ import {
 } from "@mui/material";
 
 import { MAX_MISS_THRESHOLDS, maxMissLabel } from "./max-miss-dialog.js";
+
+const MAX_MISS_THRESHOLD_KEY = "gh_max_miss_threshold";
 
 const SECTION_ROWS = [
   [
@@ -166,32 +165,37 @@ function MaxMissGrid({ roundState, trackKey, color, title, threshold }) {
   );
 }
 
-export default function GhMaxMissDialog({ open, onClose, roundState, gameId }) {
-  const [threshold, setThreshold] = useState(9);
+export default function GhMaxMissPanel({ roundState, gameId, replayRound = null }) {
+  const [threshold, setThreshold] = useState(() => {
+    const stored = Number(sessionStorage.getItem(MAX_MISS_THRESHOLD_KEY));
+    return MAX_MISS_THRESHOLDS.includes(stored) ? stored : 9;
+  });
+  const changeThreshold = (value) => {
+    setThreshold(value);
+    sessionStorage.setItem(MAX_MISS_THRESHOLD_KEY, String(value));
+  };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xl">
-      <DialogTitle sx={{ pb: 1 }}>고연패 현황</DialogTitle>
-      <DialogContent>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.2 }}>
-          <FormControl size="small" sx={{ minWidth: 130 }}>
-            <Select value={threshold} onChange={(event) => setThreshold(Number(event.target.value))}>
-              {MAX_MISS_THRESHOLDS.map((value) => (
-                <MenuItem key={value} value={value}>{value}M 이상</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Box sx={{ px: 1.5, py: 0.9, minWidth: 100, border: "1px solid #777", borderRadius: 1, color: "#fff", fontWeight: 800 }}>
-            #{gameId || "-"}
-          </Box>
+    <Box sx={{ minHeight: "100vh", p: 1.5, backgroundColor: "#0d0f12" }}>
+      <Typography sx={{ mb: 1, color: "#fff", fontSize: 18, fontWeight: 900 }}>고연패 현황</Typography>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.2 }}>
+        <FormControl size="small" sx={{ minWidth: 130 }}>
+          <Select value={threshold} onChange={(event) => changeThreshold(Number(event.target.value))}>
+            {MAX_MISS_THRESHOLDS.map((value) => (
+              <MenuItem key={value} value={value}>{value}M 이상</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Box sx={{ px: 1.5, py: 0.9, minWidth: 100, border: "1px solid #777", borderRadius: 1, color: "#fff", fontWeight: 800 }}>
+          #{gameId || "-"}{replayRound ? ` · ${replayRound}회차 리플레이` : ""}
         </Box>
-        <Box sx={{ overflowX: "auto", pb: 1 }}>
-          <Box sx={{ display: "flex", gap: 1.5, width: "max-content", backgroundColor: "#111", p: 1 }}>
-            <MaxMissGrid roundState={roundState} trackKey="assist_h" color="#20c9e8" title="회차어시 H" threshold={threshold} />
-            <MaxMissGrid roundState={roundState} trackKey="assist_q" color="#ff74df" title="쿼터어시 Q" threshold={threshold} />
-          </Box>
+      </Box>
+      <Box sx={{ overflow: "auto", pb: 1 }}>
+        <Box sx={{ display: "flex", gap: 1.5, width: "max-content", backgroundColor: "#111", p: 1 }}>
+          <MaxMissGrid roundState={roundState} trackKey="assist_h" color="#20c9e8" title="회차어시 H" threshold={threshold} />
+          <MaxMissGrid roundState={roundState} trackKey="assist_q" color="#ff74df" title="쿼터어시 Q" threshold={threshold} />
         </Box>
-      </DialogContent>
-    </Dialog>
+      </Box>
+    </Box>
   );
 }
