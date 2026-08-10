@@ -13,6 +13,7 @@ import {
   createEmptyAutoStatus,
   mergePolledAutoStatus,
   shouldDisplayAutoError,
+  shouldDisplayBetFailure,
   shouldDisplaySlotAutoError,
 } from "./auto-status";
 import { getRoundStateSubgameBasis } from "./subgame-basis.js";
@@ -211,6 +212,7 @@ function GhRoundAmountTable({
   selectedSlotNo,
   onSlotSelect,
   slotBusy = false,
+  slotSelectionBlocked = false,
   onEnd,
   endDisabled = true,
   endDisabledReason,
@@ -254,7 +256,7 @@ function GhRoundAmountTable({
         color: hasError ? "#111" : "#fff",
         blink: hasError,
         onClick: () => onSlotSelect?.(slotNo),
-        disabled: slotBusy,
+        disabled: slotSelectionBlocked,
         title: slot?.occupied
           ? `${slotNo}번 게임 #${slot.game_id}${slot.table_name ? ` / ${slot.table_name}` : ""}`
           : `${slotNo}번 빈 슬롯 — 새 게임 시작`,
@@ -337,7 +339,30 @@ function GhRoundAmountTable({
   };
   return (
     <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1.4, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1 }}>
-      <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5, width: "100%" }}>
+      <Box sx={{ position: "relative", display: "flex", alignItems: "stretch", gap: 0.5, width: "100%" }}>
+        {slotBusy && (
+          <Box
+            role="status"
+            aria-live="polite"
+            sx={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 3,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px solid #2f9bff",
+              borderRadius: 1,
+              backgroundColor: "rgba(8, 10, 13, 0.88)",
+              color: "#7ec8ff",
+              fontSize: 12,
+              fontWeight: "bold",
+              cursor: "wait",
+            }}
+          >
+            슬롯 전환 중...
+          </Box>
+        )}
         {toolbarButtons.map(({
           label,
           color,
@@ -545,9 +570,9 @@ function GhBettingSummaryPanel({
   const replayCells = roundState?.actual_bet_table?.cells || [];
   const replayFailure = replayActive
     ? [replayCells[replayRoundNum], replayCells[replayRoundNum - 1]]
-      .find((cell) => cell?.failure_code)
+      .find((cell) => shouldDisplayBetFailure(cell?.failure_code))
     : null;
-  const hasReplayBetError = !!replayFailure?.failure_code;
+  const hasReplayBetError = shouldDisplayBetFailure(replayFailure?.failure_code);
   const errorCode = hasAutoError
     ? autoStatus?.error_code || autoError?.code || "auto_error"
     : replayFailure?.failure_code || "auto_error";
@@ -800,6 +825,7 @@ export default function GhUserGamePage() {
   const [gameSlots, setGameSlots] = useState([]);
   const [selectedSlotNo, setSelectedSlotNo] = useState(null);
   const [slotBusy, setSlotBusy] = useState(false);
+  const slotBusyRef = useRef(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [shoeCopyOpen, setShoeCopyOpen] = useState(false);
   const [shoeSourceType, setShoeSourceType] = useState("gh");
@@ -1557,7 +1583,8 @@ export default function GhUserGamePage() {
   };
 
   const handleSlotSelect = async (slotNo) => {
-    if (slotBusy) return;
+    if (slotBusyRef.current) return;
+    slotBusyRef.current = true;
     const slot = gameSlots.find((item) => item.slot_no === slotNo);
     setSlotBusy(true);
     try {
@@ -1581,6 +1608,7 @@ export default function GhUserGamePage() {
       );
       await refreshGameSlots().catch(() => {});
     } finally {
+      slotBusyRef.current = false;
       setSlotBusy(false);
     }
   };
@@ -1842,7 +1870,8 @@ export default function GhUserGamePage() {
 
   const handleCloseSlotConfirm = async () => {
     setShowEndConfirm(false);
-    if (!selectedSlotNo || !gameId || autoStatus.running || slotBusy) return;
+    if (!selectedSlotNo || !gameId || autoStatus.running || slotBusyRef.current) return;
+    slotBusyRef.current = true;
     setSlotBusy(true);
     try {
       await apiCaller.post(GH_GAMES_API.SLOT_CLOSE(selectedSlotNo));
@@ -1871,6 +1900,7 @@ export default function GhUserGamePage() {
           : "게임을 종료하지 못했습니다.",
       );
     } finally {
+      slotBusyRef.current = false;
       setSlotBusy(false);
     }
   };
@@ -2356,7 +2386,8 @@ export default function GhUserGamePage() {
             gameSlots={gameSlots}
             selectedSlotNo={selectedSlotNo}
             onSlotSelect={handleSlotSelect}
-            slotBusy={slotBusy || replay.active}
+            slotBusy={slotBusy}
+            slotSelectionBlocked={slotBusy || replay.active}
             onEnd={() => setShowEndConfirm(true)}
             endDisabled={endDisabled}
             endDisabledReason={endDisabledReason}

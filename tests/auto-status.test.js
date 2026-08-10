@@ -6,6 +6,7 @@ import {
   createEmptyAutoStatus,
   mergePolledAutoStatus,
   shouldDisplayAutoError,
+  shouldDisplayBetFailure,
   shouldDisplaySlotAutoError,
 } from "../src/pages/ghgame/auto-status.js";
 
@@ -144,4 +145,11 @@ test("slot Error blink remains visible after Auto stops with an error", () => {
     }),
     true,
   );
+});
+
+test("monitoring bet skips are not displayed as betting failures", () => {
+  assert.equal(shouldDisplayBetFailure("phase_not_betting"), false);
+  assert.equal(shouldDisplayBetFailure("casino_bet_rejected"), true);
+  assert.equal(shouldDisplayBetFailure("no_pick_at_betsopen"), true);
+  assert.equal(shouldDisplayBetFailure(null), false);
 });

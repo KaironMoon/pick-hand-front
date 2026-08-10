@@ -22,6 +22,10 @@ export const shouldDisplaySlotAutoError = (slot) => Boolean(
   slot?.phase === "error" || slot?.auto_status === "error"
 );
 
+export const shouldDisplayBetFailure = (failureCode) => Boolean(
+  failureCode && failureCode !== "phase_not_betting"
+);
+
 export const autoStatusLookupError = (status) => (
   status?.running
     ? {
