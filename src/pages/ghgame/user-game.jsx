@@ -19,6 +19,7 @@ import {
 import { getRoundStateSubgameBasis } from "./subgame-basis.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
 import { buildGoalStatusItems, formatGoalTarget } from "./goal-status.js";
+import { resolvePickMartinSummary } from "./pick-martin-summary.js";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 
 // blink 애니메이션
@@ -544,14 +545,11 @@ function GhBettingSummaryPanel({
     (acc, value) => ({ ...acc, [value]: acc[value] + 1 }),
     { P: 0, B: 0 },
   );
-  const pickMartin = roundState?.pick_martin;
-  const step = pickMartin?.step || 1;
-  const amount = autoStatus?.running
-    ? Number(autoStatus?.pending_amount_p || 0)
-    : (pickMartin?.amount ?? 0);
-  const displayedDirection = autoStatus?.running
-    ? autoStatus?.pending_direction
-    : pickMartin?.direction;
+  const {
+    step,
+    amount,
+    direction: displayedDirection,
+  } = resolvePickMartinSummary(roundState, autoStatus);
   const pickMartinBorder = displayedDirection === "P"
     ? "#1565c0"
     : displayedDirection === "B"

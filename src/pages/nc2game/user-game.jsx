@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, MenuItem, TextField, Typography, useMediaQuery, useTheme,
@@ -27,10 +27,12 @@ const buildShoePreviewGrid = (actuals) => {
 
 function PickChip({ value }) {
   if (!value) return null;
+  const waiting = value === "W";
   return (
     <Box sx={{
       width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-      color: "#fff", fontWeight: 900, fontSize: 11, backgroundColor: value === "P" ? "#1565c0" : "#e53935",
+      color: waiting ? "#000" : "#fff", fontWeight: 900, fontSize: 11,
+      backgroundColor: waiting ? "#fff" : value === "P" ? "#1565c0" : "#e53935",
     }}>{value}</Box>
   );
 }
@@ -40,20 +42,20 @@ function Nc2Grid({ state }) {
   const sortedItems = [...(state?.items || [])].sort(
     (left, right) => Number(left.game_seq || 0) - Number(right.game_seq || 0),
   );
-  const infoWidths = [30, 58, 42, 48, 40, 50];
+  const infoWidths = [30, 58, 52, 42, 48, 50];
   const progressRoundIndex = Number(state?.round_num || 0) < 60 ? Number(state?.round_num || 0) : -1;
   return (
     <Box sx={{ overflow: "auto", maxHeight: "62vh", border: "1px solid #59616d", backgroundColor: "#101318" }}>
-      <Box component="table" sx={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", width: 2128, minWidth: 2128, fontSize: 11, color: "#fff" }}>
+      <Box component="table" sx={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", width: 2140, minWidth: 2140, fontSize: 11, color: "#fff" }}>
         <thead>
           <tr>
-            {["#", "NC", "단계", "적중률", "구간", "금액", ...Array.from({ length: 60 }, (_, i) => i + 1)].map((label, index) => (
+            {["#", "NC", "구분", "단계", "적중률", "금액", ...Array.from({ length: 60 }, (_, i) => i + 1)].map((label, index) => (
               (() => {
                 const isProgress = index >= 6 && index - 6 === progressRoundIndex;
                 return (
               <Box component="th" key={label} sx={{
-                position: "sticky", top: 0, left: index < 2 ? (index === 0 ? 0 : infoWidths[0]) : undefined,
-                zIndex: index < 2 ? 4 : 3,
+                position: "sticky", top: 0, left: index < 3 ? (index === 0 ? 0 : index === 1 ? infoWidths[0] : infoWidths[0] + infoWidths[1]) : undefined,
+                zIndex: index < 3 ? 4 : 3,
                 width: index < 6 ? infoWidths[index] : 31,
                 minWidth: index < 6 ? infoWidths[index] : 31,
                 maxWidth: index < 6 ? infoWidths[index] : 31,
@@ -71,27 +73,48 @@ function Nc2Grid({ state }) {
           </tr>
         </thead>
         <tbody>
-          {sortedItems.map((item, sortedIndex) => (
-            <tr key={item.index}>
-              <Box component="td" sx={{ position: "sticky", left: 0, zIndex: 2, width: infoWidths[0], minWidth: infoWidths[0], maxWidth: infoWidths[0], textAlign: "center", borderRight: "1px solid #59616d", borderBottom: "1px solid #59616d", backgroundColor: "#181d23" }}>{sortedIndex + 1}</Box>
-              <Box component="td" sx={{ position: "sticky", left: infoWidths[0], zIndex: 2, width: infoWidths[1], minWidth: infoWidths[1], maxWidth: infoWidths[1], textAlign: "center", borderRight: "1px solid #59616d", borderBottom: "1px solid #59616d", backgroundColor: "#181d23", fontWeight: 800 }}>{item.game_seq}</Box>
-              <Box component="td" sx={{ width: infoWidths[2], minWidth: infoWidths[2], textAlign: "center", borderRight: "1px solid #59616d", borderBottom: "1px solid #59616d" }}>{item.step}S</Box>
-              <Box component="td" sx={{ width: infoWidths[3], minWidth: infoWidths[3], textAlign: "center", borderRight: "1px solid #59616d", borderBottom: "1px solid #59616d" }}>{item.rate == null ? "-" : `${item.rate}%`}</Box>
-              <Box component="td" sx={{ width: infoWidths[4], minWidth: infoWidths[4], textAlign: "center", borderRight: "1px solid #59616d", borderBottom: "1px solid #59616d", color: zoneColor[item.zone] }}>{item.zone}</Box>
-              <Box component="td" sx={{ width: infoWidths[5], minWidth: infoWidths[5], textAlign: "right", pr: 0.5, borderRight: "1px solid #59616d", borderBottom: "1px solid #59616d", color: zoneColor[item.zone] }}>{Number(item.amount || 0).toFixed(1)}</Box>
-              {Array.from({ length: 60 }, (_, roundIndex) => {
-                const pick = item.shoes?.[roundIndex];
-                const actual = actuals[roundIndex];
-                const status = actual ? (pick === actual ? "hit" : "miss") : null;
-                const isProgress = roundIndex === progressRoundIndex;
-                return (
-                  <Box component="td" key={roundIndex} sx={{ width: 31, height: 31, borderRight: isProgress ? "2px solid #ffb300" : "1px solid #59616d", borderLeft: isProgress ? "2px solid #ffb300" : undefined, borderBottom: "1px solid #59616d", textAlign: "center", backgroundColor: actual ? (status === "hit" ? "#2e9e5b" : "#5b6068") : isProgress ? "rgba(255,193,7,.13)" : "transparent" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center" }}><PickChip value={pick} /></Box>
-                  </Box>
-                );
-              })}
-            </tr>
-          ))}
+          {sortedItems.map((item, sortedIndex) => {
+            const assistHistory = Array.isArray(item.assist_history) ? item.assist_history : [];
+            const sharedInfoSx = { textAlign: "center", borderRight: "1px solid #59616d", borderBottom: "1px solid #59616d" };
+            const roundCellSx = (isProgress, status) => ({
+              width: 31, height: 27, borderRight: isProgress ? "2px solid #ffb300" : "1px solid #59616d",
+              borderLeft: isProgress ? "2px solid #ffb300" : undefined, borderBottom: "1px solid #59616d", textAlign: "center",
+              backgroundColor: status === "hit" ? "#2e9e5b" : status === "miss" ? "#5b6068" : status === "wait" ? "#4b3b18" : isProgress ? "rgba(255,193,7,.13)" : "transparent",
+            });
+            return <Fragment key={item.index}>
+              <tr>
+                <Box component="td" rowSpan={2} sx={{ position: "sticky", left: 0, zIndex: 2, width: infoWidths[0], minWidth: infoWidths[0], maxWidth: infoWidths[0], ...sharedInfoSx, backgroundColor: item.ended ? "#1565c0" : "#181d23", color: "#fff", fontWeight: item.ended ? 900 : 400 }}>{sortedIndex + 1}</Box>
+                <Box component="td" rowSpan={2} sx={{ position: "sticky", left: infoWidths[0], zIndex: 2, width: infoWidths[1], minWidth: infoWidths[1], maxWidth: infoWidths[1], ...sharedInfoSx, backgroundColor: "#181d23", fontWeight: 800 }}>{item.game_seq}</Box>
+                <Box component="td" sx={{ position: "sticky", left: infoWidths[0] + infoWidths[1], zIndex: 2, width: infoWidths[2], minWidth: infoWidths[2], ...sharedInfoSx, backgroundColor: "#20262e", color: "#90caf9", fontWeight: 800 }}>생성픽</Box>
+                {[3, 4, 5].map((index) => <Box component="td" key={index} sx={{ width: infoWidths[index], minWidth: infoWidths[index], ...sharedInfoSx, color: "#555" }}>-</Box>)}
+                {Array.from({ length: 60 }, (_, roundIndex) => {
+                  const pick = item.shoes?.[roundIndex];
+                  const actual = actuals[roundIndex];
+                  const status = actual ? (pick === actual ? "hit" : "miss") : null;
+                  const isProgress = roundIndex === progressRoundIndex;
+                  return <Box component="td" key={roundIndex} title="생성픽" sx={roundCellSx(isProgress, status)}><Box sx={{ display: "flex", justifyContent: "center" }}><PickChip value={pick} /></Box></Box>;
+                })}
+              </tr>
+              <tr>
+                <Box component="td" sx={{ position: "sticky", left: infoWidths[0] + infoWidths[1], zIndex: 2, width: infoWidths[2], minWidth: infoWidths[2], ...sharedInfoSx, backgroundColor: "#20262e", color: "#ce93d8", fontWeight: 800 }}>어시픽</Box>
+                <Box component="td" sx={{ width: infoWidths[3], minWidth: infoWidths[3], ...sharedInfoSx }}>{item.step}S</Box>
+                <Box component="td" sx={{ width: infoWidths[4], minWidth: infoWidths[4], ...sharedInfoSx }}>{item.rate == null ? "-" : `${item.rate}%`}</Box>
+                <Box component="td" sx={{ width: infoWidths[5], minWidth: infoWidths[5], ...sharedInfoSx, textAlign: "right", pr: 0.5, color: zoneColor[item.zone] }}>{Number(item.amount || 0).toFixed(1)}</Box>
+                {Array.from({ length: 60 }, (_, roundIndex) => {
+                  const actual = actuals[roundIndex];
+                  const fallbackPick = item.shoes?.[roundIndex];
+                  const stored = assistHistory[roundIndex];
+                  const isCurrent = roundIndex === progressRoundIndex;
+                  const pick = stored ? stored.pick : actual ? fallbackPick : isCurrent ? (item.assist_pick ?? item.pick) : null;
+                  const status = stored?.status || (actual && pick ? (pick === actual ? "hit" : "miss") : isCurrent && !pick ? "wait" : null);
+                  const source = stored?.source || (isCurrent ? item.assist_source : "회차진행");
+                  return <Box component="td" key={roundIndex} title={source || "어시픽"} sx={roundCellSx(isCurrent, status)}>
+                    <Box sx={{ display: "flex", justifyContent: "center" }}><PickChip value={status === "wait" ? "W" : pick} /></Box>
+                  </Box>;
+                })}
+              </tr>
+            </Fragment>;
+          })}
         </tbody>
       </Box>
     </Box>
@@ -114,8 +137,13 @@ export default function Nc2UserGamePage() {
   const [autoPlayMode, setAutoPlayMode] = useState("keep");
   const [autoStatus, setAutoStatus] = useState({ running: false });
   const [autoStatusError, setAutoStatusError] = useState(null);
-  const [replayControls, setReplayControls] = useState(false);
-  const [replay, setReplay] = useState({ active: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
+  const [replayControlsOpen, setReplayControlsOpen] = useState(false);
+  const [replay, setReplay] = useState({ active: false, sourceGameId: null, originGameId: null, roundNum: 0, totalRounds: 0 });
+  const [replayOpen, setReplayOpen] = useState(false);
+  const [replayGameInput, setReplayGameInput] = useState("");
+  const [replayPreview, setReplayPreview] = useState(null);
+  const [replayLoading, setReplayLoading] = useState(false);
+  const [replayError, setReplayError] = useState("");
   const [roundInput, setRoundInput] = useState("");
   const [newOpen, setNewOpen] = useState(false);
   const [shoeCopyOpen, setShoeCopyOpen] = useState(false);
@@ -168,7 +196,7 @@ export default function Nc2UserGamePage() {
       const response = await apiCaller.post(NC2_GAMES_API.START, { keep_combination: keepCombination, source_game_id: source });
       applyGame(response.data);
       if (source) setSourceGameId("");
-      setReplay({ active: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
+      setReplay({ active: false, sourceGameId: null, originGameId: null, roundNum: 0, totalRounds: 0 });
     } catch (err) {
       setError(err.response?.data?.detail || "NC2 게임을 시작하지 못했습니다.");
     } finally { setLoading(false); }
@@ -344,17 +372,87 @@ export default function Nc2UserGamePage() {
     await start({ source: sourceGameId ? Number(sourceGameId) : null });
   };
 
+  const openReplay = () => {
+    setReplayGameInput("");
+    setReplayPreview(null);
+    setReplayError("");
+    setReplayOpen(true);
+  };
+
+  const loadReplayPreview = async () => {
+    const entered = replayGameInput.trim();
+    const source = entered ? Number(entered) : replay.active ? replay.sourceGameId : game?.game_id;
+    if (!Number.isInteger(source) || source <= 0) {
+      setReplayError("올바른 게임번호를 입력하세요.");
+      return;
+    }
+    setReplayLoading(true);
+    setReplayError("");
+    try {
+      const response = await apiCaller.get(NC2_GAMES_API.REPLAY(source));
+      setReplayPreview(response.data);
+    } catch (err) {
+      setReplayPreview(null);
+      setReplayError(err.response?.data?.detail || "리플레이 데이터를 불러오지 못했습니다.");
+    } finally {
+      setReplayLoading(false);
+    }
+  };
+
+  const confirmReplay = () => {
+    if (!replayPreview) return;
+    const originGameId = replay.active ? replay.originGameId : game?.game_id;
+    setGame(replayPreview);
+    setReplay({
+      active: true,
+      sourceGameId: replayPreview.game_id,
+      originGameId,
+      roundNum: Number(replayPreview.round_state?.round_num || 0),
+      totalRounds: Number(replayPreview.total_rounds || 0),
+    });
+    setRoundInput(String(replayPreview.round_state?.round_num || 0));
+    setReplayOpen(false);
+  };
+
   const moveReplay = async (target) => {
+    if (replayLoading) return;
     const source = replay.active ? replay.sourceGameId : game?.game_id;
     const total = replay.active ? replay.totalRounds : Number(state?.round_num || 0);
-    const round = Math.max(0, Math.min(total, Number(target)));
-    const response = await apiCaller.get(NC2_GAMES_API.REPLAY(source), { round_num: round });
-    setGame(response.data);
-    setReplay({ active: true, sourceGameId: source, roundNum: round, totalRounds: response.data.total_rounds });
-    setRoundInput(String(round));
+    const round = Math.max(1, Math.min(total, Number(target)));
+    setReplayLoading(true);
+    try {
+      const response = await apiCaller.get(NC2_GAMES_API.REPLAY(source), { round_num: round });
+      setGame(response.data);
+      setReplay((previous) => ({
+        active: true,
+        sourceGameId: source,
+        originGameId: previous.active ? previous.originGameId : game?.game_id,
+        roundNum: round,
+        totalRounds: response.data.total_rounds,
+      }));
+      setRoundInput(String(round));
+    } catch (err) {
+      setError(err.response?.data?.detail || "리플레이 회차를 불러오지 못했습니다.");
+    } finally {
+      setReplayLoading(false);
+    }
+  };
+
+  const exitReplay = async () => {
+    const originGameId = replay.originGameId;
+    if (!originGameId) return;
+    setReplayLoading(true);
+    try {
+      await restore(originGameId);
+      setReplay({ active: false, sourceGameId: null, originGameId: null, roundNum: 0, totalRounds: 0 });
+      setRoundInput("");
+    } finally {
+      setReplayLoading(false);
+    }
   };
 
   const aggregate = state?.next_bet || {};
+  const pickMartin = state?.pick_martin || {};
   const currentRound = replay.active ? replay.roundNum : Number(state?.round_num || 0);
   const finalLabel = aggregate.direction ? `${aggregate.direction} ${Number(aggregate.amount || 0).toFixed(1)}P` : "대기 0P";
   const summary = useMemo(() => ({ P: aggregate.p_total || 0, B: aggregate.b_total || 0 }), [aggregate.p_total, aggregate.b_total]);
@@ -372,7 +470,7 @@ export default function Nc2UserGamePage() {
   }, [state?.actuals, state?.round_history]);
   const pCount = [...String(state?.actuals || "")].filter((value) => value === "P").length;
   const bCount = Number(state?.round_num || 0) - pCount;
-  const inputLocked = !game || loading || replay.active || Number(state?.round_num || 0) >= 60;
+  const inputLocked = !game || loading || replay.active;
   const panelSx = { border: "1px solid rgba(255,255,255,.3)", borderRadius: 1, backgroundColor: "#101318" };
   const pbSx = (backgroundColor) => ({ width: 48, height: 48, borderRadius: 2, backgroundColor, color: "#fff", fontSize: 24, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", cursor: inputLocked ? "not-allowed" : "pointer", opacity: inputLocked ? .4 : 1, "&:hover": { opacity: .85 }, "&:active": { transform: "scale(.95)" } });
   const ghRoundState = useMemo(() => {
@@ -380,7 +478,7 @@ export default function Nc2UserGamePage() {
     const historyByRound = new Map(
       (state?.round_history || []).map((entry) => [Number(entry.round_num), entry]),
     );
-    const cells = Array.from({ length: 80 }, (_, idx) => {
+    const cells = Array.from({ length: Math.max(80, actuals.length + 1) }, (_, idx) => {
       const history = historyByRound.get(idx + 1);
       const isCurrent = idx === actuals.length;
       return {
@@ -396,7 +494,11 @@ export default function Nc2UserGamePage() {
     return {
       round_num: Number(state?.round_num || 0),
       shoe_results: [...actuals],
-      pick_martin: { step: 1, direction: aggregate.direction, amount: Number(aggregate.amount || 0) },
+      pick_martin: {
+        step: Number(pickMartin.step || 1),
+        direction: pickMartin.direction || aggregate.direction,
+        amount: Number(pickMartin.amount || 0),
+      },
       round_amount_table: {
         cells,
         total_side: aggregate.direction,
@@ -404,7 +506,7 @@ export default function Nc2UserGamePage() {
         total_pnl: Number(state?.pnl || 0),
       },
     };
-  }, [state, aggregate.direction, aggregate.amount]);
+  }, [state, aggregate.direction, aggregate.amount, pickMartin.step, pickMartin.direction, pickMartin.amount]);
 
   return (
     <Box sx={{ p: isMobile ? .5 : 2 }}>
@@ -424,12 +526,12 @@ export default function Nc2UserGamePage() {
             <Box sx={{ borderRadius: 1, px: .5, height: 20, minWidth: 44, backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>A</Box>
             <Box sx={{ ...panelSx, minWidth: 55, height: 24, px: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", color: Number(summary.P) > 0 ? "#4caf50" : "#666", fontSize: 12, fontWeight: 900 }}>{Number(summary.P).toFixed(1)}</Box>
             <Box sx={{ borderRadius: 1, px: .5, height: 20, minWidth: 44, backgroundColor: "#c62828", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>Z</Box>
-            <Box sx={{ ...panelSx, minWidth: 80, height: 24, px: .6, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: .5, color: Number(summary.B) > 0 ? "#4caf50" : "#666", fontSize: 11, fontWeight: 900 }}><span style={{ color: "#888", fontSize: 10 }}>1S</span>{Number(summary.B).toFixed(1)}{aggregate.direction || ""}</Box>
+            <Box sx={{ ...panelSx, minWidth: 80, height: 24, px: .6, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: .5, color: Number(pickMartin.amount) > 0 ? "#4caf50" : "#666", fontSize: 11, fontWeight: 900 }}><span style={{ color: "#888", fontSize: 10 }}>{Number(pickMartin.step || 1)}S</span>{Number(pickMartin.amount || 0).toFixed(1)}{pickMartin.direction || ""}</Box>
             <Box sx={{ width: 32, height: 32, border: "1px solid #8e24aa", borderRadius: 1, backgroundColor: "#101318", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 13, opacity: .4 }}>≡0</Box>
             <Box sx={{ width: 32, height: 32, border: "1px solid #2f80ed", borderRadius: 1, backgroundColor: "#101318", color: "#64b5f6", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 13 }}>RE</Box>
           </Box>
           <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-            <Box sx={{ ...panelSx, width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>{currentRound + 1 > 60 ? 60 : currentRound + 1}</Box>
+            <Box sx={{ ...panelSx, width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>{currentRound + 1}</Box>
             <Box sx={pbSx("#1565c0")} onClick={() => !inputLocked && record("P")}>P</Box>
             <Box sx={{ ...panelSx, width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>{pCount}</Box>
             <Box sx={pbSx("#f44336")} onClick={() => !inputLocked && record("B")}>B</Box>
@@ -480,16 +582,17 @@ export default function Nc2UserGamePage() {
         />
         <Button size="small" variant="outlined" color="warning" onClick={() => setNewOpen(true)} disabled={!sourceGameId || loading || autoStatus.running || replay.active}>이 조합으로 새 게임</Button>
         <Button size="small" variant="outlined" color="warning" onClick={() => { setShoeSourceType("nc2"); setShoeSourceId(""); setShoePreview(null); setShoeCopyError(""); setShoeCopyOpen(true); }} disabled={loading || autoStatus.running || replay.active || !game?.game_id}>기존 슈 불러오기</Button>
-        <Button size="small" variant="outlined" onClick={() => setReplayControls((value) => !value)} disabled={loading || !game?.game_id}>리플레이</Button>
+        <Button size="small" variant="outlined" onClick={() => setReplayControlsOpen((open) => !open)} disabled={loading || replayLoading || !game?.game_id}>리플레이</Button>
         {autoStatus.running && <Typography variant="caption" sx={{ color: "text.secondary" }}>오토 실행 중에는 NC 조합을 변경할 수 없습니다.</Typography>}
-        {(replayControls || replay.active) && <>
-          <Button size="small" onClick={() => moveReplay(currentRound - 10)} disabled={loading || currentRound <= 0}>-10</Button>
-          <Button size="small" onClick={() => moveReplay(currentRound - 1)} disabled={loading || currentRound <= 0}>이전</Button>
-          <Button size="small" onClick={() => moveReplay(currentRound + 1)} disabled={!replay.active || loading || currentRound >= replay.totalRounds}>다음</Button>
-          <Button size="small" onClick={() => moveReplay(currentRound + 10)} disabled={!replay.active || loading || currentRound >= replay.totalRounds}>+10</Button>
-          <TextField size="small" type="number" value={roundInput} onChange={(event) => setRoundInput(event.target.value)} inputProps={{ min: 0, max: replay.active ? replay.totalRounds : currentRound }} sx={{ width: 82, "& .MuiInputBase-root": { height: 32 }, "& .MuiInputBase-input": { fontSize: 12, py: .5 } }} />
-          <Button size="small" onClick={() => moveReplay(roundInput)} disabled={loading || !roundInput}>이동</Button>
-          {replay.active && <Button size="small" color="warning" onClick={() => restore(replay.sourceGameId).then(() => setReplay({ active: false, sourceGameId: null, roundNum: 0, totalRounds: 0 }))} disabled={loading}>리플레이 종료</Button>}
+        {(replay.active || replayControlsOpen) && <>
+          <Button size="small" onClick={() => moveReplay(currentRound - 10)} disabled={replayLoading || currentRound <= 1}>-10</Button>
+          <Button size="small" onClick={() => moveReplay(currentRound - 1)} disabled={replayLoading || currentRound <= 1}>이전</Button>
+          <Button size="small" onClick={() => moveReplay(currentRound + 1)} disabled={!replay.active || replayLoading || currentRound >= replay.totalRounds}>다음</Button>
+          <Button size="small" onClick={() => moveReplay(currentRound + 10)} disabled={!replay.active || replayLoading || currentRound >= replay.totalRounds}>+10</Button>
+          <TextField size="small" type="number" value={roundInput} onChange={(event) => setRoundInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") moveReplay(roundInput); }} inputProps={{ min: 1, max: replay.active ? replay.totalRounds : currentRound }} sx={{ width: 82, "& .MuiInputBase-root": { height: 32 }, "& .MuiInputBase-input": { fontSize: 12, py: .5 } }} disabled={replayLoading} />
+          <Button size="small" onClick={() => moveReplay(roundInput)} disabled={replayLoading || roundInput === ""}>이동</Button>
+          <Button size="small" onClick={openReplay} disabled={replayLoading}>다른 게임</Button>
+          {replay.active && <Button size="small" color="warning" onClick={exitReplay} disabled={replayLoading}>리플레이 종료</Button>}
         </>}
       </Box>}
 
@@ -500,9 +603,63 @@ export default function Nc2UserGamePage() {
         setAutoStatus({ ...status, running: status?.running ?? status?.status === "running" });
         setAutoStatusError(null);
       }} onError={(value) => setError(value.detail)} gameId={game?.game_id} pickhandId={user?.pickhand_id || user?.username} gameType="nc2" playMode="keep" />
+      <Dialog open={replayOpen} onClose={() => !replayLoading && setReplayOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>게임 리플레이</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>
+            게임번호를 비우면 현재 게임을, 입력하면 해당 게임을 리플레이합니다.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            size="small"
+            type="number"
+            label="다른 게임번호 (선택)"
+            value={replayGameInput}
+            disabled={replayLoading}
+            onChange={(event) => {
+              setReplayGameInput(event.target.value);
+              setReplayPreview(null);
+              setReplayError("");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") loadReplayPreview();
+            }}
+          />
+          <Button variant="outlined" sx={{ mt: 1 }} disabled={replayLoading} onClick={loadReplayPreview}>
+            {replayLoading ? "조회 중..." : "조회"}
+          </Button>
+          {replayError && <Typography variant="body2" sx={{ color: "#f44336", mt: 1 }}>{replayError}</Typography>}
+          {replayPreview && (() => {
+            const previewState = replayPreview.round_state || {};
+            const previewGrid = buildShoePreviewGrid(String(previewState.actuals || ""));
+            const previewCols = previewGrid[0]?.length || 1;
+            return <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                {`게임 #${replayPreview.game_id} · ${replayPreview.status} · ${replayPreview.total_rounds}회차`}
+              </Typography>
+              <Box sx={{ overflowX: "auto", pb: 1 }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${previewCols}, 24px)`, gridTemplateRows: `repeat(${GRID_ROWS}, 24px)`, gridAutoFlow: "column", gap: "1px", width: "fit-content", backgroundColor: "#616161", border: "1px solid #616161" }}>
+                  {Array.from({ length: previewCols }, (_, col) => Array.from({ length: GRID_ROWS }, (__, row) => {
+                    const actual = previewGrid[row][col];
+                    const color = actual === "P" ? "#1565c0" : "#f44336";
+                    return <Box key={`${row}-${col}`} sx={{ width: 24, height: 24, backgroundColor: "background.default", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {actual && <Box sx={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: color, color: "#fff", fontSize: 10, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>{actual}</Box>}
+                    </Box>;
+                  }))}
+                </Box>
+              </Box>
+            </Box>;
+          })()}
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={replayLoading} onClick={() => setReplayOpen(false)}>취소</Button>
+          <Button variant="contained" disabled={replayLoading || !replayPreview} onClick={confirmReplay}>리플레이 시작</Button>
+        </DialogActions>
+      </Dialog>
       <Dialog open={newOpen} onClose={() => setNewOpen(false)}>
         <DialogTitle>NC2 새 게임</DialogTitle>
-        <DialogContent><Typography>{sourceGameId ? `게임 #${sourceGameId}의 NC 조합을 사용합니다.` : keepCombination ? "현재 NC 조합을 유지합니다." : "128개 NC를 새로 선정합니다."}</Typography></DialogContent>
+        <DialogContent><Typography>{sourceGameId ? `게임 #${sourceGameId}의 NC 조합을 그대로 사용합니다.` : keepCombination ? `현재 ${state?.items?.length || 128}개 NC 조합을 그대로 유지합니다.` : "설정한 개수의 NC를 새로 선정합니다."}</Typography></DialogContent>
         <DialogActions><Button onClick={() => setNewOpen(false)}>취소</Button><Button variant="contained" onClick={newGame}>시작</Button></DialogActions>
       </Dialog>
       <Dialog open={shoeCopyOpen} onClose={() => !shoeCopyLoading && setShoeCopyOpen(false)} fullWidth maxWidth="md">

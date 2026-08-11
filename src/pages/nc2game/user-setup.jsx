@@ -15,15 +15,22 @@ const method = { ...cell, cursor: "pointer", userSelect: "none" };
 const disabled = { ...cell, opacity: .3 };
 const empty = { ...cell, background: "#0a0a0a" };
 const topCondition = { ...cell, background: "#17365e", color: "#0065fe", fontWeight: "bold" };
+const ASSIST_OPTIONS = ["회차진행", "6회쉬기", "6+6", "회차반대"];
 
-function Nc2Input({ value, onChange, suffix = "", integer = false, style = cell, disabled: inputDisabled = false }) {
+function Nc2Input({ value, onChange, prefix = "", suffix = "", integer = false, style = cell, disabled: inputDisabled = false }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   if (editing) return <td style={style}><input autoFocus type="number" step={integer ? 1 : .1} value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={() => {
     const parsed = integer ? Math.round(Number(draft)) : Math.round(Number(draft) * 10) / 10;
     setEditing(false); if (Number.isFinite(parsed)) onChange(parsed);
   }} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} style={{ width: 56, background: style === teal || style === green ? "#cfeeee" : "#1a1a1a", border: "1px solid #0066FF", color: style === teal || style === green ? "#000" : "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, outline: "none" }} /></td>;
-  return <td style={{ ...style, cursor: inputDisabled ? "default" : "pointer" }} onClick={inputDisabled ? undefined : () => { setDraft(value ? String(value) : ""); setEditing(true); }}>{Number(value || 0).toFixed(suffix === "P" ? 1 : 0)}{suffix}</td>;
+  return <td style={{ ...style, cursor: inputDisabled ? "default" : "pointer" }} onClick={inputDisabled ? undefined : () => { setDraft(value ? String(value) : ""); setEditing(true); }}>{prefix}{Number(value || 0).toFixed(suffix === "P" ? 1 : 0)}{suffix}</td>;
+}
+
+function Nc2SelectCell({ value, options, onChange, style = cell, format = (option) => option }) {
+  return <td style={style}><select value={value} onChange={(event) => onChange(event.target.value)} style={{ width: "100%", height: 22, padding: "0 2px", background: "#17365e", color: "#fff", border: "1px solid #45658a", borderRadius: 2, fontSize: 11, fontWeight: "bold" }}>
+    {options.map((option) => <option key={option} value={option}>{format(option)}</option>)}
+  </select></td>;
 }
 
 function Nc2SetupTable({ config, onChange }) {
@@ -35,6 +42,21 @@ function Nc2SetupTable({ config, onChange }) {
   const betTypes = [["manual", "수동"], ["martin", "마틴"], ["cruise", "크루즈"], ["labouchere", "라보쉐르"]];
   const distMode = config.dist_mode || "even";
   const distModes = [["even", "균등"], ["asc", "증가"], ["desc", "감소"]];
+  const assistRules = [
+    { pasi: 2, assist: "회차진행", ...((config.assist_rules || [])[0] || {}) },
+    { pasi: 3, assist: "회차진행", ...((config.assist_rules || [])[1] || {}) },
+  ];
+  const pasiOptions = Array.from({ length: Math.max(1, max - 1) }, (_, index) => index + 2);
+  const updateAssistRule = (index, field, value) => {
+    const next = assistRules.map((rule) => ({ ...rule }));
+    next[index][field] = field === "pasi" ? Number(value) : value;
+    onChange({ ...config, assist_rules: next });
+  };
+  const updateStepMax = (value) => {
+    const stepMax = Math.min(16, Math.max(value, min));
+    const nextRules = assistRules.map((rule) => ({ ...rule, pasi: Math.max(2, Math.min(Math.max(2, stepMax), Number(rule.pasi || 2))) }));
+    onChange({ ...config, step_max: stepMax, assist_rules: nextRules });
+  };
   const groups = [
     { key: "white", color: "#fff", off: false, labels: [`${lo}% 이상`, `${hi}% 이하`] },
     { key: "blue", color: "#0066FF", off: lo <= 0, labels: ["0% 이상", `${lo}% 미만`] },
@@ -58,12 +80,70 @@ function Nc2SetupTable({ config, onChange }) {
       <Nc2Input value={Number(config.count || 10)} integer suffix="개" style={betType === "labouchere" ? cell : disabled} disabled={betType !== "labouchere"} onChange={(value) => onChange({ ...config, count: Math.max(1, Math.min(16, value)) })} />
       {distModes.map(([value, label]) => <td key={value} style={betType !== "labouchere" ? disabled : distMode === value ? { ...green, cursor: "pointer" } : method} onClick={betType === "labouchere" ? () => onChange({ ...config, dist_mode: value }) : undefined}>{label}</td>)}
     </tr>
-    <tr><td style={blue}>P설정</td><td style={green}>최저</td><Nc2Input value={min} integer suffix="단계" style={green} onChange={(value) => onChange({ ...config, step_min: Math.max(1, Math.min(value, max)) })} /><td style={green}>최고</td><Nc2Input value={max} integer suffix="단계" style={green} onChange={(value) => onChange({ ...config, step_max: Math.min(16, Math.max(value, min)) })} /><td colSpan={5} style={cell}></td></tr>
+    <tr>
+      <td style={blue}>P설정</td><td style={green}>최저</td><Nc2Input value={min} integer suffix="단계" style={green} onChange={(value) => onChange({ ...config, step_min: Math.max(1, Math.min(value, max)) })} /><td style={green}>최고</td><Nc2Input value={max} integer suffix="단계" style={green} onChange={updateStepMax} />
+      <Nc2SelectCell value={assistRules[0].pasi} options={pasiOptions} format={(value) => `${value}패시`} onChange={(value) => updateAssistRule(0, "pasi", value)} style={green} />
+      <Nc2SelectCell value={assistRules[0].assist} options={ASSIST_OPTIONS} onChange={(value) => updateAssistRule(0, "assist", value)} />
+      <Nc2SelectCell value={assistRules[1].pasi} options={pasiOptions} format={(value) => `${value}패시`} onChange={(value) => updateAssistRule(1, "pasi", value)} style={green} />
+      <Nc2SelectCell value={assistRules[1].assist} options={ASSIST_OPTIONS} onChange={(value) => updateAssistRule(1, "assist", value)} />
+      <td style={cell}></td>
+    </tr>
     {groups.flatMap((group) => [0, 1].map((half) => <tr key={`${group.key}-${half}`}>
       <td colSpan={2} style={{ ...cell, color: group.off ? "#666" : group.color }}>{group.key === "white" ? <><input type="number" min={0} max={100} value={half === 0 ? lo : hi} onChange={(event) => onChange({ ...config, [half === 0 ? "cond_lo" : "cond_hi"]: Math.max(0, Math.min(100, Number(event.target.value || 0))) })} style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />% {half === 0 ? "이상" : "이하"}</> : group.labels[half]}</td>
       {Array.from({ length: 8 }, (_, offset) => { const index = half * 8 + offset; const active = index + 1 >= min && index + 1 <= max; return active ? <Nc2Input key={index} value={(config[`amounts_${group.key}`] || [])[index] || 0} suffix="P" style={{ ...cell, color: group.off ? "#666" : group.color }} onChange={(value) => updateAmount(group.key, index, value)} /> : <td key={index} style={empty}></td>; })}
     </tr>))}
     <tr><td colSpan={10} style={topCondition}>최상위조건설정</td></tr>
+  </tbody></table>;
+}
+
+function MartinZSetupTable({ martin, onChange }) {
+  const enabled = !!martin.enabled;
+  const min = Math.max(1, Number(martin.step_min || 1));
+  const max = Math.min(20, Math.max(min, Number(martin.step_max || 20)));
+  const betType = martin.bet_type || "martin";
+  const amounts = [...(martin.amounts || []), ...Array(20).fill(0)].slice(0, 20);
+  const betTypes = [["martin", "마틴"], ["kkangbet", "깡벳"], ["fixed", "고정벳"], ["manual", "수동"], ["cruise", "크루즈"]];
+  const updateAmount = (index, value) => {
+    const next = [...amounts];
+    next[index] = Math.max(0, Math.round(value * 10) / 10);
+    if (betType === "martin" || betType === "kkangbet") {
+      for (let idx = index + 1; idx < max; idx += 1) next[idx] = Math.round(next[idx - 1] * 20) / 10;
+      for (let idx = index - 1; idx >= min - 1; idx -= 1) next[idx] = Math.max(.1, Math.round(next[idx + 1] * 5) / 10);
+    } else if (betType === "fixed") {
+      for (let idx = min - 1; idx < max; idx += 1) next[idx] = next[index];
+    }
+    onChange({ ...martin, amounts: next });
+  };
+  return <table style={{ borderCollapse: "collapse", minWidth: 504, color: "#fff" }}><tbody>
+    <tr>
+      <td style={{ ...red, background: "#c62828", color: "#fff" }}>마틴 Z</td>
+      <td style={enabled ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...martin, enabled: !enabled })}>{enabled ? "사용함" : "사용안함"}</td>
+      <Nc2Input value={martin.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(value) => onChange({ ...martin, budget: Math.max(0, value) })} />
+      <td colSpan={3} style={cell}>나이스초이스2 전용</td>
+    </tr>
+    <tr>
+      <td style={blue}>배팅종류</td>
+      {betTypes.map(([value, label]) => {
+        const unavailable = value === "cruise";
+        return <td key={value} style={unavailable ? disabled : betType === value ? { ...green, cursor: "pointer" } : method} onClick={unavailable ? undefined : () => onChange({ ...martin, bet_type: value })}>{label}</td>;
+      })}
+    </tr>
+    <tr>
+      <td style={blue}>단계설정</td><td style={green}>최저</td>
+      <Nc2Input value={min} integer suffix="단계" style={green} onChange={(value) => onChange({ ...martin, step_min: Math.max(1, Math.min(20, Math.min(value, max))) })} />
+      <td style={green}>최고</td>
+      <Nc2Input value={max} integer suffix="단계" style={green} onChange={(value) => onChange({ ...martin, step_max: Math.max(min, Math.min(20, value)) })} />
+      <td style={cell}></td>
+    </tr>
+    {Array.from({ length: 4 }, (_, row) => <tr key={`martin-z-${row}`}>
+      {row === 0 && <td rowSpan={4} style={blue}>금액설정</td>}
+      {Array.from({ length: 5 }, (_, offset) => {
+        const index = row * 5 + offset;
+        const step = index + 1;
+        const active = enabled && step >= min && step <= max;
+        return <Nc2Input key={index} value={active ? amounts[index] : 0} prefix={`${step}:`} suffix="P" style={active ? cell : empty} disabled={!active} onChange={(value) => updateAmount(index, value)} />;
+      })}
+    </tr>)}
   </tbody></table>;
 }
 
@@ -117,7 +197,23 @@ export default function Nc2UserSetupPage() {
       {message && <Alert severity="success" sx={{ mb: 1 }}>{message}</Alert>}
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2, p: 1, border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1 }}>
-        <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>오토 운영 옵션</Typography>
+        <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>운영 옵션</Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>나이스초이스 개수</Typography>
+          {[128, 96, 64, 32].map((count) => {
+            const selected = Number(config.reference_count ?? 128) === count;
+            return <Box key={count} role="button" tabIndex={0} onClick={() => updateConfig({ ...config, reference_count: count })} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") updateConfig({ ...config, reference_count: count }); }} sx={{ minWidth: 58, px: 1, py: .45, borderRadius: 1, border: `1px solid ${selected ? "#00a85a" : "#555"}`, backgroundColor: selected ? "#17482f" : "#171a1f", color: selected ? "#00e676" : "#aaa", textAlign: "center", fontSize: 12, fontWeight: "bold", cursor: "pointer", userSelect: "none" }}>{count}개</Box>;
+          })}
+          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>새 조합을 선정할 때 적용</Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>번호별 종료설정</Typography>
+          <input type="number" min="1" max="60" step="1" value={config.item_win_limit ?? 60} onChange={(event) => {
+            const value = Math.round(Number(event.target.value || 1));
+            updateConfig({ ...config, item_win_limit: Math.max(1, Math.min(60, value)) });
+          }} style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
+          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>각 NC 어시픽의 누적 승수 도달 시 배팅 종료</Typography>
+        </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>실배팅 배율</Typography>
           {[1, .1].map((scale) => {
@@ -141,6 +237,12 @@ export default function Nc2UserSetupPage() {
       </Box>
       <Box sx={{ overflowX: "auto", pb: 2 }}>
         <Nc2SetupTable config={config} onChange={updateConfig} />
+      </Box>
+      <Box sx={{ overflowX: "auto", pb: 2 }}>
+        <MartinZSetupTable
+          martin={config.martin_z || { enabled: false, budget: 0, bet_type: "martin", step_min: 1, step_max: 20, amounts: Array(20).fill(0) }}
+          onChange={(martin_z) => updateConfig({ ...config, martin_z })}
+        />
       </Box>
     </Box>
   );

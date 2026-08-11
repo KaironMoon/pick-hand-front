@@ -1,4 +1,5 @@
 import { Box, Tooltip } from "@mui/material";
+import { resolvePickMartinSummary } from "../../ghgame/pick-martin-summary.js";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -134,7 +135,7 @@ export function Nc2RoundAmountTable({
       title: endDisabled ? endDisabledReason : "현재 게임 종료 후 슬롯 비우기",
     },
   ];
-  const cellCount = 80;
+  const cellCount = Math.max(80, Array.isArray(table.cells) ? table.cells.length : 0);
   const strategyCells = table.cells || [];
   const actualCells = actualTable.cells || [];
   const cells = Array.from({ length: cellCount }, (_, idx) => {
@@ -295,14 +296,11 @@ export function Nc2BettingSummaryPanel({
     (acc, value) => ({ ...acc, [value]: acc[value] + 1 }),
     { P: 0, B: 0 },
   );
-  const pickMartin = roundState?.pick_martin;
-  const step = pickMartin?.step || 1;
-  const amount = autoStatus?.running
-    ? Number(autoStatus?.pending_amount_p || 0)
-    : (pickMartin?.amount ?? 0);
-  const displayedDirection = autoStatus?.running
-    ? autoStatus?.pending_direction
-    : pickMartin?.direction;
+  const {
+    step,
+    amount,
+    direction: displayedDirection,
+  } = resolvePickMartinSummary(roundState, autoStatus);
   const pickMartinBorder = displayedDirection === "P"
     ? "#1565c0"
     : displayedDirection === "B"
