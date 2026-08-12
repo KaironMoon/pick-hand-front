@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle,
   FormControlLabel, MenuItem, TextField, Typography, useMediaQuery, useTheme,
@@ -24,6 +24,87 @@ const buildShoePreviewGrid = (actuals) => {
     Array.from({ length: cols }, (__, col) => actuals?.[col * GRID_ROWS + row] || null)
   );
 };
+
+function applyActualBetAttempt(roundState, data) {
+  if (!roundState) return roundState;
+  const table = roundState.actual_bet_table || {};
+  const cells = Array.from({ length: 80 }, (_, idx) => (
+    table.cells?.[idx] || {
+      round: idx + 1,
+      bet_amount_won: 0,
+      bet_amount_p: 0,
+      actual_pnl_won: 0,
+      actual_pnl_p: 0,
+      bet_placed: false,
+      settled: false,
+    }
+  ));
+  const idx = Math.min(Math.max(0, Number(roundState.round_num || 0)), cells.length - 1);
+  const previous = cells[idx] || {};
+  const placed = !!data.placed;
+  const amountWon = placed ? Number(data.amount_won || 0) : 0;
+  const amountP = placed ? Number(data.amount_p || 0) : 0;
+  cells[idx] = {
+    ...previous,
+    round: idx + 1,
+    external_game_id: data.ext_game_id || null,
+    bet_side: data.direction || null,
+    bet_amount_won: amountWon,
+    bet_amount_p: amountP,
+    actual_pnl_won: 0,
+    actual_pnl_p: 0,
+    bet_placed: placed,
+    settled: false,
+    failure_code: data.code || null,
+    failure_detail: data.detail || null,
+  };
+  return {
+    ...roundState,
+    actual_bet_table: {
+      ...table,
+      has_auto_history: true,
+      cells,
+      total_amount_won: Number(table.total_amount_won || 0)
+        - Number(previous.bet_amount_won || 0)
+        + amountWon,
+      total_amount_p: Number(table.total_amount_p || 0)
+        - Number(previous.bet_amount_p || 0)
+        + amountP,
+    },
+  };
+}
+
+function applyActualBetSettlement(roundState, data) {
+  if (!roundState?.actual_bet_table?.cells) return roundState;
+  const table = roundState.actual_bet_table;
+  const cells = [...table.cells];
+  const idx = cells.findIndex(
+    (cell) => cell?.external_game_id === data.external_game_id,
+  );
+  if (idx < 0) return roundState;
+  const previous = cells[idx] || {};
+  const pnlWon = Number(data.actual_pnl_won || 0);
+  const pnlP = Number(data.actual_pnl_p || 0);
+  cells[idx] = {
+    ...previous,
+    actual_pnl_won: pnlWon,
+    actual_pnl_p: pnlP,
+    settled: true,
+  };
+  return {
+    ...roundState,
+    actual_bet_table: {
+      ...table,
+      cells,
+      total_pnl_won: Number(table.total_pnl_won || 0)
+        - Number(previous.actual_pnl_won || 0)
+        + pnlWon,
+      total_pnl_p: Number(table.total_pnl_p || 0)
+        - Number(previous.actual_pnl_p || 0)
+        + pnlP,
+    },
+  };
+}
 
 function PickChip({ value }) {
   if (!value) return null;
@@ -137,6 +218,7 @@ export default function Nc2UserGamePage() {
   const [autoPlayMode, setAutoPlayMode] = useState("keep");
   const [autoStatus, setAutoStatus] = useState({ running: false });
   const [autoStatusError, setAutoStatusError] = useState(null);
+  const [amountViewMode, setAmountViewMode] = useState("calculated");
   const [replayControlsOpen, setReplayControlsOpen] = useState(false);
   const [replay, setReplay] = useState({ active: false, sourceGameId: null, originGameId: null, roundNum: 0, totalRounds: 0 });
   const [replayOpen, setReplayOpen] = useState(false);
@@ -146,6 +228,11 @@ export default function Nc2UserGamePage() {
   const [replayError, setReplayError] = useState("");
   const [roundInput, setRoundInput] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
+  const [gameSlots, setGameSlots] = useState([]);
+  const [selectedSlotNo, setSelectedSlotNo] = useState(null);
+  const [slotBusy, setSlotBusy] = useState(false);
+  const slotBusyRef = useRef(false);
   const [shoeCopyOpen, setShoeCopyOpen] = useState(false);
   const [shoeSourceType, setShoeSourceType] = useState("nc2");
   const [shoeSourceId, setShoeSourceId] = useState("");
@@ -190,24 +277,99 @@ export default function Nc2UserGamePage() {
     applyGame(response.data);
   }, [applyGame]);
 
-  const start = useCallback(async ({ source = null } = {}) => {
+  const refreshGameSlots = useCallback(async () => {
+    const response = await apiCaller.get(NC2_GAMES_API.SLOTS);
+    const slots = Array.isArray(response.data?.slots) ? response.data.slots : [];
+    setGameSlots(slots);
+    return slots;
+  }, []);
+
+  const clearCurrentGame = useCallback(() => {
+    setGame(null);
+    setAutoStatus({ running: false });
+    setAutoStatusError(null);
+    setReplay({ active: false, sourceGameId: null, originGameId: null, roundNum: 0, totalRounds: 0 });
+  }, []);
+
+  const syncAutoStatusFromSlot = useCallback((slot) => {
+    setAutoStatus({
+      running: !!slot?.auto_running,
+      auto_session_id: slot?.auto_session_id || null,
+      phase: slot?.phase || null,
+      table_name: slot?.table_name || null,
+      play_mode: slot?.play_mode || "one",
+      actual_bet_scale: slot?.actual_bet_scale || 1,
+    });
+    setAutoStatusError(slot?.phase === "error" ? {
+      code: slot.error_code || "auto_error",
+      detail: slot.error_detail || "자동게임 처리 중 오류가 발생했습니다.",
+    } : null);
+  }, []);
+
+  const start = useCallback(async ({ source = null, slotNo = null, replaceGameId = null } = {}) => {
     setLoading(true); setError("");
     try {
-      const response = await apiCaller.post(NC2_GAMES_API.START, { keep_combination: keepCombination, source_game_id: source });
+      const response = await apiCaller.post(NC2_GAMES_API.START, {
+        keep_combination: keepCombination,
+        source_game_id: source,
+        slot_no: slotNo,
+        replace_game_id: replaceGameId,
+      });
       applyGame(response.data);
+      if (response.data.slot_no) setSelectedSlotNo(response.data.slot_no);
       if (source) setSourceGameId("");
       setReplay({ active: false, sourceGameId: null, originGameId: null, roundNum: 0, totalRounds: 0 });
+      await refreshGameSlots();
+      return response.data;
     } catch (err) {
-      setError(err.response?.data?.detail || "NC2 게임을 시작하지 못했습니다.");
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "NC2 게임을 시작하지 못했습니다.");
+      throw err;
     } finally { setLoading(false); }
-  }, [applyGame, keepCombination]);
+  }, [applyGame, keepCombination, refreshGameSlots]);
 
   useEffect(() => {
-    const gameId = Number(searchParams.get("gameId"));
-    if (gameId > 0) { restore(gameId).catch(() => setError("NC2 게임을 불러오지 못했습니다.")); return; }
-    apiCaller.get(NC2_GAMES_API.LAST_ACTIVE).then((response) => {
-      if (response.data?.game) applyGame(response.data.game);
-    }).catch((err) => setError(err.response?.data?.detail || "NC2 상태를 불러오지 못했습니다."));
+    let cancelled = false;
+    const initialize = async () => {
+      try {
+        const slots = await refreshGameSlots();
+        if (cancelled) return;
+        const gameId = Number(searchParams.get("gameId"));
+        const urlSlotNo = Number(searchParams.get("slot"));
+        if (gameId > 0) {
+          const slot = slots.find((item) => item.game_id === gameId);
+          setSelectedSlotNo(slot?.slot_no ?? null);
+          if (slot) syncAutoStatusFromSlot(slot);
+          await restore(gameId);
+          return;
+        }
+        if (Number.isInteger(urlSlotNo) && urlSlotNo >= 1 && urlSlotNo <= 6) {
+          const slot = slots.find((item) => item.slot_no === urlSlotNo);
+          setSelectedSlotNo(urlSlotNo);
+          if (slot?.occupied) {
+            syncAutoStatusFromSlot(slot);
+            await restore(slot.game_id);
+          } else {
+            clearCurrentGame();
+          }
+          return;
+        }
+        const firstOccupied = slots.find((item) => item.occupied);
+        if (firstOccupied) {
+          setSelectedSlotNo(firstOccupied.slot_no);
+          syncAutoStatusFromSlot(firstOccupied);
+          await restore(firstOccupied.game_id);
+        } else {
+          setSelectedSlotNo(1);
+          clearCurrentGame();
+          setSearchParams({ slot: 1 }, { replace: true });
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.response?.data?.detail || "NC2 상태를 불러오지 못했습니다.");
+      }
+    };
+    initialize();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -223,6 +385,7 @@ export default function Nc2UserGamePage() {
       if (status.running) {
         restore(game.game_id).catch(() => {});
       }
+      refreshGameSlots().catch(() => {});
     }).catch((err) => {
       if (cancelled) return;
       setAutoStatusError({
@@ -236,7 +399,11 @@ export default function Nc2UserGamePage() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [game?.game_id, restore]);
+  }, [game?.game_id, refreshGameSlots, restore]);
+
+  useEffect(() => {
+    setAmountViewMode(autoStatus.running ? "actual" : "calculated");
+  }, [autoStatus.running]);
 
   // GH와 동일하게 오토 이벤트를 실시간 구독하고, 결과 확정 시 서버 상태를 다시 읽는다.
   useEffect(() => {
@@ -330,6 +497,16 @@ export default function Nc2UserGamePage() {
               stop_reason: data.stop_reason || null,
             }));
             refreshEventGame(data.game_id);
+          } else if (type === "bet_attempt") {
+            setGame((previous) => previous ? {
+              ...previous,
+              round_state: applyActualBetAttempt(previous.round_state, data),
+            } : previous);
+          } else if (type === "bet_settled") {
+            setGame((previous) => previous ? {
+              ...previous,
+              round_state: applyActualBetSettlement(previous.round_state, data),
+            } : previous);
           } else if (type === "bet_rejected") {
             setError("배팅이 거부되었습니다 (카지노 미체결)");
             refreshEventGame(data.game_id || game.game_id);
@@ -367,9 +544,78 @@ export default function Nc2UserGamePage() {
   };
 
   const newGame = async () => {
-    if (game?.game_id && !replay.active) await apiCaller.post(NC2_GAMES_API.END(game.game_id));
-    setNewOpen(false);
-    await start({ source: sourceGameId ? Number(sourceGameId) : null });
+    try {
+      const previousGameId = game?.game_id;
+      if (previousGameId && !replay.active) await apiCaller.post(NC2_GAMES_API.END(previousGameId));
+      setNewOpen(false);
+      await start({
+        source: sourceGameId ? Number(sourceGameId) : null,
+        slotNo: selectedSlotNo,
+        replaceGameId: previousGameId || null,
+      });
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "새 게임을 시작하지 못했습니다.");
+    }
+  };
+
+  const handleSlotSelect = async (slotNo) => {
+    if (slotBusyRef.current || replay.active) return;
+    slotBusyRef.current = true;
+    setSlotBusy(true);
+    setError("");
+    try {
+      const slot = gameSlots.find((item) => item.slot_no === slotNo);
+      setSelectedSlotNo(slotNo);
+      if (slot?.occupied) {
+        syncAutoStatusFromSlot(slot);
+        await restore(slot.game_id);
+      } else {
+        clearCurrentGame();
+        await start({ slotNo });
+      }
+      await refreshGameSlots();
+    } catch (err) {
+      const code = err.response?.data?.detail?.error;
+      setError(code === "game_slot_occupied"
+        ? "다른 요청에서 슬롯이 먼저 사용됐습니다. 슬롯 상태를 새로고침합니다."
+        : "게임 슬롯을 전환하지 못했습니다.");
+      await refreshGameSlots().catch(() => {});
+    } finally {
+      slotBusyRef.current = false;
+      setSlotBusy(false);
+    }
+  };
+
+  const closeSelectedSlot = async () => {
+    setEndOpen(false);
+    if (!selectedSlotNo || !game?.game_id || autoStatus.running || slotBusyRef.current) return;
+    slotBusyRef.current = true;
+    setSlotBusy(true);
+    try {
+      await apiCaller.post(NC2_GAMES_API.SLOT_CLOSE(selectedSlotNo));
+      clearCurrentGame();
+      const slots = await refreshGameSlots();
+      const nextSlot = slots.find((item) => item.occupied && item.auto_running)
+        || slots.find((item) => item.occupied);
+      if (nextSlot) {
+        setSelectedSlotNo(nextSlot.slot_no);
+        syncAutoStatusFromSlot(nextSlot);
+        await restore(nextSlot.game_id);
+      }
+    } catch (err) {
+      const code = err.response?.data?.detail?.error;
+      setError(code === "auto_running_stop_first"
+        ? "오토를 먼저 정지해야 게임을 종료할 수 있습니다."
+        : code === "primary_game_slot_required"
+          ? "1번 슬롯은 종료할 수 없습니다."
+          : code === "last_game_slot_required"
+            ? "마지막 게임 슬롯은 종료할 수 없습니다."
+            : "게임을 종료하지 못했습니다.");
+    } finally {
+      slotBusyRef.current = false;
+      setSlotBusy(false);
+    }
   };
 
   const openReplay = () => {
@@ -471,6 +717,20 @@ export default function Nc2UserGamePage() {
   const pCount = [...String(state?.actuals || "")].filter((value) => value === "P").length;
   const bCount = Number(state?.round_num || 0) - pCount;
   const inputLocked = !game || loading || replay.active;
+  const occupiedSlotCount = gameSlots.filter((slot) => slot.occupied).length;
+  const endDisabled = loading || slotBusy || autoStatus.running || replay.active
+    || !game?.game_id || !selectedSlotNo || selectedSlotNo === 1 || occupiedSlotCount <= 1;
+  const endDisabledReason = selectedSlotNo === 1
+    ? "1번 슬롯은 종료할 수 없습니다"
+    : replay.active
+      ? "리플레이를 먼저 종료해주세요"
+      : autoStatus.running
+        ? "오토를 먼저 정지해야 게임을 종료할 수 있습니다"
+        : occupiedSlotCount <= 1
+          ? "마지막 게임 슬롯은 종료할 수 없습니다"
+          : loading || slotBusy
+            ? "현재 요청을 처리 중입니다"
+            : "종료할 게임 슬롯이 없습니다";
   const panelSx = { border: "1px solid rgba(255,255,255,.3)", borderRadius: 1, backgroundColor: "#101318" };
   const pbSx = (backgroundColor) => ({ width: 48, height: 48, borderRadius: 2, backgroundColor, color: "#fff", fontSize: 24, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", cursor: inputLocked ? "not-allowed" : "pointer", opacity: inputLocked ? .4 : 1, "&:hover": { opacity: .85 }, "&:active": { transform: "scale(.95)" } });
   const ghRoundState = useMemo(() => {
@@ -505,6 +765,7 @@ export default function Nc2UserGamePage() {
         total_amount: Number(aggregate.amount || 0),
         total_pnl: Number(state?.pnl || 0),
       },
+      actual_bet_table: state?.actual_bet_table || {},
     };
   }, [state, aggregate.direction, aggregate.amount, pickMartin.step, pickMartin.direction, pickMartin.amount]);
 
@@ -528,7 +789,32 @@ export default function Nc2UserGamePage() {
             <Box sx={{ borderRadius: 1, px: .5, height: 20, minWidth: 44, backgroundColor: "#c62828", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>Z</Box>
             <Box sx={{ ...panelSx, minWidth: 80, height: 24, px: .6, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: .5, color: Number(pickMartin.amount) > 0 ? "#4caf50" : "#666", fontSize: 11, fontWeight: 900 }}><span style={{ color: "#888", fontSize: 10 }}>{Number(pickMartin.step || 1)}S</span>{Number(pickMartin.amount || 0).toFixed(1)}{pickMartin.direction || ""}</Box>
             <Box sx={{ width: 32, height: 32, border: "1px solid #8e24aa", borderRadius: 1, backgroundColor: "#101318", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 13, opacity: .4 }}>≡0</Box>
-            <Box sx={{ width: 32, height: 32, border: "1px solid #2f80ed", borderRadius: 1, backgroundColor: "#101318", color: "#64b5f6", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 13 }}>RE</Box>
+            <Box
+              role="button"
+              tabIndex={0}
+              title={amountViewMode === "actual" ? "실제 베팅 금액 표시 중" : "전략 계산 금액 표시 중"}
+              onClick={() => setAmountViewMode((previous) => previous === "actual" ? "calculated" : "actual")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  setAmountViewMode((previous) => previous === "actual" ? "calculated" : "actual");
+                }
+              }}
+              sx={{
+                width: 32, height: 32,
+                border: `1px solid ${amountViewMode === "actual" ? "#00a85a" : "#2f80ed"}`,
+                borderRadius: 1,
+                backgroundColor: amountViewMode === "actual" ? "#10271d" : "#101318",
+                color: amountViewMode === "actual" ? "#00e676" : "#64b5f6",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 900, fontSize: 13, cursor: "pointer",
+              }}
+            >{amountViewMode === "actual" ? "BT" : "RE"}</Box>
+            {Number(autoStatus.actual_bet_scale) === 0.1 && (
+              <Box
+                title="실제 카지노 주문액에 ×0.1 적용 중"
+                sx={{ width: 38, minWidth: 38, height: 32, border: "1px solid #00a85a", borderRadius: 1, backgroundColor: "#10271d", color: "#00e676", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, whiteSpace: "nowrap" }}
+              >×0.1</Box>
+            )}
           </Box>
           <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
             <Box sx={{ ...panelSx, width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>{currentRound + 1}</Box>
@@ -543,7 +829,7 @@ export default function Nc2UserGamePage() {
             selectedMode={autoPlayMode}
             onModeChange={setAutoPlayMode}
             autoStatus={autoStatus}
-            onPlay={() => autoStatus.running ? autoService.stopAuto(autoStatus.auto_session_id).then(() => setAutoStatus({ running: false })) : setAutoOpen(true)}
+            onPlay={() => autoStatus.running ? autoService.stopAuto(autoStatus.auto_session_id).then(async () => { setAutoStatus({ running: false }); await refreshGameSlots(); }) : setAutoOpen(true)}
             autoError={autoStatusError}
             replayActive={replay.active}
             disabled={!game || replay.active}
@@ -552,15 +838,18 @@ export default function Nc2UserGamePage() {
 
         <Nc2RoundAmountTable
           roundState={ghRoundState}
-          amountMode="calculated"
+          amountMode={amountViewMode}
           onSetup={() => navigate("/nc2game/user-setup")}
           onNew={() => setNewOpen(true)}
-          newDisabled={loading || autoStatus.running}
-          gameSlots={Array.from({ length: 6 }, (_, idx) => ({ slot_no: idx + 1, occupied: idx === 0, game_id: idx === 0 ? game?.game_id : null, auto_running: idx === 0 && autoStatus.running }))}
-          selectedSlotNo={1}
-          onSlotSelect={() => {}}
-          slotBusy={loading || replay.active}
-          endDisabled
+          newDisabled={loading || slotBusy || autoStatus.running || replay.active || !selectedSlotNo}
+          gameSlots={gameSlots}
+          selectedSlotNo={selectedSlotNo}
+          onSlotSelect={handleSlotSelect}
+          slotBusy={slotBusy}
+          slotSelectionBlocked={slotBusy || replay.active}
+          onEnd={() => setEndOpen(true)}
+          endDisabled={endDisabled}
+          endDisabledReason={endDisabledReason}
         />
       </Box>
 
@@ -602,6 +891,7 @@ export default function Nc2UserGamePage() {
       <AutoStartDialog open={autoOpen} onClose={() => setAutoOpen(false)} onStarted={(status) => {
         setAutoStatus({ ...status, running: status?.running ?? status?.status === "running" });
         setAutoStatusError(null);
+        refreshGameSlots().catch(() => {});
       }} onError={(value) => setError(value.detail)} gameId={game?.game_id} pickhandId={user?.pickhand_id || user?.username} gameType="nc2" playMode="keep" />
       <Dialog open={replayOpen} onClose={() => !replayLoading && setReplayOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>게임 리플레이</DialogTitle>
@@ -661,6 +951,17 @@ export default function Nc2UserGamePage() {
         <DialogTitle>NC2 새 게임</DialogTitle>
         <DialogContent><Typography>{sourceGameId ? `게임 #${sourceGameId}의 NC 조합을 그대로 사용합니다.` : keepCombination ? `현재 ${state?.items?.length || 128}개 NC 조합을 그대로 유지합니다.` : "설정한 개수의 NC를 새로 선정합니다."}</Typography></DialogContent>
         <DialogActions><Button onClick={() => setNewOpen(false)}>취소</Button><Button variant="contained" onClick={newGame}>시작</Button></DialogActions>
+      </Dialog>
+      <Dialog open={endOpen} onClose={() => setEndOpen(false)}>
+        <DialogTitle>게임 종료</DialogTitle>
+        <DialogContent>
+          <Typography>{selectedSlotNo}번 게임을 종료하고 빈 슬롯으로 만듭니다.</Typography>
+          <Typography>게임 기록은 삭제하지 않고 보존합니다.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEndOpen(false)}>취소</Button>
+          <Button variant="contained" color="error" onClick={closeSelectedSlot}>종료</Button>
+        </DialogActions>
       </Dialog>
       <Dialog open={shoeCopyOpen} onClose={() => !shoeCopyLoading && setShoeCopyOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>기존 슈 불러오기</DialogTitle>

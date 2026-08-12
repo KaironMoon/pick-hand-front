@@ -70,6 +70,7 @@ export function Nc2RoundAmountTable({
   selectedSlotNo,
   onSlotSelect,
   slotBusy = false,
+  slotSelectionBlocked = false,
   onEnd,
   endDisabled = true,
   endDisabledReason,
@@ -113,7 +114,7 @@ export function Nc2RoundAmountTable({
         color: hasError ? "#111" : "#fff",
         blink: hasError,
         onClick: () => onSlotSelect?.(slotNo),
-        disabled: slotBusy,
+        disabled: slotSelectionBlocked,
         title: slot?.occupied
           ? `${slotNo}번 게임 #${slot.game_id}${slot.table_name ? ` / ${slot.table_name}` : ""}`
           : `${slotNo}번 빈 슬롯 — 새 게임 시작`,
@@ -196,7 +197,21 @@ export function Nc2RoundAmountTable({
   };
   return (
     <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1.4, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1 }}>
-      <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5, width: "100%" }}>
+      <Box sx={{ position: "relative", display: "flex", alignItems: "stretch", gap: 0.5, width: "100%" }}>
+        {slotBusy && (
+          <Box
+            role="status"
+            aria-live="polite"
+            sx={{
+              position: "absolute", inset: 0, zIndex: 3, display: "flex",
+              alignItems: "center", justifyContent: "center", border: "1px solid #2f9bff",
+              borderRadius: 1, backgroundColor: "rgba(8, 10, 13, 0.88)", color: "#7ec8ff",
+              fontSize: 12, fontWeight: "bold", cursor: "wait",
+            }}
+          >
+            슬롯 전환 중...
+          </Box>
+        )}
         {toolbarButtons.map(({
           label,
           color,
