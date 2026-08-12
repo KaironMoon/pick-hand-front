@@ -104,6 +104,8 @@ export function Nc2RoundAmountTable({
         active: selected,
         backgroundColor: hasError
           ? "#ffeb3b"
+          : slot?.auto_running && slot?.phase === "waiting_new_shoe"
+            ? "#6d4c00"
           : slot?.auto_running && slot?.phase === "monitoring"
             ? "#c62828"
             : slot?.auto_running
@@ -350,6 +352,7 @@ export function Nc2BettingSummaryPanel({
       : { text: "" };
   const phaseAbbr = {
     standby: "STB",
+    waiting_new_shoe: "WAIT",
     monitoring: "MON",
     betting: "BET",
     clearing: "CLR",

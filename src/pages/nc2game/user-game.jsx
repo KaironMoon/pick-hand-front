@@ -11,6 +11,8 @@ import apiCaller from "@/services/api-caller";
 import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import { Nc2BettingSummaryPanel, Nc2Circle, Nc2RoundAmountTable, calculateNc2CircleGrid } from "./components/Nc2GameBoards.jsx";
+import { nc2ItemNumberStyle } from "./item-end-style.js";
+import { nc2SetupPath } from "./slot-navigation.js";
 import { NC2_GAMES_API } from "@/constants/api-url";
 
 const zoneColor = { blue: "#42a5f5", white: "#fff", red: "#ef5350" };
@@ -164,7 +166,7 @@ function Nc2Grid({ state }) {
             });
             return <Fragment key={item.index}>
               <tr>
-                <Box component="td" rowSpan={2} sx={{ position: "sticky", left: 0, zIndex: 2, width: infoWidths[0], minWidth: infoWidths[0], maxWidth: infoWidths[0], ...sharedInfoSx, backgroundColor: item.ended ? "#1565c0" : "#181d23", color: "#fff", fontWeight: item.ended ? 900 : 400 }}>{sortedIndex + 1}</Box>
+                <Box component="td" rowSpan={2} sx={{ position: "sticky", left: 0, zIndex: 2, width: infoWidths[0], minWidth: infoWidths[0], maxWidth: infoWidths[0], ...sharedInfoSx, ...nc2ItemNumberStyle(item) }}>{sortedIndex + 1}</Box>
                 <Box component="td" rowSpan={2} sx={{ position: "sticky", left: infoWidths[0], zIndex: 2, width: infoWidths[1], minWidth: infoWidths[1], maxWidth: infoWidths[1], ...sharedInfoSx, backgroundColor: "#181d23", fontWeight: 800 }}>{item.game_seq}</Box>
                 <Box component="td" sx={{ position: "sticky", left: infoWidths[0] + infoWidths[1], zIndex: 2, width: infoWidths[2], minWidth: infoWidths[2], ...sharedInfoSx, backgroundColor: "#20262e", color: "#90caf9", fontWeight: 800 }}>생성픽</Box>
                 {[3, 4, 5].map((index) => <Box component="td" key={index} sx={{ width: infoWidths[index], minWidth: infoWidths[index], ...sharedInfoSx, color: "#555" }}>-</Box>)}
@@ -544,9 +546,11 @@ export default function Nc2UserGamePage() {
   };
 
   const newGame = async () => {
+    if (!selectedSlotNo || slotBusyRef.current || loading) return;
+    slotBusyRef.current = true;
+    setSlotBusy(true);
     try {
       const previousGameId = game?.game_id;
-      if (previousGameId && !replay.active) await apiCaller.post(NC2_GAMES_API.END(previousGameId));
       setNewOpen(false);
       await start({
         source: sourceGameId ? Number(sourceGameId) : null,
@@ -556,6 +560,9 @@ export default function Nc2UserGamePage() {
     } catch (err) {
       const detail = err.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "새 게임을 시작하지 못했습니다.");
+    } finally {
+      slotBusyRef.current = false;
+      setSlotBusy(false);
     }
   };
 
@@ -774,6 +781,7 @@ export default function Nc2UserGamePage() {
       <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
         <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>NiceChoice2</span>
         {game?.game_id && <span style={{ fontSize: 11, color: "#888" }}>#{game.game_id}</span>}
+        {game?.game_id && autoStatus.table_name && <span style={{ fontSize: 11, color: "#bbb", fontWeight: 700 }}>{autoStatus.table_name}</span>}
         {replay.active && <span style={{ fontSize: 12, color: "#ffb300", fontWeight: "bold", marginLeft: 8 }}>{`리플레이 중 #${replay.sourceGameId} · ${replay.roundNum}/${replay.totalRounds}회차`}</span>}
       </Box>
 
@@ -839,7 +847,7 @@ export default function Nc2UserGamePage() {
         <Nc2RoundAmountTable
           roundState={ghRoundState}
           amountMode={amountViewMode}
-          onSetup={() => navigate("/nc2game/user-setup")}
+          onSetup={() => navigate(nc2SetupPath(selectedSlotNo))}
           onNew={() => setNewOpen(true)}
           newDisabled={loading || slotBusy || autoStatus.running || replay.active || !selectedSlotNo}
           gameSlots={gameSlots}
@@ -950,7 +958,7 @@ export default function Nc2UserGamePage() {
       <Dialog open={newOpen} onClose={() => setNewOpen(false)}>
         <DialogTitle>NC2 새 게임</DialogTitle>
         <DialogContent><Typography>{sourceGameId ? `게임 #${sourceGameId}의 NC 조합을 그대로 사용합니다.` : keepCombination ? `현재 ${state?.items?.length || 128}개 NC 조합을 그대로 유지합니다.` : "설정한 개수의 NC를 새로 선정합니다."}</Typography></DialogContent>
-        <DialogActions><Button onClick={() => setNewOpen(false)}>취소</Button><Button variant="contained" onClick={newGame}>시작</Button></DialogActions>
+        <DialogActions><Button onClick={() => setNewOpen(false)}>취소</Button><Button variant="contained" onClick={newGame} disabled={loading || slotBusy}>시작</Button></DialogActions>
       </Dialog>
       <Dialog open={endOpen} onClose={() => setEndOpen(false)}>
         <DialogTitle>게임 종료</DialogTitle>

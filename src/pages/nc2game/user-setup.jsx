@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Alert, Box, Typography } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import apiCaller from "@/services/api-caller";
 import { USER_BET_SETTINGS_API } from "@/constants/api-url";
+import { nc2GameReturnPath } from "./slot-navigation.js";
 
 const GREEN = "#4caf50";
 const cell = { border: "1px solid #c9ccd1", width: 84, height: 22, lineHeight: 1.1, textAlign: "center", verticalAlign: "middle", fontSize: 13, padding: "1px 4px", whiteSpace: "nowrap", boxSizing: "border-box" };
@@ -35,7 +36,7 @@ function Nc2SelectCell({ value, options, onChange, style = cell, format = (optio
 
 function Nc2SetupTable({ config, onChange }) {
   const min = Number(config.step_min || 1);
-  const max = Number(config.step_max || 16);
+  const max = Math.min(20, Number(config.step_max || 16));
   const lo = Number(config.cond_lo ?? 0);
   const hi = Number(config.cond_hi ?? 100);
   const betType = config.bet_type || "manual";
@@ -45,6 +46,8 @@ function Nc2SetupTable({ config, onChange }) {
   const assistRules = [
     { pasi: 2, assist: "회차진행", ...((config.assist_rules || [])[0] || {}) },
     { pasi: 3, assist: "회차진행", ...((config.assist_rules || [])[1] || {}) },
+    { pasi: 4, assist: "회차진행", ...((config.assist_rules || [])[2] || {}) },
+    { pasi: 5, assist: "회차진행", ...((config.assist_rules || [])[3] || {}) },
   ];
   const pasiOptions = Array.from({ length: Math.max(1, max - 1) }, (_, index) => index + 2);
   const updateAssistRule = (index, field, value) => {
@@ -53,7 +56,7 @@ function Nc2SetupTable({ config, onChange }) {
     onChange({ ...config, assist_rules: next });
   };
   const updateStepMax = (value) => {
-    const stepMax = Math.min(16, Math.max(value, min));
+    const stepMax = Math.min(20, Math.max(value, min));
     const nextRules = assistRules.map((rule) => ({ ...rule, pasi: Math.max(2, Math.min(Math.max(2, stepMax), Number(rule.pasi || 2))) }));
     onChange({ ...config, step_max: stepMax, assist_rules: nextRules });
   };
@@ -64,9 +67,9 @@ function Nc2SetupTable({ config, onChange }) {
   ];
   const updateAmount = (key, index, value) => {
     const field = `amounts_${key}`;
-    const amounts = [...(config[field] || Array(16).fill(0))];
+    const amounts = [...(config[field] || Array(20).fill(0)), ...Array(20).fill(0)].slice(0, 20);
     if (betType === "martin") {
-      for (let step = 0; step < 16; step += 1) amounts[step] = Math.max(0, Math.round(value * (2 ** (step - index)) * 10) / 10);
+      for (let step = 0; step < 20; step += 1) amounts[step] = Math.max(0, Math.round(value * (2 ** (step - index)) * 10) / 10);
     } else {
       amounts[index] = Math.max(0, value);
     }
@@ -82,15 +85,18 @@ function Nc2SetupTable({ config, onChange }) {
     </tr>
     <tr>
       <td style={blue}>P설정</td><td style={green}>최저</td><Nc2Input value={min} integer suffix="단계" style={green} onChange={(value) => onChange({ ...config, step_min: Math.max(1, Math.min(value, max)) })} /><td style={green}>최고</td><Nc2Input value={max} integer suffix="단계" style={green} onChange={updateStepMax} />
-      <Nc2SelectCell value={assistRules[0].pasi} options={pasiOptions} format={(value) => `${value}패시`} onChange={(value) => updateAssistRule(0, "pasi", value)} style={green} />
-      <Nc2SelectCell value={assistRules[0].assist} options={ASSIST_OPTIONS} onChange={(value) => updateAssistRule(0, "assist", value)} />
-      <Nc2SelectCell value={assistRules[1].pasi} options={pasiOptions} format={(value) => `${value}패시`} onChange={(value) => updateAssistRule(1, "pasi", value)} style={green} />
-      <Nc2SelectCell value={assistRules[1].assist} options={ASSIST_OPTIONS} onChange={(value) => updateAssistRule(1, "assist", value)} />
-      <td style={cell}></td>
+      <td colSpan={5} style={cell}></td>
     </tr>
-    {groups.flatMap((group) => [0, 1].map((half) => <tr key={`${group.key}-${half}`}>
-      <td colSpan={2} style={{ ...cell, color: group.off ? "#666" : group.color }}>{group.key === "white" ? <><input type="number" min={0} max={100} value={half === 0 ? lo : hi} onChange={(event) => onChange({ ...config, [half === 0 ? "cond_lo" : "cond_hi"]: Math.max(0, Math.min(100, Number(event.target.value || 0))) })} style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />% {half === 0 ? "이상" : "이하"}</> : group.labels[half]}</td>
-      {Array.from({ length: 8 }, (_, offset) => { const index = half * 8 + offset; const active = index + 1 >= min && index + 1 <= max; return active ? <Nc2Input key={index} value={(config[`amounts_${group.key}`] || [])[index] || 0} suffix="P" style={{ ...cell, color: group.off ? "#666" : group.color }} onChange={(value) => updateAmount(group.key, index, value)} /> : <td key={index} style={empty}></td>; })}
+    <tr>
+      <td colSpan={2} style={blue}>NC2 어시</td>
+      {assistRules.map((rule, index) => <Fragment key={index}>
+        <Nc2SelectCell value={rule.pasi} options={pasiOptions} format={(value) => `${value}패시`} onChange={(value) => updateAssistRule(index, "pasi", value)} style={green} />
+        <Nc2SelectCell value={rule.assist} options={ASSIST_OPTIONS} onChange={(value) => updateAssistRule(index, "assist", value)} />
+      </Fragment>)}
+    </tr>
+    {groups.flatMap((group) => [0, 1, 2].map((part) => <tr key={`${group.key}-${part}`}>
+      <td colSpan={2} style={{ ...cell, color: group.off ? "#666" : group.color }}>{group.key === "white" && part < 2 ? <><input type="number" min={0} max={100} value={part === 0 ? lo : hi} onChange={(event) => onChange({ ...config, [part === 0 ? "cond_lo" : "cond_hi"]: Math.max(0, Math.min(100, Number(event.target.value || 0))) })} style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />% {part === 0 ? "이상" : "이하"}</> : group.labels[part] || ""}</td>
+      {Array.from({ length: 8 }, (_, offset) => { const index = part * 8 + offset; if (index >= 20) return <td key={index} style={empty}></td>; const active = index + 1 >= min && index + 1 <= max; return active ? <Nc2Input key={index} value={(config[`amounts_${group.key}`] || [])[index] || 0} suffix="P" style={{ ...cell, color: group.off ? "#666" : group.color }} onChange={(value) => updateAmount(group.key, index, value)} /> : <td key={index} style={empty}></td>; })}
     </tr>))}
     <tr><td colSpan={10} style={topCondition}>최상위조건설정</td></tr>
   </tbody></table>;
@@ -149,6 +155,7 @@ function MartinZSetupTable({ martin, onChange }) {
 
 export default function Nc2UserSetupPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [config, setConfig] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -185,7 +192,7 @@ export default function Nc2UserSetupPage() {
   return (
     <Box sx={{ p: 2 }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-        <Box onClick={() => navigate("/nc2game/user")} sx={{ display: "inline-flex", alignItems: "center", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1.5, py: .5, cursor: "pointer", backgroundColor: "background.paper", "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}>
+        <Box onClick={() => navigate(nc2GameReturnPath(searchParams.get("slot")))} sx={{ display: "inline-flex", alignItems: "center", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1.5, py: .5, cursor: "pointer", backgroundColor: "background.paper", "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}>
           <Typography variant="caption" sx={{ fontSize: 12 }}>&larr; 뒤로가기</Typography>
         </Box>
         <Box onClick={save} sx={{ display: "inline-flex", alignItems: "center", border: `1px solid ${dirty ? GREEN : "rgba(255,255,255,0.2)"}`, borderRadius: 1, px: 1.5, py: .5, cursor: dirty ? "pointer" : "default", backgroundColor: dirty ? GREEN : "transparent", color: dirty ? "#fff" : "#666", opacity: saving ? .5 : 1, "&:hover": dirty ? { backgroundColor: "#388e3c" } : {} }}>
