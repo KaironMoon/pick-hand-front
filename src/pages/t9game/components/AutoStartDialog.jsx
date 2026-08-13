@@ -205,7 +205,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId
         setTableId("");
         setSessionInfo((current) => ({ ...current, captured: true, status: "expired" }));
       } else if (detail?.error === "auto_session_limit_reached") {
-        message = "자동게임은 한 계정에서 최대 6개까지 실행할 수 있습니다";
+        message = "자동게임은 게임 종류별로 최대 6개까지 실행할 수 있습니다";
       } else if (detail?.error === "auto_game_already_running") {
         message = "이 게임의 자동 베팅이 이미 실행 중입니다";
       } else if (detail?.error === "auto_table_already_running") {
