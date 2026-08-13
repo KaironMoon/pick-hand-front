@@ -79,7 +79,7 @@ const formatAge = (sec) => {
   return `${Math.floor(sec / 3600)}시간 전`;
 };
 
-const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId, gameType = "gh", playMode = "keep" }) => {
+const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId, gameType = "gh", playMode = "keep", keepCombination, referenceGameSeqs }) => {
   const [sessionInfo, setSessionInfo] = useState(null);
   const [tableId, setTableId] = useState("");
   const [server, setServer] = useState("");
@@ -193,6 +193,8 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId
         server: server.trim() || null,
         gameType,
         playMode,
+        keepCombination,
+        referenceGameSeqs,
       });
       onStarted?.(resp);
       onClose?.();

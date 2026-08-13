@@ -21,6 +21,12 @@ import { claimOverallStopAlert } from "./overall-stop-alert";
 import { buildGoalStatusItems, formatGoalTarget } from "./goal-status.js";
 import { resolvePickMartinSummary } from "./pick-martin-summary.js";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
+import {
+  loadShoeCopySourceType,
+  saveShoeCopySourceType,
+  SHOE_COPY_SOURCE_STORAGE_KEYS,
+  shoeCopyEnterAction,
+} from "@/utils/shoe-copy-dialog.js";
 
 // blink 애니메이션
 const blinkKeyframes = `@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }`;
@@ -829,7 +835,10 @@ export default function GhUserGamePage() {
   const slotBusyRef = useRef(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [shoeCopyOpen, setShoeCopyOpen] = useState(false);
-  const [shoeSourceType, setShoeSourceType] = useState("gh");
+  const [shoeSourceType, setShoeSourceType] = useState(() => loadShoeCopySourceType(
+    SHOE_COPY_SOURCE_STORAGE_KEYS.gh,
+    "gh",
+  ));
   const [sourceGameInput, setSourceGameInput] = useState("");
   const [shoePreview, setShoePreview] = useState(null);
   const [shoeCopyError, setShoeCopyError] = useState("");
@@ -1742,7 +1751,6 @@ export default function GhUserGamePage() {
       setRejectMsg("오토 실행 중에는 기존 슈 입력 기능을 사용할 수 없습니다.");
       return;
     }
-    setShoeSourceType("gh");
     setSourceGameInput("");
     setShoePreview(null);
     setShoeCopyError("");
@@ -2622,7 +2630,9 @@ export default function GhUserGamePage() {
               value={shoeSourceType}
               disabled={shoeCopyExecuting}
               onChange={(event) => {
-                setShoeSourceType(event.target.value);
+                const sourceType = event.target.value;
+                setShoeSourceType(sourceType);
+                saveShoeCopySourceType(SHOE_COPY_SOURCE_STORAGE_KEYS.gh, sourceType);
                 setShoePreview(null);
                 setShoeCopyError("");
               }}
@@ -2644,7 +2654,16 @@ export default function GhUserGamePage() {
                 setShoeCopyError("");
               }}
               onKeyDown={(event) => {
-                if (event.key === "Enter") loadShoePreview();
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                const action = shoeCopyEnterAction({
+                  preview: shoePreview,
+                  sourceType: shoeSourceType,
+                  sourceGameInput,
+                  busy: shoeCopyLoading || shoeCopyExecuting,
+                });
+                if (action === "execute") executeShoeCopy();
+                else if (action === "lookup") loadShoePreview();
               }}
             />
             <Button variant="outlined" disabled={shoeCopyLoading || shoeCopyExecuting} onClick={loadShoePreview}>

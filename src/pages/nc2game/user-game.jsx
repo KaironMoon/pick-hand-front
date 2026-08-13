@@ -11,9 +11,17 @@ import apiCaller from "@/services/api-caller";
 import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import { Nc2BettingSummaryPanel, Nc2Circle, Nc2RoundAmountTable, calculateNc2CircleGrid } from "./components/Nc2GameBoards.jsx";
+import { nc2ItemWinLimitLabel } from "./game-setting-label.js";
 import { nc2ItemNumberStyle } from "./item-end-style.js";
+import { clearNc2KeepCombination, loadNc2KeepCombination, saveNc2KeepCombination } from "./keep-combination.js";
 import { nc2SetupPath } from "./slot-navigation.js";
 import { NC2_GAMES_API } from "@/constants/api-url";
+import {
+  loadShoeCopySourceType,
+  saveShoeCopySourceType,
+  SHOE_COPY_SOURCE_STORAGE_KEYS,
+  shoeCopyEnterAction,
+} from "@/utils/shoe-copy-dialog.js";
 
 const zoneColor = { blue: "#42a5f5", white: "#fff", red: "#ef5350" };
 const resultCellColor = { hit: "#00e676", miss: "#ffeb3b", wait: "#fff" };
@@ -214,7 +222,7 @@ export default function Nc2UserGamePage() {
   const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [keepCombination, setKeepCombination] = useState(false);
+  const [keptGameSeqs, setKeptGameSeqs] = useState(loadNc2KeepCombination);
   const [sourceGameId, setSourceGameId] = useState("");
   const [autoOpen, setAutoOpen] = useState(false);
   const [autoPlayMode, setAutoPlayMode] = useState("keep");
@@ -236,12 +244,16 @@ export default function Nc2UserGamePage() {
   const [slotBusy, setSlotBusy] = useState(false);
   const slotBusyRef = useRef(false);
   const [shoeCopyOpen, setShoeCopyOpen] = useState(false);
-  const [shoeSourceType, setShoeSourceType] = useState("nc2");
+  const [shoeSourceType, setShoeSourceType] = useState(() => loadShoeCopySourceType(
+    SHOE_COPY_SOURCE_STORAGE_KEYS.nc2,
+    "nc2",
+  ));
   const [shoeSourceId, setShoeSourceId] = useState("");
   const [shoePreview, setShoePreview] = useState(null);
   const [shoeCopyLoading, setShoeCopyLoading] = useState(false);
   const [shoeCopyError, setShoeCopyError] = useState("");
   const state = game?.round_state;
+  const keepCombination = Array.isArray(keptGameSeqs) && keptGameSeqs.length > 0;
 
   const loadShoePreview = async () => {
     const sourceId = Number(shoeSourceId);
@@ -270,9 +282,24 @@ export default function Nc2UserGamePage() {
 
   const applyGame = useCallback((data) => {
     setGame(data);
-    setKeepCombination(!!data?.keep_combination);
     if (data?.game_id) setSearchParams({ gameId: data.game_id }, { replace: true });
   }, [setSearchParams]);
+
+  const handleKeepCombinationChange = useCallback((event) => {
+    const enabled = event.target.checked;
+    if (!enabled) {
+      setKeptGameSeqs(null);
+      clearNc2KeepCombination();
+      return;
+    }
+    const gameSeqs = (state?.items || []).map((item) => Number(item.game_seq));
+    if (!gameSeqs.length || gameSeqs.some((value) => !Number.isInteger(value) || value <= 0)) {
+      setError("유지할 NC 조합값이 없습니다.");
+      return;
+    }
+    setKeptGameSeqs(gameSeqs);
+    saveNc2KeepCombination(gameSeqs);
+  }, [state?.items]);
 
   const restore = useCallback(async (gameId) => {
     const response = await apiCaller.get(NC2_GAMES_API.STATE(gameId));
@@ -313,11 +340,20 @@ export default function Nc2UserGamePage() {
     try {
       const response = await apiCaller.post(NC2_GAMES_API.START, {
         keep_combination: keepCombination,
+        reference_game_seqs: source ? null : keptGameSeqs,
         source_game_id: source,
         slot_no: slotNo,
         replace_game_id: replaceGameId,
       });
       applyGame(response.data);
+      if (keepCombination && source) {
+        const nextGameSeqs = (response.data?.round_state?.items || [])
+          .map((item) => Number(item.game_seq));
+        if (nextGameSeqs.length) {
+          setKeptGameSeqs(nextGameSeqs);
+          saveNc2KeepCombination(nextGameSeqs);
+        }
+      }
       if (response.data.slot_no) setSelectedSlotNo(response.data.slot_no);
       if (source) setSourceGameId("");
       setReplay({ active: false, sourceGameId: null, originGameId: null, roundNum: 0, totalRounds: 0 });
@@ -328,7 +364,7 @@ export default function Nc2UserGamePage() {
       setError(typeof detail === "string" ? detail : "NC2 게임을 시작하지 못했습니다.");
       throw err;
     } finally { setLoading(false); }
-  }, [applyGame, keepCombination, refreshGameSlots]);
+  }, [applyGame, keepCombination, keptGameSeqs, refreshGameSlots]);
 
   useEffect(() => {
     let cancelled = false;
@@ -704,6 +740,27 @@ export default function Nc2UserGamePage() {
     }
   };
 
+  const handleAutoToggle = async () => {
+    if (autoStatus.running && autoStatus.auto_session_id) {
+      await autoService.stopAuto(autoStatus.auto_session_id);
+      setAutoStatus({ running: false });
+      await refreshGameSlots();
+      return;
+    }
+
+    const hasRounds = Number(state?.round_num || 0) > 0;
+    if (hasRounds) {
+      const ok = window.confirm(
+        "현재 게임에 이미 진행된 라운드가 있습니다.\n\n" +
+        "Auto는 새 게임에서 시작하는 것을 권장합니다.\n" +
+        "취소 후 [NW] 버튼으로 새 게임을 만든 뒤 다시 시작하세요.\n\n" +
+        "그래도 현재 게임에서 진행하시겠습니까?"
+      );
+      if (!ok) return;
+    }
+    setAutoOpen(true);
+  };
+
   const aggregate = state?.next_bet || {};
   const pickMartin = state?.pick_martin || {};
   const currentRound = replay.active ? replay.roundNum : Number(state?.round_num || 0);
@@ -837,7 +894,7 @@ export default function Nc2UserGamePage() {
             selectedMode={autoPlayMode}
             onModeChange={setAutoPlayMode}
             autoStatus={autoStatus}
-            onPlay={() => autoStatus.running ? autoService.stopAuto(autoStatus.auto_session_id).then(async () => { setAutoStatus({ running: false }); await refreshGameSlots(); }) : setAutoOpen(true)}
+            onPlay={handleAutoToggle}
             autoError={autoStatusError}
             replayActive={replay.active}
             disabled={!game || replay.active}
@@ -863,9 +920,14 @@ export default function Nc2UserGamePage() {
 
       {isAdmin && <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 1.5, px: 1, py: .7, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.06)" }}>
         <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>어드민 도구</Typography>
+        <Typography
+          variant="caption"
+          title="현재 선택된 게임이 생성될 때 저장된 번호별 종료설정"
+          sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.55)", borderRadius: 1, color: "#ffe082", fontWeight: 900 }}
+        >현재 게임 승리 종료 설정: {nc2ItemWinLimitLabel(game?.config)}</Typography>
         <FormControlLabel
           sx={{ m: 0, mr: .5, "& .MuiFormControlLabel-label": { fontSize: 12 } }}
-          control={<Checkbox size="small" sx={{ p: .5 }} checked={keepCombination} onChange={(event) => setKeepCombination(event.target.checked)} />}
+          control={<Checkbox size="small" sx={{ p: .5 }} checked={keepCombination} onChange={handleKeepCombinationChange} />}
           label="NC 조합 유지"
         />
         <TextField
@@ -878,7 +940,7 @@ export default function Nc2UserGamePage() {
           sx={{ width: 142, "& .MuiInputBase-root": { height: 32 }, "& .MuiInputBase-input": { fontSize: 12, py: .5 } }}
         />
         <Button size="small" variant="outlined" color="warning" onClick={() => setNewOpen(true)} disabled={!sourceGameId || loading || autoStatus.running || replay.active}>이 조합으로 새 게임</Button>
-        <Button size="small" variant="outlined" color="warning" onClick={() => { setShoeSourceType("nc2"); setShoeSourceId(""); setShoePreview(null); setShoeCopyError(""); setShoeCopyOpen(true); }} disabled={loading || autoStatus.running || replay.active || !game?.game_id}>기존 슈 불러오기</Button>
+        <Button size="small" variant="outlined" color="warning" onClick={() => { setShoeSourceId(""); setShoePreview(null); setShoeCopyError(""); setShoeCopyOpen(true); }} disabled={loading || autoStatus.running || replay.active || !game?.game_id}>기존 슈 불러오기</Button>
         <Button size="small" variant="outlined" onClick={() => setReplayControlsOpen((open) => !open)} disabled={loading || replayLoading || !game?.game_id}>리플레이</Button>
         {autoStatus.running && <Typography variant="caption" sx={{ color: "text.secondary" }}>오토 실행 중에는 NC 조합을 변경할 수 없습니다.</Typography>}
         {(replay.active || replayControlsOpen) && <>
@@ -900,7 +962,7 @@ export default function Nc2UserGamePage() {
         setAutoStatus({ ...status, running: status?.running ?? status?.status === "running" });
         setAutoStatusError(null);
         refreshGameSlots().catch(() => {});
-      }} onError={(value) => setError(value.detail)} gameId={game?.game_id} pickhandId={user?.pickhand_id || user?.username} gameType="nc2" playMode="keep" />
+      }} onError={(value) => setError(value.detail)} gameId={game?.game_id} pickhandId={user?.pickhand_id || user?.username} gameType="nc2" playMode="keep" keepCombination={keepCombination} referenceGameSeqs={keptGameSeqs} />
       <Dialog open={replayOpen} onClose={() => !replayLoading && setReplayOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>게임 리플레이</DialogTitle>
         <DialogContent>
@@ -975,10 +1037,10 @@ export default function Nc2UserGamePage() {
         <DialogTitle>기존 슈 불러오기</DialogTitle>
         <DialogContent>
           <Box sx={{ display: "flex", gap: 1, mt: .5, mb: 2, flexWrap: "wrap" }}>
-            <TextField select size="small" label="원본 게임" value={shoeSourceType} onChange={(event) => { setShoeSourceType(event.target.value); setShoePreview(null); }} sx={{ minWidth: 150 }}>
+            <TextField select size="small" label="원본 게임" value={shoeSourceType} onChange={(event) => { const sourceType = event.target.value; setShoeSourceType(sourceType); saveShoeCopySourceType(SHOE_COPY_SOURCE_STORAGE_KEYS.nc2, sourceType); setShoePreview(null); setShoeCopyError(""); }} sx={{ minWidth: 150 }}>
               <MenuItem value="nc2">나이스초이스2</MenuItem><MenuItem value="gh">글로벌히트</MenuItem>
             </TextField>
-            <TextField size="small" type="number" label="기존 게임번호" value={shoeSourceId} onChange={(event) => { setShoeSourceId(event.target.value); setShoePreview(null); }} />
+            <TextField autoFocus size="small" type="number" label="기존 게임번호" value={shoeSourceId} onChange={(event) => { setShoeSourceId(event.target.value); setShoePreview(null); setShoeCopyError(""); }} onKeyDown={(event) => { if (event.key !== "Enter") return; event.preventDefault(); const action = shoeCopyEnterAction({ preview: shoePreview, sourceType: shoeSourceType, sourceGameInput: shoeSourceId, busy: shoeCopyLoading }); if (action === "execute") executeShoeCopy(); else if (action === "lookup") loadShoePreview(); }} />
             <Button variant="outlined" disabled={shoeCopyLoading} onClick={loadShoePreview}>조회</Button>
           </Box>
           {shoeCopyError && <Alert severity="error" sx={{ mb: 1 }}>{shoeCopyError}</Alert>}
