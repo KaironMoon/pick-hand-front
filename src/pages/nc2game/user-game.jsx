@@ -10,6 +10,7 @@ import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
 import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
+import { claimOverallStopAlert } from "../ghgame/overall-stop-alert.js";
 import { Nc2BettingSummaryPanel, Nc2Circle, Nc2RoundAmountTable, calculateNc2CircleGrid } from "./components/Nc2GameBoards.jsx";
 import { nc2ItemWinLimitLabel } from "./game-setting-label.js";
 import { nc2ItemNumberStyle } from "./item-end-style.js";
@@ -252,6 +253,12 @@ export default function Nc2UserGamePage() {
   const [shoePreview, setShoePreview] = useState(null);
   const [shoeCopyLoading, setShoeCopyLoading] = useState(false);
   const [shoeCopyError, setShoeCopyError] = useState("");
+  const overallStopAlertedRef = useRef(new Set());
+  const [overallStopDialog, setOverallStopDialog] = useState({
+    open: false,
+    detail: "",
+    modeLabel: "",
+  });
   const state = game?.round_state;
   const keepCombination = Array.isArray(keptGameSeqs) && keptGameSeqs.length > 0;
 
@@ -284,6 +291,53 @@ export default function Nc2UserGamePage() {
     setGame(data);
     if (data?.game_id) setSearchParams({ gameId: data.game_id }, { replace: true });
   }, [setSearchParams]);
+
+  const showOverallStopAlert = useCallback((targetGameId, reason, mode) => {
+    const alert = claimOverallStopAlert(
+      overallStopAlertedRef.current,
+      targetGameId,
+      reason,
+      mode,
+    );
+    if (alert) {
+      setOverallStopDialog({
+        open: true,
+        detail: alert.detail,
+        modeLabel: alert.modeLabel,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (replay.active) return;
+    const targetGameId = game?.game_id;
+    const reason = state?.overall_stop?.reason || autoStatus?.stop_reason;
+    const isPrematureManualGoal = (
+      !autoStatus?.running
+      && reason === "goal_reached"
+      && Number(game?.config?.auto_goal_amount || 0) > 0
+      && Number(state?.pnl || 0) < Number(game?.config?.auto_goal_amount || 0)
+    );
+    if (isPrematureManualGoal) {
+      overallStopAlertedRef.current.delete(String(targetGameId));
+      setOverallStopDialog((previous) => ({ ...previous, open: false }));
+      return;
+    }
+    showOverallStopAlert(
+      targetGameId,
+      reason,
+      autoStatus?.running ? "auto" : "manual",
+    );
+  }, [
+    autoStatus?.running,
+    autoStatus?.stop_reason,
+    game?.config?.auto_goal_amount,
+    game?.game_id,
+    replay.active,
+    showOverallStopAlert,
+    state?.overall_stop?.reason,
+    state?.pnl,
+  ]);
 
   const handleKeepCombinationChange = useCallback((event) => {
     const enabled = event.target.checked;
@@ -761,8 +815,13 @@ export default function Nc2UserGamePage() {
     setAutoOpen(true);
   };
 
-  const aggregate = state?.next_bet || {};
-  const pickMartin = state?.pick_martin || {};
+  const overallBettingStopped = state?.overall_stop?.stopped === true;
+  const aggregate = overallBettingStopped
+    ? { ...(state?.next_bet || {}), direction: null, amount: 0, p_total: 0, b_total: 0 }
+    : state?.next_bet || {};
+  const pickMartin = overallBettingStopped
+    ? { ...(state?.pick_martin || {}), direction: null, amount: 0 }
+    : state?.pick_martin || {};
   const currentRound = replay.active ? replay.roundNum : Number(state?.round_num || 0);
   const finalLabel = aggregate.direction ? `${aggregate.direction} ${Number(aggregate.amount || 0).toFixed(1)}P` : "대기 0P";
   const summary = useMemo(() => ({ P: aggregate.p_total || 0, B: aggregate.b_total || 0 }), [aggregate.p_total, aggregate.b_total]);
@@ -958,11 +1017,30 @@ export default function Nc2UserGamePage() {
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
       {state && <Nc2Grid state={state} />}
 
+      <Dialog
+        open={overallStopDialog.open}
+        onClose={() => setOverallStopDialog((previous) => ({ ...previous, open: false }))}
+      >
+        <DialogTitle sx={{ fontWeight: "bold" }}>게임이 종료되었습니다.</DialogTitle>
+        <DialogContent>
+          <Typography>{overallStopDialog.detail}</Typography>
+          <Typography sx={{ mt: 1, fontSize: "0.85rem", color: "text.secondary" }}>
+            {overallStopDialog.modeLabel} 게임 · 픽 계산과 결과 기록은 계속됩니다.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            variant="contained"
+            onClick={() => setOverallStopDialog((previous) => ({ ...previous, open: false }))}
+          >확인</Button>
+        </DialogActions>
+      </Dialog>
+
       <AutoStartDialog open={autoOpen} onClose={() => setAutoOpen(false)} onStarted={(status) => {
         setAutoStatus({ ...status, running: status?.running ?? status?.status === "running" });
         setAutoStatusError(null);
         refreshGameSlots().catch(() => {});
-      }} onError={(value) => setError(value.detail)} gameId={game?.game_id} pickhandId={user?.pickhand_id || user?.username} gameType="nc2" playMode="keep" keepCombination={keepCombination} referenceGameSeqs={keptGameSeqs} />
+      }} onError={(value) => setError(value.detail)} gameId={game?.game_id} pickhandId={user?.pickhand_id || user?.username} gameType="nc2" playMode="keep" />
       <Dialog open={replayOpen} onClose={() => !replayLoading && setReplayOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>게임 리플레이</DialogTitle>
         <DialogContent>
