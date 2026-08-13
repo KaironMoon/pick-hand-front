@@ -6,6 +6,7 @@ import apiCaller from "@/services/api-caller";
 import { USER_BET_SETTINGS_API } from "@/constants/api-url";
 import { userAtom } from "@/store/auth-store";
 import { updatePbjStrategy } from "./pbj-goal.js";
+import { extendMartinAmounts, GH_FIXED_PASI_LEVELS, GH_STRATEGY_MAX_STEP } from "./strategy-step-capacity.js";
 
 const GREEN = "#4caf50";
 const LABEL_COLOR = "#c62828";
@@ -529,9 +530,8 @@ const isKnownAssistOption = (value) => !value || ASSIST_OPTS.includes(value);
 const normalizeAssistOption = (value) => (["대기진행", "G(H0)", "G(%0)"].includes(value) ? "해당진행" : (isKnownAssistOption(value) ? (value || "해당진행") : "해당진행"));
 const SIX_M_ASSISTS = new Set(["6M", "6MX"]);
 // 패시 어시스트 행 (2~20패시). 설정한 최고 단계까지 표시.
-const PASI_LEVELS = Array.from({ length: 19 }, (_, i) => i + 2);
 function defaultPasi() {
-  return PASI_LEVELS.map((lvl) => ({
+  return GH_FIXED_PASI_LEVELS.map((lvl) => ({
     level: lvl,
     assist1: "해당진행",
     assist_h_by_section: {},
@@ -624,13 +624,13 @@ const DEFAULT_STRATEGY_SETUP = {
   enabled: false,
   bet_type: "manual",
   step_min: 1,
-  step_max: 16,        // 조건부 P배열은 16칸(흰/파/빨 각 1~16)
+  step_max: 16,
   // 조건부 P배열: 흰색 하한/상한(%) 직접 입력. 파랑(0~lo-1)/빨강(hi+1~100)은 파생.
   cond_lo: 0,          // 흰색 하한 (% 이상)
   cond_hi: 100,        // 흰색 상한 (% 이하)
-  amounts_white: new Array(16).fill(0),
-  amounts_blue: new Array(16).fill(0),
-  amounts_red: new Array(16).fill(0),
+  amounts_white: new Array(GH_STRATEGY_MAX_STEP).fill(0),
+  amounts_blue: new Array(GH_STRATEGY_MAX_STEP).fill(0),
+  amounts_red: new Array(GH_STRATEGY_MAX_STEP).fill(0),
   // (구) 단일 amounts — 라보쉐르/하위호환 위해 유지
   amounts: new Array(20).fill(0),
   count: 10,
@@ -670,9 +670,9 @@ function defaultStrategySetup() {
   return {
     ...DEFAULT_STRATEGY_SETUP,
     amounts: new Array(20).fill(0),
-    amounts_white: new Array(16).fill(0),
-    amounts_blue: new Array(16).fill(0),
-    amounts_red: new Array(16).fill(0),
+    amounts_white: new Array(GH_STRATEGY_MAX_STEP).fill(0),
+    amounts_blue: new Array(GH_STRATEGY_MAX_STEP).fill(0),
+    amounts_red: new Array(GH_STRATEGY_MAX_STEP).fill(0),
     multi_sections: { A: true, AR: true, OLD: true, NEW: true },
     pasi: defaultPasi(),
     sequence: [],
@@ -959,12 +959,12 @@ export function GhConditionalAmountSetup({ name, strat, onChange }) {
   const groupKey = { white: "amounts_white", blue: "amounts_blue", red: "amounts_red" };
   const editP = (group, idx, val) => {
     const key = groupKey[group];
-    const arr = [...(s[key] || new Array(16).fill(0))];
+    const arr = [...(s[key] || new Array(GH_STRATEGY_MAX_STEP).fill(0))];
     arr[idx] = roundP1(val);
     onChange({ ...s, [key]: arr });
   };
-  const rows = (group, color, off = false) => [0, 1].map((half) => {
-    const arr = s[groupKey[group]] || new Array(16).fill(0);
+  const rows = (group, color, off = false) => Array.from({ length: Math.ceil(GH_STRATEGY_MAX_STEP / 8) }, (_, half) => {
+    const arr = s[groupKey[group]] || new Array(GH_STRATEGY_MAX_STEP).fill(0);
     const boundary = group === "blue"
       ? (half === 0 ? "0% 이상" : `${condLo}% 미만`)
       : group === "red"
@@ -973,13 +973,14 @@ export function GhConditionalAmountSetup({ name, strat, onChange }) {
     return (
       <tr key={`${group}-${half}`}>
         <td colSpan={2} style={{ ...mkCell, whiteSpace: "nowrap", color: off ? "#555" : color || "#fff" }}>
-          {group === "white" ? <><input type="number" min={0} max={100} value={half === 0 ? condLo : condHi} onChange={(event) => {
+          {half >= 2 ? null : group === "white" ? <><input type="number" min={0} max={100} value={half === 0 ? condLo : condHi} onChange={(event) => {
             const value = Math.max(0, Math.min(100, Number(event.target.value || 0)));
             onChange({ ...s, [half === 0 ? "cond_lo" : "cond_hi"]: value });
           }} style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />% {half === 0 ? "이상" : "이하"}</> : boundary}
         </td>
         {Array.from({ length: 8 }, (_, i) => {
           const idx = half * 8 + i;
+          if (idx >= GH_STRATEGY_MAX_STEP) return <td key={idx} style={mkEmpty}></td>;
           const active = idx + 1 >= stepMin && idx + 1 <= stepMax;
           return active ? <MkInput key={idx} value={arr[idx] || 0} onChange={(value) => editP(group, idx, value)} render={(value) => `${fmtP1(value)}P`} style={{ ...mkCell, cursor: "pointer", color: off ? "#555" : color || "#fff" }} /> : <td key={idx} style={mkEmpty}></td>;
         })}
@@ -992,9 +993,18 @@ export function GhConditionalAmountSetup({ name, strat, onChange }) {
         <tr><td style={mkRed}>{name}</td><td style={mkGreen}>사용함</td><td colSpan={8} style={mkMethod}>128개 NC 공통 조건부 배팅표</td></tr>
         <tr>
           <td style={mkBlue}>P설정</td><td style={mkGreen}>최저</td>
-          <MkInput value={stepMin} suffix="단계" range={[1, 16]} style={mkGreen} onChange={(value) => onChange({ ...s, step_min: Math.min(value, stepMax) })} />
+          <MkInput value={stepMin} suffix="단계" range={[1, GH_STRATEGY_MAX_STEP]} style={mkGreen} onChange={(value) => onChange({ ...s, step_min: Math.min(value, stepMax) })} />
           <td style={mkGreen}>최고</td>
-          <MkInput value={stepMax} suffix="단계" range={[1, 16]} style={mkGreen} onChange={(value) => onChange({ ...s, step_max: Math.max(value, stepMin) })} />
+          <MkInput value={stepMax} suffix="단계" range={[1, GH_STRATEGY_MAX_STEP]} style={mkGreen} onChange={(value) => {
+            const nextStepMax = Math.max(value, stepMin);
+            const upd = { ...s, step_max: nextStepMax };
+            if (s.bet_type === "martin" && nextStepMax > stepMax) {
+              Object.values(groupKey).forEach((key) => {
+                upd[key] = extendMartinAmounts(s[key], stepMax, nextStepMax);
+              });
+            }
+            onChange(upd);
+          }} />
           <td colSpan={5} style={mkCell}></td>
         </tr>
         {rows("white", null)}
@@ -1045,16 +1055,16 @@ function StrategySetupSection({ name, strat, onChange, variant, sections, target
   const setMethod = (t) => {
     if (t === "labouchere") {
       const seq = generateLabouchereSequence(s.target_man, count, s.dist_mode || "even");
-      const arr = new Array(16).fill(0);
-      seq.forEach((v, i) => { const idx = (stepMin - 1) + i; if (idx >= 0 && idx < 16) arr[idx] = v; });
+      const arr = new Array(GH_STRATEGY_MAX_STEP).fill(0);
+      seq.forEach((v, i) => { const idx = (stepMin - 1) + i; if (idx >= 0 && idx < GH_STRATEGY_MAX_STEP) arr[idx] = v; });
       onChange({ ...s, bet_type: t, amounts_white: arr, amounts_blue: [...arr], amounts_red: [...arr] });
     } else onChange({ ...s, bet_type: t });
   };
   const regenLab = (patch) => {
     const next = { ...s, ...patch };
     const seq = generateLabouchereSequence(next.target_man, next.count || count, next.dist_mode || "even");
-    const arr = new Array(16).fill(0);
-    seq.forEach((v, i) => { const idx = (next.step_min || stepMin) - 1 + i; if (idx >= 0 && idx < 16) arr[idx] = v; });
+    const arr = new Array(GH_STRATEGY_MAX_STEP).fill(0);
+    seq.forEach((v, i) => { const idx = (next.step_min || stepMin) - 1 + i; if (idx >= 0 && idx < GH_STRATEGY_MAX_STEP) arr[idx] = v; });
     onChange({ ...next, sequence: seq, amounts_white: arr, amounts_blue: [...arr], amounts_red: [...arr] });
   };
 
@@ -1062,25 +1072,25 @@ function StrategySetupSection({ name, strat, onChange, variant, sections, target
   const groupKey = { white: "amounts_white", blue: "amounts_blue", red: "amounts_red" };
   const editP = (group, idx, val) => {
     const key = groupKey[group];
-    const arr = [...(s[key] || new Array(16).fill(0))];
+    const arr = [...(s[key] || new Array(GH_STRATEGY_MAX_STEP).fill(0))];
     if (s.bet_type === "martin") {
-      for (let k = 0; k < 16; k++) arr[k] = Math.round(val * Math.pow(2, k - idx) * 10) / 10;
+      for (let k = 0; k < GH_STRATEGY_MAX_STEP; k++) arr[k] = Math.round(val * Math.pow(2, k - idx) * 10) / 10;
     } else arr[idx] = val;
     onChange({ ...s, [key]: arr });
   };
   const inRange = (step) => step >= stepMin && step <= stepMax;
   const pRender = (v) => `${fmtP1(v)}P`;
 
-  // 조건부 P배열 한 그룹(2줄: 1~8, 9~16) 렌더
+  // 조건부 P배열 한 그룹(8단계씩 렌더, 마지막 줄의 남는 칸은 비움)
   const condRows = (group, condLabel, condColor, off) => {
     const key = groupKey[group];
-    const arr = s[key] || new Array(16).fill(0);
+    const arr = s[key] || new Array(GH_STRATEGY_MAX_STEP).fill(0);
     const txtStyle = off ? mkCondOff : (condColor ? { color: condColor } : {});
-    return [0, 1].map((half) => (
+    return Array.from({ length: Math.ceil(GH_STRATEGY_MAX_STEP / 8) }, (_, half) => (
       <tr key={`${name}-${group}-${half}`} style={off ? { opacity: 1 } : undefined}>
         {/* 조건칸(colSpan2): half0=하한/이상, half1=상한/이하 */}
         <td colSpan={2} style={{ ...mkCell, whiteSpace: "nowrap", ...txtStyle }}>
-          {group === "white" ? (
+          {half >= 2 ? null : group === "white" ? (
             <>
               <input type="number" value={half === 0 ? condLo : condHi} min={0} max={100}
                 onChange={(e) => {
@@ -1097,8 +1107,9 @@ function StrategySetupSection({ name, strat, onChange, variant, sections, target
           )}
         </td>
         {Array.from({ length: 8 }, (_, i) => {
-          const idx = half * 8 + i;        // 1~8, 9~16
+          const idx = half * 8 + i;
           const step = idx + 1;
+          if (step > GH_STRATEGY_MAX_STEP) return <td key={idx} style={mkEmpty}></td>;
           // 최저~최고 단계 밖은 비활성(회색·입력불가). 칸은 시안처럼 그대로 보임.
           if (!inRange(step)) return <td key={idx} style={mkEmpty}></td>;
           const amt = arr[idx] || 0;
@@ -1225,15 +1236,20 @@ function StrategySetupSection({ name, strat, onChange, variant, sections, target
       <tr>
         <td style={mkBlue}>P설정</td>
         <td style={mkGreen}>최저</td>
-        <MkInput value={stepMin} suffix="단계" range={[1, 16]} style={mkGreen} onChange={(v) => {
+        <MkInput value={stepMin} suffix="단계" range={[1, GH_STRATEGY_MAX_STEP]} style={mkGreen} onChange={(v) => {
           const upd = { ...s, step_min: v };
           if (v > stepMax) upd.step_max = v;
           onChange(upd);
         }} />
         <td style={mkGreen}>최고</td>
-        <MkInput value={stepMax} suffix="단계" range={[1, 16]} style={mkGreen} onChange={(v) => {
+        <MkInput value={stepMax} suffix="단계" range={[1, GH_STRATEGY_MAX_STEP]} style={mkGreen} onChange={(v) => {
           const upd = { ...s, step_max: v, pasi: trimSixMAssistBundles(pasi, v) };
           if (v < stepMin) upd.step_min = v;
+          if (s.bet_type === "martin" && v > stepMax) {
+            Object.values(groupKey).forEach((key) => {
+              upd[key] = extendMartinAmounts(s[key], stepMax, v);
+            });
+          }
           onChange(upd);
         }} />
         <td style={mkCell}></td><td style={mkCell}></td><td style={mkCell}></td><td style={mkCell}></td><td style={mkCell}></td>
