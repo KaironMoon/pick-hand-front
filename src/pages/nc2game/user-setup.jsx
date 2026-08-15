@@ -26,12 +26,15 @@ const zoneTextCell = (base, group) => ({
   color: group.off ? "#666" : group.color,
 });
 const ASSIST_OPTIONS = ["회차진행", "6회쉬기", "6+6", "회차반대"];
+const NC2_MAX_BET_STEPS = 25;
+const AMOUNT_GRID_COLUMNS = 8;
+const AMOUNT_GRID_ROWS = Math.ceil(NC2_MAX_BET_STEPS / AMOUNT_GRID_COLUMNS);
 const ZZZ_POINT_OPTIONS = Array.from({ length: 13 }, (_, index) => Math.round((index + 1) * 2) / 10);
 const ZZZ_RANDOM_COUNT_OPTIONS = [32, 64, 96, 128];
 const DEFAULT_MARTIN_ZZZ = {
   enabled: false, budget: 0, bet_type: "martin", step_min: 1, step_max: 20,
-  amounts: Array(20).fill(0), cond_lo: 0, cond_hi: 100,
-  amounts_blue: Array(20).fill(0), amounts_white: Array(20).fill(0), amounts_red: Array(20).fill(0),
+  amounts: Array(NC2_MAX_BET_STEPS).fill(0), cond_lo: 0, cond_hi: 100,
+  amounts_blue: Array(NC2_MAX_BET_STEPS).fill(0), amounts_white: Array(NC2_MAX_BET_STEPS).fill(0), amounts_red: Array(NC2_MAX_BET_STEPS).fill(0),
   trigger_points: [], loss_trigger_streak: 4, loss4_extra_points: [],
   reference_count: 128, reference_game_seqs: [], use_zzz1_nc: false,
 };
@@ -53,9 +56,9 @@ function Nc2SelectCell({ value, options, onChange, style = cell, format = (optio
   </select></td>;
 }
 
-function Nc2SetupTable({ config, onChange }) {
+function Nc2SetupTable({ config, onChange, label = "NC2" }) {
   const min = Number(config.step_min || 1);
-  const max = Math.min(20, Number(config.step_max || 16));
+  const max = Math.min(NC2_MAX_BET_STEPS, Number(config.step_max || 16));
   const lo = Number(config.cond_lo ?? 0);
   const hi = Number(config.cond_hi ?? 100);
   const betType = config.bet_type || "manual";
@@ -70,7 +73,7 @@ function Nc2SetupTable({ config, onChange }) {
     onChange({ ...config, assist_rules: next });
   };
   const updateStepMax = (value) => {
-    const stepMax = Math.min(20, Math.max(value, min));
+    const stepMax = Math.min(NC2_MAX_BET_STEPS, Math.max(value, min));
     onChange({ ...config, step_max: stepMax, assist_rules: assistRules });
   };
   const groups = [
@@ -80,9 +83,9 @@ function Nc2SetupTable({ config, onChange }) {
   ];
   const updateAmount = (key, index, value) => {
     const field = `amounts_${key}`;
-    const amounts = [...(config[field] || Array(20).fill(0)), ...Array(20).fill(0)].slice(0, 20);
+    const amounts = [...(config[field] || Array(NC2_MAX_BET_STEPS).fill(0)), ...Array(NC2_MAX_BET_STEPS).fill(0)].slice(0, NC2_MAX_BET_STEPS);
     if (betType === "martin") {
-      for (let step = 0; step < 20; step += 1) amounts[step] = Math.max(0, Math.round(value * (2 ** (step - index)) * 10) / 10);
+      for (let step = 0; step < NC2_MAX_BET_STEPS; step += 1) amounts[step] = Math.max(0, Math.round(value * (2 ** (step - index)) * 10) / 10);
     } else {
       amounts[index] = Math.max(0, value);
     }
@@ -90,7 +93,7 @@ function Nc2SetupTable({ config, onChange }) {
   };
   return <table style={{ borderCollapse: "collapse", minWidth: 840, color: "#fff" }}><tbody>
     <tr>
-      <td style={red}>NC2</td>
+      <td style={red}>{label}</td>
       <td style={config.enabled !== false ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...config, enabled: config.enabled === false })}>{config.enabled !== false ? "사용함" : "사용안함"}</td>
       {betTypes.map(([value, label]) => <td key={value} style={betType === value ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...config, bet_type: value })}>{label}</td>)}
       <Nc2Input value={Number(config.count || 10)} integer suffix="개" style={betType === "labouchere" ? cell : disabled} disabled={betType !== "labouchere"} onChange={(value) => onChange({ ...config, count: Math.max(1, Math.min(16, value)) })} />
@@ -100,9 +103,9 @@ function Nc2SetupTable({ config, onChange }) {
       <td style={blue}>P설정</td><td style={green}>최저</td><Nc2Input value={min} integer suffix="단계" style={green} onChange={(value) => onChange({ ...config, step_min: Math.max(1, Math.min(value, max)) })} /><td style={green}>최고</td><Nc2Input value={max} integer suffix="단계" style={green} onChange={updateStepMax} />
       <td colSpan={5} style={cell}></td>
     </tr>
-    {groups.flatMap((group) => [0, 1, 2].map((part) => <tr key={`${group.key}-${part}`}>
+    {groups.flatMap((group) => Array.from({ length: AMOUNT_GRID_ROWS }, (_, part) => <tr key={`${group.key}-${part}`}>
       <td colSpan={2} style={{ ...cell, color: group.off ? "#666" : group.color }}>{group.key === "white" && part < 2 ? <><input type="number" min={0} max={100} value={part === 0 ? lo : hi} onChange={(event) => onChange({ ...config, [part === 0 ? "cond_lo" : "cond_hi"]: Math.max(0, Math.min(100, Number(event.target.value || 0))) })} style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />% {part === 0 ? "이상" : "이하"}</> : group.labels[part] || ""}</td>
-      {Array.from({ length: 8 }, (_, offset) => { const index = part * 8 + offset; if (index >= 20) return <td key={index} style={empty}></td>; const active = index + 1 >= min && index + 1 <= max; return active ? <Nc2Input key={index} value={(config[`amounts_${group.key}`] || [])[index] || 0} suffix="P" style={{ ...cell, color: group.off ? "#666" : group.color }} onChange={(value) => updateAmount(group.key, index, value)} /> : <td key={index} style={empty}></td>; })}
+      {Array.from({ length: AMOUNT_GRID_COLUMNS }, (_, offset) => { const index = part * AMOUNT_GRID_COLUMNS + offset; if (index >= NC2_MAX_BET_STEPS) return <td key={index} style={empty}></td>; const active = index + 1 >= min && index + 1 <= max; return active ? <Nc2Input key={index} value={(config[`amounts_${group.key}`] || [])[index] || 0} suffix="P" style={{ ...cell, color: group.off ? "#666" : group.color }} onChange={(value) => updateAmount(group.key, index, value)} /> : <td key={index} style={empty}></td>; })}
     </tr>))}
     <tr><td colSpan={10} style={topCondition}>최상위조건설정</td></tr>
     {assistRows.map((rules, rowIndex) => <tr key={`assist-${rowIndex}`}>
@@ -123,9 +126,9 @@ function Nc2SetupTable({ config, onChange }) {
 function MartinZSetupTable({ martin, onChange }) {
   const enabled = !!martin.enabled;
   const min = Math.max(1, Number(martin.step_min || 1));
-  const max = Math.min(20, Math.max(min, Number(martin.step_max || 20)));
+  const max = Math.min(NC2_MAX_BET_STEPS, Math.max(min, Number(martin.step_max || 20)));
   const betType = martin.bet_type || "martin";
-  const amounts = [...(martin.amounts || []), ...Array(20).fill(0)].slice(0, 20);
+  const amounts = [...(martin.amounts || []), ...Array(NC2_MAX_BET_STEPS).fill(0)].slice(0, NC2_MAX_BET_STEPS);
   const betTypes = [["martin", "마틴"], ["kkangbet", "깡벳"], ["fixed", "고정벳"], ["manual", "수동"], ["cruise", "크루즈"]];
   const updateAmount = (index, value) => {
     const next = [...amounts];
@@ -154,13 +157,13 @@ function MartinZSetupTable({ martin, onChange }) {
     </tr>
     <tr>
       <td style={blue}>단계설정</td><td style={green}>최저</td>
-      <Nc2Input value={min} integer suffix="단계" style={green} onChange={(value) => onChange({ ...martin, step_min: Math.max(1, Math.min(20, Math.min(value, max))) })} />
+      <Nc2Input value={min} integer suffix="단계" style={green} onChange={(value) => onChange({ ...martin, step_min: Math.max(1, Math.min(NC2_MAX_BET_STEPS, Math.min(value, max))) })} />
       <td style={green}>최고</td>
-      <Nc2Input value={max} integer suffix="단계" style={green} onChange={(value) => onChange({ ...martin, step_max: Math.max(min, Math.min(20, value)) })} />
+      <Nc2Input value={max} integer suffix="단계" style={green} onChange={(value) => onChange({ ...martin, step_max: Math.max(min, Math.min(NC2_MAX_BET_STEPS, value)) })} />
       <td style={cell}></td>
     </tr>
-    {Array.from({ length: 4 }, (_, row) => <tr key={`martin-z-${row}`}>
-      {row === 0 && <td rowSpan={4} style={blue}>금액설정</td>}
+    {Array.from({ length: 5 }, (_, row) => <tr key={`martin-z-${row}`}>
+      {row === 0 && <td rowSpan={5} style={blue}>금액설정</td>}
       {Array.from({ length: 5 }, (_, offset) => {
         const index = row * 5 + offset;
         const step = index + 1;
@@ -184,7 +187,7 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
   };
   const enabled = !!value.enabled;
   const min = Math.max(1, Number(value.step_min || 1));
-  const max = Math.min(20, Math.max(min, Number(value.step_max || 20)));
+  const max = Math.min(NC2_MAX_BET_STEPS, Math.max(min, Number(value.step_max || 20)));
   const lo = Number(value.cond_lo ?? DEFAULT_MARTIN_ZZZ.cond_lo);
   const hi = Number(value.cond_hi ?? DEFAULT_MARTIN_ZZZ.cond_hi);
   const sharesZzz1Nc = index > 0 && !!value.use_zzz1_nc;
@@ -211,7 +214,7 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
   };
   const updateAmount = (zone, index, amount) => {
     const key = `amounts_${zone}`;
-    const amounts = [...(value[key] || []), ...Array(20).fill(0)].slice(0, 20);
+    const amounts = [...(value[key] || []), ...Array(NC2_MAX_BET_STEPS).fill(0)].slice(0, NC2_MAX_BET_STEPS);
     const next = [...amounts];
     next[index] = Math.max(0, Math.round(amount * 10) / 10);
     if (value.bet_type === "martin" || value.bet_type === "kkangbet") {
@@ -265,16 +268,16 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
           <td style={blue}>단계설정</td><td style={green}>최저</td>
           <Nc2Input value={min} integer suffix="단계" style={green} onChange={(step_min) => onChange({ ...value, step_min: Math.max(1, Math.min(step_min, max)) })} />
           <td style={green}>최고</td>
-          <Nc2Input value={max} integer suffix="단계" style={green} onChange={(step_max) => onChange({ ...value, step_max: Math.max(min, Math.min(20, step_max)) })} />
+          <Nc2Input value={max} integer suffix="단계" style={green} onChange={(step_max) => onChange({ ...value, step_max: Math.max(min, Math.min(NC2_MAX_BET_STEPS, step_max)) })} />
           <td colSpan={5} style={empty}></td>
         </tr>
-        {amountGroups.flatMap((group) => Array.from({ length: 3 }, (_, row) => <tr key={`zzz-${group.key}-${row}`}>
+        {amountGroups.flatMap((group) => Array.from({ length: AMOUNT_GRID_ROWS }, (_, row) => <tr key={`zzz-${group.key}-${row}`}>
           <td colSpan={2} style={zoneTextCell(cell, group)}>
             {group.key === "white" && row < 2 ? <><input type="number" min={0} max={100} value={row === 0 ? lo : hi} onChange={(event) => onChange({ ...value, [row === 0 ? "cond_lo" : "cond_hi"]: Math.max(0, Math.min(100, Number(event.target.value || 0))) })} style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />% {row === 0 ? "이상" : "이하"}</> : group.labels?.[row] || ""}
           </td>
-          {Array.from({ length: 8 }, (__, offset) => {
-            const index = row * 8 + offset;
-            if (index >= 20) return <td key={index} style={zoneTextCell(empty, group)}></td>;
+          {Array.from({ length: AMOUNT_GRID_COLUMNS }, (__, offset) => {
+            const index = row * AMOUNT_GRID_COLUMNS + offset;
+            if (index >= NC2_MAX_BET_STEPS) return <td key={index} style={zoneTextCell(empty, group)}></td>;
             const active = index + 1 >= min && index + 1 <= max;
             const amounts = value[`amounts_${group.key}`] || [];
             return <Nc2Input key={index} value={active ? amounts[index] : 0} suffix="P" style={zoneTextCell(active ? cell : empty, group)} disabled={!active} onChange={(amount) => updateAmount(group.key, index, amount)} />;
@@ -342,6 +345,10 @@ export default function Nc2UserSetupPage() {
       use_zzz1_nc: index > 0 && (saved?.use_zzz1_nc ?? true),
     };
   });
+  const nc2Setups = Array.from({ length: 6 }, (_, index) => {
+    const saved = Array.isArray(config?.nc2_setups) ? config.nc2_setups[index] : null;
+    return saved || config || {};
+  });
 
   useEffect(() => {
     apiCaller.get(USER_BET_SETTINGS_API.GET("nc2"))
@@ -365,6 +372,12 @@ export default function Nc2UserSetupPage() {
     martin_zzzs: nextZzzs,
     martin_zzz: nextZzzs[0],
   });
+
+  const updateNc2Setup = (index, nextSetup) => {
+    const nextSetups = nc2Setups.map((setup) => ({ ...setup }));
+    nextSetups[index] = nextSetup;
+    updateConfig({ ...config, nc2_setups: nextSetups });
+  };
 
   const randomizeZzzReferences = async (index, count) => {
     setReferenceBusy(true); setError("");
@@ -410,7 +423,12 @@ export default function Nc2UserSetupPage() {
         const validation = await apiCaller.post(NC2_GAMES_API.REFERENCE_VALIDATE, { game_seqs: gameSeqs });
         validatedZzzs[index] = { ...zzz, reference_count: validation.data.count, reference_game_seqs: validation.data.game_seqs };
       }
-      const nextConfig = { ...config, martin_zzzs: validatedZzzs, martin_zzz: validatedZzzs[0] };
+      const nextConfig = {
+        ...config,
+        nc2_setups: nc2Setups,
+        martin_zzzs: validatedZzzs,
+        martin_zzz: validatedZzzs[0],
+      };
       const response = await apiCaller.put(USER_BET_SETTINGS_API.SAVE("nc2"), { config: nextConfig });
       setConfig(response.data.config);
       setDirty(false);
@@ -475,12 +493,16 @@ export default function Nc2UserSetupPage() {
           <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>{item.help}</Typography>
         </Box>)}
       </Box>
-      <Box sx={{ overflowX: "auto", pb: 2 }}>
-        <Nc2SetupTable config={config} onChange={updateConfig} />
-      </Box>
+      {nc2Setups.map((setup, index) => <Box key={`nc2-s${index + 1}`} sx={{ overflowX: "auto", pb: 2 }}>
+        <Nc2SetupTable
+          config={setup}
+          label={`NC2 S${index + 1}`}
+          onChange={(nextSetup) => updateNc2Setup(index, nextSetup)}
+        />
+      </Box>)}
       <Box sx={{ overflowX: "auto", pb: 2 }}>
         <MartinZSetupTable
-          martin={config.martin_z || { enabled: false, budget: 0, bet_type: "martin", step_min: 1, step_max: 20, amounts: Array(20).fill(0) }}
+          martin={config.martin_z || { enabled: false, budget: 0, bet_type: "martin", step_min: 1, step_max: 20, amounts: Array(NC2_MAX_BET_STEPS).fill(0) }}
           onChange={(martin_z) => updateConfig({ ...config, martin_z })}
         />
       </Box>

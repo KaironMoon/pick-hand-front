@@ -16,6 +16,7 @@ import { nc2ItemWinLimitLabel } from "./game-setting-label.js";
 import { nc2ItemNumberStyle } from "./item-end-style.js";
 import { clearNc2KeepCombination, loadNc2KeepCombination, saveNc2KeepCombination } from "./keep-combination.js";
 import { createGameResponseGuard } from "./game-response-guard.js";
+import { isNc2ReferenceFixedOpen } from "./reference-sections.js";
 import { nc2SetupPath } from "./slot-navigation.js";
 import { NC2_GAMES_API } from "@/constants/api-url";
 import {
@@ -312,6 +313,11 @@ function MartinZzzReferenceGrid({ zzz, roundNum }) {
 
 function Nc2ReferenceSections({ state, zzzs }) {
   const [selected, setSelected] = useState({});
+  if (isNc2ReferenceFixedOpen(zzzs)) {
+    return <Box sx={{ mb: 2, backgroundColor: "#000", p: 1, overflowX: "auto" }}>
+      <Nc2Grid state={state} />
+    </Box>;
+  }
   const sections = [
     ...zzzs.map((zzz) => ({ id: `zzz-${zzz.index}`, label: `ZZZ${zzz.index} NC`, zzz })),
     { id: "existing-nc", label: "기존 NC" },

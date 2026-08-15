@@ -1,4 +1,4 @@
-export const FIXED_NC2_ASSIST_PASI = Array.from({ length: 19 }, (_, index) => index + 2);
+export const FIXED_NC2_ASSIST_PASI = Array.from({ length: 24 }, (_, index) => index + 2);
 
 export function buildFixedNc2AssistRules(savedRules) {
   const savedAssistByPasi = new Map(
@@ -18,13 +18,11 @@ export function visibleNc2AssistRows(rules, stepMax) {
       .filter((rule) => rule.pasi <= highestPasi)
       .map((rule) => [rule.pasi, rule]),
   );
-  const columns = [
-    FIXED_NC2_ASSIST_PASI.slice(0, 5),
-    FIXED_NC2_ASSIST_PASI.slice(5, 10),
-    FIXED_NC2_ASSIST_PASI.slice(10, 15),
-    FIXED_NC2_ASSIST_PASI.slice(15, 19),
-  ];
-  const rows = Array.from({ length: 5 }, (_, row) =>
+  const columnSize = Math.ceil(FIXED_NC2_ASSIST_PASI.length / 4);
+  const columns = Array.from({ length: 4 }, (_, column) => (
+    FIXED_NC2_ASSIST_PASI.slice(column * columnSize, (column + 1) * columnSize)
+  ));
+  const rows = Array.from({ length: columnSize }, (_, row) =>
     columns.map((column) => visibleByPasi.get(column[row]) || null));
   while (rows.length > 1 && rows.at(-1).every((rule) => rule == null)) rows.pop();
   return rows;
