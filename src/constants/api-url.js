@@ -93,6 +93,7 @@ const NC2_GAMES_API = {
   SLOTS: "/api/v1/nc2/games/slots",
   SLOT_CLOSE: (slotNo) => `/api/v1/nc2/games/slots/${slotNo}/close`,
   LAST_ACTIVE: "/api/v1/nc2/games/last-active",
+  LAST_ROUND: (id) => `/api/v1/nc2/games/${id}/last-round`,
   STATE: (id) => `/api/v1/nc2/games/${id}/state`,
   END: (id) => `/api/v1/nc2/games/${id}/end`,
   REPLAY: (id) => `/api/v1/nc2/games/${id}/replay`,

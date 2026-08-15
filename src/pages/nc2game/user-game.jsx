@@ -218,6 +218,132 @@ function Nc2Grid({ state }) {
   );
 }
 
+function MartinZzzBoard({ zzz, actuals, roundHistory }) {
+  const historyByRound = new Map((roundHistory || []).map((entry) => [Number(entry.round_num), entry]));
+  const currentRound = Math.min(59, String(actuals || "").length);
+  const statusItems = [
+    ["P/B", `${zzz.p_count || 0}/${zzz.b_count || 0}`],
+    ["판정", `${Number(zzz.point || 0).toFixed(1)}P`],
+    ["방향", zzz.direction || "-"],
+    ["단계", `${zzz.step || 1}단계`],
+    ["승률", zzz.rate == null ? "-" : `${Number(zzz.rate).toFixed(1)}% (${zzz.hit || 0}/${zzz.total || 0})`],
+    ["구간", { white: "흰색", blue: "파란색", red: "빨간색" }[zzz.zone] || "흰색"],
+    ["금액", `${Number(zzz.amount || 0).toFixed(1)}P`],
+    ["연패", `${zzz.loss_streak || 0}연패`],
+    ["손익", `${Number(zzz.pnl || 0).toFixed(1)}P`],
+  ];
+  const componentForRound = (roundIndex) => {
+    if (roundIndex === String(actuals || "").length) {
+      return {
+        direction: zzz.direction,
+        amount: zzz.amount || 0,
+        point: zzz.point || 0,
+        matched: !!zzz.matched,
+      };
+    }
+    return (historyByRound.get(roundIndex + 1)?.zzz_components || []).find(
+      (item) => Number(item.index) === Number(zzz.index),
+    );
+  };
+  return <Box sx={{ mb: 1.5, border: "1px solid #7e57c2", backgroundColor: "#120d1b" }}>
+    <Box sx={{ display: "flex", flexWrap: "wrap" }}>
+      <Box sx={{ px: 1.2, py: .6, backgroundColor: "#7b1fa2", fontSize: 11, fontWeight: 900 }}>{zzz.name || `마틴 ZZZ ${zzz.index}`}</Box>
+      {statusItems.map(([label, value]) => <Box key={label} sx={{ px: 1.2, py: .6, borderLeft: "1px solid #4a3d5f", fontSize: 11 }}><Box component="span" sx={{ color: "#aaa", mr: .6 }}>{label}</Box><Box component="span" sx={{ color: label === "금액" || label === "손익" ? "#00e676" : "#fff", fontWeight: 900 }}>{value}</Box></Box>)}
+    </Box>
+    <Box sx={{ overflowX: "auto", borderTop: "1px solid #4a3d5f" }}>
+      <Box component="table" sx={{ borderCollapse: "collapse", tableLayout: "fixed", minWidth: 1920, fontSize: 10 }}><tbody>
+      <tr>
+        <Box component="th" sx={{ position: "sticky", left: 0, zIndex: 2, width: 64, minWidth: 64, backgroundColor: "#251832", borderRight: "1px solid #4a3d5f", borderBottom: "1px solid #4a3d5f", lineHeight: 1.1 }}>NC금액<br />합계</Box>
+        {Array.from({ length: 60 }, (_, roundIndex) => {
+          const component = componentForRound(roundIndex);
+          const direction = component?.direction;
+          return <Box component="td" key={roundIndex} sx={{ width: 31, minWidth: 31, height: 24, textAlign: "center", borderRight: roundIndex === currentRound ? "2px solid #ffb300" : "1px solid #4a3d5f", borderBottom: "1px solid #4a3d5f", color: direction === "P" ? "#42a5f5" : direction === "B" ? "#ef5350" : "#777", fontWeight: 900 }}>{component ? Number(component.point || 0).toFixed(1) : ""}</Box>;
+        })}
+      </tr>
+      <tr>
+        <Box component="th" sx={{ position: "sticky", left: 0, zIndex: 2, width: 64, minWidth: 64, backgroundColor: "#251832", borderRight: "1px solid #4a3d5f" }}>ZZZ픽</Box>
+        {Array.from({ length: 60 }, (_, roundIndex) => {
+          const component = componentForRound(roundIndex);
+          const direction = component?.matched ? component?.direction : null;
+          const actual = String(actuals || "")[roundIndex];
+          const status = actual && direction ? (actual === direction ? "hit" : "miss") : null;
+          return <Box component="td" key={roundIndex} sx={{ width: 31, minWidth: 31, height: 30, textAlign: "center", borderRight: roundIndex === currentRound ? "2px solid #ffb300" : "1px solid #4a3d5f", backgroundColor: status === "hit" ? resultCellColor.hit : status === "miss" ? resultCellColor.miss : "transparent" }} title={component ? `${Number(component.amount || 0).toFixed(1)}P` : "배팅 없음"}><Box sx={{ display: "flex", justifyContent: "center" }}><PickChip value={direction} /></Box></Box>;
+        })}
+      </tr></tbody></Box>
+    </Box>
+  </Box>;
+}
+
+function MartinZzzReferenceGrid({ zzz, roundNum }) {
+  const progressRoundIndex = Number(roundNum || 0) < 60 ? Number(roundNum || 0) : -1;
+  const roundCellSx = (roundIndex) => {
+    const isProgress = roundIndex === progressRoundIndex;
+    return {
+      width: 31,
+      minWidth: 31,
+      height: 26,
+      textAlign: "center",
+      borderRight: isProgress ? "2px solid #ffb300" : "1px solid #4a3d5f",
+      borderLeft: isProgress ? "2px solid #ffb300" : undefined,
+      borderBottom: "1px solid #4a3d5f",
+      backgroundColor: isProgress ? "rgba(255,193,7,.13)" : "transparent",
+    };
+  };
+  return <Box sx={{ mb: 1.5, border: "1px solid #7e57c2", backgroundColor: "#120d1b" }}>
+    <Box sx={{ px: 1.2, py: .6, backgroundColor: "#7b1fa2", fontSize: 11, fontWeight: 900 }}>{`마틴 ZZZ ${zzz.index} 기준 NC (${zzz.reference_game_seqs?.length || 0})`}</Box>
+    <Box sx={{ overflow: "auto", maxHeight: "42vh", borderTop: "1px solid #4a3d5f" }}>
+      <Box component="table" sx={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", minWidth: 1980, fontSize: 10 }}>
+        <thead><tr>
+          <Box component="th" sx={{ position: "sticky", top: 0, left: 0, zIndex: 3, width: 62, minWidth: 62, height: 28, backgroundColor: "#251832", borderRight: "1px solid #4a3d5f", borderBottom: "1px solid #4a3d5f" }}>NC</Box>
+          {Array.from({ length: 60 }, (_, roundIndex) => {
+            const isProgress = roundIndex === progressRoundIndex;
+            return <Box component="th" key={roundIndex} sx={{ ...roundCellSx(roundIndex), position: "sticky", top: 0, zIndex: 2, backgroundColor: isProgress ? "#6d4c00" : "#251832", color: isProgress ? "#fff59d" : "#ddd", boxShadow: isProgress ? "inset 0 0 8px rgba(255,193,7,.45)" : "none" }}>{isProgress ? `▶${roundIndex + 1}` : roundIndex + 1}</Box>;
+          })}
+        </tr></thead>
+        <tbody>
+        {(zzz.refs || []).map((ref, refIndex) => <tr key={ref.game_seq}>
+          <Box component="td" sx={{ position: "sticky", left: 0, zIndex: 1, width: 62, minWidth: 62, textAlign: "center", backgroundColor: "#18121f", borderRight: "1px solid #4a3d5f", borderBottom: "1px solid #4a3d5f" }}>{ref.game_seq || refIndex + 1}</Box>
+          {Array.from({ length: 60 }, (_, roundIndex) => <Box component="td" key={roundIndex} sx={roundCellSx(roundIndex)}><Box sx={{ display: "flex", justifyContent: "center" }}><PickChip value={ref.shoes?.[roundIndex]} /></Box></Box>)}
+        </tr>)}
+      </tbody></Box>
+    </Box>
+  </Box>;
+}
+
+function Nc2ReferenceSections({ state, zzzs }) {
+  const [selected, setSelected] = useState({});
+  const sections = [
+    ...zzzs.map((zzz) => ({ id: `zzz-${zzz.index}`, label: `ZZZ${zzz.index} NC`, zzz })),
+    { id: "existing-nc", label: "기존 NC" },
+  ];
+  const toggle = (id) => setSelected((previous) => ({ ...previous, [id]: !previous[id] }));
+  return <Box sx={{ mb: 2, backgroundColor: "#000", p: 1, overflowX: "auto" }}>
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: .75, mb: 1 }}>
+      {sections.map((section) => <Box
+        key={section.id}
+        component="button"
+        type="button"
+        onClick={() => toggle(section.id)}
+        style={{
+          border: selected[section.id] ? "1px solid #00e676" : "1px solid #555",
+          borderRadius: 4,
+          background: selected[section.id] ? "#14351f" : "#1b1b1b",
+          color: selected[section.id] ? "#fff" : "#bbb",
+          padding: "4px 9px",
+          fontSize: 12,
+          cursor: "pointer",
+        }}
+      >{section.label}</Box>)}
+    </Box>
+    {!sections.some((section) => selected[section.id]) && <Box sx={{ color: "#777", fontSize: 12, py: 1 }}>표시할 NC 판을 선택하세요.</Box>}
+    {sections.map((section) => selected[section.id]
+      ? section.zzz
+        ? <MartinZzzReferenceGrid key={section.id} zzz={section.zzz} roundNum={state?.round_num} />
+        : <Nc2Grid key={section.id} state={state} />
+      : null)}
+  </Box>;
+}
+
 export default function Nc2UserGamePage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -656,6 +782,21 @@ export default function Nc2UserGamePage() {
     finally { setLoading(false); }
   };
 
+  const deleteLastRound = async () => {
+    if (!game?.game_id || loading || replay.active || autoStatus.running || Number(state?.round_num || 0) <= 0) return;
+    setLoading(true); setError("");
+    const ticket = gameResponseGuardRef.current.begin(game.game_id);
+    try {
+      const response = await apiCaller.delete(NC2_GAMES_API.LAST_ROUND(game.game_id));
+      if (gameResponseGuardRef.current.canApply(ticket)) applyGame(response.data);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(detail?.error === "auto_running_stop_first"
+        ? "오토를 먼저 정지해야 마지막 회차를 삭제할 수 있습니다."
+        : typeof detail === "string" ? detail : "마지막 회차 삭제 실패");
+    } finally { setLoading(false); }
+  };
+
   const newGame = async () => {
     if (!selectedSlotNo || slotBusyRef.current || loading) return;
     slotBusyRef.current = true;
@@ -862,6 +1003,7 @@ export default function Nc2UserGamePage() {
   const pCount = [...String(state?.actuals || "")].filter((value) => value === "P").length;
   const bCount = Number(state?.round_num || 0) - pCount;
   const inputLocked = !game || loading || replay.active;
+  const deleteDisabled = inputLocked || autoStatus.running || Number(state?.round_num || 0) <= 0;
   const occupiedSlotCount = gameSlots.filter((slot) => slot.occupied).length;
   const endDisabled = loading || slotBusy || autoStatus.running || replay.active
     || !game?.game_id || !selectedSlotNo || selectedSlotNo === 1 || occupiedSlotCount <= 1;
@@ -968,7 +1110,27 @@ export default function Nc2UserGamePage() {
             <Box sx={{ ...panelSx, width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>{pCount}</Box>
             <Box sx={pbSx("#f44336")} onClick={() => !inputLocked && record("B")}>B</Box>
             <Box sx={{ ...panelSx, width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900 }}>{bCount}</Box>
-            <Box sx={{ ...panelSx, px: 1.5, height: 40, display: "flex", alignItems: "center", color: "#666" }}>del</Box>
+            <Box
+              role="button"
+              tabIndex={deleteDisabled ? undefined : 0}
+              title={autoStatus.running ? "오토를 먼저 정지해주세요" : deleteDisabled ? "삭제할 회차가 없습니다" : "마지막 회차 삭제"}
+              onClick={deleteDisabled ? undefined : deleteLastRound}
+              onKeyDown={deleteDisabled ? undefined : (event) => {
+                if (event.key === "Enter" || event.key === " ") deleteLastRound();
+              }}
+              sx={{
+                ...panelSx,
+                px: 1.5,
+                height: 40,
+                display: "flex",
+                alignItems: "center",
+                color: deleteDisabled ? "#666" : "#fff",
+                cursor: deleteDisabled ? "not-allowed" : "pointer",
+                opacity: deleteDisabled ? .45 : 1,
+                "&:hover": deleteDisabled ? undefined : { borderColor: "#f44336", color: "#ff8a80" },
+                "&:active": deleteDisabled ? undefined : { transform: "scale(.96)" },
+              }}
+            >del</Box>
           </Box>
           <Nc2BettingSummaryPanel
             roundState={ghRoundState}
@@ -981,26 +1143,6 @@ export default function Nc2UserGamePage() {
             disabled={!game || replay.active}
           />
         </Box>
-
-        {state?.martin_zzz?.enabled && (() => {
-          const zzz = state.martin_zzz;
-          const statusItems = [
-            ["P/B", `${zzz.p_count || 0}/${zzz.b_count || 0}`],
-            ["판정", `${Number(zzz.point || 0).toFixed(1)}P`],
-            ["방향", zzz.direction || "-"],
-            ["조건", zzz.matched ? (zzz.match_type === "loss4_extra" ? `${zzz.loss_trigger_streak || 4}연패 추가` : "기본") : "불일치"],
-            ["단계", `${zzz.step || 1}단계`],
-            ["승률", zzz.rate == null ? "-" : `${Number(zzz.rate).toFixed(1)}% (${zzz.hit || 0}/${zzz.total || 0})`],
-            ["구간", { white: "흰색", blue: "파란색", red: "빨간색" }[zzz.zone] || "흰색"],
-            ["ZZZ금액", `${Number(zzz.amount || 0).toFixed(1)}P`],
-            ["연패", `${zzz.loss_streak || 0}연패`],
-            ["NC", `${zzz.reference_game_seqs?.length || 0}개`],
-          ];
-          return <Box sx={{ display: "flex", flexWrap: "wrap", border: "1px solid #7e57c2", backgroundColor: "#120d1b", mb: 1 }}>
-            <Box sx={{ px: 1.2, py: .6, backgroundColor: "#7b1fa2", fontSize: 11, fontWeight: 900 }}>마틴 ZZZ</Box>
-            {statusItems.map(([label, value]) => <Box key={label} sx={{ px: 1.2, py: .6, borderLeft: "1px solid #4a3d5f", fontSize: 11 }}><Box component="span" sx={{ color: "#aaa", mr: .6 }}>{label}</Box><Box component="span" sx={{ color: label === "ZZZ금액" ? "#00e676" : "#fff", fontWeight: 900 }}>{value}</Box></Box>)}
-          </Box>;
-        })()}
 
         <Nc2RoundAmountTable
           roundState={ghRoundState}
@@ -1057,7 +1199,16 @@ export default function Nc2UserGamePage() {
       </Box>}
 
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
-      {state && <Nc2Grid state={state} />}
+      {(state?.martin_zzzs || []).filter((zzz) => zzz?.enabled).map((zzz) => <MartinZzzBoard
+        key={zzz.index}
+        zzz={zzz}
+        actuals={state.actuals}
+        roundHistory={state.round_history}
+      />)}
+      {state && <Nc2ReferenceSections
+        state={state}
+        zzzs={(state.martin_zzzs || []).filter((zzz) => zzz?.enabled)}
+      />}
 
       <Dialog
         open={overallStopDialog.open}

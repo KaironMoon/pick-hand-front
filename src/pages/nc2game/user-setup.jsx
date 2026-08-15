@@ -21,15 +21,21 @@ const method = { ...cell, cursor: "pointer", userSelect: "none" };
 const disabled = { ...cell, opacity: .3 };
 const empty = { ...cell, background: "#0a0a0a" };
 const topCondition = { ...cell, background: "#17365e", color: "#0065fe", fontWeight: "bold" };
+const zoneTextCell = (base, group) => ({
+  ...base,
+  color: group.off ? "#666" : group.color,
+});
 const ASSIST_OPTIONS = ["회차진행", "6회쉬기", "6+6", "회차반대"];
 const ZZZ_POINT_OPTIONS = Array.from({ length: 13 }, (_, index) => Math.round((index + 1) * 2) / 10);
+const ZZZ_RANDOM_COUNT_OPTIONS = [32, 64, 96, 128];
 const DEFAULT_MARTIN_ZZZ = {
   enabled: false, budget: 0, bet_type: "martin", step_min: 1, step_max: 20,
-  amounts: Array(20).fill(0), cond_lo: 40, cond_hi: 60,
+  amounts: Array(20).fill(0), cond_lo: 0, cond_hi: 100,
   amounts_blue: Array(20).fill(0), amounts_white: Array(20).fill(0), amounts_red: Array(20).fill(0),
   trigger_points: [], loss_trigger_streak: 4, loss4_extra_points: [],
-  reference_count: 128, reference_game_seqs: [],
+  reference_count: 128, reference_game_seqs: [], use_zzz1_nc: false,
 };
+const MARTIN_ZZZ_COUNT = 5;
 
 function Nc2Input({ value, onChange, prefix = "", suffix = "", integer = false, style = cell, disabled: inputDisabled = false }) {
   const [editing, setEditing] = useState(false);
@@ -165,7 +171,7 @@ function MartinZSetupTable({ martin, onChange }) {
   </tbody></table>;
 }
 
-function MartinZZZSetupTable({ martin, onChange, onRandom, onImport, busy }) {
+function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport, busy }) {
   const source = martin || {};
   const legacyAmounts = Array.isArray(source.amounts) ? source.amounts : [];
   const value = {
@@ -179,12 +185,24 @@ function MartinZZZSetupTable({ martin, onChange, onRandom, onImport, busy }) {
   const enabled = !!value.enabled;
   const min = Math.max(1, Number(value.step_min || 1));
   const max = Math.min(20, Math.max(min, Number(value.step_max || 20)));
-  const lo = Number(value.cond_lo ?? 40);
-  const hi = Number(value.cond_hi ?? 60);
-  const refs = Array.isArray(value.reference_game_seqs) ? value.reference_game_seqs : [];
+  const lo = Number(value.cond_lo ?? DEFAULT_MARTIN_ZZZ.cond_lo);
+  const hi = Number(value.cond_hi ?? DEFAULT_MARTIN_ZZZ.cond_hi);
+  const sharesZzz1Nc = index > 0 && !!value.use_zzz1_nc;
+  const refs = sharesZzz1Nc
+    ? (Array.isArray(zzz1?.reference_game_seqs) ? zzz1.reference_game_seqs : [])
+    : (Array.isArray(value.reference_game_seqs) ? value.reference_game_seqs : []);
   const [importOpen, setImportOpen] = useState(false);
   const [sourceGameId, setSourceGameId] = useState("");
+  const [randomCount, setRandomCount] = useState(
+    ZZZ_RANDOM_COUNT_OPTIONS.includes(Number(sharesZzz1Nc ? zzz1?.reference_count : source.reference_count))
+      ? Number(sharesZzz1Nc ? zzz1?.reference_count : source.reference_count) : 128,
+  );
   const betTypes = [["martin", "마틴"], ["kkangbet", "깡벳"], ["fixed", "고정벳"], ["manual", "수동"]];
+
+  useEffect(() => {
+    const referenceCount = Number(sharesZzz1Nc ? zzz1?.reference_count : source.reference_count);
+    if (ZZZ_RANDOM_COUNT_OPTIONS.includes(referenceCount)) setRandomCount(referenceCount);
+  }, [sharesZzz1Nc, source.reference_count, zzz1?.reference_count]);
 
   const togglePoint = (key, point) => {
     const selected = (value[key] || []).map(Number);
@@ -210,6 +228,10 @@ function MartinZZZSetupTable({ martin, onChange, onRandom, onImport, busy }) {
     while (next.length && (next[next.length - 1] == null || next[next.length - 1] === "")) next.pop();
     onChange({ ...value, reference_game_seqs: next });
   };
+  const updateReferenceCount = (count) => {
+    setRandomCount(count);
+    onChange({ ...value, reference_count: count, reference_game_seqs: refs.slice(0, count) });
+  };
   const duplicateValues = new Set(refs.filter((item, index) => item && refs.indexOf(item) !== index).map(Number));
   const pointRows = (key, label) => <>
     {Array.from({ length: 2 }, (_, row) => <tr key={`${key}-${row}`}>
@@ -232,10 +254,10 @@ function MartinZZZSetupTable({ martin, onChange, onRandom, onImport, busy }) {
     <Box sx={{ overflowX: "auto", pb: 1 }}>
       <table style={{ borderCollapse: "collapse", minWidth: NC2_CELL_WIDTH * 10, color: "#fff" }}><tbody>
         <tr>
-          <td style={{ ...red, background: "#7b1fa2", color: "#fff" }}>마틴 ZZZ</td>
+          <td style={{ ...red, background: "#7b1fa2", color: "#fff" }}>마틴 ZZZ {index + 1}</td>
           <td style={enabled ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...value, enabled: !enabled })}>{enabled ? "사용함" : "사용안함"}</td>
           <Nc2Input value={value.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(budget) => onChange({ ...value, budget: Math.max(0, budget) })} />
-          <td colSpan={7} style={cell}>나이스초이스2 전용</td>
+          <td colSpan={7} style={cell}>{index === 0 ? "나이스초이스2 전용" : <label style={{ cursor: "pointer", display: "inline-flex", gap: 5, alignItems: "center" }}><input type="checkbox" checked={sharesZzz1Nc} onChange={(event) => onChange({ ...value, use_zzz1_nc: event.target.checked })} />ZZZ 1번 NC 사용</label>}</td>
         </tr>
         {pointRows("trigger_points", "베팅포인트")}
         <tr><td style={blue}>베팅종류</td>{betTypes.map(([type, label]) => <td key={type} style={value.bet_type === type ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...value, bet_type: type })}>{label}</td>)}<td colSpan={5} style={empty}></td></tr>
@@ -247,40 +269,47 @@ function MartinZZZSetupTable({ martin, onChange, onRandom, onImport, busy }) {
           <td colSpan={5} style={empty}></td>
         </tr>
         {amountGroups.flatMap((group) => Array.from({ length: 3 }, (_, row) => <tr key={`zzz-${group.key}-${row}`}>
-          <td colSpan={2} style={{ ...cell, color: group.off ? "#666" : group.color }}>
+          <td colSpan={2} style={zoneTextCell(cell, group)}>
             {group.key === "white" && row < 2 ? <><input type="number" min={0} max={100} value={row === 0 ? lo : hi} onChange={(event) => onChange({ ...value, [row === 0 ? "cond_lo" : "cond_hi"]: Math.max(0, Math.min(100, Number(event.target.value || 0))) })} style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />% {row === 0 ? "이상" : "이하"}</> : group.labels?.[row] || ""}
           </td>
           {Array.from({ length: 8 }, (__, offset) => {
             const index = row * 8 + offset;
-            if (index >= 20) return <td key={index} style={empty}></td>;
-            const active = enabled && index + 1 >= min && index + 1 <= max;
+            if (index >= 20) return <td key={index} style={zoneTextCell(empty, group)}></td>;
+            const active = index + 1 >= min && index + 1 <= max;
             const amounts = value[`amounts_${group.key}`] || [];
-            return <Nc2Input key={index} value={active ? amounts[index] : 0} prefix={`${index + 1}:`} suffix="P" style={active ? { ...cell, color: group.off ? "#666" : group.color } : empty} disabled={!active} onChange={(amount) => updateAmount(group.key, index, amount)} />;
+            return <Nc2Input key={index} value={active ? amounts[index] : 0} suffix="P" style={zoneTextCell(active ? cell : empty, group)} disabled={!active} onChange={(amount) => updateAmount(group.key, index, amount)} />;
           })}
         </tr>))}
         {pointRows("loss4_extra_points", <><input type="number" min={1} max={20} value={value.loss_trigger_streak || 4} onChange={(event) => onChange({ ...value, loss_trigger_streak: Math.max(1, Math.min(20, Number(event.target.value || 1))) })} style={{ width: 32, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 12, borderRadius: 3, padding: "1px" }} />연패시<br />추가포인트</>)}
+        <tr>
+          <td colSpan={2} style={blue}>ZZZ 기준 NC 번호</td>
+          <td colSpan={8} style={{ ...cell, height: "auto", padding: 4, whiteSpace: "normal" }}>
+            <Box sx={{ display: "flex", gap: .7, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+              <TextField select size="small" label="랜덤 개수" value={randomCount} disabled={sharesZzz1Nc} onChange={(event) => updateReferenceCount(Number(event.target.value))} SelectProps={{ native: true }} sx={{ width: 105, "& .MuiInputBase-root": { height: 32 } }}>
+                {ZZZ_RANDOM_COUNT_OPTIONS.map((count) => <option key={count} value={count}>{count}개</option>)}
+              </TextField>
+              <Button size="small" variant="contained" disabled={busy || sharesZzz1Nc} onClick={() => onRandom(randomCount)}>랜덤으로 다시 고르기</Button>
+              <Button size="small" variant="outlined" disabled={busy || sharesZzz1Nc} onClick={() => setImportOpen(true)}>나초2에서 가져오기</Button>
+              <Button size="small" color="warning" disabled={busy || sharesZzz1Nc || refs.length === 0} onClick={() => onChange({ ...value, reference_game_seqs: [] })}>전체 초기화</Button>
+              <Typography variant="caption" sx={{ color: "#aaa" }}>{refs.filter((item) => Number(item) > 0).length}/{randomCount}개</Typography>
+            </Box>
+          </td>
+        </tr>
+        {Array.from({ length: Math.ceil(randomCount / 10) }, (_, row) => <tr key={`zzz-ref-row-${row}`}>
+          {Array.from({ length: 10 }, (__, offset) => {
+            const index = row * 10 + offset;
+            if (index >= randomCount) return <td key={index} style={empty}></td>;
+            const ref = refs[index] ?? "";
+            const invalid = ref !== "" && (!Number.isInteger(Number(ref)) || Number(ref) <= 0 || duplicateValues.has(Number(ref)));
+            return <td key={index} style={{ ...cell, padding: 0, border: invalid ? "1px solid #f44336" : cell.border, background: "#15191f" }}>
+              <Box sx={{ display: "flex", alignItems: "center" }}>
+                <Box sx={{ width: 25, flexShrink: 0, color: "#777", fontSize: 9, textAlign: "center" }}>{index + 1}</Box>
+                <input type="number" min="1" value={ref} disabled={sharesZzz1Nc} onChange={(event) => updateReference(index, event.target.value)} style={{ width: "100%", minWidth: 0, height: 24, border: 0, outline: "none", background: "transparent", color: invalid ? "#ff5252" : sharesZzz1Nc ? "#999" : "#fff", textAlign: "center", fontSize: 11 }} />
+              </Box>
+            </td>;
+          })}
+        </tr>)}
       </tbody></table>
-    </Box>
-
-    <Box sx={{ border: "1px solid #c9ccd1", background: "#0a0a0a", color: "#fff", p: 1, minWidth: 504 }}>
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 1 }}>
-        <Typography variant="caption" sx={{ color: "#42a5f5", fontWeight: 900 }}>ZZZ 기준 NC 번호</Typography>
-        <TextField size="small" type="number" label="랜덤 개수" value={value.reference_count || 128} onChange={(event) => onChange({ ...value, reference_count: Math.max(1, Math.min(128, Number(event.target.value || 1))) })} inputProps={{ min: 1, max: 128 }} sx={{ width: 105, "& .MuiInputBase-root": { height: 32 } }} />
-        <Button size="small" variant="contained" disabled={busy} onClick={() => onRandom(Number(value.reference_count || 128))}>랜덤으로 다시 고르기</Button>
-        <Button size="small" variant="outlined" disabled={busy} onClick={() => setImportOpen(true)}>나초2에서 가져오기</Button>
-        <Button size="small" color="warning" disabled={busy || refs.length === 0} onClick={() => onChange({ ...value, reference_game_seqs: [] })}>전체 초기화</Button>
-        <Typography variant="caption" sx={{ color: "#aaa" }}>{refs.filter((item) => Number(item) > 0).length}/128개</Typography>
-      </Box>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(4, minmax(70px, 1fr))", sm: "repeat(8, minmax(70px, 1fr))", lg: "repeat(16, minmax(70px, 1fr))" }, gap: .4 }}>
-        {Array.from({ length: 128 }, (_, index) => {
-          const ref = refs[index] ?? "";
-          const invalid = ref !== "" && (!Number.isInteger(Number(ref)) || Number(ref) <= 0 || duplicateValues.has(Number(ref)));
-          return <Box key={index} sx={{ display: "flex", alignItems: "center", border: `1px solid ${invalid ? "#f44336" : "#59616d"}`, background: "#15191f" }}>
-            <Box sx={{ width: 25, color: "#777", fontSize: 9, textAlign: "center" }}>{index + 1}</Box>
-            <input type="number" min="1" value={ref} onChange={(event) => updateReference(index, event.target.value)} style={{ width: "100%", minWidth: 0, height: 24, border: 0, outline: "none", background: "transparent", color: invalid ? "#ff5252" : "#fff", textAlign: "center", fontSize: 11 }} />
-          </Box>;
-        })}
-      </Box>
     </Box>
 
     <Dialog open={importOpen} onClose={() => !busy && setImportOpen(false)}>
@@ -303,6 +332,16 @@ export default function Nc2UserSetupPage() {
   const [referenceBusy, setReferenceBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const martinZzzs = Array.from({ length: MARTIN_ZZZ_COUNT }, (_, index) => {
+    const saved = Array.isArray(config?.martin_zzzs)
+      ? config.martin_zzzs[index]
+      : index === 0 ? config?.martin_zzz : {};
+    return {
+      ...DEFAULT_MARTIN_ZZZ,
+      ...saved,
+      use_zzz1_nc: index > 0 && (saved?.use_zzz1_nc ?? true),
+    };
+  });
 
   useEffect(() => {
     apiCaller.get(USER_BET_SETTINGS_API.GET("nc2"))
@@ -321,21 +360,31 @@ export default function Nc2UserSetupPage() {
     return typeof detail === "string" ? detail : detail?.message || fallback;
   };
 
-  const randomizeZzzReferences = async (count) => {
+  const updateMartinZzzs = (nextZzzs) => updateConfig({
+    ...config,
+    martin_zzzs: nextZzzs,
+    martin_zzz: nextZzzs[0],
+  });
+
+  const randomizeZzzReferences = async (index, count) => {
     setReferenceBusy(true); setError("");
     try {
       const response = await apiCaller.post(NC2_GAMES_API.REFERENCE_RANDOM, { count });
-      updateConfig({ ...config, martin_zzz: { ...DEFAULT_MARTIN_ZZZ, ...(config.martin_zzz || {}), reference_count: response.data.count, reference_game_seqs: response.data.game_seqs } });
+      const next = martinZzzs.map((item) => ({ ...item }));
+      next[index] = { ...next[index], reference_count: response.data.count, reference_game_seqs: response.data.game_seqs };
+      updateMartinZzzs(next);
     } catch (err) {
       setError(errorMessage(err, "랜덤 NC 번호를 선정하지 못했습니다."));
     } finally { setReferenceBusy(false); }
   };
 
-  const importZzzReferences = async (gameId) => {
+  const importZzzReferences = async (index, gameId) => {
     setReferenceBusy(true); setError("");
     try {
       const response = await apiCaller.get(NC2_GAMES_API.REFERENCE_FROM_GAME(gameId));
-      updateConfig({ ...config, martin_zzz: { ...DEFAULT_MARTIN_ZZZ, ...(config.martin_zzz || {}), reference_count: response.data.count, reference_game_seqs: response.data.game_seqs, reference_source: { type: "nc2_game", game_id: response.data.source_game_id } } });
+      const next = martinZzzs.map((item) => ({ ...item }));
+      next[index] = { ...next[index], reference_count: response.data.count, reference_game_seqs: response.data.game_seqs, reference_source: { type: "nc2_game", game_id: response.data.source_game_id } };
+      updateMartinZzzs(next);
       return true;
     } catch (err) {
       setError(errorMessage(err, "나초2 게임의 NC 번호를 가져오지 못했습니다."));
@@ -347,18 +396,21 @@ export default function Nc2UserSetupPage() {
     if (!dirty || saving) return;
     setSaving(true); setError("");
     try {
-      let nextConfig = config;
-      const zzz = { ...DEFAULT_MARTIN_ZZZ, ...(config.martin_zzz || {}) };
-      if (zzz.enabled) {
-        if (!(zzz.trigger_points || []).length) throw new Error("마틴 ZZZ 베팅포인트를 한 개 이상 선택하세요.");
-        const gameSeqs = (zzz.reference_game_seqs || []).filter((item) => item !== "" && item != null).map(Number);
-        if (!gameSeqs.length) throw new Error("마틴 ZZZ 기준 NC 번호를 한 개 이상 입력하세요.");
+      let validatedZzzs = martinZzzs.map((item) => ({ ...item }));
+      for (let index = 0; index < validatedZzzs.length; index += 1) {
+        const zzz = validatedZzzs[index];
+        if (!zzz.enabled) continue;
+        if (!(zzz.trigger_points || []).length) throw new Error(`마틴 ZZZ ${index + 1} 베팅포인트를 한 개 이상 선택하세요.`);
+        const referenceOwner = index > 0 && zzz.use_zzz1_nc ? validatedZzzs[0] : zzz;
+        const gameSeqs = (referenceOwner.reference_game_seqs || []).filter((item) => item !== "" && item != null).map(Number);
+        if (!gameSeqs.length) throw new Error(`마틴 ZZZ ${index + 1} 기준 NC 번호를 한 개 이상 입력하세요.`);
         if (gameSeqs.some((item) => !Number.isInteger(item) || item <= 0) || new Set(gameSeqs).size !== gameSeqs.length || gameSeqs.length > 128) {
-          throw new Error("마틴 ZZZ NC 번호는 중복 없는 양수로 최대 128개까지 입력할 수 있습니다.");
+          throw new Error(`마틴 ZZZ ${index + 1} NC 번호는 중복 없는 양수로 최대 128개까지 입력할 수 있습니다.`);
         }
         const validation = await apiCaller.post(NC2_GAMES_API.REFERENCE_VALIDATE, { game_seqs: gameSeqs });
-        nextConfig = { ...config, martin_zzz: { ...zzz, reference_count: validation.data.count, reference_game_seqs: validation.data.game_seqs } };
+        validatedZzzs[index] = { ...zzz, reference_count: validation.data.count, reference_game_seqs: validation.data.game_seqs };
       }
+      const nextConfig = { ...config, martin_zzzs: validatedZzzs, martin_zzz: validatedZzzs[0] };
       const response = await apiCaller.put(USER_BET_SETTINGS_API.SAVE("nc2"), { config: nextConfig });
       setConfig(response.data.config);
       setDirty(false);
@@ -432,13 +484,20 @@ export default function Nc2UserSetupPage() {
           onChange={(martin_z) => updateConfig({ ...config, martin_z })}
         />
       </Box>
-      <MartinZZZSetupTable
-        martin={config.martin_zzz || DEFAULT_MARTIN_ZZZ}
-        onChange={(martin_zzz) => updateConfig({ ...config, martin_zzz })}
-        onRandom={randomizeZzzReferences}
-        onImport={importZzzReferences}
+      {martinZzzs.map((martin, index) => <MartinZZZSetupTable
+        key={index}
+        index={index}
+        martin={martin}
+        zzz1={martinZzzs[0]}
+        onChange={(nextMartin) => {
+          const next = martinZzzs.map((item) => ({ ...item }));
+          next[index] = nextMartin;
+          updateMartinZzzs(next);
+        }}
+        onRandom={(count) => randomizeZzzReferences(index, count)}
+        onImport={(gameId) => importZzzReferences(index, gameId)}
         busy={referenceBusy || saving}
-      />
+      />)}
     </Box>
   );
 }
