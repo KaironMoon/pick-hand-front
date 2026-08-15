@@ -1,14 +1,18 @@
 import { Fragment, useEffect, useState } from "react";
-import { Alert, Box, Typography } from "@mui/material";
+import {
+  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  TextField, Typography,
+} from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import apiCaller from "@/services/api-caller";
-import { USER_BET_SETTINGS_API } from "@/constants/api-url";
+import { NC2_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 import { nc2GameReturnPath } from "./slot-navigation.js";
 import { buildFixedNc2AssistRules, visibleNc2AssistRows } from "./assist-settings.js";
 
 const GREEN = "#4caf50";
-const cell = { border: "1px solid #c9ccd1", width: 84, height: 22, lineHeight: 1.1, textAlign: "center", verticalAlign: "middle", fontSize: 13, padding: "1px 4px", whiteSpace: "nowrap", boxSizing: "border-box" };
+const NC2_CELL_WIDTH = 84;
+const cell = { border: "1px solid #c9ccd1", width: NC2_CELL_WIDTH, height: 22, lineHeight: 1.1, textAlign: "center", verticalAlign: "middle", fontSize: 13, padding: "1px 4px", whiteSpace: "nowrap", boxSizing: "border-box" };
 const green = { ...cell, background: "#009900", color: "#fff" };
 const teal = { ...cell, background: "#33CCCC", color: "#000" };
 const blue = { ...cell, color: "#0066FF", fontWeight: "bold" };
@@ -18,6 +22,14 @@ const disabled = { ...cell, opacity: .3 };
 const empty = { ...cell, background: "#0a0a0a" };
 const topCondition = { ...cell, background: "#17365e", color: "#0065fe", fontWeight: "bold" };
 const ASSIST_OPTIONS = ["회차진행", "6회쉬기", "6+6", "회차반대"];
+const ZZZ_POINT_OPTIONS = Array.from({ length: 13 }, (_, index) => Math.round((index + 1) * 2) / 10);
+const DEFAULT_MARTIN_ZZZ = {
+  enabled: false, budget: 0, bet_type: "martin", step_min: 1, step_max: 20,
+  amounts: Array(20).fill(0), cond_lo: 40, cond_hi: 60,
+  amounts_blue: Array(20).fill(0), amounts_white: Array(20).fill(0), amounts_red: Array(20).fill(0),
+  trigger_points: [], loss_trigger_streak: 4, loss4_extra_points: [],
+  reference_count: 128, reference_game_seqs: [],
+};
 
 function Nc2Input({ value, onChange, prefix = "", suffix = "", integer = false, style = cell, disabled: inputDisabled = false }) {
   const [editing, setEditing] = useState(false);
@@ -82,6 +94,11 @@ function Nc2SetupTable({ config, onChange }) {
       <td style={blue}>P설정</td><td style={green}>최저</td><Nc2Input value={min} integer suffix="단계" style={green} onChange={(value) => onChange({ ...config, step_min: Math.max(1, Math.min(value, max)) })} /><td style={green}>최고</td><Nc2Input value={max} integer suffix="단계" style={green} onChange={updateStepMax} />
       <td colSpan={5} style={cell}></td>
     </tr>
+    {groups.flatMap((group) => [0, 1, 2].map((part) => <tr key={`${group.key}-${part}`}>
+      <td colSpan={2} style={{ ...cell, color: group.off ? "#666" : group.color }}>{group.key === "white" && part < 2 ? <><input type="number" min={0} max={100} value={part === 0 ? lo : hi} onChange={(event) => onChange({ ...config, [part === 0 ? "cond_lo" : "cond_hi"]: Math.max(0, Math.min(100, Number(event.target.value || 0))) })} style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />% {part === 0 ? "이상" : "이하"}</> : group.labels[part] || ""}</td>
+      {Array.from({ length: 8 }, (_, offset) => { const index = part * 8 + offset; if (index >= 20) return <td key={index} style={empty}></td>; const active = index + 1 >= min && index + 1 <= max; return active ? <Nc2Input key={index} value={(config[`amounts_${group.key}`] || [])[index] || 0} suffix="P" style={{ ...cell, color: group.off ? "#666" : group.color }} onChange={(value) => updateAmount(group.key, index, value)} /> : <td key={index} style={empty}></td>; })}
+    </tr>))}
+    <tr><td colSpan={10} style={topCondition}>최상위조건설정</td></tr>
     {assistRows.map((rules, rowIndex) => <tr key={`assist-${rowIndex}`}>
       <td colSpan={2} style={rowIndex === 0 ? blue : cell}>{rowIndex === 0 ? "NC2 어시" : ""}</td>
       {Array.from({ length: 4 }, (_, slot) => {
@@ -94,11 +111,6 @@ function Nc2SetupTable({ config, onChange }) {
         </Fragment>;
       })}
     </tr>)}
-    {groups.flatMap((group) => [0, 1, 2].map((part) => <tr key={`${group.key}-${part}`}>
-      <td colSpan={2} style={{ ...cell, color: group.off ? "#666" : group.color }}>{group.key === "white" && part < 2 ? <><input type="number" min={0} max={100} value={part === 0 ? lo : hi} onChange={(event) => onChange({ ...config, [part === 0 ? "cond_lo" : "cond_hi"]: Math.max(0, Math.min(100, Number(event.target.value || 0))) })} style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />% {part === 0 ? "이상" : "이하"}</> : group.labels[part] || ""}</td>
-      {Array.from({ length: 8 }, (_, offset) => { const index = part * 8 + offset; if (index >= 20) return <td key={index} style={empty}></td>; const active = index + 1 >= min && index + 1 <= max; return active ? <Nc2Input key={index} value={(config[`amounts_${group.key}`] || [])[index] || 0} suffix="P" style={{ ...cell, color: group.off ? "#666" : group.color }} onChange={(value) => updateAmount(group.key, index, value)} /> : <td key={index} style={empty}></td>; })}
-    </tr>))}
-    <tr><td colSpan={10} style={topCondition}>최상위조건설정</td></tr>
   </tbody></table>;
 }
 
@@ -153,12 +165,142 @@ function MartinZSetupTable({ martin, onChange }) {
   </tbody></table>;
 }
 
+function MartinZZZSetupTable({ martin, onChange, onRandom, onImport, busy }) {
+  const source = martin || {};
+  const legacyAmounts = Array.isArray(source.amounts) ? source.amounts : [];
+  const value = {
+    ...DEFAULT_MARTIN_ZZZ,
+    ...source,
+    ...Object.fromEntries(["blue", "white", "red"].map((zone) => {
+      const key = `amounts_${zone}`;
+      return [key, Array.isArray(source[key]) ? source[key] : legacyAmounts];
+    })),
+  };
+  const enabled = !!value.enabled;
+  const min = Math.max(1, Number(value.step_min || 1));
+  const max = Math.min(20, Math.max(min, Number(value.step_max || 20)));
+  const lo = Number(value.cond_lo ?? 40);
+  const hi = Number(value.cond_hi ?? 60);
+  const refs = Array.isArray(value.reference_game_seqs) ? value.reference_game_seqs : [];
+  const [importOpen, setImportOpen] = useState(false);
+  const [sourceGameId, setSourceGameId] = useState("");
+  const betTypes = [["martin", "마틴"], ["kkangbet", "깡벳"], ["fixed", "고정벳"], ["manual", "수동"]];
+
+  const togglePoint = (key, point) => {
+    const selected = (value[key] || []).map(Number);
+    const next = selected.includes(point) ? selected.filter((item) => item !== point) : [...selected, point].sort((a, b) => a - b);
+    onChange({ ...value, [key]: next });
+  };
+  const updateAmount = (zone, index, amount) => {
+    const key = `amounts_${zone}`;
+    const amounts = [...(value[key] || []), ...Array(20).fill(0)].slice(0, 20);
+    const next = [...amounts];
+    next[index] = Math.max(0, Math.round(amount * 10) / 10);
+    if (value.bet_type === "martin" || value.bet_type === "kkangbet") {
+      for (let idx = index + 1; idx < max; idx += 1) next[idx] = Math.round(next[idx - 1] * 20) / 10;
+      for (let idx = index - 1; idx >= min - 1; idx -= 1) next[idx] = Math.max(.1, Math.round(next[idx + 1] * 5) / 10);
+    } else if (value.bet_type === "fixed") {
+      for (let idx = min - 1; idx < max; idx += 1) next[idx] = next[index];
+    }
+    onChange({ ...value, [key]: next });
+  };
+  const updateReference = (index, raw) => {
+    const next = [...refs];
+    next[index] = raw === "" ? null : Number(raw);
+    while (next.length && (next[next.length - 1] == null || next[next.length - 1] === "")) next.pop();
+    onChange({ ...value, reference_game_seqs: next });
+  };
+  const duplicateValues = new Set(refs.filter((item, index) => item && refs.indexOf(item) !== index).map(Number));
+  const pointRows = (key, label) => <>
+    {Array.from({ length: 2 }, (_, row) => <tr key={`${key}-${row}`}>
+      {row === 0 && <td rowSpan={2} colSpan={2} style={{ ...blue, whiteSpace: "normal", lineHeight: 1.15 }}>{label}</td>}
+      {Array.from({ length: 8 }, (__, offset) => {
+        const point = ZZZ_POINT_OPTIONS[row * 8 + offset];
+        if (!point) return <td key={offset} style={empty}></td>;
+        const selected = (value[key] || []).map(Number).includes(point);
+        return <td key={point} style={selected ? { ...teal, color: "#0066FF", fontWeight: "bold", cursor: "pointer" } : method} onClick={() => togglePoint(key, point)}>{point.toFixed(1)}</td>;
+      })}
+    </tr>)}
+  </>;
+  const amountGroups = [
+    { key: "white", color: "#fff", off: false, labels: null },
+    { key: "blue", color: "#0066FF", off: lo <= 0, labels: ["0% 이상", `${lo}% 미만`, ""] },
+    { key: "red", color: "#FF0000", off: hi >= 100, labels: [`${hi}% 초과`, "100% 이하", ""] },
+  ];
+
+  return <Box>
+    <Box sx={{ overflowX: "auto", pb: 1 }}>
+      <table style={{ borderCollapse: "collapse", minWidth: NC2_CELL_WIDTH * 10, color: "#fff" }}><tbody>
+        <tr>
+          <td style={{ ...red, background: "#7b1fa2", color: "#fff" }}>마틴 ZZZ</td>
+          <td style={enabled ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...value, enabled: !enabled })}>{enabled ? "사용함" : "사용안함"}</td>
+          <Nc2Input value={value.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(budget) => onChange({ ...value, budget: Math.max(0, budget) })} />
+          <td colSpan={7} style={cell}>나이스초이스2 전용</td>
+        </tr>
+        {pointRows("trigger_points", "베팅포인트")}
+        <tr><td style={blue}>베팅종류</td>{betTypes.map(([type, label]) => <td key={type} style={value.bet_type === type ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...value, bet_type: type })}>{label}</td>)}<td colSpan={5} style={empty}></td></tr>
+        <tr>
+          <td style={blue}>단계설정</td><td style={green}>최저</td>
+          <Nc2Input value={min} integer suffix="단계" style={green} onChange={(step_min) => onChange({ ...value, step_min: Math.max(1, Math.min(step_min, max)) })} />
+          <td style={green}>최고</td>
+          <Nc2Input value={max} integer suffix="단계" style={green} onChange={(step_max) => onChange({ ...value, step_max: Math.max(min, Math.min(20, step_max)) })} />
+          <td colSpan={5} style={empty}></td>
+        </tr>
+        {amountGroups.flatMap((group) => Array.from({ length: 3 }, (_, row) => <tr key={`zzz-${group.key}-${row}`}>
+          <td colSpan={2} style={{ ...cell, color: group.off ? "#666" : group.color }}>
+            {group.key === "white" && row < 2 ? <><input type="number" min={0} max={100} value={row === 0 ? lo : hi} onChange={(event) => onChange({ ...value, [row === 0 ? "cond_lo" : "cond_hi"]: Math.max(0, Math.min(100, Number(event.target.value || 0))) })} style={{ width: 42, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 13, borderRadius: 3, padding: "1px 2px" }} />% {row === 0 ? "이상" : "이하"}</> : group.labels?.[row] || ""}
+          </td>
+          {Array.from({ length: 8 }, (__, offset) => {
+            const index = row * 8 + offset;
+            if (index >= 20) return <td key={index} style={empty}></td>;
+            const active = enabled && index + 1 >= min && index + 1 <= max;
+            const amounts = value[`amounts_${group.key}`] || [];
+            return <Nc2Input key={index} value={active ? amounts[index] : 0} prefix={`${index + 1}:`} suffix="P" style={active ? { ...cell, color: group.off ? "#666" : group.color } : empty} disabled={!active} onChange={(amount) => updateAmount(group.key, index, amount)} />;
+          })}
+        </tr>))}
+        {pointRows("loss4_extra_points", <><input type="number" min={1} max={20} value={value.loss_trigger_streak || 4} onChange={(event) => onChange({ ...value, loss_trigger_streak: Math.max(1, Math.min(20, Number(event.target.value || 1))) })} style={{ width: 32, background: "#1a1a1a", border: "1px solid #555", color: "#fff", textAlign: "center", fontSize: 12, borderRadius: 3, padding: "1px" }} />연패시<br />추가포인트</>)}
+      </tbody></table>
+    </Box>
+
+    <Box sx={{ border: "1px solid #c9ccd1", background: "#0a0a0a", color: "#fff", p: 1, minWidth: 504 }}>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 1 }}>
+        <Typography variant="caption" sx={{ color: "#42a5f5", fontWeight: 900 }}>ZZZ 기준 NC 번호</Typography>
+        <TextField size="small" type="number" label="랜덤 개수" value={value.reference_count || 128} onChange={(event) => onChange({ ...value, reference_count: Math.max(1, Math.min(128, Number(event.target.value || 1))) })} inputProps={{ min: 1, max: 128 }} sx={{ width: 105, "& .MuiInputBase-root": { height: 32 } }} />
+        <Button size="small" variant="contained" disabled={busy} onClick={() => onRandom(Number(value.reference_count || 128))}>랜덤으로 다시 고르기</Button>
+        <Button size="small" variant="outlined" disabled={busy} onClick={() => setImportOpen(true)}>나초2에서 가져오기</Button>
+        <Button size="small" color="warning" disabled={busy || refs.length === 0} onClick={() => onChange({ ...value, reference_game_seqs: [] })}>전체 초기화</Button>
+        <Typography variant="caption" sx={{ color: "#aaa" }}>{refs.filter((item) => Number(item) > 0).length}/128개</Typography>
+      </Box>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(4, minmax(70px, 1fr))", sm: "repeat(8, minmax(70px, 1fr))", lg: "repeat(16, minmax(70px, 1fr))" }, gap: .4 }}>
+        {Array.from({ length: 128 }, (_, index) => {
+          const ref = refs[index] ?? "";
+          const invalid = ref !== "" && (!Number.isInteger(Number(ref)) || Number(ref) <= 0 || duplicateValues.has(Number(ref)));
+          return <Box key={index} sx={{ display: "flex", alignItems: "center", border: `1px solid ${invalid ? "#f44336" : "#59616d"}`, background: "#15191f" }}>
+            <Box sx={{ width: 25, color: "#777", fontSize: 9, textAlign: "center" }}>{index + 1}</Box>
+            <input type="number" min="1" value={ref} onChange={(event) => updateReference(index, event.target.value)} style={{ width: "100%", minWidth: 0, height: 24, border: 0, outline: "none", background: "transparent", color: invalid ? "#ff5252" : "#fff", textAlign: "center", fontSize: 11 }} />
+          </Box>;
+        })}
+      </Box>
+    </Box>
+
+    <Dialog open={importOpen} onClose={() => !busy && setImportOpen(false)}>
+      <DialogTitle>나초2 NC 번호 가져오기</DialogTitle>
+      <DialogContent><TextField autoFocus fullWidth type="number" label="나초2 게임번호" value={sourceGameId} onChange={(event) => setSourceGameId(event.target.value)} inputProps={{ min: 1 }} sx={{ mt: 1 }} /></DialogContent>
+      <DialogActions>
+        <Button disabled={busy} onClick={() => setImportOpen(false)}>취소</Button>
+        <Button disabled={busy || !sourceGameId} variant="contained" onClick={async () => { const ok = await onImport(Number(sourceGameId)); if (ok) { setImportOpen(false); setSourceGameId(""); } }}>가져오기</Button>
+      </DialogActions>
+    </Dialog>
+  </Box>;
+}
+
 export default function Nc2UserSetupPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [config, setConfig] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [referenceBusy, setReferenceBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -174,16 +316,55 @@ export default function Nc2UserSetupPage() {
     setMessage("");
   };
 
+  const errorMessage = (err, fallback) => {
+    const detail = err.response?.data?.detail;
+    return typeof detail === "string" ? detail : detail?.message || fallback;
+  };
+
+  const randomizeZzzReferences = async (count) => {
+    setReferenceBusy(true); setError("");
+    try {
+      const response = await apiCaller.post(NC2_GAMES_API.REFERENCE_RANDOM, { count });
+      updateConfig({ ...config, martin_zzz: { ...DEFAULT_MARTIN_ZZZ, ...(config.martin_zzz || {}), reference_count: response.data.count, reference_game_seqs: response.data.game_seqs } });
+    } catch (err) {
+      setError(errorMessage(err, "랜덤 NC 번호를 선정하지 못했습니다."));
+    } finally { setReferenceBusy(false); }
+  };
+
+  const importZzzReferences = async (gameId) => {
+    setReferenceBusy(true); setError("");
+    try {
+      const response = await apiCaller.get(NC2_GAMES_API.REFERENCE_FROM_GAME(gameId));
+      updateConfig({ ...config, martin_zzz: { ...DEFAULT_MARTIN_ZZZ, ...(config.martin_zzz || {}), reference_count: response.data.count, reference_game_seqs: response.data.game_seqs, reference_source: { type: "nc2_game", game_id: response.data.source_game_id } } });
+      return true;
+    } catch (err) {
+      setError(errorMessage(err, "나초2 게임의 NC 번호를 가져오지 못했습니다."));
+      return false;
+    } finally { setReferenceBusy(false); }
+  };
+
   const save = async () => {
     if (!dirty || saving) return;
     setSaving(true); setError("");
     try {
-      const response = await apiCaller.put(USER_BET_SETTINGS_API.SAVE("nc2"), { config });
+      let nextConfig = config;
+      const zzz = { ...DEFAULT_MARTIN_ZZZ, ...(config.martin_zzz || {}) };
+      if (zzz.enabled) {
+        if (!(zzz.trigger_points || []).length) throw new Error("마틴 ZZZ 베팅포인트를 한 개 이상 선택하세요.");
+        const gameSeqs = (zzz.reference_game_seqs || []).filter((item) => item !== "" && item != null).map(Number);
+        if (!gameSeqs.length) throw new Error("마틴 ZZZ 기준 NC 번호를 한 개 이상 입력하세요.");
+        if (gameSeqs.some((item) => !Number.isInteger(item) || item <= 0) || new Set(gameSeqs).size !== gameSeqs.length || gameSeqs.length > 128) {
+          throw new Error("마틴 ZZZ NC 번호는 중복 없는 양수로 최대 128개까지 입력할 수 있습니다.");
+        }
+        const validation = await apiCaller.post(NC2_GAMES_API.REFERENCE_VALIDATE, { game_seqs: gameSeqs });
+        nextConfig = { ...config, martin_zzz: { ...zzz, reference_count: validation.data.count, reference_game_seqs: validation.data.game_seqs } };
+      }
+      const response = await apiCaller.put(USER_BET_SETTINGS_API.SAVE("nc2"), { config: nextConfig });
       setConfig(response.data.config);
       setDirty(false);
       setMessage("저장했습니다. NW로 새 게임을 시작하면 적용됩니다.");
     } catch (err) {
-      setError(err.response?.data?.detail || "설정을 저장하지 못했습니다.");
+      setError(err.response ? errorMessage(err, "설정을 저장하지 못했습니다.") : err.message || "설정을 저장하지 못했습니다.");
     } finally { setSaving(false); }
   };
 
@@ -251,6 +432,13 @@ export default function Nc2UserSetupPage() {
           onChange={(martin_z) => updateConfig({ ...config, martin_z })}
         />
       </Box>
+      <MartinZZZSetupTable
+        martin={config.martin_zzz || DEFAULT_MARTIN_ZZZ}
+        onChange={(martin_zzz) => updateConfig({ ...config, martin_zzz })}
+        onRandom={randomizeZzzReferences}
+        onImport={importZzzReferences}
+        busy={referenceBusy || saving}
+      />
     </Box>
   );
 }

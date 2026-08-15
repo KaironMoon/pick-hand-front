@@ -917,7 +917,7 @@ export default function Nc2UserGamePage() {
   return (
     <Box sx={{ p: isMobile ? .5 : 2 }}>
       <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
-        <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>GlobalHit</span>
+        <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>TripleNine</span>
         {game?.game_id && <span style={{ fontSize: 11, color: "#888" }}>#{game.game_id}</span>}
         {game?.game_id && autoStatus.table_name && <span style={{ fontSize: 11, color: "#bbb", fontWeight: 700 }}>{autoStatus.table_name}</span>}
         {replay.active && <span style={{ fontSize: 12, color: "#ffb300", fontWeight: "bold", marginLeft: 8 }}>{`리플레이 중 #${replay.sourceGameId} · ${replay.roundNum}/${replay.totalRounds}회차`}</span>}
@@ -981,6 +981,26 @@ export default function Nc2UserGamePage() {
             disabled={!game || replay.active}
           />
         </Box>
+
+        {state?.martin_zzz?.enabled && (() => {
+          const zzz = state.martin_zzz;
+          const statusItems = [
+            ["P/B", `${zzz.p_count || 0}/${zzz.b_count || 0}`],
+            ["판정", `${Number(zzz.point || 0).toFixed(1)}P`],
+            ["방향", zzz.direction || "-"],
+            ["조건", zzz.matched ? (zzz.match_type === "loss4_extra" ? `${zzz.loss_trigger_streak || 4}연패 추가` : "기본") : "불일치"],
+            ["단계", `${zzz.step || 1}단계`],
+            ["승률", zzz.rate == null ? "-" : `${Number(zzz.rate).toFixed(1)}% (${zzz.hit || 0}/${zzz.total || 0})`],
+            ["구간", { white: "흰색", blue: "파란색", red: "빨간색" }[zzz.zone] || "흰색"],
+            ["ZZZ금액", `${Number(zzz.amount || 0).toFixed(1)}P`],
+            ["연패", `${zzz.loss_streak || 0}연패`],
+            ["NC", `${zzz.reference_game_seqs?.length || 0}개`],
+          ];
+          return <Box sx={{ display: "flex", flexWrap: "wrap", border: "1px solid #7e57c2", backgroundColor: "#120d1b", mb: 1 }}>
+            <Box sx={{ px: 1.2, py: .6, backgroundColor: "#7b1fa2", fontSize: 11, fontWeight: 900 }}>마틴 ZZZ</Box>
+            {statusItems.map(([label, value]) => <Box key={label} sx={{ px: 1.2, py: .6, borderLeft: "1px solid #4a3d5f", fontSize: 11 }}><Box component="span" sx={{ color: "#aaa", mr: .6 }}>{label}</Box><Box component="span" sx={{ color: label === "ZZZ금액" ? "#00e676" : "#fff", fontWeight: 900 }}>{value}</Box></Box>)}
+          </Box>;
+        })()}
 
         <Nc2RoundAmountTable
           roundState={ghRoundState}

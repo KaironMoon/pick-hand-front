@@ -98,6 +98,9 @@ const NC2_GAMES_API = {
   REPLAY: (id) => `/api/v1/nc2/games/${id}/replay`,
   SHOE_COPY_PROCESS: "/api/v1/nc2/games/shoe-copy/process",
   SHOE_COPY_PREVIEW: (id) => `/api/v1/nc2/games/shoe-copy/${id}`,
+  REFERENCE_RANDOM: "/api/v1/nc2/games/reference-combinations/random",
+  REFERENCE_VALIDATE: "/api/v1/nc2/games/reference-combinations/validate",
+  REFERENCE_FROM_GAME: (id) => `/api/v1/nc2/games/reference-combinations/${id}`,
 };
 
 const NC_SETTINGS_API = {

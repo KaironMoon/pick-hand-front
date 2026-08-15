@@ -131,11 +131,6 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
                 <ListItemText primary="유저" primaryTypographyProps={{ fontSize: "0.85rem" }} />
               </ListItemButton>
             </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/nc2game/user-setup")} sx={{ pl: 7 }}>
-                <ListItemText primary="설정" primaryTypographyProps={{ fontSize: "0.85rem" }} />
-              </ListItemButton>
-            </ListItem>
           </List>
           <Divider sx={{ bgcolor: "military.border", my: 1 }} />
           {/* 글로벌히트 */}
