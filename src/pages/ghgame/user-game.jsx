@@ -2639,7 +2639,7 @@ export default function GhUserGamePage() {
               sx={{ minWidth: 150 }}
             >
               <MenuItem value="gh">글로벌히트</MenuItem>
-              <MenuItem value="nc2">나이스초이스2</MenuItem>
+              <MenuItem value="nc2">트리플나인</MenuItem>
             </TextField>
             <TextField
               autoFocus

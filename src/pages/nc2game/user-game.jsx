@@ -917,7 +917,7 @@ export default function Nc2UserGamePage() {
   return (
     <Box sx={{ p: isMobile ? .5 : 2 }}>
       <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
-        <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>NiceChoice2</span>
+        <span style={{ fontSize: 14, fontWeight: "bold", color: "#fff" }}>GlobalHit</span>
         {game?.game_id && <span style={{ fontSize: 11, color: "#888" }}>#{game.game_id}</span>}
         {game?.game_id && autoStatus.table_name && <span style={{ fontSize: 11, color: "#bbb", fontWeight: 700 }}>{autoStatus.table_name}</span>}
         {replay.active && <span style={{ fontSize: 12, color: "#ffb300", fontWeight: "bold", marginLeft: 8 }}>{`리플레이 중 #${replay.sourceGameId} · ${replay.roundNum}/${replay.totalRounds}회차`}</span>}
@@ -1138,7 +1138,7 @@ export default function Nc2UserGamePage() {
         <DialogContent>
           <Box sx={{ display: "flex", gap: 1, mt: .5, mb: 2, flexWrap: "wrap" }}>
             <TextField select size="small" label="원본 게임" value={shoeSourceType} onChange={(event) => { const sourceType = event.target.value; setShoeSourceType(sourceType); saveShoeCopySourceType(SHOE_COPY_SOURCE_STORAGE_KEYS.nc2, sourceType); setShoePreview(null); setShoeCopyError(""); }} sx={{ minWidth: 150 }}>
-              <MenuItem value="nc2">나이스초이스2</MenuItem><MenuItem value="gh">글로벌히트</MenuItem>
+              <MenuItem value="nc2">트리플나인</MenuItem><MenuItem value="gh">글로벌히트</MenuItem>
             </TextField>
             <TextField autoFocus size="small" type="number" label="기존 게임번호" value={shoeSourceId} onChange={(event) => { setShoeSourceId(event.target.value); setShoePreview(null); setShoeCopyError(""); }} onKeyDown={(event) => { if (event.key !== "Enter") return; event.preventDefault(); const action = shoeCopyEnterAction({ preview: shoePreview, sourceType: shoeSourceType, sourceGameInput: shoeSourceId, busy: shoeCopyLoading }); if (action === "execute") executeShoeCopy(); else if (action === "lookup") loadShoePreview(); }} />
             <Button variant="outlined" disabled={shoeCopyLoading} onClick={loadShoePreview}>조회</Button>

@@ -125,7 +125,7 @@ function MartinZSetupTable({ martin, onChange }) {
       <td style={{ ...red, background: "#c62828", color: "#fff" }}>마틴 Z</td>
       <td style={enabled ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...martin, enabled: !enabled })}>{enabled ? "사용함" : "사용안함"}</td>
       <Nc2Input value={martin.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(value) => onChange({ ...martin, budget: Math.max(0, value) })} />
-      <td colSpan={3} style={cell}>나이스초이스2 전용</td>
+      <td colSpan={3} style={cell}>트리플나인 전용</td>
     </tr>
     <tr>
       <td style={blue}>배팅종류</td>
@@ -198,7 +198,7 @@ export default function Nc2UserSetupPage() {
         <Box onClick={save} sx={{ display: "inline-flex", alignItems: "center", border: `1px solid ${dirty ? GREEN : "rgba(255,255,255,0.2)"}`, borderRadius: 1, px: 1.5, py: .5, cursor: dirty ? "pointer" : "default", backgroundColor: dirty ? GREEN : "transparent", color: dirty ? "#fff" : "#666", opacity: saving ? .5 : 1, "&:hover": dirty ? { backgroundColor: "#388e3c" } : {} }}>
           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold" }}>{saving ? "저장 중..." : "저장"}</Typography>
         </Box>
-        <Typography variant="caption" sx={{ color: "#bbb", fontWeight: "bold" }}>나이스초이스2 설정</Typography>
+        <Typography variant="caption" sx={{ color: "#bbb", fontWeight: "bold" }}>트리플나인 설정</Typography>
       </Box>
 
       {message && <Alert severity="success" sx={{ mb: 1 }}>{message}</Alert>}
