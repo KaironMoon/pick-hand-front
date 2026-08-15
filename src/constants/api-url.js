@@ -8,6 +8,7 @@ const AUTH_API = {
 const USERS_API = {
   BASE: "/api/v1/users",
   DETAIL: (id) => `/api/v1/users/${id}`,
+  EMERGENCY_STOP: (id) => `/api/v1/users/${id}/emergency-stop`,
 };
 
 const SETTINGS_API = {
@@ -178,6 +179,7 @@ const ABOO_API = {
   PICKHAND_ID: "/api/v1/users/profile/pickhand-id",
   AUTO_START: "/api/v1/games/auto/start",
   AUTO_STOP: "/api/v1/games/auto/stop",
+  AUTO_EMERGENCY_STOP: "/api/v1/games/auto/emergency-stop",
   AUTO_STATUS: "/api/v1/games/auto/status",
   DISCOVER_TABLES: "/api/v1/games/auto/discover-tables",
 };

@@ -15,6 +15,7 @@ import { Nc2BettingSummaryPanel, Nc2Circle, Nc2RoundAmountTable, calculateNc2Cir
 import { nc2ItemWinLimitLabel } from "./game-setting-label.js";
 import { nc2ItemNumberStyle } from "./item-end-style.js";
 import { clearNc2KeepCombination, loadNc2KeepCombination, saveNc2KeepCombination } from "./keep-combination.js";
+import { createGameResponseGuard } from "./game-response-guard.js";
 import { nc2SetupPath } from "./slot-navigation.js";
 import { NC2_GAMES_API } from "@/constants/api-url";
 import {
@@ -134,23 +135,23 @@ function Nc2Grid({ state }) {
   const sortedItems = [...(state?.items || [])].sort(
     (left, right) => Number(left.game_seq || 0) - Number(right.game_seq || 0),
   );
-  const infoWidths = [30, 58, 52, 42, 48, 50];
+  const infoWidths = [30, 58, 52, 42, 48, 50, 58];
   const progressRoundIndex = Number(state?.round_num || 0) < 60 ? Number(state?.round_num || 0) : -1;
   return (
     <Box sx={{ overflow: "auto", maxHeight: "62vh", border: "1px solid #59616d", backgroundColor: "#101318" }}>
-      <Box component="table" sx={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", width: 2140, minWidth: 2140, fontSize: 11, color: "#fff" }}>
+      <Box component="table" sx={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", width: 2198, minWidth: 2198, fontSize: 11, color: "#fff" }}>
         <thead>
           <tr>
-            {["#", "NC", "구분", "단계", "적중률", "금액", ...Array.from({ length: 60 }, (_, i) => i + 1)].map((label, index) => (
+            {["#", "NC", "구분", "단계", "적중률", "금액", "최대연패", ...Array.from({ length: 60 }, (_, i) => i + 1)].map((label, index) => (
               (() => {
-                const isProgress = index >= 6 && index - 6 === progressRoundIndex;
+                const isProgress = index >= 7 && index - 7 === progressRoundIndex;
                 return (
               <Box component="th" key={label} sx={{
                 position: "sticky", top: 0, left: index < 3 ? (index === 0 ? 0 : index === 1 ? infoWidths[0] : infoWidths[0] + infoWidths[1]) : undefined,
                 zIndex: index < 3 ? 4 : 3,
-                width: index < 6 ? infoWidths[index] : 31,
-                minWidth: index < 6 ? infoWidths[index] : 31,
-                maxWidth: index < 6 ? infoWidths[index] : 31,
+                width: index < 7 ? infoWidths[index] : 31,
+                minWidth: index < 7 ? infoWidths[index] : 31,
+                maxWidth: index < 7 ? infoWidths[index] : 31,
                 height: 31,
                 borderRight: isProgress ? "2px solid #ffb300" : "1px solid #59616d",
                 borderLeft: isProgress ? "2px solid #ffb300" : undefined,
@@ -178,7 +179,10 @@ function Nc2Grid({ state }) {
                 <Box component="td" rowSpan={2} sx={{ position: "sticky", left: 0, zIndex: 2, width: infoWidths[0], minWidth: infoWidths[0], maxWidth: infoWidths[0], ...sharedInfoSx, ...nc2ItemNumberStyle(item) }}>{sortedIndex + 1}</Box>
                 <Box component="td" rowSpan={2} sx={{ position: "sticky", left: infoWidths[0], zIndex: 2, width: infoWidths[1], minWidth: infoWidths[1], maxWidth: infoWidths[1], ...sharedInfoSx, backgroundColor: "#181d23", fontWeight: 800 }}>{item.game_seq}</Box>
                 <Box component="td" sx={{ position: "sticky", left: infoWidths[0] + infoWidths[1], zIndex: 2, width: infoWidths[2], minWidth: infoWidths[2], ...sharedInfoSx, backgroundColor: "#20262e", color: "#90caf9", fontWeight: 800 }}>생성픽</Box>
-                {[3, 4, 5].map((index) => <Box component="td" key={index} sx={{ width: infoWidths[index], minWidth: infoWidths[index], ...sharedInfoSx, color: "#555" }}>-</Box>)}
+                <Box component="td" sx={{ width: infoWidths[3], minWidth: infoWidths[3], ...sharedInfoSx, color: "#555" }}>-</Box>
+                <Box component="td" sx={{ width: infoWidths[4], minWidth: infoWidths[4], ...sharedInfoSx }}>{item.generated_rate == null ? "-" : `${item.generated_rate}%`}</Box>
+                <Box component="td" sx={{ width: infoWidths[5], minWidth: infoWidths[5], ...sharedInfoSx, color: "#555" }}>-</Box>
+                <Box component="td" sx={{ width: infoWidths[6], minWidth: infoWidths[6], ...sharedInfoSx, fontWeight: 800 }}>{Number(item.generated_max_miss_streak || 0)}</Box>
                 {Array.from({ length: 60 }, (_, roundIndex) => {
                   const pick = item.shoes?.[roundIndex];
                   const actual = actuals[roundIndex];
@@ -192,6 +196,7 @@ function Nc2Grid({ state }) {
                 <Box component="td" sx={{ width: infoWidths[3], minWidth: infoWidths[3], ...sharedInfoSx }}>{item.step}S</Box>
                 <Box component="td" sx={{ width: infoWidths[4], minWidth: infoWidths[4], ...sharedInfoSx }}>{item.rate == null ? "-" : `${item.rate}%`}</Box>
                 <Box component="td" sx={{ width: infoWidths[5], minWidth: infoWidths[5], ...sharedInfoSx, textAlign: "right", pr: 0.5, color: zoneColor[item.zone] }}>{Number(item.amount || 0).toFixed(1)}</Box>
+                <Box component="td" sx={{ width: infoWidths[6], minWidth: infoWidths[6], ...sharedInfoSx, fontWeight: 800 }}>{Number(item.max_miss_streak || 0)}</Box>
                 {Array.from({ length: 60 }, (_, roundIndex) => {
                   const actual = actuals[roundIndex];
                   const fallbackPick = item.shoes?.[roundIndex];
@@ -244,6 +249,10 @@ export default function Nc2UserGamePage() {
   const [selectedSlotNo, setSelectedSlotNo] = useState(null);
   const [slotBusy, setSlotBusy] = useState(false);
   const slotBusyRef = useRef(false);
+  const gameResponseGuardRef = useRef(null);
+  if (gameResponseGuardRef.current === null) {
+    gameResponseGuardRef.current = createGameResponseGuard();
+  }
   const [shoeCopyOpen, setShoeCopyOpen] = useState(false);
   const [shoeSourceType, setShoeSourceType] = useState(() => loadShoeCopySourceType(
     SHOE_COPY_SOURCE_STORAGE_KEYS.nc2,
@@ -287,7 +296,8 @@ export default function Nc2UserGamePage() {
     finally { setShoeCopyLoading(false); setLoading(false); }
   };
 
-  const applyGame = useCallback((data) => {
+  const applyGame = useCallback((data, { activate = false } = {}) => {
+    if (activate) gameResponseGuardRef.current.activate(data?.game_id);
     setGame(data);
     if (data?.game_id) setSearchParams({ gameId: data.game_id }, { replace: true });
   }, [setSearchParams]);
@@ -355,9 +365,13 @@ export default function Nc2UserGamePage() {
     saveNc2KeepCombination(gameSeqs);
   }, [state?.items]);
 
-  const restore = useCallback(async (gameId) => {
+  const restore = useCallback(async (gameId, { activate = false } = {}) => {
+    if (activate) gameResponseGuardRef.current.activate(gameId);
+    const ticket = gameResponseGuardRef.current.begin(gameId);
     const response = await apiCaller.get(NC2_GAMES_API.STATE(gameId));
+    if (!gameResponseGuardRef.current.canApply(ticket)) return null;
     applyGame(response.data);
+    return response.data;
   }, [applyGame]);
 
   const refreshGameSlots = useCallback(async () => {
@@ -368,6 +382,7 @@ export default function Nc2UserGamePage() {
   }, []);
 
   const clearCurrentGame = useCallback(() => {
+    gameResponseGuardRef.current.clear();
     setGame(null);
     setAutoStatus({ running: false });
     setAutoStatusError(null);
@@ -399,7 +414,7 @@ export default function Nc2UserGamePage() {
         slot_no: slotNo,
         replace_game_id: replaceGameId,
       });
-      applyGame(response.data);
+      applyGame(response.data, { activate: true });
       if (keepCombination && source) {
         const nextGameSeqs = (response.data?.round_state?.items || [])
           .map((item) => Number(item.game_seq));
@@ -432,7 +447,7 @@ export default function Nc2UserGamePage() {
           const slot = slots.find((item) => item.game_id === gameId);
           setSelectedSlotNo(slot?.slot_no ?? null);
           if (slot) syncAutoStatusFromSlot(slot);
-          await restore(gameId);
+          await restore(gameId, { activate: true });
           return;
         }
         if (Number.isInteger(urlSlotNo) && urlSlotNo >= 1 && urlSlotNo <= 6) {
@@ -440,7 +455,7 @@ export default function Nc2UserGamePage() {
           setSelectedSlotNo(urlSlotNo);
           if (slot?.occupied) {
             syncAutoStatusFromSlot(slot);
-            await restore(slot.game_id);
+            await restore(slot.game_id, { activate: true });
           } else {
             clearCurrentGame();
           }
@@ -450,7 +465,7 @@ export default function Nc2UserGamePage() {
         if (firstOccupied) {
           setSelectedSlotNo(firstOccupied.slot_no);
           syncAutoStatusFromSlot(firstOccupied);
-          await restore(firstOccupied.game_id);
+          await restore(firstOccupied.game_id, { activate: true });
         } else {
           setSelectedSlotNo(1);
           clearCurrentGame();
@@ -468,7 +483,7 @@ export default function Nc2UserGamePage() {
     if (!game?.game_id) return undefined;
     let cancelled = false;
     const poll = () => autoService.getAutoStatus(game.game_id, "nc2").then((status) => {
-      if (cancelled) return;
+      if (cancelled || !gameResponseGuardRef.current.isActive(game.game_id)) return;
       setAutoStatus(status);
       setAutoStatusError(null);
       if (status.running && (status.play_mode === "one" || status.play_mode === "keep")) {
@@ -510,9 +525,9 @@ export default function Nc2UserGamePage() {
     let reconnectTimer;
     let cancelled = false;
 
-    const refreshEventGame = (gameId) => {
+    const refreshEventGame = (gameId, activate = false) => {
       if (!gameId) return;
-      restore(gameId).catch(() => {});
+      restore(gameId, { activate }).catch(() => {});
     };
     const connect = () => {
       if (cancelled) return;
@@ -525,6 +540,7 @@ export default function Nc2UserGamePage() {
       };
       ws.onmessage = (event) => {
         try {
+          if (!gameResponseGuardRef.current.isActive(game.game_id)) return;
           const message = JSON.parse(event.data);
           const type = message.type;
           const data = message.data || {};
@@ -543,7 +559,8 @@ export default function Nc2UserGamePage() {
           }
 
           if (type === "round_committed") {
-            refreshEventGame(data.game_id || game.game_id);
+            const eventGameId = data.game_id || game.game_id;
+            refreshEventGame(eventGameId, Number(eventGameId) !== Number(game.game_id));
             setAutoStatus((previous) => ({
               ...previous,
               phase: data.phase ?? previous.phase,
@@ -571,10 +588,10 @@ export default function Nc2UserGamePage() {
               stop_reason: data.stop_reason ?? data.reason ?? previous.stop_reason,
             }));
             if (data.game_id && Number(data.game_id) !== Number(game.game_id)) {
-              refreshEventGame(data.game_id);
+              refreshEventGame(data.game_id, true);
             }
           } else if (type === "game_switched" && data.new_game_id) {
-            refreshEventGame(data.new_game_id);
+            refreshEventGame(data.new_game_id, true);
           } else if (type === "auto_restarted") {
             setAutoStatus((previous) => ({
               ...previous,
@@ -588,7 +605,7 @@ export default function Nc2UserGamePage() {
               pnl_actual_p: 0,
               stop_reason: data.stop_reason || null,
             }));
-            refreshEventGame(data.game_id);
+            refreshEventGame(data.game_id, true);
           } else if (type === "bet_attempt") {
             setGame((previous) => previous ? {
               ...previous,
@@ -630,7 +647,11 @@ export default function Nc2UserGamePage() {
   const record = async (actual) => {
     if (!game?.game_id || loading || replay.active) return;
     setLoading(true); setError("");
-    try { applyGame((await apiCaller.post(NC2_GAMES_API.ROUND, { game_id: game.game_id, actual })).data); }
+    const ticket = gameResponseGuardRef.current.begin(game.game_id);
+    try {
+      const response = await apiCaller.post(NC2_GAMES_API.ROUND, { game_id: game.game_id, actual });
+      if (gameResponseGuardRef.current.canApply(ticket)) applyGame(response.data);
+    }
     catch (err) { setError(err.response?.data?.detail || "결과 입력 실패"); }
     finally { setLoading(false); }
   };
@@ -666,7 +687,7 @@ export default function Nc2UserGamePage() {
       setSelectedSlotNo(slotNo);
       if (slot?.occupied) {
         syncAutoStatusFromSlot(slot);
-        await restore(slot.game_id);
+        await restore(slot.game_id, { activate: true });
       } else {
         clearCurrentGame();
         await start({ slotNo });
@@ -698,7 +719,7 @@ export default function Nc2UserGamePage() {
       if (nextSlot) {
         setSelectedSlotNo(nextSlot.slot_no);
         syncAutoStatusFromSlot(nextSlot);
-        await restore(nextSlot.game_id);
+        await restore(nextSlot.game_id, { activate: true });
       }
     } catch (err) {
       const code = err.response?.data?.detail?.error;
@@ -745,6 +766,7 @@ export default function Nc2UserGamePage() {
   const confirmReplay = () => {
     if (!replayPreview) return;
     const originGameId = replay.active ? replay.originGameId : game?.game_id;
+    gameResponseGuardRef.current.clear();
     setGame(replayPreview);
     setReplay({
       active: true,
@@ -786,7 +808,7 @@ export default function Nc2UserGamePage() {
     if (!originGameId) return;
     setReplayLoading(true);
     try {
-      await restore(originGameId);
+      await restore(originGameId, { activate: true });
       setReplay({ active: false, sourceGameId: null, originGameId: null, roundNum: 0, totalRounds: 0 });
       setRoundInput("");
     } finally {

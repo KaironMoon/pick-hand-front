@@ -16,11 +16,14 @@ import PeopleIcon from "@mui/icons-material/People";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import LogoutIcon from "@mui/icons-material/Logout";
+import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 
 import { useNavigate } from "react-router-dom";
 import { useAtomValue, useSetAtom } from "jotai";
 import { userAtom, logoutAtom } from "@/store/auth-store";
 import { blockedGamesAtom, fetchBlockedGamesAtom } from "@/store/app-settings-store";
+import autoService from "@/services/auto-service";
+import { emergencyStopResultMessage } from "@/utils/emergency-stop-result";
 
 function PageLeftMenu({ isMobile, onMenuClose }) {
   const theme = useTheme();
@@ -30,6 +33,10 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
   const blockedGames = useAtomValue(blockedGamesAtom);
   const fetchBlocked = useSetAtom(fetchBlockedGamesAtom);
   const [popupOpen, setPopupOpen] = useState(false);
+  const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const [emergencyBusy, setEmergencyBusy] = useState(false);
+  const [emergencyResult, setEmergencyResult] = useState(null);
+  const [emergencyError, setEmergencyError] = useState("");
 
   useEffect(() => {
     fetchBlocked();
@@ -52,6 +59,29 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
   const handleLogout = async () => {
     await logout();
     navigate("/login", { replace: true });
+  };
+
+  const openEmergencyStop = () => {
+    setEmergencyResult(null);
+    setEmergencyError("");
+    setEmergencyOpen(true);
+  };
+
+  const handleEmergencyStop = async () => {
+    if (emergencyBusy) return;
+    setEmergencyBusy(true);
+    setEmergencyError("");
+    try {
+      setEmergencyResult(await autoService.emergencyStop());
+    } catch (error) {
+      setEmergencyError(
+        error.response?.data?.detail?.error === "auto_stop_dispatch_failed"
+          ? "오토 실행 서버에 정지 명령을 전달하지 못했습니다. 잠시 후 다시 시도해 주세요."
+          : "전체 비상정지 요청을 처리하지 못했습니다.",
+      );
+    } finally {
+      setEmergencyBusy(false);
+    }
   };
 
   return (
@@ -374,6 +404,42 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
           </Button>
         </DialogActions>
       </Dialog>
+      <Dialog
+        open={emergencyOpen}
+        onClose={emergencyBusy ? undefined : () => setEmergencyOpen(false)}
+        PaperProps={{ sx: { backgroundColor: "background.paper", border: "1px solid #d32f2f", minWidth: 340 } }}
+      >
+        <DialogTitle sx={{ color: "#f44336", fontWeight: 800 }}>전체 비상정지</DialogTitle>
+        <DialogContent>
+          {emergencyResult ? (
+            <Typography sx={{ color: emergencyResult.failed || emergencyResult.worker_failed || emergencyResult.discovery_failed ? "#ff9800" : "text.primary" }}>
+              {emergencyStopResultMessage(emergencyResult)}
+            </Typography>
+          ) : (
+            <Typography sx={{ color: "text.primary" }}>
+              현재 계정의 글로벌히트·나이스초이스 전체 슬롯 오토를 모두 정지하시겠습니까?
+            </Typography>
+          )}
+          {emergencyError && <Typography sx={{ color: "#f44336", mt: 1 }}>{emergencyError}</Typography>}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          {emergencyResult ? (
+            <Button onClick={() => setEmergencyOpen(false)} variant="contained">확인</Button>
+          ) : (
+            <>
+              <Button onClick={() => setEmergencyOpen(false)} disabled={emergencyBusy}>취소</Button>
+              <Button
+                onClick={handleEmergencyStop}
+                disabled={emergencyBusy}
+                variant="contained"
+                color="error"
+              >
+                {emergencyBusy ? "정지 중..." : "모두 정지"}
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
       <Box sx={{ mt: "auto", p: 1.5 }}>
         <Divider sx={{ bgcolor: "military.border", mb: 1.5 }} />
         {user && (
@@ -381,6 +447,16 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
             <Box sx={{ color: "#888", fontSize: "0.75rem" }}>{user.nickname || user.username}</Box>
           </Box>
         )}
+        <Button
+          fullWidth
+          variant="contained"
+          color="error"
+          startIcon={<ReportProblemIcon />}
+          onClick={openEmergencyStop}
+          sx={{ mb: 1, fontWeight: 800 }}
+        >
+          전체 비상정지
+        </Button>
         <Button
           fullWidth
           variant="outlined"

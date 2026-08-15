@@ -34,10 +34,12 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import SettingsIcon from "@mui/icons-material/Settings";
+import StopCircleIcon from "@mui/icons-material/StopCircle";
 import { useNavigate } from "react-router-dom";
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
 import { USERS_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
+import { emergencyStopResultMessage } from "@/utils/emergency-stop-result";
 
 function UsersPage() {
   const theme = useTheme();
@@ -64,6 +66,7 @@ function UsersPage() {
   const [copySource, setCopySource] = useState("");
   const [copyError, setCopyError] = useState("");
   const [copying, setCopying] = useState(false);
+  const [emergencyStoppingId, setEmergencyStoppingId] = useState(null);
   const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
 
   const fetchUsers = useCallback(async () => {
@@ -184,6 +187,32 @@ function UsersPage() {
     }
   };
 
+  const handleEmergencyStop = async (target) => {
+    const label = target.nickname || target.username;
+    if (!window.confirm(`${label} 계정의 글로벌히트·나이스초이스 Auto를 모두 비상정지할까요?`)) return;
+    setEmergencyStoppingId(target.id);
+    try {
+      const response = await apiCaller.post(USERS_API.EMERGENCY_STOP(target.id));
+      const result = response.data;
+      setSnack({
+        open: true,
+        message: `${target.username}: ${emergencyStopResultMessage(result)}`,
+        severity: result.ok ? "success" : "warning",
+      });
+      if (result.ok) {
+        setUsers((current) => current.map((user) => (
+          user.id === target.id ? { ...user, has_running_auto: false } : user
+        )));
+      } else {
+        await fetchUsers();
+      }
+    } catch {
+      setSnack({ open: true, message: `${target.username} 계정의 Auto 비상정지에 실패했습니다.`, severity: "error" });
+    } finally {
+      setEmergencyStoppingId(null);
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const d = new Date(dateStr);
@@ -294,6 +323,18 @@ function UsersPage() {
                   </TableCell>
                   <TableCell sx={cellSx}>{formatDate(user.created_at)}</TableCell>
                   <TableCell sx={{ ...cellSx, textAlign: "center" }}>
+                    <Tooltip title={user.has_running_auto ? "GH·나이스초이스 Auto 비상정지" : "실행 중인 Auto 없음"}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          disabled={!user.has_running_auto || emergencyStoppingId === user.id}
+                          onClick={() => handleEmergencyStop(user)}
+                          sx={{ color: "#f44336" }}
+                        >
+                          <StopCircleIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
                     <Tooltip title="GH 설정 편집">
                       <IconButton
                         size="small"
