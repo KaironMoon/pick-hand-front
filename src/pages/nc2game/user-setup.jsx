@@ -9,6 +9,7 @@ import apiCaller from "@/services/api-caller";
 import { NC2_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 import { nc2GameReturnPath } from "./slot-navigation.js";
 import { buildFixedNc2AssistRules, visibleNc2AssistRows } from "./assist-settings.js";
+import { nc2ZzzStopLabel } from "./zzz-stop-label.js";
 
 const GREEN = "#4caf50";
 const NC2_CELL_WIDTH = 84;
@@ -265,8 +266,8 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
           <Nc2Input value={value.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(budget) => onChange({ ...value, budget: Math.max(0, budget) })} />
           <td colSpan={3} style={cell}>{index === 0 ? "나이스초이스2 전용" : <label style={{ cursor: "pointer", display: "inline-flex", gap: 5, alignItems: "center" }}><input type="checkbox" checked={sharesZzz1Nc} onChange={(event) => onChange({ ...value, use_zzz1_nc: event.target.checked })} />ZZZ 1번 NC 사용</label>}</td>
           <Nc2Input value={value.stop_round || 0} prefix="회차:" integer style={cell} onChange={(stop_round) => onChange({ ...value, stop_round: Math.max(0, Math.min(60, stop_round)) })} />
-          <Nc2Input value={value.stop_step || 0} prefix="패시:" integer style={cell} onChange={(stop_step) => onChange({ ...value, stop_step: Math.max(0, Math.min(max, stop_step)) })} />
-          <td colSpan={2} style={{ ...cell, color: "#888", fontSize: 10 }}>{Number(value.stop_round || 0) === 0 ? "회차 0 = 미사용" : Number(value.stop_step || 0) === 0 ? "회차 도달 즉시 종료" : "회차 이후 패시 종료"}</td>
+          <Nc2Input value={value.stop_step || 0} prefix="패:" integer style={cell} onChange={(stop_step) => onChange({ ...value, stop_step: Math.max(0, Math.min(max, stop_step)) })} />
+          <td colSpan={2} style={{ ...cell, color: "#888", fontSize: 10 }}>{nc2ZzzStopLabel(value.stop_round, value.stop_step)}</td>
         </tr>
         {pointRows("trigger_points", "베팅포인트")}
         <tr><td style={blue}>베팅종류</td>{betTypes.map(([type, label]) => <td key={type} style={value.bet_type === type ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...value, bet_type: type })}>{label}</td>)}<td colSpan={5} style={empty}></td></tr>

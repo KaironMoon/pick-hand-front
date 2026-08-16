@@ -18,6 +18,7 @@ import { clearNc2KeepCombination, loadNc2KeepCombination, saveNc2KeepCombination
 import { createGameResponseGuard } from "./game-response-guard.js";
 import { isNc2ReferenceFixedOpen } from "./reference-sections.js";
 import { nc2SetupPath } from "./slot-navigation.js";
+import { nc2ZzzStopLabel } from "./zzz-stop-label.js";
 import { NC2_GAMES_API } from "@/constants/api-url";
 import {
   loadShoeCopySourceType,
@@ -233,7 +234,7 @@ function MartinZzzBoard({ zzz, actuals, roundHistory }) {
     ["연패", `${zzz.loss_streak || 0}연패`],
     ["손익", `${Number(zzz.pnl || 0).toFixed(1)}P`],
     ["상태", zzz.ended ? `${zzz.ended_at_round || "-"}회 종료` : "진행"],
-    ["종료조건", Number(zzz.stop_round || 0) === 0 ? "미사용" : Number(zzz.stop_step || 0) === 0 ? `${zzz.stop_round}회 즉시` : `${zzz.stop_round}회/${zzz.stop_step}패시`],
+    ["종료조건", nc2ZzzStopLabel(zzz.stop_round, zzz.stop_step)],
   ];
   const componentForRound = (roundIndex) => {
     if (roundIndex === String(actuals || "").length) {
