@@ -29,16 +29,19 @@ const ASSIST_OPTIONS = ["회차진행", "6회쉬기", "6+6", "회차반대"];
 const NC2_MAX_BET_STEPS = 25;
 const AMOUNT_GRID_COLUMNS = 8;
 const AMOUNT_GRID_ROWS = Math.ceil(NC2_MAX_BET_STEPS / AMOUNT_GRID_COLUMNS);
-const ZZZ_POINT_OPTIONS = Array.from({ length: 13 }, (_, index) => Math.round((index + 1) * 2) / 10);
+const ZZZ_POINT_GRID_COLUMNS = 8;
+const ZZZ_POINT_OPTIONS = Array.from({ length: 24 }, (_, index) => Math.round((index + 1) * 2) / 10);
+const ZZZ_POINT_GRID_ROWS = Math.ceil(ZZZ_POINT_OPTIONS.length / ZZZ_POINT_GRID_COLUMNS);
 const ZZZ_RANDOM_COUNT_OPTIONS = [32, 64, 96, 128];
 const DEFAULT_MARTIN_ZZZ = {
   enabled: false, budget: 0, bet_type: "martin", step_min: 1, step_max: 20,
+  stop_round: 0, stop_step: 0,
   amounts: Array(NC2_MAX_BET_STEPS).fill(0), cond_lo: 0, cond_hi: 100,
   amounts_blue: Array(NC2_MAX_BET_STEPS).fill(0), amounts_white: Array(NC2_MAX_BET_STEPS).fill(0), amounts_red: Array(NC2_MAX_BET_STEPS).fill(0),
   trigger_points: [], loss_trigger_streak: 4, loss4_extra_points: [],
   reference_count: 128, reference_game_seqs: [], use_zzz1_nc: false,
 };
-const MARTIN_ZZZ_COUNT = 5;
+const MARTIN_ZZZ_COUNT = 7;
 
 function Nc2Input({ value, onChange, prefix = "", suffix = "", integer = false, style = cell, disabled: inputDisabled = false }) {
   const [editing, setEditing] = useState(false);
@@ -237,10 +240,10 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
   };
   const duplicateValues = new Set(refs.filter((item, index) => item && refs.indexOf(item) !== index).map(Number));
   const pointRows = (key, label) => <>
-    {Array.from({ length: 2 }, (_, row) => <tr key={`${key}-${row}`}>
-      {row === 0 && <td rowSpan={2} colSpan={2} style={{ ...blue, whiteSpace: "normal", lineHeight: 1.15 }}>{label}</td>}
-      {Array.from({ length: 8 }, (__, offset) => {
-        const point = ZZZ_POINT_OPTIONS[row * 8 + offset];
+    {Array.from({ length: ZZZ_POINT_GRID_ROWS }, (_, row) => <tr key={`${key}-${row}`}>
+      {row === 0 && <td rowSpan={ZZZ_POINT_GRID_ROWS} colSpan={2} style={{ ...blue, whiteSpace: "normal", lineHeight: 1.15 }}>{label}</td>}
+      {Array.from({ length: ZZZ_POINT_GRID_COLUMNS }, (__, offset) => {
+        const point = ZZZ_POINT_OPTIONS[row * ZZZ_POINT_GRID_COLUMNS + offset];
         if (!point) return <td key={offset} style={empty}></td>;
         const selected = (value[key] || []).map(Number).includes(point);
         return <td key={point} style={selected ? { ...teal, color: "#0066FF", fontWeight: "bold", cursor: "pointer" } : method} onClick={() => togglePoint(key, point)}>{point.toFixed(1)}</td>;
@@ -260,7 +263,10 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
           <td style={{ ...red, background: "#7b1fa2", color: "#fff" }}>마틴 ZZZ {index + 1}</td>
           <td style={enabled ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...value, enabled: !enabled })}>{enabled ? "사용함" : "사용안함"}</td>
           <Nc2Input value={value.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(budget) => onChange({ ...value, budget: Math.max(0, budget) })} />
-          <td colSpan={7} style={cell}>{index === 0 ? "나이스초이스2 전용" : <label style={{ cursor: "pointer", display: "inline-flex", gap: 5, alignItems: "center" }}><input type="checkbox" checked={sharesZzz1Nc} onChange={(event) => onChange({ ...value, use_zzz1_nc: event.target.checked })} />ZZZ 1번 NC 사용</label>}</td>
+          <td colSpan={3} style={cell}>{index === 0 ? "나이스초이스2 전용" : <label style={{ cursor: "pointer", display: "inline-flex", gap: 5, alignItems: "center" }}><input type="checkbox" checked={sharesZzz1Nc} onChange={(event) => onChange({ ...value, use_zzz1_nc: event.target.checked })} />ZZZ 1번 NC 사용</label>}</td>
+          <Nc2Input value={value.stop_round || 0} prefix="회차:" integer style={cell} onChange={(stop_round) => onChange({ ...value, stop_round: Math.max(0, Math.min(60, stop_round)) })} />
+          <Nc2Input value={value.stop_step || 0} prefix="패시:" integer style={cell} onChange={(stop_step) => onChange({ ...value, stop_step: Math.max(0, Math.min(max, stop_step)) })} />
+          <td colSpan={2} style={{ ...cell, color: "#888", fontSize: 10 }}>{Number(value.stop_round || 0) === 0 ? "회차 0 = 미사용" : Number(value.stop_step || 0) === 0 ? "회차 도달 즉시 종료" : "회차 이후 패시 종료"}</td>
         </tr>
         {pointRows("trigger_points", "베팅포인트")}
         <tr><td style={blue}>베팅종류</td>{betTypes.map(([type, label]) => <td key={type} style={value.bet_type === type ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...value, bet_type: type })}>{label}</td>)}<td colSpan={5} style={empty}></td></tr>

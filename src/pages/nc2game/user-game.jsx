@@ -232,6 +232,8 @@ function MartinZzzBoard({ zzz, actuals, roundHistory }) {
     ["금액", `${Number(zzz.amount || 0).toFixed(1)}P`],
     ["연패", `${zzz.loss_streak || 0}연패`],
     ["손익", `${Number(zzz.pnl || 0).toFixed(1)}P`],
+    ["상태", zzz.ended ? `${zzz.ended_at_round || "-"}회 종료` : "진행"],
+    ["종료조건", Number(zzz.stop_round || 0) === 0 ? "미사용" : Number(zzz.stop_step || 0) === 0 ? `${zzz.stop_round}회 즉시` : `${zzz.stop_round}회/${zzz.stop_step}패시`],
   ];
   const componentForRound = (roundIndex) => {
     if (roundIndex === String(actuals || "").length) {
@@ -253,6 +255,13 @@ function MartinZzzBoard({ zzz, actuals, roundHistory }) {
     </Box>
     <Box sx={{ overflowX: "auto", borderTop: "1px solid #4a3d5f" }}>
       <Box component="table" sx={{ borderCollapse: "collapse", tableLayout: "fixed", minWidth: 1920, fontSize: 10 }}><tbody>
+      <tr>
+        <Box component="th" sx={{ position: "sticky", left: 0, zIndex: 2, width: 64, minWidth: 64, height: 24, backgroundColor: "#251832", borderRight: "1px solid #4a3d5f", borderBottom: "1px solid #4a3d5f" }}>회차</Box>
+        {Array.from({ length: 60 }, (_, roundIndex) => {
+          const isCurrent = roundIndex === currentRound;
+          return <Box component="th" key={roundIndex} sx={{ width: 31, minWidth: 31, height: 24, textAlign: "center", borderRight: isCurrent ? "2px solid #ffb300" : "1px solid #4a3d5f", borderBottom: "1px solid #4a3d5f", backgroundColor: isCurrent ? "#6d4c00" : "#251832", color: isCurrent ? "#fff59d" : "#ddd", boxShadow: isCurrent ? "inset 0 0 8px rgba(255,193,7,.45)" : "none" }}>{isCurrent ? `▶${roundIndex + 1}` : roundIndex + 1}</Box>;
+        })}
+      </tr>
       <tr>
         <Box component="th" sx={{ position: "sticky", left: 0, zIndex: 2, width: 64, minWidth: 64, backgroundColor: "#251832", borderRight: "1px solid #4a3d5f", borderBottom: "1px solid #4a3d5f", lineHeight: 1.1 }}>NC금액<br />합계</Box>
         {Array.from({ length: 60 }, (_, roundIndex) => {
