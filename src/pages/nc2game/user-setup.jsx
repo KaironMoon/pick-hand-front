@@ -7,7 +7,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import apiCaller from "@/services/api-caller";
 import { NC2_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
-import { nc2GameReturnPath } from "./slot-navigation.js";
+import { nc2GameReturnPath, nc2SelectedSlotNo } from "./slot-navigation.js";
 import { buildFixedNc2AssistRules, visibleNc2AssistRows } from "./assist-settings.js";
 import { nc2ZzzStopLabel } from "./zzz-stop-label.js";
 
@@ -40,9 +40,24 @@ const DEFAULT_MARTIN_ZZZ = {
   amounts: Array(NC2_MAX_BET_STEPS).fill(0), cond_lo: 0, cond_hi: 100,
   amounts_blue: Array(NC2_MAX_BET_STEPS).fill(0), amounts_white: Array(NC2_MAX_BET_STEPS).fill(0), amounts_red: Array(NC2_MAX_BET_STEPS).fill(0),
   trigger_points: [], loss_trigger_streak: 4, loss4_extra_points: [],
-  reference_count: 128, reference_game_seqs: [], use_zzz1_nc: false,
+  reference_count: 128, reference_game_seqs: [], use_slot1_nc: false, use_zzz1_nc: false,
+};
+const DEFAULT_MARTIN_Z = {
+  enabled: false, budget: 0, bet_type: "martin", step_min: 1, step_max: 20,
+  amounts: Array(NC2_MAX_BET_STEPS).fill(0),
 };
 const MARTIN_ZZZ_COUNT = 7;
+
+const martinZzzsFromSetup = (setup = {}) => Array.from({ length: MARTIN_ZZZ_COUNT }, (_, index) => {
+  const saved = Array.isArray(setup.martin_zzzs)
+    ? setup.martin_zzzs[index]
+    : index === 0 ? setup.martin_zzz : {};
+  return {
+    ...DEFAULT_MARTIN_ZZZ,
+    ...saved,
+    use_zzz1_nc: index > 0 && (saved?.use_zzz1_nc ?? true),
+  };
+});
 
 function Nc2Input({ value, onChange, prefix = "", suffix = "", integer = false, style = cell, disabled: inputDisabled = false }) {
   const [editing, setEditing] = useState(false);
@@ -127,7 +142,7 @@ function Nc2SetupTable({ config, onChange, label = "NC2" }) {
   </tbody></table>;
 }
 
-function MartinZSetupTable({ martin, onChange }) {
+function MartinZSetupTable({ martin, onChange, slotNo }) {
   const enabled = !!martin.enabled;
   const min = Math.max(1, Number(martin.step_min || 1));
   const max = Math.min(NC2_MAX_BET_STEPS, Math.max(min, Number(martin.step_max || 20)));
@@ -147,7 +162,7 @@ function MartinZSetupTable({ martin, onChange }) {
   };
   return <table style={{ borderCollapse: "collapse", minWidth: 504, color: "#fff" }}><tbody>
     <tr>
-      <td style={{ ...red, background: "#c62828", color: "#fff" }}>마틴 Z</td>
+      <td style={{ ...red, background: "#c62828", color: "#fff" }}>S{slotNo} 마틴 Z</td>
       <td style={enabled ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...martin, enabled: !enabled })}>{enabled ? "사용함" : "사용안함"}</td>
       <Nc2Input value={martin.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(value) => onChange({ ...martin, budget: Math.max(0, value) })} />
       <td colSpan={3} style={cell}>트리플나인 전용</td>
@@ -178,7 +193,7 @@ function MartinZSetupTable({ martin, onChange }) {
   </tbody></table>;
 }
 
-function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport, busy }) {
+function MartinZZZSetupTable({ index, martin, zzz1, slot1Zzz1, onChange, onRandom, onImport, busy, slotNo }) {
   const source = martin || {};
   const legacyAmounts = Array.isArray(source.amounts) ? source.amounts : [];
   const value = {
@@ -194,23 +209,24 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
   const max = Math.min(NC2_MAX_BET_STEPS, Math.max(min, Number(value.step_max || 20)));
   const lo = Number(value.cond_lo ?? DEFAULT_MARTIN_ZZZ.cond_lo);
   const hi = Number(value.cond_hi ?? DEFAULT_MARTIN_ZZZ.cond_hi);
+  const sharesSlot1Nc = slotNo > 1 && index === 0 && !!value.use_slot1_nc;
   const sharesZzz1Nc = index > 0 && !!value.use_zzz1_nc;
-  const refs = sharesZzz1Nc
-    ? (Array.isArray(zzz1?.reference_game_seqs) ? zzz1.reference_game_seqs : [])
-    : (Array.isArray(value.reference_game_seqs) ? value.reference_game_seqs : []);
+  const referenceOwner = sharesZzz1Nc ? zzz1 : sharesSlot1Nc ? slot1Zzz1 : value;
+  const sharesReferenceNc = sharesSlot1Nc || sharesZzz1Nc;
+  const refs = Array.isArray(referenceOwner?.reference_game_seqs) ? referenceOwner.reference_game_seqs : [];
   const [importOpen, setImportOpen] = useState(false);
   const [sourceGameId, setSourceGameId] = useState("");
   const [importError, setImportError] = useState("");
   const [randomCount, setRandomCount] = useState(
-    ZZZ_RANDOM_COUNT_OPTIONS.includes(Number(sharesZzz1Nc ? zzz1?.reference_count : source.reference_count))
-      ? Number(sharesZzz1Nc ? zzz1?.reference_count : source.reference_count) : 128,
+    ZZZ_RANDOM_COUNT_OPTIONS.includes(Number(referenceOwner?.reference_count))
+      ? Number(referenceOwner.reference_count) : 128,
   );
   const betTypes = [["martin", "마틴"], ["kkangbet", "깡벳"], ["fixed", "고정벳"], ["manual", "수동"]];
 
   useEffect(() => {
-    const referenceCount = Number(sharesZzz1Nc ? zzz1?.reference_count : source.reference_count);
+    const referenceCount = Number(referenceOwner?.reference_count);
     if (ZZZ_RANDOM_COUNT_OPTIONS.includes(referenceCount)) setRandomCount(referenceCount);
-  }, [sharesZzz1Nc, source.reference_count, zzz1?.reference_count]);
+  }, [referenceOwner?.reference_count]);
 
   const togglePoint = (key, point) => {
     const selected = (value[key] || []).map(Number);
@@ -262,10 +278,14 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
     <Box sx={{ overflowX: "auto", pb: 1 }}>
       <table style={{ borderCollapse: "collapse", minWidth: NC2_CELL_WIDTH * 10, color: "#fff" }}><tbody>
         <tr>
-          <td style={{ ...red, background: "#7b1fa2", color: "#fff" }}>마틴 ZZZ {index + 1}</td>
+          <td style={{ ...red, background: "#7b1fa2", color: "#fff" }}>S{slotNo} 마틴 ZZZ {index + 1}</td>
           <td style={enabled ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...value, enabled: !enabled })}>{enabled ? "사용함" : "사용안함"}</td>
           <Nc2Input value={value.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(budget) => onChange({ ...value, budget: Math.max(0, budget) })} />
-          <td colSpan={3} style={cell}>{index === 0 ? "나이스초이스2 전용" : <label style={{ cursor: "pointer", display: "inline-flex", gap: 5, alignItems: "center" }}><input type="checkbox" checked={sharesZzz1Nc} onChange={(event) => onChange({ ...value, use_zzz1_nc: event.target.checked })} />ZZZ 1번 NC 사용</label>}</td>
+          <td colSpan={3} style={cell}>{index === 0
+            ? slotNo === 1
+              ? "나이스초이스2 전용"
+              : <label style={{ cursor: "pointer", display: "inline-flex", gap: 5, alignItems: "center" }}><input type="checkbox" checked={sharesSlot1Nc} onChange={(event) => onChange({ ...value, use_slot1_nc: event.target.checked })} />슬롯 1 NC 사용</label>
+            : <label style={{ cursor: "pointer", display: "inline-flex", gap: 5, alignItems: "center" }}><input type="checkbox" checked={sharesZzz1Nc} onChange={(event) => onChange({ ...value, use_zzz1_nc: event.target.checked })} />ZZZ 1번 NC 사용</label>}</td>
           <Nc2Input value={value.stop_round || 0} prefix="회차:" integer style={cell} onChange={(stop_round) => onChange({ ...value, stop_round: Math.max(0, Math.min(60, stop_round)) })} />
           <Nc2Input value={value.stop_step || 0} prefix="패:" integer style={cell} onChange={(stop_step) => onChange({ ...value, stop_step: Math.max(0, Math.min(max, stop_step)) })} />
           <td colSpan={2} style={{ ...cell, color: "#888", fontSize: 10 }}>{nc2ZzzStopLabel(value.stop_round, value.stop_step)}</td>
@@ -296,12 +316,12 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
           <td colSpan={2} style={blue}>ZZZ 기준 NC 번호</td>
           <td colSpan={8} style={{ ...cell, height: "auto", padding: 4, whiteSpace: "normal" }}>
             <Box sx={{ display: "flex", gap: .7, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
-              <TextField select size="small" label="랜덤 개수" value={randomCount} disabled={sharesZzz1Nc} onChange={(event) => updateReferenceCount(Number(event.target.value))} SelectProps={{ native: true }} sx={{ width: 105, "& .MuiInputBase-root": { height: 32 } }}>
+              <TextField select size="small" label="랜덤 개수" value={randomCount} disabled={sharesReferenceNc} onChange={(event) => updateReferenceCount(Number(event.target.value))} SelectProps={{ native: true }} sx={{ width: 105, "& .MuiInputBase-root": { height: 32 } }}>
                 {ZZZ_RANDOM_COUNT_OPTIONS.map((count) => <option key={count} value={count}>{count}개</option>)}
               </TextField>
-              <Button size="small" variant="contained" disabled={busy || sharesZzz1Nc} onClick={() => onRandom(randomCount)}>랜덤으로 다시 고르기</Button>
-              <Button size="small" variant="outlined" disabled={busy || sharesZzz1Nc} onClick={() => { setImportError(""); setImportOpen(true); }}>나초2에서 가져오기</Button>
-              <Button size="small" color="warning" disabled={busy || sharesZzz1Nc || refs.length === 0} onClick={() => onChange({ ...value, reference_game_seqs: [] })}>전체 초기화</Button>
+              <Button size="small" variant="contained" disabled={busy || sharesReferenceNc} onClick={() => onRandom(randomCount)}>랜덤으로 다시 고르기</Button>
+              <Button size="small" variant="outlined" disabled={busy || sharesReferenceNc} onClick={() => { setImportError(""); setImportOpen(true); }}>나초2에서 가져오기</Button>
+              <Button size="small" color="warning" disabled={busy || sharesReferenceNc || refs.length === 0} onClick={() => onChange({ ...value, reference_game_seqs: [] })}>전체 초기화</Button>
               <Typography variant="caption" sx={{ color: "#aaa" }}>{refs.filter((item) => Number(item) > 0).length}/{randomCount}개</Typography>
             </Box>
           </td>
@@ -315,7 +335,7 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
             return <td key={index} style={{ ...cell, padding: 0, border: invalid ? "1px solid #f44336" : cell.border, background: "#15191f" }}>
               <Box sx={{ display: "flex", alignItems: "center" }}>
                 <Box sx={{ width: 25, flexShrink: 0, color: "#777", fontSize: 9, textAlign: "center" }}>{index + 1}</Box>
-                <input type="number" min="1" value={ref} disabled={sharesZzz1Nc} onChange={(event) => updateReference(index, event.target.value)} style={{ width: "100%", minWidth: 0, height: 24, border: 0, outline: "none", background: "transparent", color: invalid ? "#ff5252" : sharesZzz1Nc ? "#999" : "#fff", textAlign: "center", fontSize: 11 }} />
+                <input type="number" min="1" value={ref} disabled={sharesReferenceNc} onChange={(event) => updateReference(index, event.target.value)} style={{ width: "100%", minWidth: 0, height: 24, border: 0, outline: "none", background: "transparent", color: invalid ? "#ff5252" : sharesReferenceNc ? "#999" : "#fff", textAlign: "center", fontSize: 11 }} />
               </Box>
             </td>;
           })}
@@ -346,27 +366,33 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
 
 export default function Nc2UserSetupPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedSlotNo = nc2SelectedSlotNo(searchParams.get("slot"));
   const [config, setConfig] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [referenceBusy, setReferenceBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const martinZzzs = Array.from({ length: MARTIN_ZZZ_COUNT }, (_, index) => {
-    const saved = Array.isArray(config?.martin_zzzs)
-      ? config.martin_zzzs[index]
-      : index === 0 ? config?.martin_zzz : {};
-    return {
-      ...DEFAULT_MARTIN_ZZZ,
-      ...saved,
-      use_zzz1_nc: index > 0 && (saved?.use_zzz1_nc ?? true),
-    };
-  });
   const nc2Setups = Array.from({ length: 6 }, (_, index) => {
     const saved = Array.isArray(config?.nc2_setups) ? config.nc2_setups[index] : null;
-    return saved || config || {};
+    return {
+      ...(saved || config || {}),
+      martin_z: saved?.martin_z || config?.martin_z || DEFAULT_MARTIN_Z,
+      martin_zzzs: saved?.martin_zzzs || config?.martin_zzzs || [],
+      martin_zzz: saved?.martin_zzz || config?.martin_zzz,
+    };
   });
+  const selectedSetup = nc2Setups[selectedSlotNo - 1] || {};
+  const martinZzzs = martinZzzsFromSetup(selectedSetup);
+  const slot1Zzz1 = martinZzzsFromSetup(nc2Setups[0])[0];
+  const effectiveZzz1 = selectedSlotNo > 1 && martinZzzs[0]?.use_slot1_nc
+    ? {
+        ...martinZzzs[0],
+        reference_count: slot1Zzz1.reference_count,
+        reference_game_seqs: slot1Zzz1.reference_game_seqs,
+      }
+    : martinZzzs[0];
 
   useEffect(() => {
     apiCaller.get(USER_BET_SETTINGS_API.GET("nc2"))
@@ -385,16 +411,24 @@ export default function Nc2UserSetupPage() {
     return typeof detail === "string" ? detail : detail?.message || fallback;
   };
 
-  const updateMartinZzzs = (nextZzzs) => updateConfig({
-    ...config,
-    martin_zzzs: nextZzzs,
-    martin_zzz: nextZzzs[0],
-  });
-
   const updateNc2Setup = (index, nextSetup) => {
     const nextSetups = nc2Setups.map((setup) => ({ ...setup }));
     nextSetups[index] = nextSetup;
     updateConfig({ ...config, nc2_setups: nextSetups });
+  };
+
+  const updateSelectedSetup = (nextSetup) => updateNc2Setup(selectedSlotNo - 1, nextSetup);
+
+  const updateMartinZzzs = (nextZzzs) => updateSelectedSetup({
+    ...selectedSetup,
+    martin_zzzs: nextZzzs,
+    martin_zzz: nextZzzs[0],
+  });
+
+  const selectSlot = (slotNo) => {
+    setSearchParams({ slot: String(slotNo) }, { replace: true });
+    setMessage("");
+    setError("");
   };
 
   const randomizeZzzReferences = async (index, count) => {
@@ -426,25 +460,53 @@ export default function Nc2UserSetupPage() {
     if (!dirty || saving) return;
     setSaving(true); setError("");
     try {
-      let validatedZzzs = martinZzzs.map((item) => ({ ...item }));
-      for (let index = 0; index < validatedZzzs.length; index += 1) {
-        const zzz = validatedZzzs[index];
-        if (!zzz.enabled) continue;
-        if (!(zzz.trigger_points || []).length) throw new Error(`마틴 ZZZ ${index + 1} 베팅포인트를 한 개 이상 선택하세요.`);
-        const referenceOwner = index > 0 && zzz.use_zzz1_nc ? validatedZzzs[0] : zzz;
-        const gameSeqs = (referenceOwner.reference_game_seqs || []).filter((item) => item !== "" && item != null).map(Number);
-        if (!gameSeqs.length) throw new Error(`마틴 ZZZ ${index + 1} 기준 NC 번호를 한 개 이상 입력하세요.`);
-        if (gameSeqs.some((item) => !Number.isInteger(item) || item <= 0) || new Set(gameSeqs).size !== gameSeqs.length || gameSeqs.length > 128) {
-          throw new Error(`마틴 ZZZ ${index + 1} NC 번호는 중복 없는 양수로 최대 128개까지 입력할 수 있습니다.`);
+      const validatedSetups = nc2Setups.map((setup) => ({
+        ...setup,
+        martin_z: { ...DEFAULT_MARTIN_Z, ...(setup.martin_z || {}) },
+        martin_zzzs: martinZzzsFromSetup(setup),
+      }));
+      const referenceValidationCache = new Map();
+      for (let slotIndex = 0; slotIndex < validatedSetups.length; slotIndex += 1) {
+        const validatedZzzs = validatedSetups[slotIndex].martin_zzzs;
+        const usesSlot1Nc = slotIndex > 0 && !!validatedZzzs[0].use_slot1_nc;
+        const effectiveSlotZzz1 = usesSlot1Nc
+          ? validatedSetups[0].martin_zzzs[0]
+          : validatedZzzs[0];
+        for (let index = 0; index < validatedZzzs.length; index += 1) {
+          const zzz = validatedZzzs[index];
+          if (!zzz.enabled) continue;
+          const settingLabel = `S${slotIndex + 1} 마틴 ZZZ ${index + 1}`;
+          if (!(zzz.trigger_points || []).length) throw new Error(`${settingLabel} 베팅포인트를 한 개 이상 선택하세요.`);
+          const usesSharedNc = (index === 0 && usesSlot1Nc) || (index > 0 && zzz.use_zzz1_nc);
+          const referenceOwner = index > 0 && zzz.use_zzz1_nc ? effectiveSlotZzz1 : usesSlot1Nc ? effectiveSlotZzz1 : zzz;
+          const gameSeqs = (referenceOwner.reference_game_seqs || []).filter((item) => item !== "" && item != null).map(Number);
+          if (!gameSeqs.length) throw new Error(`${settingLabel} 기준 NC 번호를 한 개 이상 입력하세요.`);
+          if (gameSeqs.some((item) => !Number.isInteger(item) || item <= 0) || new Set(gameSeqs).size !== gameSeqs.length || gameSeqs.length > 128) {
+            throw new Error(`${settingLabel} NC 번호는 중복 없는 양수로 최대 128개까지 입력할 수 있습니다.`);
+          }
+          const validationKey = gameSeqs.join(",");
+          let validation = referenceValidationCache.get(validationKey);
+          if (!validation) {
+            validation = await apiCaller.post(NC2_GAMES_API.REFERENCE_VALIDATE, { game_seqs: gameSeqs });
+            referenceValidationCache.set(validationKey, validation);
+          }
+          if (!usesSharedNc) {
+            validatedZzzs[index] = { ...zzz, reference_count: validation.data.count, reference_game_seqs: validation.data.game_seqs };
+          }
         }
-        const validation = await apiCaller.post(NC2_GAMES_API.REFERENCE_VALIDATE, { game_seqs: gameSeqs });
-        validatedZzzs[index] = { ...zzz, reference_count: validation.data.count, reference_game_seqs: validation.data.game_seqs };
+        validatedSetups[slotIndex] = {
+          ...validatedSetups[slotIndex],
+          martin_zzzs: validatedZzzs,
+          martin_zzz: validatedZzzs[0],
+        };
       }
+      const firstSetup = validatedSetups[0];
       const nextConfig = {
         ...config,
-        nc2_setups: nc2Setups,
-        martin_zzzs: validatedZzzs,
-        martin_zzz: validatedZzzs[0],
+        nc2_setups: validatedSetups,
+        martin_z: firstSetup.martin_z,
+        martin_zzzs: firstSetup.martin_zzzs,
+        martin_zzz: firstSetup.martin_zzz,
       };
       const response = await apiCaller.put(USER_BET_SETTINGS_API.SAVE("nc2"), { config: nextConfig });
       setConfig(response.data.config);
@@ -460,7 +522,7 @@ export default function Nc2UserSetupPage() {
   return (
     <Box sx={{ p: 2 }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-        <Box onClick={() => navigate(nc2GameReturnPath(searchParams.get("slot")))} sx={{ display: "inline-flex", alignItems: "center", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1.5, py: .5, cursor: "pointer", backgroundColor: "background.paper", "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}>
+        <Box onClick={() => navigate(nc2GameReturnPath(selectedSlotNo))} sx={{ display: "inline-flex", alignItems: "center", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1.5, py: .5, cursor: "pointer", backgroundColor: "background.paper", "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}>
           <Typography variant="caption" sx={{ fontSize: 12 }}>&larr; 뒤로가기</Typography>
         </Box>
         <Box onClick={save} sx={{ display: "inline-flex", alignItems: "center", border: `1px solid ${dirty ? GREEN : "rgba(255,255,255,0.2)"}`, borderRadius: 1, px: 1.5, py: .5, cursor: dirty ? "pointer" : "default", backgroundColor: dirty ? GREEN : "transparent", color: dirty ? "#fff" : "#666", opacity: saving ? .5 : 1, "&:hover": dirty ? { backgroundColor: "#388e3c" } : {} }}>
@@ -510,24 +572,53 @@ export default function Nc2UserSetupPage() {
           <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>{item.help}</Typography>
         </Box>)}
       </Box>
-      {nc2Setups.map((setup, index) => <Box key={`nc2-s${index + 1}`} sx={{ overflowX: "auto", pb: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, p: 1, border: "1px solid rgba(0,168,90,.55)", borderRadius: 1, backgroundColor: "rgba(0,168,90,.06)" }}>
+        <Typography variant="caption" sx={{ fontSize: 12, color: "#00e676", minWidth: 110, fontWeight: "bold" }}>슬롯별 설정</Typography>
+        <Box sx={{ display: "flex", gap: .7, flexWrap: "wrap" }}>
+          {Array.from({ length: 6 }, (_, index) => index + 1).map((slotNo) => {
+            const selected = selectedSlotNo === slotNo;
+            const blocked = referenceBusy || saving;
+            return <Box
+              key={slotNo}
+              role="button"
+              tabIndex={blocked ? undefined : 0}
+              onClick={blocked ? undefined : () => selectSlot(slotNo)}
+              onKeyDown={blocked ? undefined : (event) => {
+                if (event.key === "Enter" || event.key === " ") selectSlot(slotNo);
+              }}
+              sx={{
+                minWidth: 44, px: 1, py: .45, borderRadius: 1,
+                border: `1px solid ${selected ? "#00a85a" : "#555"}`,
+                backgroundColor: selected ? "#17482f" : "#171a1f",
+                color: selected ? "#00e676" : "#aaa",
+                textAlign: "center", fontSize: 12, fontWeight: "bold",
+                cursor: blocked ? "not-allowed" : "pointer", opacity: blocked ? .5 : 1, userSelect: "none",
+              }}
+            >S{slotNo}</Box>;
+          })}
+        </Box>
+        <Typography variant="caption" sx={{ fontSize: 10, color: "#999" }}>아래 NC2·마틴 Z·ZZZ 설정에만 적용</Typography>
+      </Box>
+      <Box key={`nc2-s${selectedSlotNo}`} sx={{ overflowX: "auto", pb: 2 }}>
         <Nc2SetupTable
-          config={setup}
-          label={`NC2 S${index + 1}`}
-          onChange={(nextSetup) => updateNc2Setup(index, nextSetup)}
+          config={selectedSetup}
+          label={`NC2 S${selectedSlotNo}`}
+          onChange={(nextSetup) => updateSelectedSetup(nextSetup)}
         />
-      </Box>)}
+      </Box>
       <Box sx={{ overflowX: "auto", pb: 2 }}>
         <MartinZSetupTable
-          martin={config.martin_z || { enabled: false, budget: 0, bet_type: "martin", step_min: 1, step_max: 20, amounts: Array(NC2_MAX_BET_STEPS).fill(0) }}
-          onChange={(martin_z) => updateConfig({ ...config, martin_z })}
+          martin={selectedSetup.martin_z || DEFAULT_MARTIN_Z}
+          onChange={(martin_z) => updateSelectedSetup({ ...selectedSetup, martin_z })}
+          slotNo={selectedSlotNo}
         />
       </Box>
       {martinZzzs.map((martin, index) => <MartinZZZSetupTable
-        key={index}
+        key={`${selectedSlotNo}-${index}`}
         index={index}
         martin={martin}
-        zzz1={martinZzzs[0]}
+        zzz1={effectiveZzz1}
+        slot1Zzz1={slot1Zzz1}
         onChange={(nextMartin) => {
           const next = martinZzzs.map((item) => ({ ...item }));
           next[index] = nextMartin;
@@ -536,6 +627,7 @@ export default function Nc2UserSetupPage() {
         onRandom={(count) => randomizeZzzReferences(index, count)}
         onImport={(gameId) => importZzzReferences(index, gameId)}
         busy={referenceBusy || saving}
+        slotNo={selectedSlotNo}
       />)}
     </Box>
   );

@@ -17,7 +17,7 @@ import { nc2ItemNumberStyle } from "./item-end-style.js";
 import { clearNc2KeepCombination, loadNc2KeepCombination, saveNc2KeepCombination } from "./keep-combination.js";
 import { createGameResponseGuard } from "./game-response-guard.js";
 import { isNc2ReferenceFixedOpen } from "./reference-sections.js";
-import { nc2SetupPath } from "./slot-navigation.js";
+import { nc2SetupPath, updateNc2GameSearchParams } from "./slot-navigation.js";
 import { nc2ZzzStopLabel } from "./zzz-stop-label.js";
 import { NC2_GAMES_API } from "@/constants/api-url";
 import {
@@ -441,7 +441,15 @@ export default function Nc2UserGamePage() {
   const applyGame = useCallback((data, { activate = false } = {}) => {
     if (activate) gameResponseGuardRef.current.activate(data?.game_id);
     setGame(data);
-    if (data?.game_id) setSearchParams({ gameId: data.game_id }, { replace: true });
+    if (data?.game_id) {
+      setSearchParams(
+        (current) => updateNc2GameSearchParams(current, {
+          gameId: data.game_id,
+          slotNo: data.slot_no,
+        }),
+        { replace: true },
+      );
+    }
   }, [setSearchParams]);
 
   const showOverallStopAlert = useCallback((targetGameId, reason, mode) => {
@@ -588,6 +596,12 @@ export default function Nc2UserGamePage() {
         if (gameId > 0) {
           const slot = slots.find((item) => item.game_id === gameId);
           setSelectedSlotNo(slot?.slot_no ?? null);
+          if (slot) {
+            setSearchParams(
+              (current) => updateNc2GameSearchParams(current, { gameId, slotNo: slot.slot_no }),
+              { replace: true },
+            );
+          }
           if (slot) syncAutoStatusFromSlot(slot);
           await restore(gameId, { activate: true });
           return;
@@ -606,6 +620,13 @@ export default function Nc2UserGamePage() {
         const firstOccupied = slots.find((item) => item.occupied);
         if (firstOccupied) {
           setSelectedSlotNo(firstOccupied.slot_no);
+          setSearchParams(
+            (current) => updateNc2GameSearchParams(current, {
+              gameId: firstOccupied.game_id,
+              slotNo: firstOccupied.slot_no,
+            }),
+            { replace: true },
+          );
           syncAutoStatusFromSlot(firstOccupied);
           await restore(firstOccupied.game_id, { activate: true });
         } else {
@@ -842,6 +863,10 @@ export default function Nc2UserGamePage() {
     try {
       const slot = gameSlots.find((item) => item.slot_no === slotNo);
       setSelectedSlotNo(slotNo);
+      setSearchParams(
+        (current) => updateNc2GameSearchParams(current, { slotNo, gameId: null }),
+        { replace: true },
+      );
       if (slot?.occupied) {
         syncAutoStatusFromSlot(slot);
         await restore(slot.game_id, { activate: true });
