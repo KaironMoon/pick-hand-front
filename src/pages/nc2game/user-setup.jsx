@@ -200,6 +200,7 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
     : (Array.isArray(value.reference_game_seqs) ? value.reference_game_seqs : []);
   const [importOpen, setImportOpen] = useState(false);
   const [sourceGameId, setSourceGameId] = useState("");
+  const [importError, setImportError] = useState("");
   const [randomCount, setRandomCount] = useState(
     ZZZ_RANDOM_COUNT_OPTIONS.includes(Number(sharesZzz1Nc ? zzz1?.reference_count : source.reference_count))
       ? Number(sharesZzz1Nc ? zzz1?.reference_count : source.reference_count) : 128,
@@ -299,7 +300,7 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
                 {ZZZ_RANDOM_COUNT_OPTIONS.map((count) => <option key={count} value={count}>{count}개</option>)}
               </TextField>
               <Button size="small" variant="contained" disabled={busy || sharesZzz1Nc} onClick={() => onRandom(randomCount)}>랜덤으로 다시 고르기</Button>
-              <Button size="small" variant="outlined" disabled={busy || sharesZzz1Nc} onClick={() => setImportOpen(true)}>나초2에서 가져오기</Button>
+              <Button size="small" variant="outlined" disabled={busy || sharesZzz1Nc} onClick={() => { setImportError(""); setImportOpen(true); }}>나초2에서 가져오기</Button>
               <Button size="small" color="warning" disabled={busy || sharesZzz1Nc || refs.length === 0} onClick={() => onChange({ ...value, reference_game_seqs: [] })}>전체 초기화</Button>
               <Typography variant="caption" sx={{ color: "#aaa" }}>{refs.filter((item) => Number(item) > 0).length}/{randomCount}개</Typography>
             </Box>
@@ -322,12 +323,22 @@ function MartinZZZSetupTable({ index, martin, zzz1, onChange, onRandom, onImport
       </tbody></table>
     </Box>
 
-    <Dialog open={importOpen} onClose={() => !busy && setImportOpen(false)}>
+    <Dialog open={importOpen} onClose={() => { if (!busy) { setImportError(""); setImportOpen(false); } }}>
       <DialogTitle>나초2 NC 번호 가져오기</DialogTitle>
-      <DialogContent><TextField autoFocus fullWidth type="number" label="나초2 게임번호" value={sourceGameId} onChange={(event) => setSourceGameId(event.target.value)} inputProps={{ min: 1 }} sx={{ mt: 1 }} /></DialogContent>
+      <DialogContent>
+        <TextField autoFocus fullWidth type="number" label="나초2 게임번호" value={sourceGameId} onChange={(event) => { setSourceGameId(event.target.value); setImportError(""); }} inputProps={{ min: 1 }} sx={{ mt: 1 }} />
+        {importError && <Alert severity="error" sx={{ mt: 1.5 }}>{importError}</Alert>}
+      </DialogContent>
       <DialogActions>
-        <Button disabled={busy} onClick={() => setImportOpen(false)}>취소</Button>
-        <Button disabled={busy || !sourceGameId} variant="contained" onClick={async () => { const ok = await onImport(Number(sourceGameId)); if (ok) { setImportOpen(false); setSourceGameId(""); } }}>가져오기</Button>
+        <Button disabled={busy} onClick={() => { setImportError(""); setImportOpen(false); }}>취소</Button>
+        <Button disabled={busy || !sourceGameId} variant="contained" onClick={async () => {
+          const result = await onImport(Number(sourceGameId));
+          if (result.ok) {
+            setImportError(""); setImportOpen(false); setSourceGameId("");
+          } else {
+            setImportError(result.error);
+          }
+        }}>가져오기</Button>
       </DialogActions>
     </Dialog>
   </Box>;
@@ -405,10 +416,9 @@ export default function Nc2UserSetupPage() {
       const next = martinZzzs.map((item) => ({ ...item }));
       next[index] = { ...next[index], reference_count: response.data.count, reference_game_seqs: response.data.game_seqs, reference_source: { type: "nc2_game", game_id: response.data.source_game_id } };
       updateMartinZzzs(next);
-      return true;
+      return { ok: true, error: "" };
     } catch (err) {
-      setError(errorMessage(err, "나초2 게임의 NC 번호를 가져오지 못했습니다."));
-      return false;
+      return { ok: false, error: errorMessage(err, "나초2 게임의 NC 번호를 가져오지 못했습니다.") };
     } finally { setReferenceBusy(false); }
   };
 
