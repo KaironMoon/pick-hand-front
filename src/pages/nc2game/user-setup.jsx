@@ -37,7 +37,7 @@ const ZZZ_POINT_OPTIONS = Array.from({ length: 24 }, (_, index) => Math.round((i
 const ZZZ_POINT_GRID_ROWS = Math.ceil(ZZZ_POINT_OPTIONS.length / ZZZ_POINT_GRID_COLUMNS);
 const ZZZ_RANDOM_COUNT_OPTIONS = [32, 64, 96, 128];
 const DEFAULT_MARTIN_ZZZ = {
-  enabled: false, budget: 0, bet_type: "martin", step_min: 1, step_max: 20,
+  enabled: false, budget: 0, loss_stop_amount: 0, bet_type: "martin", step_min: 1, step_max: 20,
   stop_round: 0, stop_step: 0,
   amounts: Array(NC2_MAX_BET_STEPS).fill(0), cond_lo: 0, cond_hi: 100,
   amounts_blue: Array(NC2_MAX_BET_STEPS).fill(0), amounts_white: Array(NC2_MAX_BET_STEPS).fill(0), amounts_red: Array(NC2_MAX_BET_STEPS).fill(0),
@@ -319,14 +319,15 @@ function MartinZZZSetupTable({ index, martin, zzz1, slot1Zzz1, onChange, onRando
           <td style={{ ...red, background: "#7b1fa2", color: "#fff" }}>S{slotNo} 마틴 ZZZ {index + 1}</td>
           <td style={enabled ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...value, enabled: !enabled })}>{enabled ? "사용함" : "사용안함"}</td>
           <Nc2Input value={value.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(budget) => onChange({ ...value, budget: Math.max(0, budget) })} />
-          <td colSpan={3} style={cell}>{index === 0
+          <Nc2Input value={value.loss_stop_amount || 0} prefix="손실:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(loss_stop_amount) => onChange({ ...value, loss_stop_amount: Math.max(0, loss_stop_amount) })} />
+          <td colSpan={2} style={cell}>{index === 0
             ? slotNo === 1
               ? "나이스초이스2 전용"
               : <label style={{ cursor: "pointer", display: "inline-flex", gap: 5, alignItems: "center" }}><input type="checkbox" checked={sharesSlot1Nc} onChange={(event) => onChange({ ...value, use_slot1_nc: event.target.checked })} />슬롯 1 NC 사용</label>
             : <label style={{ cursor: "pointer", display: "inline-flex", gap: 5, alignItems: "center" }}><input type="checkbox" checked={sharesZzz1Nc} onChange={(event) => onChange({ ...value, use_zzz1_nc: event.target.checked })} />ZZZ 1번 NC 사용</label>}</td>
           <Nc2Input value={value.stop_round || 0} prefix="회차:" integer style={cell} onChange={(stop_round) => onChange({ ...value, stop_round: Math.max(0, Math.min(60, stop_round)) })} />
           <Nc2Input value={value.stop_step || 0} prefix="패:" integer style={cell} onChange={(stop_step) => onChange({ ...value, stop_step: Math.max(0, Math.min(max, stop_step)) })} />
-          <td colSpan={2} style={{ ...cell, color: "#888", fontSize: 10 }}>{nc2ZzzStopLabel(value.stop_round, value.stop_step)}</td>
+          <td colSpan={2} style={{ ...cell, color: "#888", fontSize: 10 }}>{nc2ZzzStopLabel(value.stop_round, value.stop_step, value.loss_stop_amount)}</td>
         </tr>
         {pointRows("trigger_points", "베팅포인트")}
         <tr><td style={blue}>베팅종류</td>{betTypes.map(([type, label]) => <td key={type} style={value.bet_type === type ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...value, bet_type: type })}>{label}</td>)}<td colSpan={5} style={empty}></td></tr>
@@ -625,6 +626,15 @@ export default function Nc2UserSetupPage() {
             updateSelectedSetup({ ...selectedSetup, item_win_limit: Math.max(1, Math.min(60, value)) });
           }} style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
           <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>각 NC 어시픽의 누적 승수 도달 시 배팅 종료</Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>번호별 손실종료</Typography>
+          <input type="number" min="0" step="0.1" value={selectedSetup.item_loss_stop_amount ?? 0} onChange={(event) => {
+            const value = Math.max(0, Math.round(Number(event.target.value || 0) * 10) / 10);
+            updateSelectedSetup({ ...selectedSetup, item_loss_stop_amount: value });
+          }} style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
+          {Number(selectedSetup.item_loss_stop_amount || 0) === 0 && <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>}
+          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>각 NC의 개별 누적 PNL이 설정 손실에 도달하면 해당 번호만 배팅 종료</Typography>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>실배팅 배율</Typography>

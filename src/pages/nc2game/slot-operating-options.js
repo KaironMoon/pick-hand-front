@@ -25,3 +25,9 @@ export const nc2DrawdownConditionLabel = (config) => {
   ) return "사용안함";
   return `${formatConditionNumber(startAmount)} P 이상 달성 시 최고 PNL에서 ${formatConditionNumber(lossPercent)}% 이상 손실 나면 배팅 정지`;
 };
+
+export const nc2ItemLossStopLabel = (config) => {
+  const amount = Number(config?.item_loss_stop_amount || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return "사용안함";
+  return `개별 NC 누적 ${formatConditionNumber(amount)} P 손실 시 해당 번호 배팅 정지`;
+};

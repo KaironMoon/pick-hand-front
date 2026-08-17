@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   NC2_SLOT_OPERATING_OPTIONS,
   nc2DrawdownConditionLabel,
+  nc2ItemLossStopLabel,
   replaceNc2SlotSetup,
 } from "../src/pages/nc2game/slot-operating-options.js";
 
@@ -48,5 +49,13 @@ test("NC2 current game drawdown condition explains enabled and disabled settings
       auto_drawdown_percent: 20,
     }),
     "100.5 P 이상 달성 시 최고 PNL에서 20% 이상 손실 나면 배팅 정지",
+  );
+});
+
+test("NC2 individual loss stop label explains enabled and disabled settings", () => {
+  assert.equal(nc2ItemLossStopLabel({}), "사용안함");
+  assert.equal(
+    nc2ItemLossStopLabel({ item_loss_stop_amount: 100.5 }),
+    "개별 NC 누적 100.5 P 손실 시 해당 번호 배팅 정지",
   );
 });
