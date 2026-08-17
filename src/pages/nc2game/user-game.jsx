@@ -1278,13 +1278,13 @@ export default function Nc2UserGamePage() {
       </>}
 
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
-      {(state?.martin_zzzs || []).filter((zzz) => zzz?.enabled).map((zzz) => <MartinZzzBoard
+      {isAdmin && (state?.martin_zzzs || []).filter((zzz) => zzz?.enabled).map((zzz) => <MartinZzzBoard
         key={zzz.index}
         zzz={zzz}
         actuals={state.actuals}
         roundHistory={state.round_history}
       />)}
-      {state && <Nc2ReferenceSections
+      {isAdmin && state && <Nc2ReferenceSections
         state={state}
         zzzs={(state.martin_zzzs || []).filter((zzz) => zzz?.enabled)}
       />}
