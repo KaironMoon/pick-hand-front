@@ -18,7 +18,9 @@ import { clearNc2KeepCombination, loadNc2KeepCombination, saveNc2KeepCombination
 import { createGameResponseGuard } from "./game-response-guard.js";
 import { isNc2ReferenceFixedOpen } from "./reference-sections.js";
 import { nc2SetupPath, updateNc2GameSearchParams } from "./slot-navigation.js";
+import { nc2DrawdownConditionLabel } from "./slot-operating-options.js";
 import { nc2ZzzStopLabel } from "./zzz-stop-label.js";
+import { betStepRangeLabel } from "./bet-block-setting.js";
 import { NC2_GAMES_API } from "@/constants/api-url";
 import {
   loadShoeCopySourceType,
@@ -411,6 +413,10 @@ export default function Nc2UserGamePage() {
     modeLabel: "",
   });
   const state = game?.round_state;
+  const nc2BetRangeStoppedCount = (state?.items || []).filter(
+    (item) => item?.bet_range_stopped,
+  ).length;
+  const martinZBetRangeStopped = !!state?.martin_z_bet_range_stop?.stopped;
   const keepCombination = Array.isArray(keptGameSeqs) && keptGameSeqs.length > 0;
 
   const loadShoePreview = async () => {
@@ -1072,6 +1078,15 @@ export default function Nc2UserGamePage() {
       return {
         round: idx + 1,
         amount: history ? Number(history.amount || 0) : isCurrent ? Number(aggregate.amount || 0) : 0,
+        martinZIncluded: history
+          ? Number(history.bonus_amount || 0) > 0
+          : isCurrent && Number(aggregate.bonus_amount || 0) > 0,
+        martinZAmount: history
+          ? Number(history.bonus_amount || 0)
+          : isCurrent ? Number(aggregate.bonus_amount || 0) : 0,
+        scaledMartinZAmount: history
+          ? Number(history.scaled_bonus_amount || 0)
+          : isCurrent ? Number(aggregate.scaled_bonus_amount || 0) : 0,
         pnl: history ? Number(history.pnl || 0) : 0,
         total_pnl: history ? Number(history.total_pnl || 0) : 0,
         actual: history?.actual || actuals[idx] || null,
@@ -1095,7 +1110,7 @@ export default function Nc2UserGamePage() {
       },
       actual_bet_table: state?.actual_bet_table || {},
     };
-  }, [state, aggregate.direction, aggregate.amount, pickMartin.step, pickMartin.direction, pickMartin.amount]);
+  }, [state, aggregate.direction, aggregate.amount, aggregate.bonus_amount, aggregate.scaled_bonus_amount, pickMartin.step, pickMartin.direction, pickMartin.amount]);
 
   return (
     <Box sx={{ p: isMobile ? .5 : 2 }}>
@@ -1199,10 +1214,12 @@ export default function Nc2UserGamePage() {
           onEnd={() => setEndOpen(true)}
           endDisabled={endDisabled}
           endDisabledReason={endDisabledReason}
+          restrictedView={!isAdmin}
         />
       </Box>
 
-      {isAdmin && <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 1.5, px: 1, py: .7, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.06)" }}>
+      {isAdmin && <>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: .7, px: 1, py: .7, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.06)" }}>
         <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>어드민 도구</Typography>
         <Typography
           variant="caption"
@@ -1237,7 +1254,28 @@ export default function Nc2UserGamePage() {
           <Button size="small" onClick={openReplay} disabled={replayLoading}>다른 게임</Button>
           {replay.active && <Button size="small" color="warning" onClick={exitReplay} disabled={replayLoading}>리플레이 종료</Button>}
         </>}
-      </Box>}
+      </Box>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 1.5, px: 1, py: .7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
+        <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>현재 게임 배팅조건</Typography>
+        <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
+          NC2: {game?.config ? betStepRangeLabel(
+            game.config.bet_block_after_round,
+            game.config.bet_allowed_step_min,
+            game.config.bet_allowed_step_max,
+          ) : "-"} · 배팅중지 {nc2BetRangeStoppedCount}개
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
+          마틴 Z: {game?.config ? betStepRangeLabel(
+            game.config.martin_z?.bet_block_after_round,
+            game.config.martin_z?.bet_allowed_step_min,
+            game.config.martin_z?.bet_allowed_step_max,
+          ) : "-"} · {martinZBetRangeStopped ? "배팅중지" : "정상"}
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
+          손실종료조건: {game?.config ? nc2DrawdownConditionLabel(game.config) : "-"}
+        </Typography>
+      </Box>
+      </>}
 
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
       {(state?.martin_zzzs || []).filter((zzz) => zzz?.enabled).map((zzz) => <MartinZzzBoard

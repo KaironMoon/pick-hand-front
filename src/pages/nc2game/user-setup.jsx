@@ -8,6 +8,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
 import { NC2_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 import { nc2GameReturnPath, nc2SelectedSlotNo } from "./slot-navigation.js";
+import { NC2_SLOT_OPERATING_OPTIONS, replaceNc2SlotSetup } from "./slot-operating-options.js";
+import { betStepRangeLabel, normalizeBetAllowedStepRange, normalizeBetBlockAfterRound } from "./bet-block-setting.js";
 import { buildFixedNc2AssistRules, visibleNc2AssistRows } from "./assist-settings.js";
 import { nc2ZzzStopLabel } from "./zzz-stop-label.js";
 
@@ -43,7 +45,9 @@ const DEFAULT_MARTIN_ZZZ = {
   reference_count: 128, reference_game_seqs: [], use_slot1_nc: false, use_zzz1_nc: false,
 };
 const DEFAULT_MARTIN_Z = {
-  enabled: false, budget: 0, bet_type: "martin", step_min: 1, step_max: 20,
+  enabled: false, budget: 0, bet_block_after_round: 0,
+  bet_allowed_step_min: 1, bet_allowed_step_max: 25,
+  bet_type: "martin", step_min: 1, step_max: 20,
   amounts: Array(NC2_MAX_BET_STEPS).fill(0),
 };
 const MARTIN_ZZZ_COUNT = 7;
@@ -73,6 +77,38 @@ function Nc2SelectCell({ value, options, onChange, style = cell, format = (optio
   return <td style={style}><select value={value} onChange={(event) => onChange(event.target.value)} style={{ width: "100%", height: 22, padding: "0 2px", background: "#17365e", color: "#fff", border: "1px solid #45658a", borderRadius: 2, fontSize: 11, fontWeight: "bold" }}>
     {options.map((option) => <option key={option} value={option}>{format(option)}</option>)}
   </select></td>;
+}
+
+function BetStepRangeRow({ config, onChange, totalColumns }) {
+  const round = normalizeBetBlockAfterRound(config.bet_block_after_round);
+  const [minStep, maxStep] = normalizeBetAllowedStepRange(
+    config.bet_allowed_step_min,
+    config.bet_allowed_step_max,
+  );
+  const active = round > 0;
+  const inputStyle = { width: 46, padding: "2px 4px", background: "#16213e", color: active ? "#fff" : "#777", border: `1px solid ${active ? "#33CCCC" : "#555"}`, borderRadius: 3, textAlign: "center", fontSize: 12 };
+  const updateRange = (nextMin, nextMax) => {
+    const [normalizedMin, normalizedMax] = normalizeBetAllowedStepRange(nextMin, nextMax);
+    onChange({
+      ...config,
+      bet_allowed_step_min: normalizedMin,
+      bet_allowed_step_max: normalizedMax,
+    });
+  };
+  return <tr>
+    <td style={blue}>배팅조건</td>
+    <td colSpan={totalColumns - 1} style={{ ...cell, padding: "4px 8px", color: active ? "#fff" : "#666" }}>
+      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: .7, flexWrap: "wrap", justifyContent: "center" }}>
+        <input type="number" min="0" max="60" step="1" value={round} onChange={(event) => onChange({ ...config, bet_block_after_round: normalizeBetBlockAfterRound(event.target.value) })} style={inputStyle} />
+        <span>회차 이후</span>
+        <span>허용단계</span>
+        <input type="number" min="1" max="25" step="1" value={minStep} onChange={(event) => updateRange(event.target.value, maxStep)} style={inputStyle} />
+        <span>~</span>
+        <input type="number" min="1" max="25" step="1" value={maxStep} onChange={(event) => updateRange(minStep, event.target.value)} style={inputStyle} />
+        <span>{betStepRangeLabel(round, minStep, maxStep)}</span>
+      </Box>
+    </td>
+  </tr>;
 }
 
 function Nc2SetupTable({ config, onChange, label = "NC2" }) {
@@ -118,6 +154,7 @@ function Nc2SetupTable({ config, onChange, label = "NC2" }) {
       <Nc2Input value={Number(config.count || 10)} integer suffix="개" style={betType === "labouchere" ? cell : disabled} disabled={betType !== "labouchere"} onChange={(value) => onChange({ ...config, count: Math.max(1, Math.min(16, value)) })} />
       {distModes.map(([value, label]) => <td key={value} style={betType !== "labouchere" ? disabled : distMode === value ? { ...green, cursor: "pointer" } : method} onClick={betType === "labouchere" ? () => onChange({ ...config, dist_mode: value }) : undefined}>{label}</td>)}
     </tr>
+    <BetStepRangeRow config={config} totalColumns={10} onChange={onChange} />
     <tr>
       <td style={blue}>P설정</td><td style={green}>최저</td><Nc2Input value={min} integer suffix="단계" style={green} onChange={(value) => onChange({ ...config, step_min: Math.max(1, Math.min(value, max)) })} /><td style={green}>최고</td><Nc2Input value={max} integer suffix="단계" style={green} onChange={updateStepMax} />
       <td colSpan={5} style={cell}></td>
@@ -167,6 +204,7 @@ function MartinZSetupTable({ martin, onChange, slotNo }) {
       <Nc2Input value={martin.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(value) => onChange({ ...martin, budget: Math.max(0, value) })} />
       <td colSpan={3} style={cell}>트리플나인 전용</td>
     </tr>
+    <BetStepRangeRow config={martin} totalColumns={6} onChange={onChange} />
     <tr>
       <td style={blue}>배팅종류</td>
       {betTypes.map(([value, label]) => {
@@ -412,12 +450,22 @@ export default function Nc2UserSetupPage() {
   };
 
   const updateNc2Setup = (index, nextSetup) => {
-    const nextSetups = nc2Setups.map((setup) => ({ ...setup }));
-    nextSetups[index] = nextSetup;
+    const nextSetups = replaceNc2SlotSetup(nc2Setups, index + 1, nextSetup);
     updateConfig({ ...config, nc2_setups: nextSetups });
   };
 
   const updateSelectedSetup = (nextSetup) => updateNc2Setup(selectedSlotNo - 1, nextSetup);
+
+  const updateOperatingOption = (item, rawValue) => {
+    const raw = item.step === 1
+      ? parseInt(rawValue || "0", 10)
+      : parseFloat(rawValue || "0");
+    const nonNegative = Math.max(0, raw || 0);
+    updateSelectedSetup({
+      ...selectedSetup,
+      [item.key]: item.max ? Math.min(item.max, nonNegative) : nonNegative,
+    });
+  };
 
   const updateMartinZzzs = (nextZzzs) => updateSelectedSetup({
     ...selectedSetup,
@@ -533,45 +581,6 @@ export default function Nc2UserSetupPage() {
 
       {message && <Alert severity="success" sx={{ mb: 1 }}>{message}</Alert>}
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2, p: 1, border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1 }}>
-        <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>운영 옵션</Typography>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>나이스초이스 개수</Typography>
-          {[128, 96, 64, 32].map((count) => {
-            const selected = Number(config.reference_count ?? 128) === count;
-            return <Box key={count} role="button" tabIndex={0} onClick={() => updateConfig({ ...config, reference_count: count })} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") updateConfig({ ...config, reference_count: count }); }} sx={{ minWidth: 58, px: 1, py: .45, borderRadius: 1, border: `1px solid ${selected ? "#00a85a" : "#555"}`, backgroundColor: selected ? "#17482f" : "#171a1f", color: selected ? "#00e676" : "#aaa", textAlign: "center", fontSize: 12, fontWeight: "bold", cursor: "pointer", userSelect: "none" }}>{count}개</Box>;
-          })}
-          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>새 조합을 선정할 때 적용</Typography>
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>번호별 종료설정</Typography>
-          <input type="number" min="1" max="60" step="1" value={config.item_win_limit ?? 60} onChange={(event) => {
-            const value = Math.round(Number(event.target.value || 1));
-            updateConfig({ ...config, item_win_limit: Math.max(1, Math.min(60, value)) });
-          }} style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
-          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>각 NC 어시픽의 누적 승수 도달 시 배팅 종료</Typography>
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>실배팅 배율</Typography>
-          {[1, .1].map((scale) => {
-            const selected = Number(config.auto_actual_bet_scale ?? 1) === scale;
-            return <Box key={scale} role="button" tabIndex={0} onClick={() => updateConfig({ ...config, auto_actual_bet_scale: scale })} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") updateConfig({ ...config, auto_actual_bet_scale: scale }); }} sx={{ minWidth: 58, px: 1, py: .45, borderRadius: 1, border: `1px solid ${selected ? "#00a85a" : "#555"}`, backgroundColor: selected ? "#17482f" : "#171a1f", color: selected ? "#00e676" : "#aaa", textAlign: "center", fontSize: 12, fontWeight: "bold", cursor: "pointer", userSelect: "none" }}>×{scale}</Box>;
-          })}
-          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>전략 계산액은 유지하고 실제 카지노 주문액에만 적용</Typography>
-        </Box>
-        {[
-          { key: "auto_goal_amount", label: "전체 목표금액 (P)", step: .1, help: "전체 실 PNL이 목표에 도달하면 다음 회차부터 배팅 중지" },
-          { key: "auto_end_round", label: "미달 마감 회차", step: 1, help: "설정 회차까지 배팅하고 다음 회차부터 배팅 중지" },
-        ].map((item) => <Box key={item.key} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>{item.label}</Typography>
-          <input type="number" min="0" step={item.step} value={config[item.key] ?? 0} onChange={(event) => {
-            const raw = item.step === 1 ? parseInt(event.target.value || "0", 10) : parseFloat(event.target.value || "0");
-            updateConfig({ ...config, [item.key]: Math.max(0, raw || 0) });
-          }} style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
-          {Number(config[item.key] || 0) === 0 && <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>}
-          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>{item.help}</Typography>
-        </Box>)}
-      </Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, p: 1, border: "1px solid rgba(0,168,90,.55)", borderRadius: 1, backgroundColor: "rgba(0,168,90,.06)" }}>
         <Typography variant="caption" sx={{ fontSize: 12, color: "#00e676", minWidth: 110, fontWeight: "bold" }}>슬롯별 설정</Typography>
         <Box sx={{ display: "flex", gap: .7, flexWrap: "wrap" }}>
@@ -597,7 +606,74 @@ export default function Nc2UserSetupPage() {
             >S{slotNo}</Box>;
           })}
         </Box>
-        <Typography variant="caption" sx={{ fontSize: 10, color: "#999" }}>아래 NC2·마틴 Z·ZZZ 설정에만 적용</Typography>
+        <Typography variant="caption" sx={{ fontSize: 10, color: "#999" }}>아래 운영옵션·NC2·마틴 Z·ZZZ 설정에 적용</Typography>
+      </Box>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2, p: 1, border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1 }}>
+        <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>S{selectedSlotNo} 운영 옵션</Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>나이스초이스 개수</Typography>
+          {[128, 96, 64, 32].map((count) => {
+            const selected = Number(selectedSetup.reference_count ?? 128) === count;
+            return <Box key={count} role="button" tabIndex={0} onClick={() => updateSelectedSetup({ ...selectedSetup, reference_count: count })} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") updateSelectedSetup({ ...selectedSetup, reference_count: count }); }} sx={{ minWidth: 58, px: 1, py: .45, borderRadius: 1, border: `1px solid ${selected ? "#00a85a" : "#555"}`, backgroundColor: selected ? "#17482f" : "#171a1f", color: selected ? "#00e676" : "#aaa", textAlign: "center", fontSize: 12, fontWeight: "bold", cursor: "pointer", userSelect: "none" }}>{count}개</Box>;
+          })}
+          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>새 조합을 선정할 때 적용</Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>번호별 종료설정</Typography>
+          <input type="number" min="1" max="60" step="1" value={selectedSetup.item_win_limit ?? 60} onChange={(event) => {
+            const value = Math.round(Number(event.target.value || 1));
+            updateSelectedSetup({ ...selectedSetup, item_win_limit: Math.max(1, Math.min(60, value)) });
+          }} style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
+          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>각 NC 어시픽의 누적 승수 도달 시 배팅 종료</Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>실배팅 배율</Typography>
+          {[1, .1].map((scale) => {
+            const selected = Number(selectedSetup.auto_actual_bet_scale ?? 1) === scale;
+            return <Box key={scale} role="button" tabIndex={0} onClick={() => updateSelectedSetup({ ...selectedSetup, auto_actual_bet_scale: scale })} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") updateSelectedSetup({ ...selectedSetup, auto_actual_bet_scale: scale }); }} sx={{ minWidth: 58, px: 1, py: .45, borderRadius: 1, border: `1px solid ${selected ? "#00a85a" : "#555"}`, backgroundColor: selected ? "#17482f" : "#171a1f", color: selected ? "#00e676" : "#aaa", textAlign: "center", fontSize: 12, fontWeight: "bold", cursor: "pointer", userSelect: "none" }}>×{scale}</Box>;
+          })}
+          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>전략 계산액은 유지하고 실제 카지노 주문액에만 적용</Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>손실종료조건</Typography>
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={selectedSetup.auto_drawdown_start_amount ?? 0}
+            onChange={(event) => updateOperatingOption(
+              NC2_SLOT_OPERATING_OPTIONS.find((item) => item.key === "auto_drawdown_start_amount"),
+              event.target.value,
+            )}
+            style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+          />
+          <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 달성 시 최고 PNL에서</Typography>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value={selectedSetup.auto_drawdown_percent ?? 0}
+            onChange={(event) => updateOperatingOption(
+              NC2_SLOT_OPERATING_OPTIONS.find((item) => item.key === "auto_drawdown_percent"),
+              event.target.value,
+            )}
+            style={{ width: 70, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+          />
+          <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>% 이상 손실 나면 배팅 정지</Typography>
+          {(Number(selectedSetup.auto_drawdown_start_amount || 0) === 0
+            || Number(selectedSetup.auto_drawdown_percent || 0) === 0)
+            && <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>}
+        </Box>
+        {NC2_SLOT_OPERATING_OPTIONS.filter((item) => ![
+          "auto_drawdown_start_amount",
+          "auto_drawdown_percent",
+        ].includes(item.key)).map((item) => <Box key={item.key} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>{item.label}</Typography>
+          <input type="number" min="0" max={item.max} step={item.step} value={selectedSetup[item.key] ?? 0} onChange={(event) => updateOperatingOption(item, event.target.value)} style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
+          {Number(selectedSetup[item.key] || 0) === 0 && <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>}
+          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>{item.help}</Typography>
+        </Box>)}
       </Box>
       <Box key={`nc2-s${selectedSlotNo}`} sx={{ overflowX: "auto", pb: 2 }}>
         <Nc2SetupTable

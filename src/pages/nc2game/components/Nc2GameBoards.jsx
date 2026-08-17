@@ -1,5 +1,6 @@
 import { Box, Tooltip } from "@mui/material";
 import { resolvePickMartinSummary } from "../../ghgame/pick-martin-summary.js";
+import { nc2BetCellAmountDisplay } from "../bet-cell-display.js";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -55,6 +56,46 @@ export const calculateNc2CircleGrid = (results) => {
   return grid;
 };
 
+function Nc2RestrictedBettingNotice() {
+  return (
+    <Box
+      role="note"
+      sx={{
+        height: 328,
+        minHeight: 328,
+        px: { xs: 2, md: 4 },
+        py: { xs: 3, md: 4 },
+        border: "1px solid #303740",
+        background: "linear-gradient(145deg, #262b31 0%, #1d2228 52%, #252a30 100%)",
+        color: "#f3f0e7",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        boxSizing: "border-box",
+        width: "100%",
+      }}
+    >
+      <Box
+        component="img"
+        src="/header.png"
+        alt="TRIPLE NINE"
+        sx={{ width: { xs: 190, md: 240 }, maxWidth: "70%", height: "auto", objectFit: "contain", mb: { xs: 3, md: 4 } }}
+      />
+
+      <Box sx={{ maxWidth: 640, fontSize: { xs: 10, md: 11 }, lineHeight: 1.65, fontWeight: 700, wordBreak: "keep-all" }}>
+        <Box>해당 프로그램은 연구 목적으로 개발된 프로그램으로서 연구 외 다른 목적으로 사용할 수 없습니다.</Box>
+        <Box>대한민국에서는 도박 행위를 엄격히 규제하므로 본 프로그램을 도박 등 불법적인 목적으로 사용하는 것을 금지합니다.</Box>
+        <Box>이를 위반하는 행위에 대해서는 관계 법령에 따른 책임이 발생할 수 있음을 알려드립니다.</Box>
+        <Box sx={{ mt: 2 }}>
+          (도박은 형법 제246조에 따라 1천만원 이하의 벌금, 상습도박은 3년 이하의 징역 또는 2천만원 이하의 벌금에 처할 수 있습니다.)
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
 export function Nc2RoundAmountTable({
   roundState,
   amountMode,
@@ -74,6 +115,7 @@ export function Nc2RoundAmountTable({
   onEnd,
   endDisabled = true,
   endDisabledReason,
+  restrictedView = false,
 }) {
   const table = roundState?.round_amount_table || {};
   const actualTable = roundState?.actual_bet_table || {};
@@ -138,7 +180,9 @@ export function Nc2RoundAmountTable({
       title: endDisabled ? endDisabledReason : "현재 게임 종료 후 슬롯 비우기",
     },
   ];
-  const cellCount = Math.max(80, Array.isArray(table.cells) ? table.cells.length : 0);
+  const cellCount = restrictedView
+    ? 0
+    : Math.max(80, Array.isArray(table.cells) ? table.cells.length : 0);
   const strategyCells = table.cells || [];
   const actualCells = actualTable.cells || [];
   const cells = Array.from({ length: cellCount }, (_, idx) => {
@@ -155,6 +199,8 @@ export function Nc2RoundAmountTable({
     return {
       ...strategyCell,
       amount: Number(actualCell.bet_amount_p || 0),
+      martinZIncluded: strategyCell.martinZIncluded && !!actualCell.bet_placed,
+      martinZAmount: Number(strategyCell.scaledMartinZAmount || 0),
       pnl: Number(actualCell.actual_pnl_p || 0),
       betPlaced: !!actualCell.bet_placed,
       settled: !!actualCell.settled,
@@ -198,7 +244,7 @@ export function Nc2RoundAmountTable({
     return "#777";
   };
   return (
-    <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1.4, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1 }}>
+    <Box sx={{ flex: restrictedView ? "0 0 701px" : "0 0 auto", minWidth: restrictedView ? 701 : undefined, display: "flex", flexDirection: "column", gap: 1.4, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1 }}>
       <Box sx={{ position: "relative", display: "flex", alignItems: "stretch", gap: 0.5, width: "100%" }}>
         {slotBusy && (
           <Box
@@ -278,14 +324,22 @@ export function Nc2RoundAmountTable({
           <span>PnL</span><span>{fmt(totalPnl)}</span>
         </Box>
       </Box>
-      <Box sx={{ display: "grid", gridTemplateRows: "repeat(10, 31px)", gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
-        {Array.from({ length: cellCount }, (_, idx) => (
-          <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P / PnL ${fmt(cells[idx]?.pnl)}P`}>
-            <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
-            <Box sx={{ color: "#fff", fontSize: 11, fontWeight: "bold", textAlign: "right", pr: 0.4 }}>{fmt(cells[idx]?.amount)}</Box>
-          </Box>
-        ))}
-      </Box>
+      {restrictedView
+        ? <Nc2RestrictedBettingNotice />
+        : <Box sx={{ display: "grid", gridTemplateRows: "repeat(10, 31px)", gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
+          {Array.from({ length: cellCount }, (_, idx) => (
+            <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P / PnL ${fmt(cells[idx]?.pnl)}P`}>
+              <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
+              <Box sx={{ color: "#fff", fontSize: cells[idx]?.martinZIncluded ? 10 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, letterSpacing: cells[idx]?.martinZIncluded ? "-0.3px" : 0 }}>
+                {nc2BetCellAmountDisplay({
+                  amount: cells[idx]?.amount,
+                  martinZIncluded: cells[idx]?.martinZIncluded,
+                  martinZAmount: cells[idx]?.martinZAmount,
+                })}
+              </Box>
+            </Box>
+          ))}
+        </Box>}
     </Box>
   );
 }
@@ -364,11 +418,13 @@ export function Nc2BettingSummaryPanel({
   const stopReason = autoStatus?.stop_reason || roundState?.overall_stop?.reason;
   const monitoringReason = stopReason === "goal_reached"
     ? "목표중지"
+    : stopReason === "drawdown_reached"
+      ? "손실중지"
     : stopReason === "end_round_reached"
       ? "마감중지"
       : stopReason === "active_pot_limit_reached"
         ? "POT중지"
-      : null;
+        : null;
   const autoPnl = Number(autoStatus?.pnl_actual_p || 0);
   const autoPnlText = `${autoPnl.toLocaleString(undefined, {
     minimumFractionDigits: 1,

@@ -43,6 +43,21 @@ test("goal reason wins when callers report only the server-selected reason", () 
   assert.equal(alert.title, "전체 목표금액 달성");
 });
 
+test("drawdown alert explains that only betting stopped", () => {
+  const alert = claimOverallStopAlert(
+    new Set(),
+    105,
+    "drawdown_reached",
+    "manual",
+  );
+
+  assert.deepEqual(alert, {
+    title: "최고 PNL 손실률 도달",
+    detail: "최고 PNL 대비 설정 손실률에 도달하여 배팅이 정지되었습니다.",
+    modeLabel: "수동",
+  });
+});
+
 test("active POT limit alert explains that only betting stopped", () => {
   const alert = claimOverallStopAlert(
     new Set(),

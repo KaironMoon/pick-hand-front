@@ -3,6 +3,10 @@ const STOP_ALERTS = {
     title: "전체 목표금액 달성",
     detail: "전체 목표금액을 달성하여 배팅이 정지되었습니다.",
   },
+  drawdown_reached: {
+    title: "최고 PNL 손실률 도달",
+    detail: "최고 PNL 대비 설정 손실률에 도달하여 배팅이 정지되었습니다.",
+  },
   end_round_reached: {
     title: "미달마감 도달",
     detail: "미달마감 회차에 도달하여 배팅이 정지되었습니다.",
