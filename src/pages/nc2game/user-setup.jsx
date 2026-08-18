@@ -9,7 +9,7 @@ import apiCaller from "@/services/api-caller";
 import { NC2_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 import { nc2GameReturnPath, nc2SelectedSlotNo } from "./slot-navigation.js";
 import { NC2_SLOT_OPERATING_OPTIONS, replaceNc2SlotSetup } from "./slot-operating-options.js";
-import { betStepRangeLabel, normalizeBetAllowedStepRange, normalizeBetBlockAfterRound } from "./bet-block-setting.js";
+import { normalizeBetBlockAfterRound } from "./bet-block-setting.js";
 import { buildFixedNc2AssistRules, visibleNc2AssistRows } from "./assist-settings.js";
 import { nc2ZzzStopLabel } from "./zzz-stop-label.js";
 
@@ -79,33 +79,16 @@ function Nc2SelectCell({ value, options, onChange, style = cell, format = (optio
   </select></td>;
 }
 
-function BetStepRangeRow({ config, onChange, totalColumns }) {
+function BetStopRoundRow({ config, onChange, totalColumns }) {
   const round = normalizeBetBlockAfterRound(config.bet_block_after_round);
-  const [minStep, maxStep] = normalizeBetAllowedStepRange(
-    config.bet_allowed_step_min,
-    config.bet_allowed_step_max,
-  );
   const active = round > 0;
   const inputStyle = { width: 46, padding: "2px 4px", background: "#16213e", color: active ? "#fff" : "#777", border: `1px solid ${active ? "#33CCCC" : "#555"}`, borderRadius: 3, textAlign: "center", fontSize: 12 };
-  const updateRange = (nextMin, nextMax) => {
-    const [normalizedMin, normalizedMax] = normalizeBetAllowedStepRange(nextMin, nextMax);
-    onChange({
-      ...config,
-      bet_allowed_step_min: normalizedMin,
-      bet_allowed_step_max: normalizedMax,
-    });
-  };
   return <tr>
     <td style={blue}>배팅조건</td>
     <td colSpan={totalColumns - 1} style={{ ...cell, padding: "4px 8px", color: active ? "#fff" : "#666" }}>
       <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: .7, flexWrap: "wrap", justifyContent: "center" }}>
         <input type="number" min="0" max="60" step="1" value={round} onChange={(event) => onChange({ ...config, bet_block_after_round: normalizeBetBlockAfterRound(event.target.value) })} style={inputStyle} />
-        <span>회차 이후</span>
-        <span>허용단계</span>
-        <input type="number" min="1" max="25" step="1" value={minStep} onChange={(event) => updateRange(event.target.value, maxStep)} style={inputStyle} />
-        <span>~</span>
-        <input type="number" min="1" max="25" step="1" value={maxStep} onChange={(event) => updateRange(minStep, event.target.value)} style={inputStyle} />
-        <span>{betStepRangeLabel(round, minStep, maxStep)}</span>
+        <span>회차부터 배팅 중지</span>
       </Box>
     </td>
   </tr>;
@@ -154,7 +137,7 @@ function Nc2SetupTable({ config, onChange, label = "NC2" }) {
       <Nc2Input value={Number(config.count || 10)} integer suffix="개" style={betType === "labouchere" ? cell : disabled} disabled={betType !== "labouchere"} onChange={(value) => onChange({ ...config, count: Math.max(1, Math.min(16, value)) })} />
       {distModes.map(([value, label]) => <td key={value} style={betType !== "labouchere" ? disabled : distMode === value ? { ...green, cursor: "pointer" } : method} onClick={betType === "labouchere" ? () => onChange({ ...config, dist_mode: value }) : undefined}>{label}</td>)}
     </tr>
-    <BetStepRangeRow config={config} totalColumns={10} onChange={onChange} />
+    <BetStopRoundRow config={config} totalColumns={10} onChange={onChange} />
     <tr>
       <td style={blue}>P설정</td><td style={green}>최저</td><Nc2Input value={min} integer suffix="단계" style={green} onChange={(value) => onChange({ ...config, step_min: Math.max(1, Math.min(value, max)) })} /><td style={green}>최고</td><Nc2Input value={max} integer suffix="단계" style={green} onChange={updateStepMax} />
       <td colSpan={5} style={cell}></td>
@@ -204,7 +187,7 @@ function MartinZSetupTable({ martin, onChange, slotNo }) {
       <Nc2Input value={martin.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(value) => onChange({ ...martin, budget: Math.max(0, value) })} />
       <td colSpan={3} style={cell}>트리플나인 전용</td>
     </tr>
-    <BetStepRangeRow config={martin} totalColumns={6} onChange={onChange} />
+    <BetStopRoundRow config={martin} totalColumns={6} onChange={onChange} />
     <tr>
       <td style={blue}>배팅종류</td>
       {betTypes.map(([value, label]) => {

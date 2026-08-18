@@ -20,7 +20,7 @@ import { isNc2ReferenceFixedOpen } from "./reference-sections.js";
 import { nc2SetupPath, updateNc2GameSearchParams } from "./slot-navigation.js";
 import { nc2DrawdownConditionLabel, nc2SlotLossStopLabel } from "./slot-operating-options.js";
 import { nc2ZzzStopLabel } from "./zzz-stop-label.js";
-import { betStepRangeLabel } from "./bet-block-setting.js";
+import { betStopRoundLabel } from "./bet-block-setting.js";
 import { NC2_GAMES_API } from "@/constants/api-url";
 import {
   loadShoeCopySourceType,
@@ -236,6 +236,8 @@ function MartinZzzBoard({ zzz, actuals, roundHistory }) {
     ["연패", `${zzz.loss_streak || 0}연패`],
     ["손익", `${Number(zzz.pnl || 0).toFixed(1)}P`],
     ["판정손익", `${Number(zzz.effective_pnl ?? zzz.pnl ?? 0).toFixed(1)}P${Number(zzz.pnl_scale || 1) !== 1 ? ` (×${Number(zzz.pnl_scale)})` : ""}`],
+    ["판정목표", Number(zzz.effective_budget || 0) > 0 ? `${Number(zzz.effective_budget).toFixed(1)}P` : "사용안함"],
+    ["판정손실", Number(zzz.effective_loss_stop_amount || 0) > 0 ? `${Number(zzz.effective_loss_stop_amount).toFixed(1)}P` : "사용안함"],
     ["상태", zzz.ended ? `${zzz.ended_at_round || "-"}회 ${zzz.end_reason === "loss_stop" ? "손실종료" : "종료"}` : "진행"],
     ["종료조건", nc2ZzzStopLabel(zzz.stop_round, zzz.stop_step, zzz.loss_stop_amount)],
   ];
@@ -1132,7 +1134,7 @@ export default function Nc2UserGamePage() {
             <Box sx={{ borderRadius: 1, px: .5, height: 20, minWidth: 44, backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>A</Box>
             <Box sx={{ ...panelSx, minWidth: 55, height: 24, px: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", color: Number(summary.P) > 0 ? "#4caf50" : "#666", fontSize: 12, fontWeight: 900 }}>{Number(summary.P).toFixed(1)}</Box>
             <Box sx={{ borderRadius: 1, px: .5, height: 20, minWidth: 44, backgroundColor: "#c62828", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>Z</Box>
-            <Box title={`마틴 Z 판정손익 ${Number(pickMartin.effective_pnl || 0).toFixed(1)}P${Number(pickMartin.pnl_scale || 1) !== 1 ? ` (×${Number(pickMartin.pnl_scale)})` : ""}`} sx={{ ...panelSx, minWidth: 80, height: 24, px: .6, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: .5, color: Number(pickMartin.amount) > 0 ? "#4caf50" : "#666", fontSize: 11, fontWeight: 900 }}><span style={{ color: "#888", fontSize: 10 }}>{Number(pickMartin.step || 1)}S</span>{Number(pickMartin.amount || 0).toFixed(1)}{pickMartin.direction || ""}</Box>
+            <Box title={`마틴 Z 판정손익 ${Number(pickMartin.effective_pnl || 0).toFixed(1)}P / 판정목표 ${Number(pickMartin.effective_budget || 0).toFixed(1)}P${Number(pickMartin.pnl_scale || 1) !== 1 ? ` (×${Number(pickMartin.pnl_scale)})` : ""}`} sx={{ ...panelSx, minWidth: 80, height: 24, px: .6, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: .5, color: Number(pickMartin.amount) > 0 ? "#4caf50" : "#666", fontSize: 11, fontWeight: 900 }}><span style={{ color: "#888", fontSize: 10 }}>{Number(pickMartin.step || 1)}S</span>{Number(pickMartin.amount || 0).toFixed(1)}{pickMartin.direction || ""}</Box>
             <Box sx={{ width: 32, height: 32, border: "1px solid #8e24aa", borderRadius: 1, backgroundColor: "#101318", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 13, opacity: .4 }}>≡0</Box>
             <Box
               role="button"
@@ -1259,25 +1261,22 @@ export default function Nc2UserGamePage() {
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 1.5, px: 1, py: .7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
         <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>현재 게임 배팅조건</Typography>
         <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
-          NC2: {game?.config ? betStepRangeLabel(
+          NC2: {game?.config ? betStopRoundLabel(
             game.config.bet_block_after_round,
-            game.config.bet_allowed_step_min,
-            game.config.bet_allowed_step_max,
           ) : "-"} · 배팅중지 {nc2BetRangeStoppedCount}개
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
-          마틴 Z: {game?.config ? betStepRangeLabel(
+          마틴 Z: {game?.config ? betStopRoundLabel(
             game.config.martin_z?.bet_block_after_round,
-            game.config.martin_z?.bet_allowed_step_min,
-            game.config.martin_z?.bet_allowed_step_max,
           ) : "-"} · {martinZBetRangeStopped ? "배팅중지" : "정상"}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
           손실종료조건: {game?.config ? nc2DrawdownConditionLabel(game.config) : "-"}
+          {autoStatus.running && Number(autoStatus.actual_bet_scale) !== 1 ? ` · 설정 ${Number(autoStatus.drawdown_start_amount || 0).toFixed(1)}P / 판정 ${Number(autoStatus.effective_drawdown_start_amount || 0).toFixed(1)}P` : ""}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
           슬롯 NC 손실종료: {game?.config ? nc2SlotLossStopLabel(game.config) : "-"}
-          {state?.nc_loss_stop ? ` · ${state.nc_loss_stop.mode === "actual" ? "실PNL" : "계산PNL"} ${Number(state.nc_loss_stop.pnl || 0).toFixed(1)}P${state.nc_loss_stop.stopped ? " · 중지" : ""}` : ""}
+          {state?.nc_loss_stop ? ` · ${state.nc_loss_stop.mode === "actual" ? "실PNL" : "계산PNL"} ${Number(state.nc_loss_stop.pnl || 0).toFixed(1)}P / 판정기준 ${Number(state.nc_loss_stop.limit || 0).toFixed(1)}P${state.nc_loss_stop.stopped ? " · 중지" : ""}` : ""}
         </Typography>
       </Box>
       </>}
