@@ -628,13 +628,15 @@ export default function Nc2UserSetupPage() {
           <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>각 NC 어시픽의 누적 승수 도달 시 배팅 종료</Typography>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>번호별 손실종료</Typography>
-          <input type="number" min="0" step="0.1" value={selectedSetup.item_loss_stop_amount ?? 0} onChange={(event) => {
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>슬롯 NC2 손실종료</Typography>
+          <input type="number" min="0" step="0.1" value={selectedSetup.slot_loss_stop_amount ?? selectedSetup.item_loss_stop_amount ?? 0} onChange={(event) => {
             const value = Math.max(0, Math.round(Number(event.target.value || 0) * 10) / 10);
-            updateSelectedSetup({ ...selectedSetup, item_loss_stop_amount: value });
+            const nextSetup = { ...selectedSetup, slot_loss_stop_amount: value };
+            delete nextSetup.item_loss_stop_amount;
+            updateSelectedSetup(nextSetup);
           }} style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
-          {Number(selectedSetup.item_loss_stop_amount || 0) === 0 && <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>}
-          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>각 NC의 개별 누적 PNL이 설정 손실에 도달하면 해당 번호만 배팅 종료</Typography>
+          {Number(selectedSetup.slot_loss_stop_amount ?? selectedSetup.item_loss_stop_amount ?? 0) === 0 && <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>}
+          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>이 슬롯의 NC 합산 누적 PNL이 설정 손실에 도달하면 슬롯 NC 배팅 전체 종료</Typography>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>실배팅 배율</Typography>

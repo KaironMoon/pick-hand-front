@@ -18,7 +18,7 @@ import { clearNc2KeepCombination, loadNc2KeepCombination, saveNc2KeepCombination
 import { createGameResponseGuard } from "./game-response-guard.js";
 import { isNc2ReferenceFixedOpen } from "./reference-sections.js";
 import { nc2SetupPath, updateNc2GameSearchParams } from "./slot-navigation.js";
-import { nc2DrawdownConditionLabel, nc2ItemLossStopLabel } from "./slot-operating-options.js";
+import { nc2DrawdownConditionLabel, nc2SlotLossStopLabel } from "./slot-operating-options.js";
 import { nc2ZzzStopLabel } from "./zzz-stop-label.js";
 import { betStepRangeLabel } from "./bet-block-setting.js";
 import { NC2_GAMES_API } from "@/constants/api-url";
@@ -1275,7 +1275,7 @@ export default function Nc2UserGamePage() {
           손실종료조건: {game?.config ? nc2DrawdownConditionLabel(game.config) : "-"}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
-          번호별 손실종료: {game?.config ? nc2ItemLossStopLabel(game.config) : "-"}
+          슬롯 NC 손실종료: {game?.config ? nc2SlotLossStopLabel(game.config) : "-"}
         </Typography>
       </Box>
       </>}

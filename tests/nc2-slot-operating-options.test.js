@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   NC2_SLOT_OPERATING_OPTIONS,
   nc2DrawdownConditionLabel,
-  nc2ItemLossStopLabel,
+  nc2SlotLossStopLabel,
   replaceNc2SlotSetup,
 } from "../src/pages/nc2game/slot-operating-options.js";
 
@@ -52,10 +52,10 @@ test("NC2 current game drawdown condition explains enabled and disabled settings
   );
 });
 
-test("NC2 individual loss stop label explains enabled and disabled settings", () => {
-  assert.equal(nc2ItemLossStopLabel({}), "사용안함");
+test("NC2 slot loss stop label explains enabled and disabled settings", () => {
+  assert.equal(nc2SlotLossStopLabel({}), "사용안함");
   assert.equal(
-    nc2ItemLossStopLabel({ item_loss_stop_amount: 100.5 }),
-    "개별 NC 누적 100.5 P 손실 시 해당 번호 배팅 정지",
+    nc2SlotLossStopLabel({ slot_loss_stop_amount: 100.5 }),
+    "슬롯 NC 합산 누적 100.5 P 손실 시 NC 배팅 전체 정지",
   );
 });

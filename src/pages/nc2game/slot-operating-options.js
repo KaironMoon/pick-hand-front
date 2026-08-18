@@ -26,8 +26,8 @@ export const nc2DrawdownConditionLabel = (config) => {
   return `${formatConditionNumber(startAmount)} P 이상 달성 시 최고 PNL에서 ${formatConditionNumber(lossPercent)}% 이상 손실 나면 배팅 정지`;
 };
 
-export const nc2ItemLossStopLabel = (config) => {
-  const amount = Number(config?.item_loss_stop_amount || 0);
+export const nc2SlotLossStopLabel = (config) => {
+  const amount = Number(config?.slot_loss_stop_amount ?? config?.item_loss_stop_amount ?? 0);
   if (!Number.isFinite(amount) || amount <= 0) return "사용안함";
-  return `개별 NC 누적 ${formatConditionNumber(amount)} P 손실 시 해당 번호 배팅 정지`;
+  return `슬롯 NC 합산 누적 ${formatConditionNumber(amount)} P 손실 시 NC 배팅 전체 정지`;
 };
