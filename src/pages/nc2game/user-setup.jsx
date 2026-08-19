@@ -29,6 +29,7 @@ const zoneTextCell = (base, group) => ({
   color: group.off ? "#666" : group.color,
 });
 const ASSIST_OPTIONS = ["회차진행", "6회쉬기", "6+6", "회차반대"];
+const MARTIN_Z_ASSIST_OPTIONS = ["회차진행", "J"];
 const NC2_MAX_BET_STEPS = 25;
 const AMOUNT_GRID_COLUMNS = 8;
 const AMOUNT_GRID_ROWS = Math.ceil(NC2_MAX_BET_STEPS / AMOUNT_GRID_COLUMNS);
@@ -49,6 +50,7 @@ const DEFAULT_MARTIN_Z = {
   bet_allowed_step_min: 1, bet_allowed_step_max: 25,
   bet_type: "martin", step_min: 1, step_max: 20,
   amounts: Array(NC2_MAX_BET_STEPS).fill(0),
+  assist_rules: Array.from({ length: NC2_MAX_BET_STEPS - 1 }, (_, index) => ({ pasi: index + 2, assist: "회차진행" })),
 };
 const MARTIN_ZZZ_COUNT = 7;
 
@@ -168,6 +170,8 @@ function MartinZSetupTable({ martin, onChange, slotNo }) {
   const max = Math.min(NC2_MAX_BET_STEPS, Math.max(min, Number(martin.step_max || 20)));
   const betType = martin.bet_type || "martin";
   const amounts = [...(martin.amounts || []), ...Array(NC2_MAX_BET_STEPS).fill(0)].slice(0, NC2_MAX_BET_STEPS);
+  const assistRules = buildFixedNc2AssistRules(martin.assist_rules);
+  const assistRows = visibleNc2AssistRows(assistRules, max);
   const betTypes = [["martin", "마틴"], ["kkangbet", "깡벳"], ["fixed", "고정벳"], ["manual", "수동"], ["cruise", "크루즈"]];
   const updateAmount = (index, value) => {
     const next = [...amounts];
@@ -180,35 +184,57 @@ function MartinZSetupTable({ martin, onChange, slotNo }) {
     }
     onChange({ ...martin, amounts: next });
   };
-  return <table style={{ borderCollapse: "collapse", minWidth: 504, color: "#fff" }}><tbody>
+  const updateAssistRule = (index, value) => {
+    const next = assistRules.map((rule) => ({ ...rule }));
+    next[index].assist = value;
+    onChange({ ...martin, assist_rules: next });
+  };
+  const updateStepMax = (value) => {
+    const stepMax = Math.max(min, Math.min(NC2_MAX_BET_STEPS, value));
+    onChange({ ...martin, step_max: stepMax, assist_rules: assistRules });
+  };
+  return <table style={{ borderCollapse: "collapse", minWidth: 840, color: "#fff" }}><tbody>
     <tr>
       <td style={{ ...red, background: "#c62828", color: "#fff" }}>S{slotNo} 마틴 Z</td>
       <td style={enabled ? { ...green, cursor: "pointer" } : method} onClick={() => onChange({ ...martin, enabled: !enabled })}>{enabled ? "사용함" : "사용안함"}</td>
       <Nc2Input value={martin.budget || 0} prefix="목표:" suffix="P" style={enabled ? teal : disabled} disabled={!enabled} onChange={(value) => onChange({ ...martin, budget: Math.max(0, value) })} />
-      <td colSpan={3} style={cell}>트리플나인 전용</td>
+      <td colSpan={7} style={cell}>트리플나인 전용</td>
     </tr>
-    <BetStopRoundRow config={martin} totalColumns={6} onChange={onChange} />
+    <BetStopRoundRow config={martin} totalColumns={10} onChange={onChange} />
     <tr>
       <td style={blue}>배팅종류</td>
       {betTypes.map(([value, label]) => {
         const unavailable = value === "cruise";
         return <td key={value} style={unavailable ? disabled : betType === value ? { ...green, cursor: "pointer" } : method} onClick={unavailable ? undefined : () => onChange({ ...martin, bet_type: value })}>{label}</td>;
       })}
+      <td colSpan={4} style={cell}></td>
     </tr>
     <tr>
       <td style={blue}>단계설정</td><td style={green}>최저</td>
       <Nc2Input value={min} integer suffix="단계" style={green} onChange={(value) => onChange({ ...martin, step_min: Math.max(1, Math.min(NC2_MAX_BET_STEPS, Math.min(value, max))) })} />
       <td style={green}>최고</td>
-      <Nc2Input value={max} integer suffix="단계" style={green} onChange={(value) => onChange({ ...martin, step_max: Math.max(min, Math.min(NC2_MAX_BET_STEPS, value)) })} />
-      <td style={cell}></td>
+      <Nc2Input value={max} integer suffix="단계" style={green} onChange={updateStepMax} />
+      <td colSpan={5} style={cell}></td>
     </tr>
-    {Array.from({ length: 5 }, (_, row) => <tr key={`martin-z-${row}`}>
-      {row === 0 && <td rowSpan={5} style={blue}>금액설정</td>}
-      {Array.from({ length: 5 }, (_, offset) => {
-        const index = row * 5 + offset;
+    {Array.from({ length: AMOUNT_GRID_ROWS }, (_, row) => <tr key={`martin-z-${row}`}>
+      {row === 0 && <td rowSpan={AMOUNT_GRID_ROWS} colSpan={2} style={blue}>금액설정</td>}
+      {Array.from({ length: AMOUNT_GRID_COLUMNS }, (_, offset) => {
+        const index = row * AMOUNT_GRID_COLUMNS + offset;
+        if (index >= NC2_MAX_BET_STEPS) return <td key={index} style={empty}></td>;
         const step = index + 1;
         const active = enabled && step >= min && step <= max;
         return <Nc2Input key={index} value={active ? amounts[index] : 0} prefix={`${step}:`} suffix="P" style={active ? cell : empty} disabled={!active} onChange={(value) => updateAmount(index, value)} />;
+      })}
+    </tr>)}
+    <tr><td colSpan={10} style={topCondition}>마틴Z어시(NC방향도 변경)</td></tr>
+    {assistRows.map((rules, rowIndex) => <tr key={`martin-z-assist-${rowIndex}`}>
+      <td colSpan={2} style={rowIndex === 0 ? blue : cell}>{rowIndex === 0 ? "Z 어시" : ""}</td>
+      {rules.map((rule, columnIndex) => {
+        if (!rule) return <Fragment key={columnIndex}><td style={empty}></td><td style={empty}></td></Fragment>;
+        return <Fragment key={rule.pasi}>
+          <td style={green}>{rule.pasi}패시</td>
+          <Nc2SelectCell value={rule.assist} options={MARTIN_Z_ASSIST_OPTIONS} onChange={(value) => updateAssistRule(rule.pasi - 2, value)} />
+        </Fragment>;
       })}
     </tr>)}
   </tbody></table>;
@@ -619,7 +645,7 @@ export default function Nc2UserSetupPage() {
             updateSelectedSetup(nextSetup);
           }} style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
           {Number(selectedSetup.slot_loss_stop_amount ?? selectedSetup.item_loss_stop_amount ?? 0) === 0 && <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>}
-          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>이 슬롯의 NC 합산 누적 PNL이 설정 손실에 도달하면 슬롯 NC 배팅 전체 종료</Typography>
+          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>마틴 Z·ZZZ 제외 순수 NC PNL 기준. 오토 시 PNL과 손실금액에 실배팅 배율을 동일 적용</Typography>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>실배팅 배율</Typography>
@@ -663,12 +689,53 @@ export default function Nc2UserSetupPage() {
         {NC2_SLOT_OPERATING_OPTIONS.filter((item) => ![
           "auto_drawdown_start_amount",
           "auto_drawdown_percent",
+          "profit_stop_after_round",
+          "profit_stop_bet_amount",
         ].includes(item.key)).map((item) => <Box key={item.key} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>{item.label}</Typography>
           <input type="number" min="0" max={item.max} step={item.step} value={selectedSetup[item.key] ?? 0} onChange={(event) => updateOperatingOption(item, event.target.value)} style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
           {Number(selectedSetup[item.key] || 0) === 0 && <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>}
           <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>{item.help}</Typography>
         </Box>)}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>수익보호</Typography>
+          <input
+            type="number"
+            min="0"
+            max="60"
+            step="1"
+            value={selectedSetup.profit_stop_after_round ?? 0}
+            onChange={(event) => updateOperatingOption(
+              NC2_SLOT_OPERATING_OPTIONS.find((item) => item.key === "profit_stop_after_round"),
+              event.target.value,
+            )}
+            style={{ width: 70, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+          />
+          <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>회차 이후</Typography>
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={selectedSetup.profit_stop_bet_amount ?? 0}
+            onChange={(event) => updateOperatingOption(
+              NC2_SLOT_OPERATING_OPTIONS.find((item) => item.key === "profit_stop_bet_amount"),
+              event.target.value,
+            )}
+            style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+          />
+          <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 배팅 할 경우 이후 배팅 중지</Typography>
+          {(Number(selectedSetup.profit_stop_after_round || 0) === 0
+            || Number(selectedSetup.profit_stop_bet_amount || 0) === 0)
+            && <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>}
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>J모드</Typography>
+          {[true, false].map((enabled) => {
+            const selected = Boolean(selectedSetup.j_mode_enabled) === enabled;
+            return <Box key={String(enabled)} role="button" tabIndex={0} onClick={() => updateSelectedSetup({ ...selectedSetup, j_mode_enabled: enabled })} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") updateSelectedSetup({ ...selectedSetup, j_mode_enabled: enabled }); }} sx={{ minWidth: 68, px: 1, py: .45, borderRadius: 1, border: `1px solid ${selected ? "#00a85a" : "#555"}`, backgroundColor: selected ? "#17482f" : "#171a1f", color: selected ? "#00e676" : "#aaa", textAlign: "center", fontSize: 12, fontWeight: "bold", cursor: "pointer", userSelect: "none" }}>{enabled ? "사용함" : "사용안함"}</Box>;
+          })}
+          <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>21회차부터 NC BET 금액에 J 방향 적용. 마틴 Z·ZZZ는 주문·단계·PNL 정지</Typography>
+        </Box>
       </Box>
       <Box key={`nc2-s${selectedSlotNo}`} sx={{ overflowX: "auto", pb: 2 }}>
         <Nc2SetupTable

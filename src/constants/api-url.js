@@ -9,6 +9,7 @@ const USERS_API = {
   BASE: "/api/v1/users",
   DETAIL: (id) => `/api/v1/users/${id}`,
   EMERGENCY_STOP: (id) => `/api/v1/users/${id}/emergency-stop`,
+  ROULETTE_KEEPER_STOP: (id) => `/api/v1/users/${id}/roulette-keeper/stop`,
 };
 
 const SETTINGS_API = {

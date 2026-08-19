@@ -1,6 +1,7 @@
 import { Box, Tooltip } from "@mui/material";
 import { resolvePickMartinSummary } from "../../ghgame/pick-martin-summary.js";
 import { nc2BetCellAmountDisplay } from "../bet-cell-display.js";
+import { nc2KeepLabel } from "../keep-count.js";
 
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
@@ -346,6 +347,7 @@ export function Nc2RoundAmountTable({
 export function Nc2BettingSummaryPanel({
   roundState,
   selectedMode,
+  keepCount,
   onModeChange,
   autoStatus,
   onPlay,
@@ -441,7 +443,7 @@ export function Nc2BettingSummaryPanel({
         ? `${monitoringReason}: 현재 게임은 결과만 기록하며 킵 모드는 다음 게임에서 배팅을 재개합니다.`
         : undefined,
     },
-    { text: "keep", selection: "keep" },
+    { text: nc2KeepLabel(keepCount, autoStatus), selection: "keep" },
     {
       text: hasAutoError ? "check" : autoStatus?.running ? "stop" : "play",
       play: true,

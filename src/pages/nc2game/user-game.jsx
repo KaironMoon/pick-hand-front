@@ -14,11 +14,18 @@ import { claimOverallStopAlert } from "../ghgame/overall-stop-alert.js";
 import { Nc2BettingSummaryPanel, Nc2Circle, Nc2RoundAmountTable, calculateNc2CircleGrid } from "./components/Nc2GameBoards.jsx";
 import { nc2ItemWinLimitLabel } from "./game-setting-label.js";
 import { nc2ItemNumberStyle } from "./item-end-style.js";
+import { nc2AggregateDisplay } from "./nc-aggregate-display.js";
+import {
+  NC2_KEEP_COUNT_DEFAULT,
+  NC2_KEEP_COUNT_MAX,
+  NC2_KEEP_COUNT_MIN,
+  parseNc2KeepCount,
+} from "./keep-count.js";
 import { clearNc2KeepCombination, loadNc2KeepCombination, saveNc2KeepCombination } from "./keep-combination.js";
 import { createGameResponseGuard } from "./game-response-guard.js";
 import { isNc2ReferenceFixedOpen } from "./reference-sections.js";
 import { nc2SetupPath, updateNc2GameSearchParams } from "./slot-navigation.js";
-import { nc2DrawdownConditionLabel, nc2SlotLossStopLabel } from "./slot-operating-options.js";
+import { nc2DrawdownConditionLabel, nc2JModeLabel, nc2ProfitStopConditionLabel, nc2SlotLossStopLabel } from "./slot-operating-options.js";
 import { nc2ZzzStopLabel } from "./zzz-stop-label.js";
 import { betStopRoundLabel } from "./bet-block-setting.js";
 import { NC2_GAMES_API } from "@/constants/api-url";
@@ -132,6 +139,22 @@ function PickChip({ value }) {
       backgroundColor: waiting ? "#fff" : value === "P" ? "#1565c0" : "#e53935",
     }}>{value}</Box>
   );
+}
+
+function Nc2AggregateBet({ aggregate, pnl }) {
+  const display = nc2AggregateDisplay(aggregate);
+  const pnlValue = Number(pnl || 0);
+  return <Box sx={{ display: "flex", width: "fit-content", minWidth: 300, mb: .6 }}>
+    <Box sx={{ minWidth: display.direction ? 28 : 42, px: .5, border: "1px solid #3f4650", backgroundColor: display.color, color: "#fff", fontSize: display.direction ? 13 : 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {display.directionLabel}
+    </Box>
+    <Box sx={{ flex: 1, minWidth: 128, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: 900, px: .75, py: .45, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <span>NC BET</span><span>{display.amountLabel}</span>
+    </Box>
+    <Box sx={{ flex: 1, minWidth: 124, border: "1px solid #3f4650", backgroundColor: "#111821", color: pnlValue >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: 900, px: .75, py: .45, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <span>NC PNL</span><span>{pnlValue.toFixed(1)}P</span>
+    </Box>
+  </Box>;
 }
 
 function Nc2Grid({ state }) {
@@ -330,6 +353,7 @@ function Nc2ReferenceSections({ state, zzzs }) {
   const [selected, setSelected] = useState({});
   if (isNc2ReferenceFixedOpen(zzzs)) {
     return <Box sx={{ mb: 2, backgroundColor: "#000", p: 1, overflowX: "auto" }}>
+      <Nc2AggregateBet aggregate={state?.nc_aggregate} pnl={state?.nc_pnl} />
       <Nc2Grid state={state} />
     </Box>;
   }
@@ -360,7 +384,10 @@ function Nc2ReferenceSections({ state, zzzs }) {
     {sections.map((section) => selected[section.id]
       ? section.zzz
         ? <MartinZzzReferenceGrid key={section.id} zzz={section.zzz} roundNum={state?.round_num} />
-        : <Nc2Grid key={section.id} state={state} />
+        : <Box key={section.id}>
+          <Nc2AggregateBet aggregate={state?.nc_aggregate} pnl={state?.nc_pnl} />
+          <Nc2Grid state={state} />
+        </Box>
       : null)}
   </Box>;
 }
@@ -379,6 +406,9 @@ export default function Nc2UserGamePage() {
   const [sourceGameId, setSourceGameId] = useState("");
   const [autoOpen, setAutoOpen] = useState(false);
   const [autoPlayMode, setAutoPlayMode] = useState("keep");
+  const [keepCount, setKeepCount] = useState(NC2_KEEP_COUNT_DEFAULT);
+  const [keepCountInput, setKeepCountInput] = useState(String(NC2_KEEP_COUNT_DEFAULT));
+  const [keepCountOpen, setKeepCountOpen] = useState(false);
   const [autoStatus, setAutoStatus] = useState({ running: false });
   const [autoStatusError, setAutoStatusError] = useState(null);
   const [amountViewMode, setAmountViewMode] = useState("calculated");
@@ -544,19 +574,23 @@ export default function Nc2UserGamePage() {
     gameResponseGuardRef.current.clear();
     setGame(null);
     setAutoStatus({ running: false });
+    setAutoPlayMode("keep");
     setAutoStatusError(null);
     setReplay({ active: false, sourceGameId: null, originGameId: null, roundNum: 0, totalRounds: 0 });
   }, []);
 
   const syncAutoStatusFromSlot = useCallback((slot) => {
+    const running = !!slot?.auto_running;
     setAutoStatus({
-      running: !!slot?.auto_running,
+      running,
       auto_session_id: slot?.auto_session_id || null,
       phase: slot?.phase || null,
       table_name: slot?.table_name || null,
       play_mode: slot?.play_mode || "one",
+      keep_shoes_remaining: slot?.keep_shoes_remaining ?? null,
       actual_bet_scale: slot?.actual_bet_scale || 1,
     });
+    setAutoPlayMode(running && slot?.play_mode === "one" ? "one" : "keep");
     setAutoStatusError(slot?.phase === "error" ? {
       code: slot.error_code || "auto_error",
       detail: slot.error_detail || "자동게임 처리 중 오류가 발생했습니다.",
@@ -660,6 +694,8 @@ export default function Nc2UserGamePage() {
       setAutoStatusError(null);
       if (status.running && (status.play_mode === "one" || status.play_mode === "keep")) {
         setAutoPlayMode(status.play_mode);
+      } else if (!status.running) {
+        setAutoPlayMode("keep");
       }
       if (status.running) {
         restore(game.game_id).catch(() => {});
@@ -776,6 +812,7 @@ export default function Nc2UserGamePage() {
               pnl_total_p: 0,
               pnl_actual_p: 0,
               stop_reason: data.stop_reason || null,
+              keep_shoes_remaining: data.keep_shoes_remaining ?? previous.keep_shoes_remaining,
             }));
             refreshEventGame(data.game_id, true);
           } else if (type === "bet_attempt") {
@@ -1011,6 +1048,7 @@ export default function Nc2UserGamePage() {
     if (autoStatus.running && autoStatus.auto_session_id) {
       await autoService.stopAuto(autoStatus.auto_session_id);
       setAutoStatus({ running: false });
+      setAutoPlayMode("keep");
       await refreshGameSlots();
       return;
     }
@@ -1025,6 +1063,24 @@ export default function Nc2UserGamePage() {
       );
       if (!ok) return;
     }
+    if (autoPlayMode === "keep") {
+      setKeepCountInput(String(keepCount));
+      setKeepCountOpen(true);
+      return;
+    }
+    setAutoOpen(true);
+  };
+
+  const handleAutoModeChange = (mode) => {
+    setAutoPlayMode(mode === "one" ? "one" : "keep");
+  };
+
+  const confirmKeepCount = () => {
+    const parsed = parseNc2KeepCount(keepCountInput);
+    if (parsed == null) return;
+    setKeepCount(parsed);
+    setAutoPlayMode("keep");
+    setKeepCountOpen(false);
     setAutoOpen(true);
   };
 
@@ -1194,7 +1250,8 @@ export default function Nc2UserGamePage() {
           <Nc2BettingSummaryPanel
             roundState={ghRoundState}
             selectedMode={autoPlayMode}
-            onModeChange={setAutoPlayMode}
+            keepCount={keepCount}
+            onModeChange={handleAutoModeChange}
             autoStatus={autoStatus}
             onPlay={handleAutoToggle}
             autoError={autoStatusError}
@@ -1270,13 +1327,20 @@ export default function Nc2UserGamePage() {
             game.config.martin_z?.bet_block_after_round,
           ) : "-"} · {martinZBetRangeStopped ? "배팅중지" : "정상"}
         </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: state?.j_mode?.active ? "#80cbc4" : "#ffe082", fontWeight: 800 }}>
+          J모드: {game?.config ? nc2JModeLabel(game.config, state) : "-"}
+        </Typography>
         <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
           손실종료조건: {game?.config ? nc2DrawdownConditionLabel(game.config) : "-"}
           {autoStatus.running && Number(autoStatus.actual_bet_scale) !== 1 ? ` · 설정 ${Number(autoStatus.drawdown_start_amount || 0).toFixed(1)}P / 판정 ${Number(autoStatus.effective_drawdown_start_amount || 0).toFixed(1)}P` : ""}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
           슬롯 NC 손실종료: {game?.config ? nc2SlotLossStopLabel(game.config) : "-"}
-          {state?.nc_loss_stop ? ` · ${state.nc_loss_stop.mode === "actual" ? "실PNL" : "계산PNL"} ${Number(state.nc_loss_stop.pnl || 0).toFixed(1)}P / 판정기준 ${Number(state.nc_loss_stop.limit || 0).toFixed(1)}P${state.nc_loss_stop.stopped ? " · 중지" : ""}` : ""}
+          {state?.nc_loss_stop ? ` · NC PNL ${Number(state.nc_loss_stop.pnl || 0).toFixed(1)}P / 판정기준 ${Number(state.nc_loss_stop.limit || 0).toFixed(1)}P${state.nc_loss_stop.mode === "auto" && Number(state.nc_loss_stop.pnl_scale || 1) !== 1 ? ` (원값 ${Number(state.nc_loss_stop.nc_pnl || 0).toFixed(1)}P ×${Number(state.nc_loss_stop.pnl_scale)})` : ""}${state.nc_loss_stop.stopped ? " · 중지" : ""}` : ""}
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
+          수익보호: {game?.config ? nc2ProfitStopConditionLabel(game.config) : "-"}
+          {state?.profit_stop?.stopped ? ` · ${state.profit_stop.mode === "actual" ? "실PNL" : "계산PNL"} ${Number(state.profit_stop.trigger_pnl || 0).toFixed(1)}P / 배팅 ${Number(state.profit_stop.trigger_bet_amount || 0).toFixed(1)}P · 중지` : ""}
         </Typography>
       </Box>
       </>}
@@ -1316,7 +1380,32 @@ export default function Nc2UserGamePage() {
         setAutoStatus({ ...status, running: status?.running ?? status?.status === "running" });
         setAutoStatusError(null);
         refreshGameSlots().catch(() => {});
-      }} onError={(value) => setError(value.detail)} gameId={game?.game_id} pickhandId={user?.pickhand_id || user?.username} gameType="nc2" playMode="keep" />
+      }} onError={(value) => setError(value.detail)} gameId={game?.game_id} pickhandId={user?.pickhand_id || user?.username} gameType="nc2" playMode={autoPlayMode} keepCount={keepCount} />
+      <Dialog open={keepCountOpen} onClose={() => setKeepCountOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>KEEP 반복 횟수</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            size="small"
+            type="number"
+            label="실행할 슈 수"
+            value={keepCountInput}
+            onChange={(event) => setKeepCountInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") confirmKeepCount();
+            }}
+            inputProps={{ min: NC2_KEEP_COUNT_MIN, max: NC2_KEEP_COUNT_MAX, step: 1 }}
+            error={keepCountInput !== "" && parseNc2KeepCount(keepCountInput) == null}
+            helperText={`${NC2_KEEP_COUNT_MIN}~${NC2_KEEP_COUNT_MAX}회 · 1회는 ONE을 사용하세요`}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setKeepCountOpen(false)}>취소</Button>
+          <Button variant="contained" disabled={parseNc2KeepCount(keepCountInput) == null} onClick={confirmKeepCount}>확인</Button>
+        </DialogActions>
+      </Dialog>
       <Dialog open={replayOpen} onClose={() => !replayLoading && setReplayOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>게임 리플레이</DialogTitle>
         <DialogContent>

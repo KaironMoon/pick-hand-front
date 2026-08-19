@@ -67,6 +67,7 @@ function UsersPage() {
   const [copyError, setCopyError] = useState("");
   const [copying, setCopying] = useState(false);
   const [emergencyStoppingId, setEmergencyStoppingId] = useState(null);
+  const [rouletteStoppingId, setRouletteStoppingId] = useState(null);
   const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
 
   const fetchUsers = useCallback(async () => {
@@ -213,6 +214,45 @@ function UsersPage() {
     }
   };
 
+  const handleRouletteKeeperStop = async (target) => {
+    const warning = target.has_running_auto
+      ? "Auto 실행 중 룰렛 유지 베팅을 정지하면 오작동 가능성이 있습니다. Auto를 먼저 중지한 뒤 진행하세요.\n\n그래도 룰렛 유지 베팅을 정지할까요?"
+      : `${target.nickname || target.username} 계정의 룰렛 유지 베팅만 정지할까요?`;
+    if (!window.confirm(warning)) return;
+    setRouletteStoppingId(target.id);
+    try {
+      const response = await apiCaller.post(USERS_API.ROULETTE_KEEPER_STOP(target.id));
+      setUsers((current) => current.map((user) => (
+        user.id === target.id
+          ? { ...user, roulette_keeper_enabled: false, roulette_keeper_state: "stopped" }
+          : user
+      )));
+      setSnack({
+        open: true,
+        message: response.data.runtime_delivered
+          ? `${target.username}: 룰렛 유지 베팅을 정지했습니다.`
+          : `${target.username}: 정지 상태를 저장했습니다. 실행 서버 전달 상태를 확인하세요.`,
+        severity: response.data.runtime_delivered ? "success" : "warning",
+      });
+    } catch (err) {
+      setSnack({
+        open: true,
+        message: err.response?.data?.detail || `${target.username} 계정의 룰렛 유지 베팅 정지에 실패했습니다.`,
+        severity: "error",
+      });
+    } finally {
+      setRouletteStoppingId(null);
+    }
+  };
+
+  const rouletteStateLabel = (state) => ({
+    running: "Auto 실행 중",
+    active: "유지 베팅 중",
+    expired: "1시간 종료",
+    stopped: "베팅 정지",
+    none: "대기",
+  }[state] || state || "대기");
+
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const d = new Date(dateStr);
@@ -267,7 +307,7 @@ function UsersPage() {
 
       <TableContainer
         component={Paper}
-        sx={{ backgroundColor: "background.paper", border: `1px solid ${borderColor}`, maxWidth: 900 }}
+        sx={{ backgroundColor: "background.paper", border: `1px solid ${borderColor}`, maxWidth: 1200 }}
       >
         <Table size="small">
           <TableHead>
@@ -276,6 +316,8 @@ function UsersPage() {
               <TableCell sx={headerCellSx}>닉네임</TableCell>
               <TableCell sx={headerCellSx}>권한</TableCell>
               <TableCell sx={headerCellSx}>상태</TableCell>
+              <TableCell sx={headerCellSx}>JSESSION</TableCell>
+              <TableCell sx={headerCellSx}>룰렛 유지</TableCell>
               <TableCell sx={headerCellSx}>생성일</TableCell>
               <TableCell sx={headerCellSx} align="center">관리</TableCell>
             </TableRow>
@@ -283,13 +325,13 @@ function UsersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} sx={{ ...cellSx, textAlign: "center", py: 4 }}>
+                <TableCell colSpan={8} sx={{ ...cellSx, textAlign: "center", py: 4 }}>
                   불러오는 중...
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} sx={{ ...cellSx, textAlign: "center", py: 4 }}>
+                <TableCell colSpan={8} sx={{ ...cellSx, textAlign: "center", py: 4 }}>
                   등록된 사용자가 없습니다.
                 </TableCell>
               </TableRow>
@@ -320,6 +362,38 @@ function UsersPage() {
                         fontSize: "0.75rem",
                       }}
                     />
+                  </TableCell>
+                  <TableCell sx={cellSx}>
+                    <Tooltip title={user.jsession_captured_at ? `캡처: ${new Date(user.jsession_captured_at).toLocaleString("ko-KR")}` : "캡처된 세션 없음"}>
+                      <Chip
+                        label={user.has_jsession ? "있음" : "없음"}
+                        size="small"
+                        color={user.has_jsession ? "success" : "default"}
+                        variant="outlined"
+                      />
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell sx={cellSx}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <Chip
+                        label={rouletteStateLabel(user.roulette_keeper_state)}
+                        size="small"
+                        color={["running", "active"].includes(user.roulette_keeper_state) ? "success" : "default"}
+                        variant="outlined"
+                      />
+                      <Tooltip title="룰렛 유지 베팅만 정지">
+                        <span>
+                          <IconButton
+                            size="small"
+                            disabled={!user.roulette_keeper_enabled || !user.has_jsession || rouletteStoppingId === user.id}
+                            onClick={() => handleRouletteKeeperStop(user)}
+                            sx={{ color: "#ff9800" }}
+                          >
+                            <StopCircleIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Box>
                   </TableCell>
                   <TableCell sx={cellSx}>{formatDate(user.created_at)}</TableCell>
                   <TableCell sx={{ ...cellSx, textAlign: "center" }}>
