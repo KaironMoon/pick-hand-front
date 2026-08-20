@@ -19,12 +19,33 @@ test("new game status starts without the previous auto error", () => {
     active_pot_count: null,
     pot_stop_count: 0,
     goal_amount: 0,
+    drawdown_start_amount: 0,
+    effective_drawdown_start_amount: 0,
+    drawdown_percent: 0,
+    drawdown_peak_actual_p: 0,
     error_code: null,
     error_detail: null,
     pending_direction: null,
     pending_amount_p: 0,
     pending_amount_won: 0,
+    keep_shoes_remaining: null,
   });
+});
+
+test("polling preserves GH drawdown status values", () => {
+  const result = mergePolledAutoStatus(createEmptyAutoStatus(), {
+    running: true,
+    auto_session_id: 7,
+    drawdown_start_amount: 10,
+    effective_drawdown_start_amount: 1,
+    drawdown_percent: 20,
+    drawdown_peak_actual_p: 1.5,
+  });
+
+  assert.equal(result.drawdown_start_amount, 10);
+  assert.equal(result.effective_drawdown_start_amount, 1);
+  assert.equal(result.drawdown_percent, 20);
+  assert.equal(result.drawdown_peak_actual_p, 1.5);
 });
 
 test("polling exposes the exact pending casino order for pre-display", () => {
@@ -102,6 +123,20 @@ test("polling preserves POT stop details for the active game", () => {
   assert.equal(result.stop_reason, "active_pot_limit_reached");
   assert.equal(result.active_pot_count, 3);
   assert.equal(result.pot_stop_count, 3);
+});
+
+test("polling preserves the remaining GH KEEP shoe count", () => {
+  const result = mergePolledAutoStatus(
+    createEmptyAutoStatus(),
+    {
+      running: true,
+      auto_session_id: "keep-session",
+      play_mode: "keep",
+      keep_shoes_remaining: 7,
+    },
+  );
+
+  assert.equal(result.keep_shoes_remaining, 7);
 });
 
 test("Error light is off whenever Auto is not running", () => {

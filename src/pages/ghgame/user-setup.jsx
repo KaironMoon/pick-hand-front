@@ -1838,6 +1838,109 @@ export default function GhUserSetupPage() {
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
+              슬롯 GH 손실종료
+            </Typography>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={config.slot_loss_stop_amount ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
+                setConfig((prev) => ({ ...prev, slot_loss_stop_amount: value }));
+                setDirty(true);
+              }}
+              style={{
+                width: 140,
+                padding: "4px 6px",
+                background: "#16213e",
+                color: "#fff",
+                border: "1px solid #2a3a5a",
+                borderRadius: 4,
+                fontSize: 12,
+              }}
+            />
+            {Number(config.slot_loss_stop_amount || 0) === 0 && (
+              <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>
+                (사용안함)
+              </Typography>
+            )}
+            <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
+              마틴 Z를 제외한 글로벌히트 PNL이 손실 한도에 도달하면 글로벌히트 배팅만 중지
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
+              손실종료조건
+            </Typography>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={config.auto_drawdown_start_amount ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
+                setConfig((prev) => ({ ...prev, auto_drawdown_start_amount: value }));
+                setDirty(true);
+              }}
+              style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 달성 시 최고 PNL에서</Typography>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={config.auto_drawdown_percent ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, Math.min(100, parseFloat(event.target.value || "0") || 0));
+                setConfig((prev) => ({ ...prev, auto_drawdown_percent: value }));
+                setDirty(true);
+              }}
+              style={{ width: 70, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>% 이상 손실 나면 배팅 정지</Typography>
+            {(Number(config.auto_drawdown_start_amount || 0) === 0 || Number(config.auto_drawdown_percent || 0) === 0) && (
+              <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
+            )}
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
+              수익보호
+            </Typography>
+            <input
+              type="number"
+              min="0"
+              max="60"
+              step="1"
+              value={config.profit_stop_after_round ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, Math.min(60, parseInt(event.target.value || "0", 10) || 0));
+                setConfig((prev) => ({ ...prev, profit_stop_after_round: value }));
+                setDirty(true);
+              }}
+              style={{ width: 70, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>회차 이후</Typography>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={config.profit_stop_bet_amount ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
+                setConfig((prev) => ({ ...prev, profit_stop_bet_amount: value }));
+                setDirty(true);
+              }}
+              style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 배팅 할 경우 이후 배팅 중지</Typography>
+            {(Number(config.profit_stop_after_round || 0) === 0 || Number(config.profit_stop_bet_amount || 0) === 0) && (
+              <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
+            )}
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
               미달 마감 회차
             </Typography>
             <input

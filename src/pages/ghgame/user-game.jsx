@@ -18,8 +18,16 @@ import {
 } from "./auto-status";
 import { getRoundStateSubgameBasis } from "./subgame-basis.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
-import { buildGoalStatusItems, formatGoalTarget } from "./goal-status.js";
+import { buildGoalStatusItems, formatGoalIndicator, formatGoalTarget } from "./goal-status.js";
 import { resolvePickMartinSummary } from "./pick-martin-summary.js";
+import { ghDrawdownStatusLabel, ghProfitStopStatusLabel } from "./slot-operating-options.js";
+import {
+  GH_KEEP_COUNT_DEFAULT,
+  GH_KEEP_COUNT_MAX,
+  GH_KEEP_COUNT_MIN,
+  ghKeepLabel,
+  parseGhKeepCount,
+} from "./keep-count.js";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 import {
   loadShoeCopySourceType,
@@ -66,9 +74,7 @@ function GoalStatusBar({ roundState, autoStatus }) {
   return (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 2 }}>
       {items.map((item) => {
-        const text = item.target > 0
-          ? `${item.label} ${formatGoalTarget(item.target)}`
-          : item.label;
+        const text = formatGoalIndicator(item);
         const title = item.target > 0
           ? `${item.label}: ${formatGoalTarget(item.pnl)} / ${formatGoalTarget(item.target)}P${item.reached ? " (목표 달성)" : ""}`
           : `${item.label}: 목표금액 없음`;
@@ -203,6 +209,60 @@ const buildResultRows = ({
     };
   });
 };
+
+function GhGlobalhitSummary({ roundState }) {
+  const aggregate = roundState?.globalhit_aggregate || {};
+  const direction = aggregate.direction;
+  const amount = Number(aggregate.amount || 0);
+  const pnl = Number(roundState?.globalhit_pnl || 0);
+  const fmt = (value) => Number(value || 0).toFixed(1);
+  return (
+    <Box sx={{ display: "flex", alignItems: "stretch", width: "fit-content", minWidth: 360, mb: 1.5 }}>
+      <Box sx={{ minWidth: direction ? 28 : 42, px: 0.5, border: "1px solid #3f4650", backgroundColor: direction === "P" ? "#1565d8" : direction === "B" ? "#e53935" : "#555", color: "#fff", fontSize: direction ? 13 : 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {direction || "-"}
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: 900, px: 0.75, py: 0.45, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span>글로벌히트 BET</span><span>{fmt(amount)}P</span>
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 145, ml: 0.5, border: "1px solid #3f4650", backgroundColor: "#111821", color: pnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: 900, px: 0.75, py: 0.45, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span>글로벌히트 PNL</span><span>{fmt(pnl)}P</span>
+      </Box>
+    </Box>
+  );
+}
+
+function GhLossStopStatus({ roundState, autoStatus }) {
+  const status = roundState?.globalhit_loss_stop;
+  const configuredLimit = Number(status?.configured_limit || 0);
+  const enabled = configuredLimit > 0;
+  const detail = enabled
+    ? `설정 ${configuredLimit.toFixed(1)}P · 글로벌히트 PNL ${Number(status?.pnl || 0).toFixed(1)}P / 판정기준 -${Number(status?.limit || 0).toFixed(1)}P${status?.mode === "auto" && Number(status?.pnl_scale || 1) !== 1 ? ` (원값 ${Number(status?.globalhit_pnl || 0).toFixed(1)}P ×${Number(status.pnl_scale)})` : ""}${status?.stopped ? " · 중지" : " · 정상"}`
+    : "미사용";
+  const drawdownStatus = autoStatus?.running
+    ? {
+      configured_drawdown_start: autoStatus.drawdown_start_amount,
+      effective_drawdown_start: autoStatus.effective_drawdown_start_amount,
+      drawdown_percent: autoStatus.drawdown_percent,
+      drawdown_armed: Number(autoStatus.drawdown_peak_actual_p || 0) >= Number(autoStatus.effective_drawdown_start_amount || 0),
+      drawdown_peak: autoStatus.drawdown_peak_actual_p,
+      reason: autoStatus.stop_reason,
+    }
+    : roundState?.overall_stop;
+  return (
+    <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 1.5, px: 1, py: 0.7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
+      <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>현재 게임 배팅조건</Typography>
+      <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: status?.stopped ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
+        슬롯 글로벌히트 손실종료: {detail}
+      </Typography>
+      <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: drawdownStatus?.reason === "drawdown_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
+        손실종료조건: {ghDrawdownStatusLabel(drawdownStatus)}
+      </Typography>
+      <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.profit_stop?.stopped ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
+        수익보호: {ghProfitStopStatusLabel(roundState?.profit_stop)}
+      </Typography>
+    </Box>
+  );
+}
 
 function GhRoundAmountTable({
   roundState,
@@ -532,6 +592,7 @@ function applyActualBetSettlement(roundState, data) {
 function GhBettingSummaryPanel({
   roundState,
   selectedMode,
+  keepCount,
   onModeChange,
   autoStatus,
   onPlay,
@@ -625,7 +686,7 @@ function GhBettingSummaryPanel({
         ? `${monitoringReason}: 현재 게임은 결과만 기록하며 킵 모드는 다음 게임에서 배팅을 재개합니다.`
         : undefined,
     },
-    { text: "keep", selection: "keep" },
+    { text: ghKeepLabel(keepCount, autoStatus), selection: "keep" },
     {
       text: autoStatus?.running ? "stop" : "play",
       play: true,
@@ -873,6 +934,9 @@ export default function GhUserGamePage() {
   const [autoDialogOpen, setAutoDialogOpen] = useState(false);
   const [autoStatus, setAutoStatus] = useState({ running: false, autoSessionId: null });
   const [autoPlayMode, setAutoPlayMode] = useState("one");
+  const [keepCount, setKeepCount] = useState(GH_KEEP_COUNT_DEFAULT);
+  const [keepCountInput, setKeepCountInput] = useState(String(GH_KEEP_COUNT_DEFAULT));
+  const [keepCountOpen, setKeepCountOpen] = useState(false);
   const [amountViewMode, setAmountViewMode] = useState("calculated");
   const [autoError, setAutoError] = useState(null);
   const [rejectMsg, setRejectMsg] = useState(null);  // 베팅 거부 레이어 팝업
@@ -1312,6 +1376,10 @@ export default function GhUserGamePage() {
               pending_direction: data.pending_direction ?? null,
               pending_amount_p: data.pending_amount_p ?? 0,
               pending_amount_won: data.pending_amount_won ?? 0,
+              drawdown_start_amount: data.drawdown_start_amount_p ?? prev.drawdown_start_amount,
+              effective_drawdown_start_amount: data.effective_drawdown_start_amount_p ?? prev.effective_drawdown_start_amount,
+              drawdown_percent: data.drawdown_percent ?? prev.drawdown_percent,
+              drawdown_peak_actual_p: data.drawdown_peak_actual_p ?? prev.drawdown_peak_actual_p,
             }));
             showOverallStopAlert(
               data.game_id || gameId,
@@ -1330,7 +1398,7 @@ export default function GhUserGamePage() {
               pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
               pnl_actual_p: data.pnl_actual_p ?? prev.pnl_actual_p,
               round_count: data.round_count ?? prev.round_count,
-              stop_reason: ["goal_reached", "end_round_reached", "active_pot_limit_reached"].includes(data.reason)
+              stop_reason: ["goal_reached", "drawdown_reached", "end_round_reached", "active_pot_limit_reached"].includes(data.reason)
                 ? data.reason
                 : prev.stop_reason,
               active_pot_count: data.active_pot_count ?? prev.active_pot_count,
@@ -1364,6 +1432,7 @@ export default function GhUserGamePage() {
               stop_reason: data.stop_reason || null,
               active_pot_count: data.active_pot_count ?? null,
               pot_stop_count: data.pot_stop_count ?? prev.pot_stop_count ?? 0,
+              keep_shoes_remaining: data.keep_shoes_remaining ?? prev.keep_shoes_remaining,
             }));
             showOverallStopAlert(
               data.game_id,
@@ -1438,8 +1507,22 @@ export default function GhUserGamePage() {
         );
         if (!ok) return;
       }
+      if (autoPlayMode === "keep") {
+        setKeepCountInput(String(keepCount));
+        setKeepCountOpen(true);
+        return;
+      }
       setAutoDialogOpen(true);
     }
+  };
+
+  const confirmKeepCount = () => {
+    const parsed = parseGhKeepCount(keepCountInput);
+    if (parsed == null) return;
+    setKeepCount(parsed);
+    setAutoPlayMode("keep");
+    setKeepCountOpen(false);
+    setAutoDialogOpen(true);
   };
 
   const handleInput = async (inputValue) => {
@@ -1584,6 +1667,7 @@ export default function GhUserGamePage() {
       phase: slot?.phase || null,
       table_name: slot?.table_name || null,
       play_mode: slot?.play_mode || "one",
+      keep_shoes_remaining: slot?.keep_shoes_remaining ?? null,
       actual_bet_scale: slot?.actual_bet_scale || 1,
     });
     setAutoError(slot?.phase === "error" ? {
@@ -2370,6 +2454,7 @@ export default function GhUserGamePage() {
           <GhBettingSummaryPanel
             roundState={roundState}
             selectedMode={autoPlayMode}
+            keepCount={keepCount}
             onModeChange={setAutoPlayMode}
             autoStatus={autoStatus}
             onPlay={handleAutoToggle}
@@ -2468,6 +2553,9 @@ export default function GhUserGamePage() {
               )}
             </Box>
           )}
+
+          {isAdmin && <GhLossStopStatus roundState={roundState} autoStatus={autoStatus} />}
+          {isAdmin && <GhGlobalhitSummary roundState={roundState} />}
 
           {isAdmin && roundStateLower && (
             <>
@@ -3124,6 +3212,32 @@ export default function GhUserGamePage() {
         </DialogActions>
       </Dialog>
 
+      <Dialog open={keepCountOpen} onClose={() => setKeepCountOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>KEEP 반복 횟수</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            size="small"
+            type="number"
+            label="실행할 슈 수"
+            value={keepCountInput}
+            onChange={(event) => setKeepCountInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") confirmKeepCount();
+            }}
+            inputProps={{ min: GH_KEEP_COUNT_MIN, max: GH_KEEP_COUNT_MAX, step: 1 }}
+            error={keepCountInput !== "" && parseGhKeepCount(keepCountInput) == null}
+            helperText={`${GH_KEEP_COUNT_MIN}~${GH_KEEP_COUNT_MAX}회 · 1회는 ONE을 사용하세요`}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setKeepCountOpen(false)}>취소</Button>
+          <Button variant="contained" disabled={parseGhKeepCount(keepCountInput) == null} onClick={confirmKeepCount}>확인</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Auto 베팅 시작 모달 — mvp-aboo-integration.md §5.1 */}
       <AutoStartDialog
         open={autoDialogOpen}
@@ -3135,6 +3249,7 @@ export default function GhUserGamePage() {
             autoSessionId: resp.auto_session_id,
             phase: resp.phase,
             play_mode: resp.play_mode,
+            keep_shoes_remaining: resp.keep_shoes_remaining ?? null,
             actual_bet_scale: resp.actual_bet_scale || 1,
             stop_reason: resp.stop_reason || null,
             active_pot_count: resp.active_pot_count ?? null,
@@ -3154,6 +3269,7 @@ export default function GhUserGamePage() {
         pickhandId={myPickhandId}
         gameType="gh"
         playMode={autoPlayMode}
+        keepCount={keepCount}
       />
 
       {/* 베팅 거부 레이어 팝업 */}

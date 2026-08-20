@@ -25,6 +25,12 @@ export const formatGoalTarget = (value) => numberOrZero(value).toLocaleString(
   { minimumFractionDigits: 0, maximumFractionDigits: 1 },
 );
 
+export const formatGoalIndicator = (item) => (
+  item?.reached && numberOrZero(item?.reachedRound) > 0
+    ? `${item.label} ${numberOrZero(item.reachedRound)}`
+    : item?.label || ""
+);
+
 export const buildGoalStatusItems = (
   strategyGoals,
   overallStop,
@@ -40,6 +46,7 @@ export const buildGoalStatusItems = (
       target,
       pnl: numberOrZero(goal.pnl),
       reached: target > 0 && Boolean(goal.reached),
+      reachedRound: numberOrZero(goal.reached_round),
       dimmed: target <= 0,
     };
   });
@@ -62,6 +69,9 @@ export const buildGoalStatusItems = (
     target: overallTarget,
     pnl: overallPnl,
     reached: overallReached,
+    reachedRound: numberOrZero(
+      overallStop?.reached_round || (overallReached ? autoStatus?.round_count : 0),
+    ),
     dimmed: overallTarget <= 0,
   });
   return items;

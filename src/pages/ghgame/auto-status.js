@@ -6,11 +6,16 @@ export const createEmptyAutoStatus = () => ({
   active_pot_count: null,
   pot_stop_count: 0,
   goal_amount: 0,
+  drawdown_start_amount: 0,
+  effective_drawdown_start_amount: 0,
+  drawdown_percent: 0,
+  drawdown_peak_actual_p: 0,
   error_code: null,
   error_detail: null,
   pending_direction: null,
   pending_amount_p: 0,
   pending_amount_won: 0,
+  keep_shoes_remaining: null,
 });
 
 export const shouldDisplayAutoError = (status, error = null) => Boolean(
@@ -55,6 +60,8 @@ export const mergePolledAutoStatus = (previous, status) => {
     round_count: status?.round_count ?? previous?.round_count,
     table_name: status?.table_name ?? previous?.table_name,
     play_mode: status?.play_mode ?? previous?.play_mode,
+    keep_shoes_remaining:
+      status?.keep_shoes_remaining ?? previous?.keep_shoes_remaining ?? null,
     stop_reason:
       status?.stop_reason ?? previous?.stop_reason ?? null,
     active_pot_count:
@@ -63,6 +70,14 @@ export const mergePolledAutoStatus = (previous, status) => {
       status?.pot_stop_count ?? previous?.pot_stop_count ?? 0,
     goal_amount:
       status?.goal_amount ?? previous?.goal_amount ?? 0,
+    drawdown_start_amount:
+      status?.drawdown_start_amount ?? status?.drawdown_start_amount_p ?? previous?.drawdown_start_amount ?? 0,
+    effective_drawdown_start_amount:
+      status?.effective_drawdown_start_amount ?? status?.effective_drawdown_start_amount_p ?? previous?.effective_drawdown_start_amount ?? 0,
+    drawdown_percent:
+      status?.drawdown_percent ?? previous?.drawdown_percent ?? 0,
+    drawdown_peak_actual_p:
+      status?.drawdown_peak_actual_p ?? previous?.drawdown_peak_actual_p ?? 0,
     pending_direction:
       status?.pending_direction ?? null,
     pending_amount_p:
