@@ -1,13 +1,24 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { toBlob } from "html-to-image";
 import {
   Box,
+  Button,
   FormControl,
   MenuItem,
   Select,
   Typography,
 } from "@mui/material";
 
-import { MAX_MISS_THRESHOLDS, maxMissLabel } from "./max-miss-dialog.js";
+import {
+  buildMaxMissClipboardPayload,
+  includeInMaxMissImage,
+  MAX_MISS_THRESHOLDS,
+  maxMissLabel,
+  maxMissTitle,
+  maxMissTrackForSection,
+  writeMaxMissClipboard,
+  writePngToClipboard,
+} from "./max-miss-dialog.js";
 
 const MAX_MISS_THRESHOLD_KEY = "gh_max_miss_threshold";
 
@@ -150,7 +161,8 @@ function MaxMissGrid({ roundState, trackKey, color, title, threshold }) {
                   </Box>
                 );
               }
-              const value = maxMissLabel(sections?.[section.key]?.[trackKey], threshold, section.always);
+              const track = maxMissTrackForSection(sections, section.key, trackKey);
+              const value = maxMissLabel(track, threshold, section.always);
               return (
                 <Box key={section.key} sx={{ display: "flex" }}>
                   <Box sx={labelCellSx(color)}>{section.label}</Box>
@@ -166,31 +178,99 @@ function MaxMissGrid({ roundState, trackKey, color, title, threshold }) {
 }
 
 export default function GhMaxMissPanel({ roundState, gameId, replayRound = null }) {
+  const captureRef = useRef(null);
+  const [copyStatus, setCopyStatus] = useState(null);
+  const [imageCopying, setImageCopying] = useState(false);
   const [threshold, setThreshold] = useState(() => {
     const stored = Number(sessionStorage.getItem(MAX_MISS_THRESHOLD_KEY));
     return MAX_MISS_THRESHOLDS.includes(stored) ? stored : 9;
   });
   const changeThreshold = (value) => {
     setThreshold(value);
+    setCopyStatus(null);
     sessionStorage.setItem(MAX_MISS_THRESHOLD_KEY, String(value));
+  };
+  const roundNum = replayRound || Number(roundState?.round_num) || null;
+  const replay = Boolean(replayRound);
+  const title = maxMissTitle({ threshold, gameId, roundNum, replay });
+  const copyForExcel = async () => {
+    setCopyStatus(null);
+    const payload = buildMaxMissClipboardPayload({
+      sections: roundState?.sections || {},
+      sectionRows: SECTION_ROWS,
+      threshold,
+      gameId,
+      roundNum,
+      replay,
+    });
+    try {
+      const format = await writeMaxMissClipboard(payload);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      setCopyStatus({
+        success: true,
+        message: format === "html"
+          ? "엑셀용 표를 디자인과 함께 복사했습니다."
+          : "엑셀용 표를 복사했습니다. 색상은 지원되지 않는 환경입니다.",
+      });
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      setCopyStatus({ success: false, message: "복사하지 못했습니다. 브라우저의 클립보드 권한을 확인해주세요." });
+    }
+  };
+  const copyAsImage = async () => {
+    if (!captureRef.current || imageCopying) return;
+    setCopyStatus(null);
+    setImageCopying(true);
+    try {
+      await document.fonts?.ready;
+      const width = captureRef.current.scrollWidth;
+      const height = captureRef.current.scrollHeight;
+      const pngPromise = toBlob(captureRef.current, {
+        backgroundColor: "#0d0f12",
+        cacheBust: true,
+        filter: includeInMaxMissImage,
+        width,
+        height,
+        pixelRatio: 2,
+      });
+      await writePngToClipboard(pngPromise);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      setCopyStatus({ success: true, message: "이미지를 클립보드에 복사했습니다." });
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      setCopyStatus({ success: false, message: "이미지를 복사하지 못했습니다. 브라우저의 클립보드 권한을 확인해주세요." });
+    } finally {
+      setImageCopying(false);
+    }
   };
 
   return (
     <Box sx={{ minHeight: "100vh", p: 1.5, backgroundColor: "#0d0f12" }}>
-      <Typography sx={{ mb: 1, color: "#fff", fontSize: 18, fontWeight: 900 }}>고연패 현황</Typography>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.2 }}>
-        <FormControl size="small" sx={{ minWidth: 130 }}>
-          <Select value={threshold} onChange={(event) => changeThreshold(Number(event.target.value))}>
-            {MAX_MISS_THRESHOLDS.map((value) => (
-              <MenuItem key={value} value={value}>{value}M 이상</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Box sx={{ px: 1.5, py: 0.9, minWidth: 100, border: "1px solid #777", borderRadius: 1, color: "#fff", fontWeight: 800 }}>
-          #{gameId || "-"}{replayRound ? ` · ${replayRound}회차 리플레이` : ""}
+      <Box ref={captureRef} data-image-capture-root="true" sx={{ width: "max-content", p: 0.5, backgroundColor: "#0d0f12" }}>
+        <Typography sx={{ mb: 1, color: "#fff", fontSize: 18, fontWeight: 900 }}>{title}</Typography>
+        <Box data-image-capture-exclude="true" sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.2 }}>
+          <FormControl size="small" sx={{ minWidth: 130 }}>
+            <Select value={threshold} onChange={(event) => changeThreshold(Number(event.target.value))}>
+              {MAX_MISS_THRESHOLDS.map((value) => (
+                <MenuItem key={value} value={value}>{value}M 이상</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Box sx={{ px: 1.5, py: 0.9, minWidth: 100, border: "1px solid #777", borderRadius: 1, color: "#fff", fontWeight: 800 }}>
+            #{gameId || "-"}{roundNum ? ` ${roundNum}회차` : ""}{replay ? " 리플레이" : ""}
+          </Box>
+          <Button size="small" variant="contained" color="success" onClick={copyForExcel}>
+            엑셀 복사
+          </Button>
+          <Button size="small" variant="contained" color="info" onClick={copyAsImage} disabled={imageCopying}>
+            {imageCopying ? "복사 중..." : "이미지 복사"}
+          </Button>
+          {copyStatus && (
+            <Typography sx={{ color: copyStatus.success ? "#66bb6a" : "#ef5350", fontSize: 12, fontWeight: 700 }}>
+              {copyStatus.message}
+            </Typography>
+          )}
         </Box>
-      </Box>
-      <Box sx={{ overflow: "auto", pb: 1 }}>
         <Box sx={{ display: "flex", gap: 1.5, width: "max-content", backgroundColor: "#111", p: 1 }}>
           <MaxMissGrid roundState={roundState} trackKey="assist_h" color="#20c9e8" title="회차어시 H" threshold={threshold} />
           <MaxMissGrid roundState={roundState} trackKey="assist_q" color="#ff74df" title="쿼터어시 Q" threshold={threshold} />
