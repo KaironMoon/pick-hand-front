@@ -526,6 +526,13 @@ const ASSIST_DISPLAY_PREFIXES = {
 };
 const assistDisplayLabel = (value) => ASSIST_DISPLAY_LABELS[value] || Object.entries(ASSIST_DISPLAY_PREFIXES)
   .reduce((label, [storedPrefix, displayPrefix]) => label.replace(storedPrefix, displayPrefix), value);
+const ASSIST_PROTECTION_OPTIONS = [
+  "J", "BF6", "BF6X", "G(H1)", "G(%1)",
+  "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)",
+  "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
+  "HB멀티(H1)", "HB멀티(%1)", "WH멀티(H1)", "WH멀티(%1)",
+  "MH멀티(H1)", "MH멀티(%1)", "DH멀티(H1)", "DH멀티(%1)",
+];
 const isKnownAssistOption = (value) => !value || ASSIST_OPTS.includes(value);
 const normalizeAssistOption = (value) => (["대기진행", "G(H0)", "G(%0)"].includes(value) ? "해당진행" : (isKnownAssistOption(value) ? (value || "해당진행") : "해당진행"));
 const SIX_M_ASSISTS = new Set(["6M", "6MX"]);
@@ -662,6 +669,10 @@ const DEFAULT_STRATEGY_SETUP = {
   ai_var_mid_to_high_hit: 2,
   ai_var_section_counts: {},
   ai_var_pass_count: 0,
+  assist_protection_enabled: false,
+  assist_protection_miss_threshold: 1,
+  assist_protection_hit_threshold: 1,
+  assist_protection_options: [],
   assist_lock_by_section: {},
   pasi: defaultPasi(),
   assist: false,
@@ -802,16 +813,18 @@ function AssistSelect({ value, onChange, sx, sixMDisabled = false }) {
 }
 
 // 작은 숫자 인풋(미스/발생/회대기/%). 시안의 .missin/.pct-in
-function NumIn({ value, onChange, min, max, color = "#0065fe", width = 30, bg = "#0d2440" }) {
+function NumIn({ value, onChange, min, max, color = "#0065fe", width = 30, bg = "#0d2440", disabled = false }) {
   return (
     <input type="number" value={value ?? 0} min={min} max={max}
+      disabled={disabled}
       onChange={(e) => {
         let v = parseInt(e.target.value || "0", 10) || 0;
         if (v < min) v = min; if (v > max) v = max;
         onChange(v);
       }}
       style={{ width, background: bg, border: "1px solid #2f5b8f", color, fontWeight: "bold",
-        textAlign: "center", fontSize: 12, borderRadius: 3, padding: 0 }} />
+        textAlign: "center", fontSize: 12, borderRadius: 3, padding: 0,
+        cursor: disabled ? "not-allowed" : "text" }} />
   );
 }
 
@@ -1168,6 +1181,96 @@ function StrategySetupSection({ name, strat, onChange, variant, sections, target
   });
   const aiVarPassCount = s.ai_var_pass_count ?? 0;
   const setAiVarPassCount = (value) => onChange({ ...s, ai_var_pass_count: value });
+  const assistProtectionEnabled = s.assist_protection_enabled === true;
+  const selectedProtectionOptions = Array.isArray(s.assist_protection_options)
+    ? s.assist_protection_options
+    : [];
+  const toggleProtectionOption = (option) => {
+    const selected = new Set(selectedProtectionOptions);
+    if (selected.has(option)) selected.delete(option);
+    else selected.add(option);
+    onChange({
+      ...s,
+      assist_protection_options: ASSIST_PROTECTION_OPTIONS.filter((item) => selected.has(item)),
+    });
+  };
+  const assistProtectionCell = (rowSpan = 1) => (
+    <td
+      colSpan={4}
+      rowSpan={rowSpan}
+      style={{
+        ...mkAssistHdr,
+        background: assistProtectionEnabled ? "#0f5a42" : "#173d34",
+        border: assistProtectionEnabled ? "2px solid #22c55e" : "2px solid #52756a",
+        color: "#fff",
+        opacity: assistProtectionEnabled ? 1 : 0.78,
+        padding: 3,
+        verticalAlign: "top",
+        transition: "opacity 120ms ease, background 120ms ease",
+      }}
+    >
+      <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, minHeight: 24, cursor: "pointer", fontWeight: 800, whiteSpace: "nowrap" }}>
+        <input
+          type="checkbox"
+          checked={assistProtectionEnabled}
+          onChange={(event) => onChange({
+            ...s,
+            assist_protection_enabled: event.target.checked,
+            ...(event.target.checked ? {} : { assist_protection_options: [] }),
+          })}
+          aria-label={`${name} 어시스트 보호 설정`}
+          style={{ width: 14, height: 14, accentColor: "#22c55e" }}
+        />
+        <span>해당 어시스트 제공</span>
+        <NumIn
+          value={s.assist_protection_miss_threshold ?? 1}
+          min={1}
+          max={20}
+          color="#7dd3fc"
+          bg="#12324a"
+          disabled={!assistProtectionEnabled}
+          onChange={(value) => onChange({ ...s, assist_protection_miss_threshold: value })}
+        />
+        <span>M 시 대기 후</span>
+        <NumIn
+          value={s.assist_protection_hit_threshold ?? 1}
+          min={1}
+          max={20}
+          color="#86efac"
+          bg="#123b2c"
+          disabled={!assistProtectionEnabled}
+          onChange={(value) => onChange({ ...s, assist_protection_hit_threshold: value })}
+        />
+        <span>H 시 제공</span>
+      </label>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 2, marginTop: 3 }}>
+        {ASSIST_PROTECTION_OPTIONS.map((option) => {
+          const selected = assistProtectionEnabled && selectedProtectionOptions.includes(option);
+          return (
+            <button
+              key={option}
+              type="button"
+              disabled={!assistProtectionEnabled}
+              aria-pressed={selected}
+              onClick={() => toggleProtectionOption(option)}
+              style={{
+                minHeight: 25,
+                padding: "1px 2px",
+                border: selected ? "1px solid #38bdf8" : "1px solid #64748b",
+                background: selected ? "#164e63" : "#171717",
+                color: selected ? "#e0f2fe" : "#9ca3af",
+                fontWeight: selected ? 800 : 500,
+                fontSize: 12,
+                cursor: assistProtectionEnabled ? "pointer" : "default",
+              }}
+            >
+              {assistDisplayLabel(option)}
+            </button>
+          );
+        })}
+      </div>
+    </td>
+  );
   const aiVarRule = (prefix, key, fallback, suffix, colSpan = 2) => (
     <td colSpan={colSpan} style={isAiVariable ? mkNavy : mkDisabled}>
       {prefix}
@@ -1339,7 +1442,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections, target
         <>
           <tr>
             <td colSpan={4} style={mkAssistHdr}>최상위조건설정</td>
-            <td colSpan={6} rowSpan={visiblePasi.length + 1} style={{ ...mkCell, padding: 0, verticalAlign: "top" }}>
+            <td colSpan={6} rowSpan={visiblePasi.length + 1 + (visiblePasi.length <= BET_PROGRESS_MODES.length + 1 ? 1 : 0)} style={{ ...mkCell, padding: 0, verticalAlign: "top" }}>
               <MultiAssistGrid
                 sections={sections}
                 visiblePasi={visiblePasi}
@@ -1369,12 +1472,19 @@ function StrategySetupSection({ name, strat, onChange, variant, sections, target
                   >
                     {BET_PROGRESS_MODES[i - 1][1]}
                   </td>
+                ) : i === BET_PROGRESS_MODES.length + 1 ? (
+                  assistProtectionCell(visiblePasi.length - BET_PROGRESS_MODES.length - 1)
+                ) : i > BET_PROGRESS_MODES.length + 1 ? (
+                  null
                 ) : (
                   <td colSpan={4} style={mkCell}></td>
                 )}
               </tr>
             );
           })}
+          {visiblePasi.length <= BET_PROGRESS_MODES.length + 1 && (
+            <tr>{assistProtectionCell()}</tr>
+          )}
         </>
       ) : (
         <>
@@ -1424,6 +1534,10 @@ function StrategySetupSection({ name, strat, onChange, variant, sections, target
                   >
                     {BET_PROGRESS_MODES[i - 1][1]}
                   </td>
+                ) : i === BET_PROGRESS_MODES.length + 1 ? (
+                  assistProtectionCell(visiblePasi.length - BET_PROGRESS_MODES.length - 1)
+                ) : i > BET_PROGRESS_MODES.length + 1 ? (
+                  null
                 ) : (
                   <td colSpan={4} style={mkCell}></td>
                 )}
@@ -1442,6 +1556,12 @@ function StrategySetupSection({ name, strat, onChange, variant, sections, target
               </tr>
             );
           })}
+          {visiblePasi.length <= BET_PROGRESS_MODES.length + 1 && (
+            <tr>
+              {assistProtectionCell()}
+              <td colSpan={6} style={mkCell}></td>
+            </tr>
+          )}
         </>
       )}
     </>
