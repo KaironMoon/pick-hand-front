@@ -9,6 +9,7 @@ import {
   MAX_MISS_CAPTURE_SECTION_ORDER,
   MAX_MISS_THRESHOLDS,
   MAX_MISS_PNG_QUANTIZE_STEP,
+  maxMissGeneratedJTrack,
   maxMissLabel,
   maxMissTitle,
   maxMissTrackForSection,
@@ -49,12 +50,15 @@ test("maximum miss thresholds cover 3M through 20M", () => {
 
 test("maximum miss values below the selected threshold stay hidden", () => {
   assert.equal(maxMissLabel({ max_miss_streak: 8 }, 9), "");
-  assert.equal(maxMissLabel({ max_miss_streak: 9 }, 9), "9M");
+  assert.equal(maxMissLabel({ max_miss_streak: 9, max_miss_round: 21 }, 9), "9M21");
+  assert.equal(maxMissLabel({ max_miss_streak: 11, max_miss_round: 34 }, 9), "11M34");
   assert.equal(maxMissLabel({ max_miss_streak: 11 }, 9), "11M");
 });
 
 test("J can always show its positive maximum miss value", () => {
-  assert.equal(maxMissLabel({ max_miss_streak: 4 }, 9, true), "4M");
+  const sections = { J: { base: { max_miss_streak: 4, max_miss_round: 12 } } };
+  assert.equal(maxMissGeneratedJTrack(sections), sections.J.base);
+  assert.equal(maxMissLabel(maxMissGeneratedJTrack(sections), 9, true), "4M12");
   assert.equal(maxMissLabel({ max_miss_streak: 0 }, 9, true), "");
 });
 
@@ -95,8 +99,11 @@ test("maximum miss title shows threshold, game, and round in the requested order
 test("Excel clipboard payload keeps layout, colors, threshold, and aliased values", () => {
   const payload = buildMaxMissClipboardPayload({
     sections: {
+      J: {
+        base: { max_miss_streak: 4, max_miss_round: 12 },
+      },
       SSR1: {
-        assist_h: { max_miss_streak: 10 },
+        assist_h: { max_miss_streak: 10, max_miss_round: 31 },
         assist_q: { max_miss_streak: 8 },
       },
     },
@@ -114,18 +121,21 @@ test("Excel clipboard payload keeps layout, colors, threshold, and aliased value
   assert.match(payload.html, /고연패 현황\(9M 이상\) #123 45회차/);
   assert.match(payload.html, /회차어시 H/);
   assert.match(payload.html, /쿼터어시 Q/);
+  assert.match(payload.html, /color:#ff74df[^>]*>J</);
+  assert.match(payload.html, />4M12</);
   assert.match(payload.html, /background-color:#181a1d/);
   assert.match(payload.html, /SSRN1/);
-  assert.match(payload.html, /10M/);
+  assert.match(payload.html, /10M31/);
   assert.doesNotMatch(payload.html, />8M</);
   assert.doesNotMatch(payload.html, /colspan=/i);
   assert.deepEqual(
     [...payload.tableHtml.matchAll(/<tr>(.*?)<\/tr>/g)].map(([, row]) => (row.match(/<td /g) || []).length),
-    [17, 17, 17],
+    [17, 17, 17, 17],
   );
   assert.match(payload.text, /^고연패 현황\(9M 이상\) #123 45회차/);
-  assert.match(payload.text, /SSRN1\t10M/);
-  assert.deepEqual(payload.text.split("\n").slice(1).map((row) => row.split("\t").length), [17, 17]);
+  assert.match(payload.text, /J\t4M12/);
+  assert.match(payload.text, /SSRN1\t10M31/);
+  assert.deepEqual(payload.text.split("\n").slice(1).map((row) => row.split("\t").length), [17, 17, 17]);
 });
 
 test("clipboard writer falls back to tab-separated text", async () => {

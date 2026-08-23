@@ -16,6 +16,7 @@ import {
   MAX_MISS_CAPTURE_PIXEL_RATIO,
   MAX_MISS_CAPTURE_SECTION_ORDER,
   MAX_MISS_THRESHOLDS,
+  maxMissGeneratedJTrack,
   maxMissLabel,
   maxMissTitle,
   maxMissTrackForSection,
@@ -114,7 +115,7 @@ const SECTION_ROWS = [
   [
     { key: "P", label: "P" },
     { key: "B", label: "B" },
-    { key: "J", label: "J", always: true },
+    null,
     null,
   ],
 ];
@@ -176,6 +177,23 @@ function MaxMissGrid({ roundState, trackKey, color, title, threshold }) {
             })}
           </Box>
         ))}
+      </Box>
+    </Box>
+  );
+}
+
+function MaxMissGeneratedJ({ roundState, threshold }) {
+  const value = maxMissLabel(
+    maxMissGeneratedJTrack(roundState?.sections || {}),
+    threshold,
+    true,
+  );
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "max-content", mb: 1 }}>
+      <Typography sx={{ color: "#ff74df", fontWeight: 900 }}>생성픽 최대연패</Typography>
+      <Box sx={{ display: "flex", border: "2px solid #b39b5d" }}>
+        <Box sx={labelCellSx("#ff74df")}>J</Box>
+        <Box sx={valueCellSx}>{value}</Box>
       </Box>
     </Box>
   );
@@ -390,6 +408,7 @@ export default function GhMaxMissPanel({ roundState, gameId, replayRound = null 
               </Typography>
             )}
           </Box>
+          <MaxMissGeneratedJ roundState={roundState} threshold={threshold} />
           <Box sx={{ display: "flex", gap: 1.5, width: "max-content", backgroundColor: "#111", p: 1 }}>
             <MaxMissGrid roundState={roundState} trackKey="assist_h" color="#20c9e8" title="회차어시 H" threshold={threshold} />
             <MaxMissGrid roundState={roundState} trackKey="assist_q" color="#ff74df" title="쿼터어시 Q" threshold={threshold} />

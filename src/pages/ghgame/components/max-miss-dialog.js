@@ -66,6 +66,10 @@ export function maxMissTrackForSection(sections, sectionKey, trackKey) {
   return section?.[trackKey];
 }
 
+export function maxMissGeneratedJTrack(sections) {
+  return maxMissTrackForSection(sections, "J", "base");
+}
+
 const escapeHtml = (value) => String(value ?? "")
   .replaceAll("&", "&amp;")
   .replaceAll("<", "&lt;")
@@ -126,6 +130,7 @@ export function buildMaxMissClipboardPayload({
   ].join(";");
   const headingStyle = `${titleStyle};font-size:16px;text-align:left`;
   const spacerStyle = "border:none;background-color:#111111;width:12px";
+  const jValue = maxMissLabel(maxMissGeneratedJTrack(sections), threshold, true);
 
   const cellsFor = (row, trackKey, color) => row.flatMap((section) => {
     if (!section) {
@@ -149,6 +154,11 @@ export function buildMaxMissClipboardPayload({
     clipboardCell(heading, headingStyle),
     ...Array.from({ length: 16 }, () => clipboardCell("", headingStyle)),
   ];
+  const jCells = [
+    clipboardCell("J", labelStyle("#ff74df")),
+    clipboardCell(jValue, valueStyle),
+    ...Array.from({ length: 15 }, () => clipboardCell("", titleStyle)),
+  ];
   const trackHeadingCells = [
     clipboardCell("회차어시 H", `${titleStyle};color:#20c9e8`),
     ...Array.from({ length: 7 }, () => clipboardCell("", titleStyle)),
@@ -159,6 +169,7 @@ export function buildMaxMissClipboardPayload({
   const tableHtml = [
     '<table style="border-collapse:collapse;background-color:#111111;font-family:Arial,sans-serif">',
     `<tr>${headingCells.join("")}</tr>`,
+    `<tr>${jCells.join("")}</tr>`,
     `<tr>${trackHeadingCells.join("")}</tr>`,
     ...htmlRows,
     "</table>",
@@ -179,6 +190,7 @@ export function buildMaxMissClipboardPayload({
   });
   const text = [
     heading,
+    ["J", jValue, ...Array(15).fill("")].join("\t"),
     ["회차어시 H", ...Array(7).fill(""), "", "쿼터어시 Q", ...Array(7).fill("")].join("\t"),
     ...textRows,
   ].join("\n");
@@ -250,5 +262,6 @@ export async function writePngToClipboard(
 export function maxMissLabel(track, threshold, always = false) {
   const maxMiss = Number(track?.max_miss_streak || 0);
   if (maxMiss <= 0 || (!always && maxMiss < threshold)) return "";
-  return `${maxMiss}M`;
+  const maxMissRound = Number(track?.max_miss_round || 0);
+  return `${maxMiss}M${maxMissRound > 0 ? maxMissRound : ""}`;
 }
