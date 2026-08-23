@@ -17,8 +17,24 @@ const STOP_ALERTS = {
   },
   round_bet_loss_streak_reached: {
     title: "배팅액판 연패중지",
-    detail: "회차별 배팅액판의 연패가 설정값에 도달하여 배팅이 정지되었습니다.",
+    detail: "설정 연패 단계 이후 실제 주문액이 기준금액에 도달하여 배팅이 정지되었습니다.",
   },
+};
+
+const formatBetAmount = (value) => Number(value).toLocaleString(undefined, {
+  maximumFractionDigits: 1,
+});
+
+const stopAlertDetail = (alert, reason, mode, stopDetail) => {
+  if (reason !== "round_bet_loss_streak_reached") return alert.detail;
+  const triggerRound = Number(stopDetail?.round_bet_loss_streak_trigger_round || 0);
+  const triggerBetAmount = Number(stopDetail?.round_bet_loss_streak_trigger_bet_amount || 0);
+  if (!Number.isInteger(triggerRound) || triggerRound <= 0
+      || !Number.isFinite(triggerBetAmount) || triggerBetAmount <= 0) {
+    return alert.detail;
+  }
+  const betLabel = mode === "auto" ? "실제 주문액" : "배팅액";
+  return `${triggerRound}회차 ${betLabel} ${formatBetAmount(triggerBetAmount)} P가 기준금액에 도달하여 배팅이 정지되었습니다.`;
 };
 
 export const claimOverallStopAlert = (
@@ -26,6 +42,7 @@ export const claimOverallStopAlert = (
   gameId,
   reason,
   mode,
+  stopDetail,
 ) => {
   const alert = STOP_ALERTS[reason];
   if (!alert || gameId === null || gameId === undefined) return null;
@@ -34,6 +51,7 @@ export const claimOverallStopAlert = (
   alertedGameIds.add(key);
   return {
     ...alert,
+    detail: stopAlertDetail(alert, reason, mode, stopDetail),
     modeLabel: mode === "auto" ? "오토" : "수동",
   };
 };

@@ -2141,7 +2141,7 @@ export default function GhUserSetupPage() {
                 setDirty(true);
               }}
               style={{
-                width: 140,
+                width: 60,
                 padding: "4px 6px",
                 background: "#16213e",
                 color: "#fff",
@@ -2150,13 +2150,40 @@ export default function GhUserSetupPage() {
                 fontSize: 12,
               }}
             />
-            {Number(config.round_bet_loss_streak_stop || 0) === 0 && (
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>
+              단계 이후
+            </Typography>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={config.round_bet_loss_streak_bet_amount ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
+                setConfig((prev) => ({ ...prev, round_bet_loss_streak_bet_amount: value }));
+                setDirty(true);
+              }}
+              style={{
+                width: 70,
+                padding: "4px 6px",
+                background: "#16213e",
+                color: "#fff",
+                border: "1px solid #2a3a5a",
+                borderRadius: 4,
+                fontSize: 12,
+              }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>
+              P 이상 배팅 시 종료
+            </Typography>
+            {(Number(config.round_bet_loss_streak_stop || 0) === 0
+              || Number(config.round_bet_loss_streak_bet_amount || 0) === 0) && (
               <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>
                 (사용안함)
               </Typography>
             )}
             <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              회차별 배팅액판에서 설정 연패 도달 시 다음 회차부터 전체 배팅 중지 (빈 회차 무시)
+              빈 회차는 무시하며, 오토는 종료 검사 시 설정액과 실제 주문액에 실배팅 배율 적용
             </Typography>
           </Box>
         </Box>

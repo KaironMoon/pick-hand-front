@@ -20,7 +20,7 @@ import { getRoundStateSubgameBasis } from "./subgame-basis.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
 import { buildGoalStatusItems, formatGoalIndicator, formatGoalTarget } from "./goal-status.js";
 import { resolvePickMartinSummary } from "./pick-martin-summary.js";
-import { ghDrawdownStatusLabel, ghProfitStopStatusLabel } from "./slot-operating-options.js";
+import { ghBetStopReasonLabel, ghDrawdownStatusLabel, ghProfitStopStatusLabel } from "./slot-operating-options.js";
 import {
   GH_KEEP_COUNT_DEFAULT,
   GH_KEEP_COUNT_MAX,
@@ -248,19 +248,29 @@ function GhLossStopStatus({ roundState, autoStatus }) {
       reason: autoStatus.stop_reason,
     }
     : roundState?.overall_stop;
+  const betStopReason = ghBetStopReasonLabel(roundState);
   return (
-    <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 1.5, px: 1, py: 0.7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
-      <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>현재 게임 배팅조건</Typography>
-      <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: status?.stopped ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
-        슬롯 글로벌히트 손실종료: {detail}
-      </Typography>
-      <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: drawdownStatus?.reason === "drawdown_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
-        손실종료조건: {ghDrawdownStatusLabel(drawdownStatus)}
-      </Typography>
-      <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.profit_stop?.stopped ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
-        수익보호: {ghProfitStopStatusLabel(roundState?.profit_stop)}
-      </Typography>
-    </Box>
+    <>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: betStopReason ? 0.5 : 1.5, px: 1, py: 0.7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
+        <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>현재 게임 배팅조건</Typography>
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: status?.stopped ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
+          슬롯 글로벌히트 손실종료: {detail}
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: drawdownStatus?.reason === "drawdown_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
+          손실종료조건: {ghDrawdownStatusLabel(drawdownStatus)}
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.profit_stop?.stopped ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
+          수익보호: {ghProfitStopStatusLabel(roundState?.profit_stop)}
+        </Typography>
+      </Box>
+      {betStopReason && (
+        <Box sx={{ mb: 1.5, px: 1, py: 0.65, border: "1px solid rgba(255,82,82,.5)", borderRadius: 1, backgroundColor: "rgba(255,82,82,.08)" }}>
+          <Typography variant="caption" sx={{ color: "#ff8a80", fontWeight: 900 }}>
+            배팅 종료 이유: {betStopReason}
+          </Typography>
+        </Box>
+      )}
+    </>
   );
 }
 
@@ -1015,12 +1025,13 @@ export default function GhUserGamePage() {
     if (msgs.length > 0) setGoalDialog({ open: true, msgs });
   }, []);
 
-  const showOverallStopAlert = useCallback((targetGameId, reason, mode) => {
+  const showOverallStopAlert = useCallback((targetGameId, reason, mode, stopDetail) => {
     const alert = claimOverallStopAlert(
       overallStopAlertedRef.current,
       targetGameId,
       reason,
       mode,
+      stopDetail,
     );
     if (alert) setOverallStopDialog({ open: true, ...alert });
   }, []);
@@ -1031,8 +1042,9 @@ export default function GhUserGamePage() {
       gameId,
       roundState?.overall_stop?.reason,
       "manual",
+      roundState?.overall_stop,
     );
-  }, [gameId, roundState?.round_num, roundState?.overall_stop?.reason, showOverallStopAlert]);
+  }, [gameId, roundState?.round_num, roundState?.overall_stop, showOverallStopAlert]);
 
   const displayPick = (() => {
     const umComb = betData?.user_martin?.combined?.direction;
@@ -1387,6 +1399,7 @@ export default function GhUserGamePage() {
               data.game_id || gameId,
               data.stop_reason,
               "auto",
+              data,
             );
           } else if (t === "shoe_result_recorded") {
             // Tie는 전략 회차를 만들지 않으므로 최신 round_state만 다시 불러온다.
@@ -1410,6 +1423,7 @@ export default function GhUserGamePage() {
               data.game_id || gameId,
               data.reason,
               "auto",
+              data,
             );
             if (data.game_id && data.game_id !== gameId) {
               setGameId(data.game_id);

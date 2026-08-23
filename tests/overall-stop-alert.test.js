@@ -79,11 +79,15 @@ test("round betting board loss streak alert explains the stop", () => {
     106,
     "round_bet_loss_streak_reached",
     "auto",
+    {
+      round_bet_loss_streak_trigger_round: 11,
+      round_bet_loss_streak_trigger_bet_amount: 12.3,
+    },
   );
 
   assert.deepEqual(alert, {
     title: "배팅액판 연패중지",
-    detail: "회차별 배팅액판의 연패가 설정값에 도달하여 배팅이 정지되었습니다.",
+    detail: "11회차 실제 주문액 12.3 P가 기준금액에 도달하여 배팅이 정지되었습니다.",
     modeLabel: "오토",
   });
 });
