@@ -669,6 +669,8 @@ function GhBettingSummaryPanel({
       ? "마감중지"
       : stopReason === "active_pot_limit_reached"
         ? "POT중지"
+        : stopReason === "round_bet_loss_streak_reached"
+          ? "연패중지"
       : null;
   const autoPnl = Number(autoStatus?.pnl_actual_p || 0);
   const autoPnlText = `${autoPnl.toLocaleString(undefined, {
@@ -1398,7 +1400,7 @@ export default function GhUserGamePage() {
               pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
               pnl_actual_p: data.pnl_actual_p ?? prev.pnl_actual_p,
               round_count: data.round_count ?? prev.round_count,
-              stop_reason: ["goal_reached", "drawdown_reached", "end_round_reached", "active_pot_limit_reached"].includes(data.reason)
+              stop_reason: ["goal_reached", "drawdown_reached", "end_round_reached", "active_pot_limit_reached", "round_bet_loss_streak_reached"].includes(data.reason)
                 ? data.reason
                 : prev.stop_reason,
               active_pot_count: data.active_pot_count ?? prev.active_pot_count,

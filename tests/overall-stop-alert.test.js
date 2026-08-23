@@ -73,6 +73,21 @@ test("active POT limit alert explains that only betting stopped", () => {
   });
 });
 
+test("round betting board loss streak alert explains the stop", () => {
+  const alert = claimOverallStopAlert(
+    new Set(),
+    106,
+    "round_bet_loss_streak_reached",
+    "auto",
+  );
+
+  assert.deepEqual(alert, {
+    title: "배팅액판 연패중지",
+    detail: "회차별 배팅액판의 연패가 설정값에 도달하여 배팅이 정지되었습니다.",
+    modeLabel: "오토",
+  });
+});
+
 test("section goals and unknown reasons do not open the overall alert", () => {
   assert.equal(
     claimOverallStopAlert(new Set(), 104, "strategy_goal_reached", "manual"),

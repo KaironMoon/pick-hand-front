@@ -2125,6 +2125,40 @@ export default function GhUserSetupPage() {
               목표가 설정된 활성 POT 수가 이 값 이하가 되면 다음 회차부터 모든 배팅 중지
             </Typography>
           </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
+              배팅액판 연패중지
+            </Typography>
+            <input
+              type="number"
+              min="0"
+              max="80"
+              step="1"
+              value={config.round_bet_loss_streak_stop ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, Math.min(80, parseInt(event.target.value || "0", 10) || 0));
+                setConfig((prev) => ({ ...prev, round_bet_loss_streak_stop: value }));
+                setDirty(true);
+              }}
+              style={{
+                width: 140,
+                padding: "4px 6px",
+                background: "#16213e",
+                color: "#fff",
+                border: "1px solid #2a3a5a",
+                borderRadius: 4,
+                fontSize: 12,
+              }}
+            />
+            {Number(config.round_bet_loss_streak_stop || 0) === 0 && (
+              <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>
+                (사용안함)
+              </Typography>
+            )}
+            <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
+              회차별 배팅액판에서 설정 연패 도달 시 다음 회차부터 전체 배팅 중지 (빈 회차 무시)
+            </Typography>
+          </Box>
         </Box>
       )}
 

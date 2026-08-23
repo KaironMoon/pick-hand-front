@@ -15,6 +15,10 @@ const STOP_ALERTS = {
     title: "잔여 POT 종료",
     detail: "활성 배팅 POT 수가 설정값 이하가 되어 배팅이 정지되었습니다.",
   },
+  round_bet_loss_streak_reached: {
+    title: "배팅액판 연패중지",
+    detail: "회차별 배팅액판의 연패가 설정값에 도달하여 배팅이 정지되었습니다.",
+  },
 };
 
 export const claimOverallStopAlert = (
