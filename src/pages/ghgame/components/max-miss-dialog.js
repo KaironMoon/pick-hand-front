@@ -1,7 +1,56 @@
 export const MAX_MISS_THRESHOLDS = Array.from({ length: 18 }, (_, index) => index + 3);
+export const MAX_MISS_CAPTURE_PIXEL_RATIO = 1;
+export const MAX_MISS_PNG_QUANTIZE_STEP = 16;
+export const MAX_MISS_CAPTURE_SECTION_ORDER = [
+  "max-miss",
+  "pot-status",
+  "round-amount-table",
+];
 
 export function includeInMaxMissImage(node) {
   return node?.dataset?.imageCaptureExclude !== "true";
+}
+
+export function quantizeRgba(data, step = MAX_MISS_PNG_QUANTIZE_STEP) {
+  if (!data || step <= 1) return data;
+  for (let index = 0; index < data.length; index += 4) {
+    data[index] = Math.min(255, Math.round(data[index] / step) * step);
+    data[index + 1] = Math.min(255, Math.round(data[index + 1] / step) * step);
+    data[index + 2] = Math.min(255, Math.round(data[index + 2] / step) * step);
+  }
+  return data;
+}
+
+export async function compressPngBlob(
+  blob,
+  {
+    documentRef = globalThis.document,
+    createImageBitmapFn = globalThis.createImageBitmap,
+    quantizeStep = MAX_MISS_PNG_QUANTIZE_STEP,
+  } = {},
+) {
+  if (!blob || !documentRef?.createElement || typeof createImageBitmapFn !== "function") return blob;
+  let bitmap;
+  try {
+    bitmap = await createImageBitmapFn(blob);
+    const canvas = documentRef.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context || typeof canvas.toBlob !== "function") return blob;
+    context.drawImage(bitmap, 0, 0);
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    quantizeRgba(imageData.data, quantizeStep);
+    context.putImageData(imageData, 0, 0);
+    const compressed = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!compressed) return blob;
+    if (Number(blob.size) > 0 && Number(compressed.size) >= Number(blob.size)) return blob;
+    return compressed;
+  } catch {
+    return blob;
+  } finally {
+    bitmap?.close?.();
+  }
 }
 
 const MAX_MISS_SECTION_KEY_ALIASES = {

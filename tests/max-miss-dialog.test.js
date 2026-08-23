@@ -3,14 +3,38 @@ import test from "node:test";
 
 import {
   buildMaxMissClipboardPayload,
+  compressPngBlob,
   includeInMaxMissImage,
+  MAX_MISS_CAPTURE_PIXEL_RATIO,
+  MAX_MISS_CAPTURE_SECTION_ORDER,
   MAX_MISS_THRESHOLDS,
+  MAX_MISS_PNG_QUANTIZE_STEP,
   maxMissLabel,
   maxMissTitle,
   maxMissTrackForSection,
+  quantizeRgba,
   writeMaxMissClipboard,
   writePngToClipboard,
 } from "../src/pages/ghgame/components/max-miss-dialog.js";
+
+test("combined image keeps the requested section order at native size", () => {
+  assert.deepEqual(MAX_MISS_CAPTURE_SECTION_ORDER, ["max-miss", "pot-status", "round-amount-table"]);
+  assert.equal(MAX_MISS_CAPTURE_PIXEL_RATIO, 1);
+});
+
+test("PNG quantization reduces color precision without changing alpha", () => {
+  const pixels = new Uint8ClampedArray([7, 23, 250, 123, 255, 129, 64, 45]);
+  assert.equal(MAX_MISS_PNG_QUANTIZE_STEP, 16);
+  assert.deepEqual(
+    [...quantizeRgba(pixels)],
+    [0, 16, 255, 123, 255, 128, 64, 45],
+  );
+});
+
+test("PNG compression safely keeps the original blob when browser APIs are unavailable", async () => {
+  const blob = { type: "image/png", size: 100 };
+  assert.equal(await compressPngBlob(blob, { documentRef: null, createImageBitmapFn: null }), blob);
+});
 
 test("image capture excludes only explicitly marked controls", () => {
   assert.equal(includeInMaxMissImage({ dataset: { imageCaptureExclude: "true" } }), false);
