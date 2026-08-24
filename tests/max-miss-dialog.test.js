@@ -7,6 +7,7 @@ import {
   includeInMaxMissImage,
   MAX_MISS_CAPTURE_PIXEL_RATIO,
   MAX_MISS_CAPTURE_SECTION_ORDER,
+  MAX_MISS_SECTION_ROWS,
   MAX_MISS_THRESHOLDS,
   MAX_MISS_PNG_QUANTIZE_STEP,
   maxMissGeneratedJTrack,
@@ -46,6 +47,15 @@ test("image capture excludes only explicitly marked controls", () => {
 
 test("maximum miss thresholds cover 3M through 20M", () => {
   assert.deepEqual(MAX_MISS_THRESHOLDS, Array.from({ length: 18 }, (_, index) => index + 3));
+});
+
+test("maximum miss grid includes 6M and 6MX beside P and B", () => {
+  assert.deepEqual(MAX_MISS_SECTION_ROWS.at(-1), [
+    { key: "P", label: "P" },
+    { key: "B", label: "B" },
+    { key: "6M", label: "6M" },
+    { key: "6MX", label: "6MX" },
+  ]);
 });
 
 test("maximum miss values below the selected threshold stay hidden", () => {
