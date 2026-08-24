@@ -47,7 +47,6 @@ if (typeof document !== "undefined" && !document.getElementById("gh-blink-style"
 
 const LSC_COLOR = "#000000";  // LSC: 검정 (모든 배경에서 고대비)
 const DS_COLOR = "#FF6600";   // 데칼/그림자: 형광 주황
-const NC_REF_LOCK_KEY = "gh_nc_ref_locked_game_seq";
 
 const buildShoePreviewGrid = (actuals) => {
   const cols = Math.max(1, Math.ceil((actuals?.length || 0) / GRID_ROWS));
@@ -954,10 +953,6 @@ export default function GhUserGamePage() {
   const [rejectMsg, setRejectMsg] = useState(null);  // 베팅 거부 레이어 팝업
   const [legacyRestoreBlocked, setLegacyRestoreBlocked] = useState(false);
   const [myPickhandId, setMyPickhandId] = useState(null);
-  const [ncRefDraft, setNcRefDraft] = useState(() => (typeof window !== "undefined" ? localStorage.getItem(NC_REF_LOCK_KEY) || "" : ""));
-  const [ncRefOriginal, setNcRefOriginal] = useState("");
-  const [ncRefLocked, setNcRefLocked] = useState(() => !!(typeof window !== "undefined" && localStorage.getItem(NC_REF_LOCK_KEY)));
-  const [ncRefBusy, setNcRefBusy] = useState(false);
 
   const strategyResults = results.filter((result) => result.value === "P" || result.value === "B");
 
@@ -966,24 +961,11 @@ export default function GhUserGamePage() {
     setReplayRoundInput(displayedRound > 0 ? String(displayedRound) : "");
   }, [replay.active, replay.roundNum, strategyResults.length]);
   const currentTurn = strategyResults.length + 1;
-  const ncRefDirty = String(ncRefDraft || "") !== String(ncRefOriginal || "");
-  const syncNcRefNo = useCallback((state) => {
-    const no = state?.nc_ref_shoe_no;
-    if (no === undefined || no === null) return;
-    const value = String(no);
-    setNcRefOriginal(value);
-    setNcRefDraft(value);
-  }, []);
   const inputLocked = processing || legacyRestoreBlocked || (replay.active && replay.external);
   // LEGACY COMPAT ONLY: displaySnapshot 별칭은 남은 레거시 보조표용이다.
   // 새 화면/상태 판단/픽 표시/닷 표시에는 사용 금지. 필요한 데이터는 서버에서 roundState에 추가한다.
   const displaySnapshot = picksSnapshot;
   const roundAmountCells = roundState?.round_amount_table?.cells || [];
-  useEffect(() => {
-    const no = roundState?.nc_ref_shoe_no;
-    if (no === undefined || no === null || ncRefDirty) return;
-    syncNcRefNo(roundState);
-  }, [roundState?.nc_ref_shoe_no]);
   const amountTableStatusFor = (idx) => {
     const cell = roundAmountCells[idx] || {};
     const pick = cell.pick ?? cell.side;
@@ -1074,11 +1056,10 @@ export default function GhUserGamePage() {
     }));
     setGlobalhitData(data.globalhit || []);
     setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundStateUpper(data.round_state_upper || null); setRoundStateLower(data.round_state_lower || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
-    syncNcRefNo(data.round_state_upper);
     setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
     setUserSummary(data.user_summary || null);
     setUserMartinDashboard(data.user_martin_dashboard || null);
-  }, [syncNcRefNo]);
+  }, []);
 
   const refreshGameSlots = useCallback(async () => {
     const res = await apiCaller.get(GH_GAMES_API.SLOTS);
@@ -1096,29 +1077,8 @@ export default function GhUserGamePage() {
       const res = await apiCaller.post(GH_GAMES_API.START + "?mode=user", body);
       setAutoError(null);
       setAutoStatus(createEmptyAutoStatus());
-      const lockedNcRef = typeof window !== "undefined" ? localStorage.getItem(NC_REF_LOCK_KEY) : null;
-      let lockedApplied = false;
-      if (lockedNcRef) {
-        try {
-          await apiCaller.post(GH_GAMES_API.NC_REF(res.data.game_id), { game_seq: Number(lockedNcRef) });
-          const stateRes = await apiCaller.get(GH_GAMES_API.STATE(res.data.game_id) + "?mode=user");
-          applyGameData(stateRes.data);
-          lockedApplied = true;
-        } catch (err) {
-          localStorage.removeItem(NC_REF_LOCK_KEY);
-          setNcRefLocked(false);
-          setRejectMsg(err.response?.data?.detail || "고정된 NC 번호를 적용하지 못했습니다.");
-        }
-      }
-      if (!lockedApplied) {
-        setLegacyRestoreBlocked(false);
-        setGameId(res.data.game_id);
-        setConfig(res.data.config);
-        setGlobalhitData(res.data.globalhit || []);
-        setTopGhSections(res.data.top_gh_sections || []); setTopNextRound(res.data.top_next_round ?? null);
-        setPicksSnapshot(res.data.picks_snapshot || null); setRoundStateUpper(res.data.round_state_upper || null); setRoundStateLower(res.data.round_state_lower || null);
-        syncNcRefNo(res.data.round_state_upper);
-      }
+      // 새 게임 응답을 전체 적용해 이전 게임의 results/빅로드/손익/베팅 상태를 함께 초기화한다.
+      applyGameData(res.data);
       skipRestoreGameIdRef.current = res.data.game_id;
       setSearchParams({ gameId: res.data.game_id }, { replace: true });
       if (res.data.slot_no) setSelectedSlotNo(res.data.slot_no);
@@ -1133,7 +1093,7 @@ export default function GhUserGamePage() {
       }
       throw err;
     }
-  }, [applyGameData, navigate, refreshGameSlots, setSearchParams, syncNcRefNo]);
+  }, [applyGameData, navigate, refreshGameSlots, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1227,50 +1187,6 @@ export default function GhUserGamePage() {
     const roundQuery = replay.active ? `&round=${encodeURIComponent(replay.roundNum)}` : "";
     popup.location.replace(`/ghgame/max-miss?gameId=${encodeURIComponent(targetGameId)}${roundQuery}`);
   }, [gameId, replay.active, replay.roundNum, replay.sourceGameId]);
-
-  const handleNcRefChange = (value) => {
-    setNcRefDraft(value.replace(/[^\d]/g, ""));
-    if (ncRefLocked) {
-      setNcRefLocked(false);
-      if (typeof window !== "undefined") localStorage.removeItem(NC_REF_LOCK_KEY);
-    }
-  };
-
-  const handleNcRefCancel = () => {
-    setNcRefDraft(ncRefOriginal);
-  };
-
-  const handleNcRefConfirm = async () => {
-    if (!gameId || !ncRefDirty || ncRefBusy) return;
-    const nextNo = Number(ncRefDraft);
-    if (!Number.isInteger(nextNo) || nextNo <= 0) {
-      setRejectMsg("NC 번호를 올바르게 입력해주세요.");
-      setNcRefDraft(ncRefOriginal);
-      return;
-    }
-    setNcRefBusy(true);
-    try {
-      await apiCaller.post(GH_GAMES_API.NC_REF(gameId), { game_seq: nextNo });
-      await restoreGame(gameId);
-      setNcRefOriginal(String(nextNo));
-      setNcRefDraft(String(nextNo));
-    } catch (err) {
-      setRejectMsg(err.response?.data?.detail || "NC 번호를 적용하지 못했습니다.");
-      setNcRefDraft(ncRefOriginal);
-    } finally {
-      setNcRefBusy(false);
-    }
-  };
-
-  const handleNcRefLockToggle = () => {
-    if (ncRefDirty || ncRefBusy || !ncRefOriginal) return;
-    const next = !ncRefLocked;
-    setNcRefLocked(next);
-    if (typeof window !== "undefined") {
-      if (next) localStorage.setItem(NC_REF_LOCK_KEY, ncRefOriginal);
-      else localStorage.removeItem(NC_REF_LOCK_KEY);
-    }
-  };
 
   // ─── Auto 모드 (pick-aboo 통합) — t9game/index.jsx 패턴 동일 ───
   // pickhand_id: userAtom에서 직접. fallback으로 username 사용
@@ -1729,7 +1645,7 @@ export default function GhUserGamePage() {
     if (!gameId || !selectedSlotNo || autoStatus.running) return;
     setProcessing(true);
     try {
-      setReplay((prev) => ({ ...prev, active: false }));
+      setReplay({ active: false, external: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
       await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gameId } });
       await startGame({ slotNo: selectedSlotNo, replaceGameId: gameId });
       await refreshGameSlots();
@@ -2587,14 +2503,9 @@ export default function GhUserGamePage() {
                 ncRefShoes={roundStateLower?.nc_ref_shoes}
                 ncRefShoeNo={roundStateLower?.nc_ref_shoe_no}
                 ncRefControls={{
-                  value: ncRefDraft,
-                  dirty: ncRefDirty,
-                  locked: ncRefLocked,
-                  busy: ncRefBusy || replay.active,
-                  onChange: handleNcRefChange,
-                  onConfirm: handleNcRefConfirm,
-                  onCancel: handleNcRefCancel,
-                  onToggleLock: handleNcRefLockToggle,
+                  value: roundStateLower?.nc_ref_shoe_no ?? "",
+                  setupValue: roundStateLower?.nc_ref_setup_game_seq ?? "랜덤",
+                  readOnly: true,
                 }}
                 actualSeq={strategyResults.map((r) => r.value).join("")}
               />

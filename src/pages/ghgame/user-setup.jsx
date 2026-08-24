@@ -3,7 +3,7 @@ import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
 import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
-import { USER_BET_SETTINGS_API } from "@/constants/api-url";
+import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 import { userAtom } from "@/store/auth-store";
 import { updatePbjStrategy } from "./pbj-goal.js";
 import { extendMartinAmounts, GH_FIXED_PASI_LEVELS, GH_STRATEGY_MAX_STEP } from "./strategy-step-capacity.js";
@@ -1725,6 +1725,7 @@ export default function GhUserSetupPage() {
   const [copySource, setCopySource] = useState("");
   const [copyError, setCopyError] = useState("");
   const [copying, setCopying] = useState(false);
+  const [ncRefRandomizing, setNcRefRandomizing] = useState(false);
 
   const blocker = useBlocker(dirty);
 
@@ -1805,6 +1806,23 @@ export default function GhUserSetupPage() {
       setCopyInputOpen(true);
     } finally {
       setCopying(false);
+    }
+  };
+
+  const handleRandomNcRef = async () => {
+    setNcRefRandomizing(true);
+    try {
+      const res = await apiCaller.post(GH_GAMES_API.NC_REF_RANDOM);
+      setConfig((prev) => ({ ...prev, nc_ref_game_seq: res.data.game_seq }));
+      setDirty(true);
+    } catch (err) {
+      setSnack({
+        open: true,
+        message: err?.response?.data?.detail || "랜덤 NC 번호를 가져오지 못했습니다.",
+        severity: "error",
+      });
+    } finally {
+      setNcRefRandomizing(false);
     }
   };
 
@@ -2220,6 +2238,50 @@ export default function GhUserSetupPage() {
                     targetLabel={b.targetLabel}
                     strat={config[b.key] || (b.legacyKey ? config[b.legacyKey] : null) || defaultStrategySetup()}
                     onChange={(o) => updateMartin(b.key, o)} />
+                  {b.key === "NC" && (
+                    <tr>
+                      <td colSpan={2} style={{ ...mkBlue, fontWeight: "bold" }}>NC 번호</td>
+                      <td colSpan={8} style={{ ...mkCell, padding: 6 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                          <Box
+                            component="input"
+                            inputMode="numeric"
+                            value={config.nc_ref_game_seq ?? ""}
+                            placeholder="게임마다 랜덤"
+                            onChange={(event) => {
+                              const value = event.target.value.replace(/[^\d]/g, "");
+                              setConfig((prev) => ({ ...prev, nc_ref_game_seq: value || null }));
+                              setDirty(true);
+                            }}
+                            sx={{
+                              width: 130,
+                              height: 30,
+                              boxSizing: "border-box",
+                              border: "1px solid #777",
+                              borderRadius: 1,
+                              backgroundColor: "#111",
+                              color: "#ffeb3b",
+                              textAlign: "center",
+                              fontWeight: "bold",
+                              outline: "none",
+                            }}
+                          />
+                          <Button
+                            size="small"
+                            variant="contained"
+                            disabled={ncRefRandomizing}
+                            onClick={handleRandomNcRef}
+                            sx={{ minWidth: 64, height: 30 }}
+                          >
+                            {ncRefRandomizing ? "선택 중" : "랜덤"}
+                          </Button>
+                          <Typography variant="caption" sx={{ color: "#999" }}>
+                            빈칸 저장 시 게임 시작마다 랜덤
+                          </Typography>
+                        </Box>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </Box>

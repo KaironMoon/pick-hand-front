@@ -489,8 +489,11 @@ function SectionPanel({ section, ctx, selectedBasisMap, onSelectBasis }) {
           <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
             <Box
               component="input"
+              aria-label="현재 게임 NC 번호"
+              title="현재 게임 NC 번호"
               value={nc.value ?? ""}
               disabled={nc.busy}
+              readOnly={nc.readOnly}
               onChange={(e) => nc.onChange?.(e.target.value)}
               sx={{
                 width: 72,
@@ -504,35 +507,53 @@ function SectionPanel({ section, ctx, selectedBasisMap, onSelectBasis }) {
                 py: 0.35,
               }}
             />
-            <Box component="button" type="button" disabled={nc.busy || nc.dirty} onClick={nc.onToggleLock} style={{
+            <Box
+              component="input"
+              aria-label="셋업 NC 번호"
+              title="셋업 NC 번호"
+              value={nc.setupValue ?? "랜덤"}
+              readOnly
+              sx={{
+                width: 72,
+                border: "1px solid #777",
+                borderRadius: "4px",
+                backgroundColor: "#111",
+                color: "#81d4fa",
+                fontWeight: "bold",
+                fontSize: 12,
+                px: 1,
+                py: 0.35,
+              }}
+            />
+            <Box component="button" type="button" disabled={nc.readOnly || nc.busy || nc.dirty} onClick={nc.onToggleLock} style={{
               border: nc.locked ? "1px solid #00e676" : "1px solid #777",
               borderRadius: 4,
               background: nc.locked ? "#14351f" : "#111",
               color: nc.locked ? "#00e676" : "#ddd",
               fontSize: 12,
               padding: "3px 7px",
-              cursor: nc.busy || nc.dirty ? "default" : "pointer",
-              opacity: nc.busy || nc.dirty ? 0.45 : 1,
+              cursor: nc.readOnly || nc.busy || nc.dirty ? "default" : "pointer",
+              opacity: nc.readOnly || nc.busy || nc.dirty ? 0.45 : 1,
             }}>고정</Box>
-            <Box component="button" type="button" disabled={nc.busy || !nc.dirty} onClick={nc.onConfirm} style={{
+            <Box component="button" type="button" disabled={nc.readOnly || nc.busy || !nc.dirty} onClick={nc.onConfirm} style={{
               border: "1px solid #4caf50",
               borderRadius: 4,
               background: "#102416",
               color: "#9be7a7",
               fontSize: 12,
               padding: "3px 7px",
-              cursor: nc.busy || !nc.dirty ? "default" : "pointer",
-              opacity: nc.busy || !nc.dirty ? 0.45 : 1,
+              cursor: nc.readOnly || nc.busy || !nc.dirty ? "default" : "pointer",
+              opacity: nc.readOnly || nc.busy || !nc.dirty ? 0.45 : 1,
             }}>확인</Box>
-            <Box component="button" type="button" disabled={nc.busy || !nc.dirty} onClick={nc.onCancel} style={{
+            <Box component="button" type="button" disabled={nc.readOnly || nc.busy || !nc.dirty} onClick={nc.onCancel} style={{
               border: "1px solid #777",
               borderRadius: 4,
               background: "#111",
               color: "#ddd",
               fontSize: 12,
               padding: "3px 7px",
-              cursor: nc.busy || !nc.dirty ? "default" : "pointer",
-              opacity: nc.busy || !nc.dirty ? 0.45 : 1,
+              cursor: nc.readOnly || nc.busy || !nc.dirty ? "default" : "pointer",
+              opacity: nc.readOnly || nc.busy || !nc.dirty ? 0.45 : 1,
             }}>취소</Box>
           </Box>
         )}

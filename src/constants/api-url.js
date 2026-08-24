@@ -60,6 +60,7 @@ const GH_GAMES_API = {
   REPLAY: (id) => `/api/v1/gh/games/replay/${id}`,
   LAST_ROUND: (id) => `/api/v1/gh/games/${id}/last-round`,
   STATE: (id) => `/api/v1/gh/games/${id}/state`,
+  NC_REF_RANDOM: "/api/v1/gh/games/nc-ref/random",
   NC_REF: (id) => `/api/v1/gh/games/${id}/nc-ref`,
   CRUISE_RESET: (id) => `/api/v1/gh/games/${id}/cruise-reset`,
   CRUISE_PAUSE_TOGGLE: (id) => `/api/v1/gh/games/${id}/cruise-pause-toggle`,
