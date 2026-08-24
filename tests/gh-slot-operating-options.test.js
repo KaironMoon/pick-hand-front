@@ -63,6 +63,19 @@ test("GH betting stop reason follows the persisted server round state", () => {
   );
   assert.equal(
     ghBetStopReasonLabel({
+      overall_stop: {
+        reason: "round_bet_loss_streak_reached",
+        round_bet_loss_streak_trigger_condition: 2,
+        round_bet_loss_streak_stop: 3,
+        round_bet_loss_streak_trigger_round: 8,
+        round_bet_loss_streak_trigger_bet_amount: 10,
+        round_bet_loss_streak_compared_bet_limit: 10,
+      },
+    }),
+    "3연패 이후 8회차 배팅액 10 P가 종료 기준 10 P 이상에 도달 (배팅액판 연패중지 2번)",
+  );
+  assert.equal(
+    ghBetStopReasonLabel({
       profit_stop: {
         stopped: true,
         trigger_pnl: 20,

@@ -92,6 +92,25 @@ test("round betting board loss streak alert explains the stop", () => {
   });
 });
 
+test("round betting board loss streak alert identifies the triggered condition", () => {
+  const alert = claimOverallStopAlert(
+    new Set(),
+    107,
+    "round_bet_loss_streak_reached",
+    "manual",
+    {
+      round_bet_loss_streak_trigger_condition: 3,
+      round_bet_loss_streak_trigger_round: 15,
+      round_bet_loss_streak_trigger_bet_amount: 30,
+    },
+  );
+
+  assert.equal(
+    alert.detail,
+    "3번 조건이 발동하여 15회차 배팅액 30 P가 기준금액에 도달하여 배팅이 정지되었습니다.",
+  );
+});
+
 test("section goals and unknown reasons do not open the overall alert", () => {
   assert.equal(
     claimOverallStopAlert(new Set(), 104, "strategy_goal_reached", "manual"),

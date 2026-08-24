@@ -284,6 +284,7 @@ function QAssistRow({ data, pos, label, labelColor }) {
 
 // 행 라벨 (왼쪽 고정 컬럼). [텍스트, 글자색]. 어시스트 블록만 빨강. (시안 동일)
 const LBL_RED = "#ff5252";
+const LBL_ORANGE = "#ff9800";
 const lblSx = { ...tdSx, color: "#fff", fontWeight: "bold", background: "#141414", textAlign: "right",
   position: "sticky", left: 0, zIndex: 2,
   borderLeft: `3px solid ${HL}`, borderRight: `3px solid ${HL}` };
@@ -335,6 +336,8 @@ function StrategyTable({ data, showLabels = true, maxBlinkActive, onMaxLabelClic
         <SimpleRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label={rowLabel("단계-AS")} labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="idx1" render={(v, i, row) => amountText(v, row.idx1Zone?.[i])} pos="mid" label={rowLabel("회차P")} labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("누적P")} labelColor={LBL_RED} />
+        <SimpleRow data={data} dataKey="martinCStepH" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("마틴C 단계")} labelColor={LBL_ORANGE} />
+        <SimpleRow data={data} dataKey="martinCAmountH" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("마틴C 금액")} labelColor={LBL_ORANGE} />
         <QAssistRow data={data} pos="mid" label={rowLabel("어시Q픽")} />
         <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label={rowLabel("쿼터연속")}
           shouldBlink={(v) => isMissStreakAtLeast(v, MISS_STREAK_BLINK_MIN)} />
@@ -346,7 +349,9 @@ function StrategyTable({ data, showLabels = true, maxBlinkActive, onMaxLabelClic
           shouldBlink={(v) => maxBlinkActive && isMaxMissAtLeast(v, MAX_MISS_BLINK_MIN)} />
         <SimpleRow data={data} dataKey="qstage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label={rowLabel("단계-AS")} />
         <SimpleRow data={data} dataKey="qidx1" render={(v, i, row) => amountText(v, row.qidx1Zone?.[i])} pos="mid" label={rowLabel("쿼터P")} />
-        <SimpleRow data={data} dataKey="qidx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="last" label={rowLabel("누적P")} />
+        <SimpleRow data={data} dataKey="qidx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("누적P")} />
+        <SimpleRow data={data} dataKey="martinCStepQ" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("마틴C 단계")} labelColor={LBL_ORANGE} />
+        <SimpleRow data={data} dataKey="martinCAmountQ" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="last" label={rowLabel("마틴C 금액")} labelColor={LBL_ORANGE} />
       </tbody>
     </Box>
   );
@@ -464,6 +469,9 @@ const fromStats = (ctx, key) => {
   const qs = qAssistStateFor(ctx, qas);
   const qData = qs || qas;
   const assistTotal = as?.total ?? 0;
+  const martinC = ctx.roundState?.conditional_martins?.martin_c?.tracks || {};
+  const martinCH = martinC[`${key}:assist_h`];
+  const martinCQ = martinC[`${key}:assist_q`];
   return {
     wait: fmtStreak(s.cur_streak_type, s.cur_streak_count),
     pick: fmtValue(s.pick),
@@ -483,6 +491,8 @@ const fromStats = (ctx, key) => {
     idx1: as ? fmtMan(as.amount ?? (amounts ? betAt(amounts, as.step, stepMin) : null)) : "",
     idx1Zone: as?.amount_zone,
     idx2: as && as.pnl !== null && as.pnl !== undefined ? fmtMan(as.pnl) : "",
+    martinCStepH: martinCH?.active ? `${martinCH.step || 1}S` : "",
+    martinCAmountH: martinCH?.active ? fmtMan(martinCH.amount ?? 0) : "",
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : {
       ...quarterAssistRow(qData, qAssistPickText(qas, qs), qs),
       qAssistSource: qs?.source ?? qas?.source,
@@ -490,6 +500,10 @@ const fromStats = (ctx, key) => {
     }),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterRow(qData, amounts, stepMin)),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : { qidx1Zone: qData?.amount_zone }),
+    ...(HIDE_QUARTER_KEYS.has(key) ? {} : {
+      martinCStepQ: martinCQ?.active ? `${martinCQ.step || 1}S` : "",
+      martinCAmountQ: martinCQ?.active ? fmtMan(martinCQ.amount ?? 0) : "",
+    }),
   };
 };
 const fromSection = (ctx, key) => fromStats(ctx, key);
@@ -534,7 +548,8 @@ function withLiveData(base, ctx) {
   const keys = ["wait", "pick", "stage1", "pct", "rec", "rec2", "assist", "assistSource", "wait2", "pct2", "assistRec", "assistRec2", "stage", "idx1", "idx2",
     "qAssist", "qAssistSource", "qWait2", "qAssistWait", "qPct2",
     "qrec", "qrec2", "qstage", "qidx1", "qidx2",
-    "idx1Zone", "qidx1Zone", "pickMark", "assistMark", "qAssistMark"];
+    "idx1Zone", "qidx1Zone", "pickMark", "assistMark", "qAssistMark",
+    "martinCStepH", "martinCAmountH", "martinCStepQ", "martinCAmountQ"];
   const out = { ...base };
   keys.forEach((k) => { out[k] = base.name.map(() => ""); });
   out.headBg = base.name.map(() => "");

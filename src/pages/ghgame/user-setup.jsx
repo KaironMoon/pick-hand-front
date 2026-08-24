@@ -202,16 +202,18 @@ function cruiseStepLabel(idx) {
   return `${(idx + 1) / 2 + 1}`;
 }
 
-function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp }) {
+function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp, fixedMartinOnly = false }) {
   const isCruise = name === "cruise";
-  const usesDecimalP = name === "martin_a" || name === "martin_z";
+  const usesDecimalP = ["martin_a", "martin_z", "martin_b", "martin_c"].includes(name);
   const enabled = martin.enabled;
   // 크루즈는 29 단계(15-2까지)를 위해 6행×5칸 = 30칸 사용, 다른 섹션은 4행×5 = 20
   const totalSteps = isCruise ? 30 : 20;
   const totalRows = isCruise ? 6 : 4;
   const defaultStepMax = isCruise ? 29 : 20;
   // 크루즈 섹션은 cruise만 선택 가능, 다른 섹션은 cruise를 못 고름
-  const sectionDisabledBetTypes = isCruise
+  const sectionDisabledBetTypes = fixedMartinOnly
+    ? BET_TYPES.filter((t) => t !== "martin")
+    : isCruise
     ? BET_TYPES.filter((t) => t !== "cruise")
     : DISABLED_BET_TYPES;
   const betType = (type) => { if (sectionDisabledBetTypes.includes(type)) return; onChange({ ...martin, bet_type: type }); };
@@ -325,6 +327,61 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
           </tr>
         ));
       })()}
+    </>
+  );
+}
+
+function ConditionalMartinSection({ kind, martin, onChange }) {
+  const isB = kind === "B";
+  const color = isB ? "#6a1b9a" : "#ef6c00";
+  return (
+    <>
+      <MartinSection
+        name={isB ? "martin_b" : "martin_c"}
+        label={`마틴${kind}`}
+        martin={martin}
+        onChange={onChange}
+        labelColor={color}
+        fixedMartinOnly
+      />
+      <tr>
+        <td style={{ ...labelCellStyle, color }}>발동조건</td>
+        <td colSpan={2} style={normalCell}>{isB ? "계산기판 총 BET" : "회차·쿼터어시"}</td>
+        <EditableCell
+          value={isB ? (martin.trigger_bet_amount || 0) : (martin.trigger_miss_streak || 0)}
+          onChange={(value) => onChange({
+            ...martin,
+            [isB ? "trigger_bet_amount" : "trigger_miss_streak"]: Math.max(0, value),
+          })}
+          suffix={isB ? "P" : "M"}
+          style={greenCell}
+          decimal={isB}
+        />
+        <td colSpan={2} style={normalCell}>이상에서 1단계 발동</td>
+      </tr>
+      <tr>
+        <td style={{ ...labelCellStyle, color }}>배팅금지</td>
+        <td colSpan={2} style={normalCell}>설정 회차부터 금지</td>
+        <EditableCell
+          value={martin.stop_bet_round || 0}
+          onChange={(value) => onChange({ ...martin, stop_bet_round: Math.max(0, Math.min(80, value)) })}
+          suffix="회차"
+          style={greenCell}
+        />
+        <td colSpan={2} style={normalCell}>0은 제한 없음</td>
+      </tr>
+      <tr>
+        <td style={{ ...labelCellStyle, color }}>목표금액</td>
+        <td colSpan={2} style={normalCell}>누적손익 목표</td>
+        <EditableCell
+          value={martin.budget || 0}
+          onChange={(value) => onChange({ ...martin, budget: Math.max(0, value) })}
+          suffix="P"
+          style={greenCell}
+          decimal
+        />
+        <td colSpan={2} style={normalCell}>0은 제한 없음</td>
+      </tr>
     </>
   );
 }
@@ -1860,6 +1917,8 @@ export default function GhUserSetupPage() {
 
   const martinA = config.martin_a || { ...DEFAULT_MARTIN, enabled: true };
   const martinZ = config.martin_z || { ...DEFAULT_MARTIN };
+  const martinB = config.martin_b || { ...DEFAULT_MARTIN, trigger_bet_amount: 0, stop_bet_round: 0 };
+  const martinC = config.martin_c || { ...DEFAULT_MARTIN, trigger_miss_streak: 0, stop_bet_round: 0 };
   const cruise = config.cruise || { ...DEFAULT_MARTIN };
   const martinS = config.martin_s || { ...DEFAULT_MARTIN };
   const allp = config.allp || { ...DEFAULT_MARTIN };
@@ -1870,6 +1929,42 @@ export default function GhUserSetupPage() {
   const two = config.two || { ...DEFAULT_MARTIN };
   const labouchere = config.labouchere || { enabled: false, target: 0, count: 10, mode: "even", sequence: [] };
   const ghPoint = config.gh_point || defaultGhPoint();
+  const roundBetLossStreakConditions = Array.from({ length: 3 }, (_, index) => {
+    const saved = Array.isArray(config.round_bet_loss_streak_conditions)
+      ? config.round_bet_loss_streak_conditions[index]
+      : null;
+    if (saved && typeof saved === "object") return saved;
+    return index === 0
+      ? {
+          stop: config.round_bet_loss_streak_stop || 0,
+          bet_amount: config.round_bet_loss_streak_bet_amount || 0,
+        }
+      : { stop: 0, bet_amount: 0 };
+  });
+  const updateRoundBetLossStreakCondition = (index, patch) => {
+    setConfig((prev) => {
+      const previousConditions = Array.from({ length: 3 }, (_, itemIndex) => {
+        const saved = Array.isArray(prev.round_bet_loss_streak_conditions)
+          ? prev.round_bet_loss_streak_conditions[itemIndex]
+          : null;
+        if (saved && typeof saved === "object") return { ...saved };
+        return itemIndex === 0
+          ? {
+              stop: prev.round_bet_loss_streak_stop || 0,
+              bet_amount: prev.round_bet_loss_streak_bet_amount || 0,
+            }
+          : { stop: 0, bet_amount: 0 };
+      });
+      previousConditions[index] = { ...previousConditions[index], ...patch };
+      return {
+        ...prev,
+        round_bet_loss_streak_conditions: previousConditions,
+        round_bet_loss_streak_stop: previousConditions[0].stop,
+        round_bet_loss_streak_bet_amount: previousConditions[0].bet_amount,
+      };
+    });
+    setDirty(true);
+  };
 
   return (
     <Box sx={{ p: 2 }}>
@@ -2143,67 +2238,66 @@ export default function GhUserSetupPage() {
               목표가 설정된 활성 POT 수가 이 값 이하가 되면 다음 회차부터 모든 배팅 중지
             </Typography>
           </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
-              배팅액판 연패중지
-            </Typography>
-            <input
-              type="number"
-              min="0"
-              max="80"
-              step="1"
-              value={config.round_bet_loss_streak_stop ?? 0}
-              onChange={(event) => {
-                const value = Math.max(0, Math.min(80, parseInt(event.target.value || "0", 10) || 0));
-                setConfig((prev) => ({ ...prev, round_bet_loss_streak_stop: value }));
-                setDirty(true);
-              }}
-              style={{
-                width: 60,
-                padding: "4px 6px",
-                background: "#16213e",
-                color: "#fff",
-                border: "1px solid #2a3a5a",
-                borderRadius: 4,
-                fontSize: 12,
-              }}
-            />
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>
-              단계 이후
-            </Typography>
-            <input
-              type="number"
-              min="0"
-              step="0.1"
-              value={config.round_bet_loss_streak_bet_amount ?? 0}
-              onChange={(event) => {
-                const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
-                setConfig((prev) => ({ ...prev, round_bet_loss_streak_bet_amount: value }));
-                setDirty(true);
-              }}
-              style={{
-                width: 70,
-                padding: "4px 6px",
-                background: "#16213e",
-                color: "#fff",
-                border: "1px solid #2a3a5a",
-                borderRadius: 4,
-                fontSize: 12,
-              }}
-            />
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>
-              P 이상 배팅 시 종료
-            </Typography>
-            {(Number(config.round_bet_loss_streak_stop || 0) === 0
-              || Number(config.round_bet_loss_streak_bet_amount || 0) === 0) && (
-              <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>
-                (사용안함)
+          {roundBetLossStreakConditions.map((condition, index) => (
+            <Box key={index} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
+                배팅액판 연패중지 {index + 1}
               </Typography>
-            )}
-            <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              빈 회차는 무시하며, 오토는 종료 검사 시 설정액과 실제 주문액에 실배팅 배율 적용
-            </Typography>
-          </Box>
+              <input
+                type="number"
+                min="0"
+                max="80"
+                step="1"
+                value={condition.stop ?? 0}
+                onChange={(event) => updateRoundBetLossStreakCondition(index, {
+                  stop: Math.max(0, Math.min(80, parseInt(event.target.value || "0", 10) || 0)),
+                })}
+                style={{
+                  width: 60,
+                  padding: "4px 6px",
+                  background: "#16213e",
+                  color: "#fff",
+                  border: "1px solid #2a3a5a",
+                  borderRadius: 4,
+                  fontSize: 12,
+                }}
+              />
+              <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>
+                단계 이후
+              </Typography>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={condition.bet_amount ?? 0}
+                onChange={(event) => updateRoundBetLossStreakCondition(index, {
+                  bet_amount: Math.max(0, parseFloat(event.target.value || "0") || 0),
+                })}
+                style={{
+                  width: 70,
+                  padding: "4px 6px",
+                  background: "#16213e",
+                  color: "#fff",
+                  border: "1px solid #2a3a5a",
+                  borderRadius: 4,
+                  fontSize: 12,
+                }}
+              />
+              <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>
+                P 이상 배팅 시 종료
+              </Typography>
+              {(Number(condition.stop || 0) === 0 || Number(condition.bet_amount || 0) === 0) && (
+                <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>
+                  (사용안함)
+                </Typography>
+              )}
+              {index === 0 && (
+                <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
+                  세 조건을 같이 검사하며, 빈 회차는 무시하고 오토 배율을 적용
+                </Typography>
+              )}
+            </Box>
+          ))}
         </Box>
       )}
 
@@ -2213,6 +2307,10 @@ export default function GhUserSetupPage() {
             <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={(m) => updateMartin("martin_a", m)} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={(m) => updateMartin("martin_z", m)} />
+            <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+            <ConditionalMartinSection kind="B" martin={martinB} onChange={(m) => updateMartin("martin_b", m)} />
+            <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+            <ConditionalMartinSection kind="C" martin={martinC} onChange={(m) => updateMartin("martin_c", m)} />
           </tbody>
         </table>
       </Box>

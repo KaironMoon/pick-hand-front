@@ -9,6 +9,7 @@ const CURRENT_BG = "#ffffff";
 const FUTURE_BG = "#1c1f25";
 const BORDER = "1px solid #3a3a3a";
 const GENERATED_PICK_BORDER = "#00ff66";
+const MARTIN_C_COLOR = "#ff9800";
 const CELL_W = 23;
 const CELL_H = 19;
 const MAX_CELLS = 78;
@@ -177,12 +178,44 @@ function getQuarterCells(ctx, spec, assist = false) {
   );
 }
 
+function getMartinCCells(ctx, spec, part) {
+  const stateKey = stateKeyForSpec(spec);
+  if (!stateKey || (part === "assist_q" && HIDE_QUARTER_KEYS.has(stateKey))) return null;
+  const track = ctx.roundState?.conditional_martins?.martin_c?.tracks?.[`${stateKey}:${part}`];
+  if (!track) return null;
+  const cells = new Array(MAX_CELLS).fill(null);
+  (track.history || []).forEach((entry) => {
+    const idx = Number(entry?.round || 0) - 1;
+    if (idx < 0 || idx >= MAX_CELLS) return;
+    cells[idx] = {
+      pick: entry.direction,
+      status: entry.status,
+      round: idx + 1,
+      martinCStep: entry.step,
+      martinCAmount: entry.amount,
+    };
+  });
+  const currentIdx = ctx.actualSeq?.length || 0;
+  if (track.direction && currentIdx < MAX_CELLS && !cells[currentIdx]) {
+    cells[currentIdx] = {
+      pick: track.direction,
+      status: "current",
+      round: currentIdx + 1,
+      martinCStep: track.step,
+      martinCAmount: track.amount,
+    };
+  }
+  return cells;
+}
+
 function Cell({ cell, onClick }) {
   let bg;
   let content = cell?.round || "";
   let color = "#777";
   let insetBorder;
-  const title = cell?.pick && cell?.round ? `${cell.round}회차` : undefined;
+  const title = cell?.pick && cell?.round
+    ? `${cell.round}회차${cell.martinCStep ? ` · C ${cell.martinCStep}S · ${Number(cell.martinCAmount || 0).toLocaleString()}P` : ""}`
+    : undefined;
   const generatedPickMark = cell?.generatedPickMark || cell?.generated_pick_mark;
   if (cell?.basis) {
     content = "";
@@ -347,7 +380,7 @@ function PickChip({ v, boxed = false }) {
   );
 }
 
-function RoadRow({ label, cells, basis = false, onCellClick }) {
+function RoadRow({ label, cells, basis = false, onCellClick, labelColor }) {
   if (basis) {
     const currentBasis = [...(cells || [])].reverse().find((cell) => cell?.basis?.prev_picks)?.basis;
     return (
@@ -383,7 +416,7 @@ function RoadRow({ label, cells, basis = false, onCellClick }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: basis ? "#ffeb3b" : "#cfe0ff",
+        color: labelColor || (basis ? "#ffeb3b" : "#cfe0ff"),
         fontSize: 11,
         fontWeight: "bold",
       }}>{label}</Box>
@@ -409,10 +442,10 @@ function RoadRow({ label, cells, basis = false, onCellClick }) {
   );
 }
 
-function Block({ title, children }) {
+function Block({ title, children, color = "#fff" }) {
   return (
     <Box sx={{ mt: 0.5 }}>
-      <Box sx={{ color: "#fff", fontSize: 12, fontWeight: "bold", mb: 0.5 }}>{title}</Box>
+      <Box sx={{ color, fontSize: 12, fontWeight: "bold", mb: 0.5 }}>{title}</Box>
       {children}
     </Box>
   );
@@ -455,6 +488,18 @@ function NormalSection({ section, ctx, selectedBasis, onSelectBasis }) {
           ))}
         </Block>
       )}
+      <Block title="마틴C" color={MARTIN_C_COLOR}>
+        {section.rows.map(([label, key]) => {
+          const hCells = getMartinCCells(ctx, key, "assist_h");
+          const qCells = getMartinCCells(ctx, key, "assist_q");
+          return (
+            <Box key={`mc-${label}`}>
+              {Array.isArray(hCells) && <RoadRow label={`${label}-H C`} cells={hCells} labelColor={MARTIN_C_COLOR} />}
+              {Array.isArray(qCells) && <RoadRow label={`${label}-Q C`} cells={qCells} labelColor={MARTIN_C_COLOR} />}
+            </Box>
+          );
+        })}
+      </Block>
     </>
   );
 }
@@ -471,6 +516,12 @@ function ForSection({ section, ctx }) {
             <RoadRow label={`${label} 회차어시스트`} cells={getRowCells(ctx, key, true)} />
             {Array.isArray(qAssistCells) && (
               <RoadRow label={`${label} 쿼터어시스트`} cells={qAssistCells} />
+            )}
+            {Array.isArray(getMartinCCells(ctx, key, "assist_h")) && (
+              <RoadRow label={`${label}-H C`} cells={getMartinCCells(ctx, key, "assist_h")} labelColor={MARTIN_C_COLOR} />
+            )}
+            {Array.isArray(getMartinCCells(ctx, key, "assist_q")) && (
+              <RoadRow label={`${label}-Q C`} cells={getMartinCCells(ctx, key, "assist_q")} labelColor={MARTIN_C_COLOR} />
             )}
           </Box>
         );

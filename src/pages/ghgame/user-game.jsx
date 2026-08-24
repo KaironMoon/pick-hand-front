@@ -2342,6 +2342,48 @@ export default function GhUserGamePage() {
                   )}
                 </Box>
 
+                {/* 행1-2: 실제 주문과 분리된 조건부 가상 마틴 B/C */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
+                  {(() => {
+                    const martinB = roundState?.conditional_martins?.martin_b || {};
+                    const amount = Number(martinB.amount || 0);
+                    const direction = martinB.direction || "";
+                    return (
+                      <>
+                        <Box sx={tagSx("#7b1fa2")} title="마틴B (가상 계산)">
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>B</Typography>
+                        </Box>
+                        <Box sx={{ ...fieldSx, minWidth: 84, px: 0.6 }}>
+                          <Typography variant="caption" sx={{ fontSize: 10, color: "#ba68c8" }}>
+                            {martinB.active ? `${martinB.step || 1}S` : "대기"}
+                          </Typography>
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: amount > 0 ? "#ce93d8" : "#666" }}>
+                            {amount > 0 ? `${amount.toLocaleString()}${direction}` : "0"}
+                          </Typography>
+                        </Box>
+                      </>
+                    );
+                  })()}
+                  {(() => {
+                    const martinC = roundState?.conditional_martins?.martin_c || {};
+                    const amount = Number(martinC.amount || 0);
+                    const direction = martinC.direction || "";
+                    return (
+                      <>
+                        <Box sx={tagSx("#ef6c00")} title="마틴C 합산 (가상 계산)">
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>C</Typography>
+                        </Box>
+                        <Box sx={{ ...fieldSx, minWidth: 84, px: 0.6 }}>
+                          <Typography variant="caption" sx={{ fontSize: 10, color: "#ffb74d" }}>합산</Typography>
+                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: amount > 0 ? "#ff9800" : "#666" }}>
+                            {amount > 0 ? `${amount.toLocaleString()}${direction}` : "0"}
+                          </Typography>
+                        </Box>
+                      </>
+                    );
+                  })()}
+                </Box>
+
                 {/* 행2: 회차 + P/B/T 결과 입력 + 횟수 + del */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box sx={turnBoxSx}>

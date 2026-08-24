@@ -45,11 +45,13 @@ export const ghBetStopReasonLabel = (roundState) => {
     return `활성 POT ${Math.max(0, Number(overallStop?.active_pot_count || 0))}개가 종료 기준 ${Math.max(0, Number(overallStop?.pot_stop_count || 0))}개 이하에 도달 (잔여 POT 종료)`;
   }
   if (reason === "round_bet_loss_streak_reached") {
+    const conditionNo = Number(overallStop?.round_bet_loss_streak_trigger_condition || 0);
     const lossStreakStop = Number(overallStop?.round_bet_loss_streak_stop || 0);
     const triggerRound = Number(overallStop?.round_bet_loss_streak_trigger_round || 0);
     const triggerBetAmount = Number(overallStop?.round_bet_loss_streak_trigger_bet_amount || 0);
     const betLimit = Number(overallStop?.round_bet_loss_streak_compared_bet_limit || 0);
-    return `${Math.max(0, lossStreakStop)}연패 이후 ${Math.max(0, triggerRound)}회차 배팅액 ${formatConditionNumber(triggerBetAmount)} P가 종료 기준 ${formatConditionNumber(betLimit)} P 이상에 도달 (배팅액판 연패중지)`;
+    const conditionLabel = conditionNo > 0 ? ` ${conditionNo}번` : "";
+    return `${Math.max(0, lossStreakStop)}연패 이후 ${Math.max(0, triggerRound)}회차 배팅액 ${formatConditionNumber(triggerBetAmount)} P가 종료 기준 ${formatConditionNumber(betLimit)} P 이상에 도달 (배팅액판 연패중지${conditionLabel})`;
   }
   if (roundState?.profit_stop?.stopped) {
     const profitStop = roundState.profit_stop;
