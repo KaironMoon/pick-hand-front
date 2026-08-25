@@ -365,6 +365,9 @@ function GhRoundAmountTable({
   const totalAmount = amountMode === "actual"
     ? Number(actualCells[currentRoundIdx]?.bet_amount_p || 0)
     : Number(table.total_amount || 0);
+  const totalPnl = amountMode === "actual"
+    ? Number(actualTable.total_pnl_p || 0)
+    : Number(table.total_pnl || 0);
   const pnlScale = amountMode === "actual"
     ? Number(roundState?.conditional_martins?.martin_b?.pnl_scale
       ?? roundState?.conditional_martins?.martin_c?.pnl_scale
@@ -504,6 +507,9 @@ function GhRoundAmountTable({
         </Box>
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>BET</span><span>{betAmountLabel}</span>
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: totalPnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>전체 PNL</span><span>{fmt(totalPnl)}</span>
         </Box>
       </Box>
       <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "stretch", gap: 0.5, width: "100%" }}>
