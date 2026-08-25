@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Box } from "@mui/material";
 
-import { isMaxMissAtLeast, isMissStreakAtLeast } from "./strategy-board-alerts.js";
+import {
+  isHighStepOverlapWait,
+  isMaxMissAtLeast,
+  isMissStreakAtLeast,
+} from "./strategy-board-alerts.js";
 
 // ── 전략별 현황 전광판 (design-260615-gh-calc.html 260623 신버전 포팅) ──
 // 4개 테이블(G1~G4) · 각 16컬럼 · 10행.
@@ -250,10 +254,12 @@ function AssistRow({ data, pos, label, labelColor }) {
         const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
         const v = (data.assist || [])[i] || "";
         const pickMark = (data.assistMark || [])[i];
-        const title = assistSourceTitle((data.assistSource || [])[i]);
+        const source = (data.assistSource || [])[i];
+        const title = assistSourceTitle(source);
+        const highStepWait = isHighStepOverlapWait(v, source);
         if (!v) return <Box component="td" key={i} title={title} sx={{ ...sx, color: dimColor }}>–</Box>;
         return (
-          <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: ASSIST_BG, ...generatedPickSx(pickMark) }}>
+          <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: ASSIST_BG, ...generatedPickSx(pickMark), ...(highStepWait ? alertBlinkSx : {}) }}>
             <AssistText v={v} />
           </Box>
         );
@@ -270,10 +276,12 @@ function QAssistRow({ data, pos, label, labelColor }) {
         const sx = { ...tdSx, ...edgeStyle(data, i, pos) };
         const v = (data.qAssist || [])[i] || "";
         const pickMark = (data.qAssistMark || [])[i];
-        const title = assistSourceTitle((data.qAssistSource || [])[i]);
+        const source = (data.qAssistSource || [])[i];
+        const title = assistSourceTitle(source);
+        const highStepWait = isHighStepOverlapWait(v, source);
         if (!v) return <Box component="td" key={i} title={title} sx={{ ...sx, color: dimColor }}>–</Box>;
         return (
-          <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: Q_ASSIST_BG, ...generatedPickSx(pickMark) }}>
+          <Box component="td" key={i} title={title} sx={{ ...sx, backgroundColor: Q_ASSIST_BG, ...generatedPickSx(pickMark), ...(highStepWait ? alertBlinkSx : {}) }}>
             <AssistText v={v} />
           </Box>
         );
