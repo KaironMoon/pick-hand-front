@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Box, Tooltip } from "@mui/material";
+import { bigRoadCurrentStatus, isBigRoadWaitRow } from "../bigroad2-wait.js";
 
 const HIT_BG = "#2e9e5b";
 const MISS_BG = "#ffeb3b";
@@ -81,7 +82,7 @@ function cellsFromStateBigRoad2(rows, nextPick = null, nextStatus = null, actual
     const result = r.result;
     const savedStatus = r.status;
     const rowGeneratedPickMark = r.generatedPickMark || r.generated_pick_mark || null;
-    const waitSlot = pick === "W" && !result;
+    const waitSlot = isBigRoadWaitRow(r);
     const hasSlot = pick || result || waitSlot;
     if (!hasSlot) continue;
     if (showGroupDivider && firstDividerIdx == null && (pick === "P" || pick === "B")) {
@@ -104,7 +105,7 @@ function cellsFromStateBigRoad2(rows, nextPick = null, nextStatus = null, actual
     }
     const generatedPickMark = currentGeneratedPickMark || null;
     if (currentStatus === "rest") cells[idx] = { rest: true, pick: currentPick, status: "current", round: idx + 1, generatedPickMark };
-    else if (currentPick === "W") cells[idx] = { wait: true, status: "current", round: idx + 1, generatedPickMark };
+    else if (currentStatus === "wait" || currentPick === "W") cells[idx] = { wait: true, status: "current", round: idx + 1, generatedPickMark };
     else cells[idx] = { pick: currentPick, status: "current", round: idx + 1, generatedPickMark };
   }
   if (showGroupDivider && firstDividerIdx != null) {
@@ -151,7 +152,7 @@ function getRowCells(ctx, spec, assist = false) {
   const stateKey = stateKeyForSpec(spec);
   const stateRows = getRoundStatePart(ctx, stateKey, assist ? "h_assist" : "picks");
   const state = getRoundStateTrack(ctx, stateKey, assist);
-  return cellsFromStateBigRoad2(stateRows || [], state?.pick, { status: state?.status, generatedPickMark: state?.generated_pick_mark }, ctx.actualSeq);
+  return cellsFromStateBigRoad2(stateRows || [], state?.pick, { status: bigRoadCurrentStatus(state), generatedPickMark: state?.generated_pick_mark }, ctx.actualSeq);
 }
 
 function getRoundStateQAssist(ctx, key) {
@@ -172,7 +173,7 @@ function getQuarterCells(ctx, spec, assist = false) {
   return cellsFromStateBigRoad2(
     stateRows || [],
     state?.pick,
-    { status: state?.status, generatedPickMark: state?.generated_pick_mark },
+    { status: bigRoadCurrentStatus(state), generatedPickMark: state?.generated_pick_mark },
     ctx.actualSeq,
     true,
   );

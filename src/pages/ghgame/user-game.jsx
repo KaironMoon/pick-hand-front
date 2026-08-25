@@ -209,27 +209,6 @@ const buildResultRows = ({
   });
 };
 
-function GhGlobalhitSummary({ roundState }) {
-  const aggregate = roundState?.globalhit_aggregate || {};
-  const direction = aggregate.direction;
-  const amount = Number(aggregate.amount || 0);
-  const pnl = Number(roundState?.globalhit_pnl || 0);
-  const fmt = (value) => Number(value || 0).toFixed(1);
-  return (
-    <Box sx={{ display: "flex", alignItems: "stretch", width: "fit-content", minWidth: 360, mb: 1.5 }}>
-      <Box sx={{ minWidth: direction ? 28 : 42, px: 0.5, border: "1px solid #3f4650", backgroundColor: direction === "P" ? "#1565d8" : direction === "B" ? "#e53935" : "#555", color: "#fff", fontSize: direction ? 13 : 11, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {direction || "-"}
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: 900, px: 0.75, py: 0.45, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span>글로벌히트 BET</span><span>{fmt(amount)}P</span>
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 145, ml: 0.5, border: "1px solid #3f4650", backgroundColor: "#111821", color: pnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: 900, px: 0.75, py: 0.45, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span>글로벌히트 PNL</span><span>{fmt(pnl)}P</span>
-      </Box>
-    </Box>
-  );
-}
-
 function GhLossStopStatus({ roundState, autoStatus }) {
   const status = roundState?.globalhit_loss_stop;
   const configuredLimit = Number(status?.configured_limit || 0);
@@ -386,9 +365,34 @@ function GhRoundAmountTable({
   const totalAmount = amountMode === "actual"
     ? Number(actualCells[currentRoundIdx]?.bet_amount_p || 0)
     : Number(table.total_amount || 0);
-  const totalPnl = amountMode === "actual"
-    ? Number(actualTable.total_pnl_p || 0)
-    : Number(table.total_pnl || 0);
+  const pnlScale = amountMode === "actual"
+    ? Number(roundState?.conditional_martins?.martin_b?.pnl_scale
+      ?? roundState?.conditional_martins?.martin_c?.pnl_scale
+      ?? 1)
+    : 1;
+  const pnlBreakdown = table.pnl_breakdown || { globalhit: table.total_pnl || 0 };
+  const componentPnls = [
+    ["PnL", Number(pnlBreakdown.globalhit || 0)],
+    ["Z", Number(pnlBreakdown.martin_z || 0)],
+    ["B", Number(pnlBreakdown.martin_b || 0)],
+    ["C", Number(pnlBreakdown.martin_c || 0)],
+  ].map(([label, value]) => [label, Math.round(value * pnlScale * 10) / 10]);
+  const basePnl = componentPnls[0][1];
+  const martinPnls = componentPnls.slice(1);
+  const globalhitAggregate = roundState?.globalhit_aggregate || {};
+  const globalhitDirection = globalhitAggregate.direction;
+  const globalhitBetAmount = Number(globalhitAggregate.amount || 0);
+  const globalhitDirectionColor = globalhitDirection === "P" ? "#1565d8" : globalhitDirection === "B" ? "#e53935" : "#555";
+  const martinContributionAmount = (cell) => [
+    cell?.pick_martin_amount,
+    cell?.martin_b_amount,
+    cell?.martin_c_p_amount,
+    cell?.martin_c_b_amount,
+  ].reduce((sum, value) => sum + Number(value || 0), 0);
+  const currentMartinAmount = martinContributionAmount(strategyCells[currentRoundIdx]);
+  const betAmountLabel = amountMode !== "actual" && currentMartinAmount > 0
+    ? `${fmt(totalAmount)} (${fmt(currentMartinAmount)})`
+    : fmt(totalAmount);
   const finalSideColor = finalSide === "P" ? "#1565d8" : finalSide === "B" ? "#e53935" : "#555";
   const cellSx = (idx) => {
     const cell = cells[idx] || {};
@@ -499,19 +503,38 @@ function GhRoundAmountTable({
           {finalSide || "-"}
         </Box>
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>BET</span><span>{fmt(totalAmount)}</span>
-        </Box>
-        <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: totalPnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>PnL</span><span>{fmt(totalPnl)}</span>
+          <span>BET</span><span>{betAmountLabel}</span>
         </Box>
       </Box>
-      <Box sx={{ display: "grid", gridTemplateRows: "repeat(10, 31px)", gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
-        {Array.from({ length: cellCount }, (_, idx) => (
-          <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P / PnL ${fmt(cells[idx]?.pnl)}P`}>
-            <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
-            <Box sx={{ color: "#fff", fontSize: 11, fontWeight: "bold", textAlign: "right", pr: 0.4 }}>{fmt(cells[idx]?.amount)}</Box>
+      <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "stretch", gap: 0.5, width: "100%" }}>
+        <Box sx={{ width: 28, minWidth: 28, border: "1px solid #3f4650", backgroundColor: globalhitDirectionColor, color: "#fff", fontSize: 13, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {globalhitDirection || "-"}
+        </Box>
+        <Box sx={{ width: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>글로벌히트 BET</span><span>{fmt(globalhitBetAmount)}</span>
+        </Box>
+        <Box sx={{ width: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: basePnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>글로벌히트 PNL</span><span>{fmt(basePnl)}</span>
+        </Box>
+        {martinPnls.map(([label, value]) => (
+          <Box key={label} sx={{ width: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: value >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span>{label} PnL</span><span>{fmt(value)}</span>
           </Box>
         ))}
+      </Box>
+      <Box sx={{ display: "grid", gridTemplateRows: "repeat(10, 31px)", gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
+        {Array.from({ length: cellCount }, (_, idx) => {
+          const martinAmount = martinContributionAmount(strategyCells[idx]);
+          const amountLabel = amountMode !== "actual" && martinAmount > 0
+            ? `${fmt(cells[idx]?.amount)} (${fmt(martinAmount)})`
+            : fmt(cells[idx]?.amount);
+          return (
+            <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / Z+B+C ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)} / C ${fmt(cells[idx]?.martin_c_pnl)}`}>
+              <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
+              <Box sx={{ color: "#fff", fontSize: martinAmount > 0 && amountMode !== "actual" ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>{amountLabel}</Box>
+            </Box>
+          );
+        })}
       </Box>
     </Box>
   );
@@ -2342,7 +2365,7 @@ export default function GhUserGamePage() {
                   )}
                 </Box>
 
-                {/* 행1-2: 실제 주문과 분리된 조건부 가상 마틴 B/C */}
+                {/* 행1-2: 배팅금액판과 실제 주문에 합산되는 조건부 마틴 B/C */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                   {(() => {
                     const martinB = roundState?.conditional_martins?.martin_b || {};
@@ -2350,7 +2373,7 @@ export default function GhUserGamePage() {
                     const direction = martinB.direction || "";
                     return (
                       <>
-                        <Box sx={tagSx("#7b1fa2")} title="마틴B (가상 계산)">
+                        <Box sx={tagSx("#7b1fa2")} title="마틴B (배팅액 합산)">
                           <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>B</Typography>
                         </Box>
                         <Box sx={{ ...fieldSx, minWidth: 84, px: 0.6 }}>
@@ -2370,7 +2393,7 @@ export default function GhUserGamePage() {
                     const direction = martinC.direction || "";
                     return (
                       <>
-                        <Box sx={tagSx("#ef6c00")} title="마틴C 합산 (가상 계산)">
+                        <Box sx={tagSx("#ef6c00")} title="마틴C 합산 (배팅액 합산)">
                           <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>C</Typography>
                         </Box>
                         <Box sx={{ ...fieldSx, minWidth: 84, px: 0.6 }}>
@@ -2529,7 +2552,6 @@ export default function GhUserGamePage() {
           )}
 
           {isAdmin && <GhLossStopStatus roundState={roundState} autoStatus={autoStatus} />}
-          {isAdmin && <GhGlobalhitSummary roundState={roundState} />}
 
           {isAdmin && roundStateLower && (
             <>

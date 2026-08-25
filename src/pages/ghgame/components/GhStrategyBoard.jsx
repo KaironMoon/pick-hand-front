@@ -469,6 +469,9 @@ const fromStats = (ctx, key) => {
   const qs = qAssistStateFor(ctx, qas);
   const qData = qs || qas;
   const assistTotal = as?.total ?? 0;
+  const hHighStepWait = hs?.bet_unavailable_reason === "high_step_overlap_wait";
+  const qHighStepWait = qs?.bet_unavailable_reason === "high_step_overlap_wait";
+  const highStepWaitTitle = "(고단계 중첩정지)";
   const martinC = ctx.roundState?.conditional_martins?.martin_c?.tracks || {};
   const martinCH = martinC[`${key}:assist_h`];
   const martinCQ = martinC[`${key}:assist_q`];
@@ -476,9 +479,9 @@ const fromStats = (ctx, key) => {
     wait: fmtStreak(s.cur_streak_type, s.cur_streak_count),
     pick: fmtValue(s.pick),
     pickMark: s.generated_pick_mark,
-    assist: fmtValue(hs?.pick),
+    assist: hHighStepWait && (hs?.pick === "P" || hs?.pick === "B") ? `${hs.pick}(W)` : fmtValue(hs?.pick),
     assistMark: hs?.generated_pick_mark,
-    assistSource: hs?.source,
+    assistSource: hHighStepWait ? highStepWaitTitle : hs?.source,
     wait2: hs ? fmtStreak(hs.cur_streak_type, hs.cur_streak_count) : (as ? fmtStreak(as.cur_streak_type, as.cur_streak_count) : undefined),
     pct2: as ? fmtPct(as.hit ?? 0, assistTotal) : undefined,
     assistRec: as ? fmtRec(assistTotal, as.hit ?? 0, as.miss ?? 0) : undefined,
@@ -488,17 +491,22 @@ const fromStats = (ctx, key) => {
     rec2: fmtRec2(s.max_hit_streak ?? 0, s.max_miss_streak ?? 0),
     stage1: fmtStage(s.step, 0),
     stage: as ? fmtStage(as.step, 0) : "",
-    idx1: as ? fmtMan(as.amount ?? (amounts ? betAt(amounts, as.step, stepMin) : null)) : "",
+    idx1: as ? (hHighStepWait ? "-" : fmtMan(as.amount ?? (amounts ? betAt(amounts, as.step, stepMin) : null))) : "",
     idx1Zone: as?.amount_zone,
     idx2: as && as.pnl !== null && as.pnl !== undefined ? fmtMan(as.pnl) : "",
     martinCStepH: martinCH?.active ? `${martinCH.step || 1}S` : "",
     martinCAmountH: martinCH?.active ? fmtMan(martinCH.amount ?? 0) : "",
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : {
-      ...quarterAssistRow(qData, qAssistPickText(qas, qs), qs),
-      qAssistSource: qs?.source ?? qas?.source,
+      ...quarterAssistRow(
+        qData,
+        qHighStepWait && (qs?.pick === "P" || qs?.pick === "B") ? `${qs.pick}(W)` : qAssistPickText(qas, qs),
+        qs,
+      ),
+      qAssistSource: qHighStepWait ? highStepWaitTitle : (qs?.source ?? qas?.source),
       qAssistMark: qs?.generated_pick_mark,
     }),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : quarterRow(qData, amounts, stepMin)),
+    ...(HIDE_QUARTER_KEYS.has(key) || !qHighStepWait ? {} : { qidx1: "-" }),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : { qidx1Zone: qData?.amount_zone }),
     ...(HIDE_QUARTER_KEYS.has(key) ? {} : {
       martinCStepQ: martinCQ?.active ? `${martinCQ.step || 1}S` : "",

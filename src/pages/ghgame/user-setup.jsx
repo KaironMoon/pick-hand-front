@@ -2298,6 +2298,50 @@ export default function GhUserSetupPage() {
               )}
             </Box>
           ))}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
+              고단계 중첩정지
+            </Typography>
+            <input
+              type="number"
+              min="0"
+              max="80"
+              step="1"
+              aria-label="고단계 중첩정지 기준 단계"
+              value={config.high_step_overlap_min_step ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, Math.min(80, parseInt(event.target.value || "0", 10) || 0));
+                setConfig((prev) => ({ ...prev, high_step_overlap_min_step: value }));
+                setDirty(true);
+              }}
+              style={{ width: 58, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>단계 이상, 상계 후</Typography>
+            <input
+              type="number"
+              min="0"
+              max="80"
+              step="1"
+              aria-label="고단계 중첩정지 배팅 허용 개수"
+              value={config.high_step_overlap_bet_count ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, Math.min(80, parseInt(event.target.value || "0", 10) || 0));
+                setConfig((prev) => ({ ...prev, high_step_overlap_bet_count: value }));
+                setDirty(true);
+              }}
+              style={{ width: 58, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>개만 배팅</Typography>
+            {(
+              Number(config.high_step_overlap_min_step || 0) === 0
+              || Number(config.high_step_overlap_bet_count || 0) === 0
+            ) && (
+              <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
+            )}
+            <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
+              계산기판 순서 우선 · 같은 항목은 회차 후 쿼터
+            </Typography>
+          </Box>
         </Box>
       )}
 
