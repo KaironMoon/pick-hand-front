@@ -92,10 +92,10 @@ export const MAX_MISS_SECTION_ROWS = [
     { key: "NCSRN", label: "NCSRN" },
   ],
   [
-    { key: "P", label: "P" },
-    { key: "B", label: "B" },
+    { key: "J", label: "J", always: true },
     { key: "6M", label: "6M" },
     { key: "6MX", label: "6MX" },
+    null,
   ],
 ];
 

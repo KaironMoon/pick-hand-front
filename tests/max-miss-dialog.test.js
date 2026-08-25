@@ -49,13 +49,15 @@ test("maximum miss thresholds cover 3M through 20M", () => {
   assert.deepEqual(MAX_MISS_THRESHOLDS, Array.from({ length: 18 }, (_, index) => index + 3));
 });
 
-test("maximum miss grid includes 6M and 6MX beside P and B", () => {
+test("maximum miss grid keeps J, 6M, and 6MX while excluding P and B", () => {
   assert.deepEqual(MAX_MISS_SECTION_ROWS.at(-1), [
-    { key: "P", label: "P" },
-    { key: "B", label: "B" },
+    { key: "J", label: "J", always: true },
     { key: "6M", label: "6M" },
     { key: "6MX", label: "6MX" },
+    null,
   ]);
+  assert.equal(MAX_MISS_SECTION_ROWS.flat().some((section) => section?.key === "P"), false);
+  assert.equal(MAX_MISS_SECTION_ROWS.flat().some((section) => section?.key === "B"), false);
 });
 
 test("maximum miss values below the selected threshold stay hidden", () => {
@@ -66,9 +68,17 @@ test("maximum miss values below the selected threshold stay hidden", () => {
 });
 
 test("J can always show its positive maximum miss value", () => {
-  const sections = { J: { base: { max_miss_streak: 4, max_miss_round: 12 } } };
+  const sections = {
+    J: {
+      base: { max_miss_streak: 4, max_miss_round: 12 },
+      assist_h: { max_miss_streak: 2, max_miss_round: 7 },
+      assist_q: { max_miss_streak: 3, max_miss_round: 9 },
+    },
+  };
   assert.equal(maxMissGeneratedJTrack(sections), sections.J.base);
   assert.equal(maxMissLabel(maxMissGeneratedJTrack(sections), 9, true), "4M12");
+  assert.equal(maxMissLabel(maxMissTrackForSection(sections, "J", "assist_h"), 9, true), "2M7");
+  assert.equal(maxMissLabel(maxMissTrackForSection(sections, "J", "assist_q"), 9, true), "3M9");
   assert.equal(maxMissLabel({ max_miss_streak: 0 }, 9, true), "");
 });
 
@@ -146,6 +156,32 @@ test("Excel clipboard payload keeps layout, colors, threshold, and aliased value
   assert.match(payload.text, /J\t4M12/);
   assert.match(payload.text, /SSRN1\t10M31/);
   assert.deepEqual(payload.text.split("\n").slice(1).map((row) => row.split("\t").length), [17, 17, 17]);
+});
+
+test("clipboard keeps J round and quarter values together with 6M and 6MX", () => {
+  const payload = buildMaxMissClipboardPayload({
+    sections: {
+      J: {
+        base: { max_miss_streak: 4, max_miss_round: 12 },
+        assist_h: { max_miss_streak: 2, max_miss_round: 7 },
+        assist_q: { max_miss_streak: 3, max_miss_round: 9 },
+      },
+      "6M": {
+        assist_h: { max_miss_streak: 9, max_miss_round: 20 },
+        assist_q: { max_miss_streak: 10, max_miss_round: 21 },
+      },
+      "6MX": {
+        assist_h: { max_miss_streak: 11, max_miss_round: 22 },
+        assist_q: { max_miss_streak: 12, max_miss_round: 23 },
+      },
+    },
+    sectionRows: MAX_MISS_SECTION_ROWS.slice(-1),
+    threshold: 9,
+  });
+
+  for (const value of ["2M7", "3M9", "9M20", "10M21", "11M22", "12M23"]) {
+    assert.match(payload.html, new RegExp(`>${value}<`));
+  }
 });
 
 test("clipboard writer falls back to tab-separated text", async () => {
