@@ -202,7 +202,7 @@ function cruiseStepLabel(idx) {
   return `${(idx + 1) / 2 + 1}`;
 }
 
-function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp, fixedMartinOnly = false }) {
+function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp }) {
   const isCruise = name === "cruise";
   const usesDecimalP = ["martin_a", "martin_z", "martin_b", "martin_c"].includes(name);
   const enabled = martin.enabled;
@@ -211,9 +211,7 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
   const totalRows = isCruise ? 6 : 4;
   const defaultStepMax = isCruise ? 29 : 20;
   // 크루즈 섹션은 cruise만 선택 가능, 다른 섹션은 cruise를 못 고름
-  const sectionDisabledBetTypes = fixedMartinOnly
-    ? BET_TYPES.filter((t) => t !== "martin")
-    : isCruise
+  const sectionDisabledBetTypes = isCruise
     ? BET_TYPES.filter((t) => t !== "cruise")
     : DISABLED_BET_TYPES;
   const betType = (type) => { if (sectionDisabledBetTypes.includes(type)) return; onChange({ ...martin, bet_type: type }); };
@@ -342,7 +340,6 @@ function ConditionalMartinSection({ kind, martin, onChange }) {
         martin={martin}
         onChange={onChange}
         labelColor={color}
-        fixedMartinOnly
       />
       <tr>
         <td style={{ ...labelCellStyle, color }}>발동조건</td>
