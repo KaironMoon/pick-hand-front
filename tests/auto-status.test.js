@@ -29,6 +29,7 @@ test("new game status starts without the previous auto error", () => {
     pending_amount_p: 0,
     pending_amount_won: 0,
     keep_shoes_remaining: null,
+    martin_recovery: null,
   });
 });
 

@@ -1,11 +1,11 @@
 const STOP_ALERTS = {
   goal_reached: {
-    title: "GH 목표금액 달성",
-    detail: "GH 목표금액을 달성하여 배팅이 정지되었습니다.",
+    title: "목표금액 달성",
+    detail: "목표금액을 달성하여 배팅이 정지되었습니다.",
   },
   drawdown_reached: {
     title: "최고 PNL 손실률 도달",
-    detail: "GH 최고 PNL 대비 설정 손실률에 도달하여 배팅이 정지되었습니다.",
+    detail: "최고 PNL 대비 설정 손실률에 도달하여 배팅이 정지되었습니다.",
   },
   end_round_reached: {
     title: "미달마감 도달",
@@ -17,7 +17,7 @@ const STOP_ALERTS = {
   },
   round_bet_loss_streak_reached: {
     title: "배팅액판 연패중지",
-    detail: "설정 연패 단계 이후 GH 배팅액이 기준금액에 도달하여 배팅이 정지되었습니다.",
+    detail: "설정 연패 단계 이후 배팅액이 기준금액에 도달하여 배팅이 정지되었습니다.",
   },
 };
 
@@ -26,7 +26,18 @@ const formatBetAmount = (value) => Number(value).toLocaleString(undefined, {
 });
 
 const stopAlertDetail = (alert, reason, mode, stopDetail) => {
-  if (reason !== "round_bet_loss_streak_reached") return alert.detail;
+  const recoveredMartins = Object.values(stopDetail?.martin_recovery?.targets || {})
+    .some((target) => target?.required);
+  const recoveryCompleted = stopDetail?.martin_recovery?.completed && recoveredMartins;
+  if (reason === "goal_reached") return recoveryCompleted
+    ? "전체 목표금액 달성 후 진행 중이던 마틴 회수까지 완료되어 최종 배팅이 정지되었습니다."
+    : "전체 목표금액을 달성하여 배팅이 정지되었습니다.";
+  if (reason === "drawdown_reached") return recoveryCompleted
+    ? "최고 PNL 손실률 도달 후 진행 중이던 마틴 회수까지 완료되어 최종 배팅이 정지되었습니다."
+    : "최고 PNL 대비 설정 손실률에 도달하여 배팅이 정지되었습니다.";
+  if (reason !== "round_bet_loss_streak_reached") return recoveryCompleted
+    ? `${alert.title} 조건 발동 후 진행 중이던 마틴 회수까지 완료되어 최종 배팅이 정지되었습니다.`
+    : alert.detail;
   const triggerRound = Number(stopDetail?.round_bet_loss_streak_trigger_round || 0);
   const triggerBetAmount = Number(stopDetail?.round_bet_loss_streak_trigger_bet_amount || 0);
   const conditionNo = Number(stopDetail?.round_bet_loss_streak_trigger_condition || 0);
@@ -34,9 +45,12 @@ const stopAlertDetail = (alert, reason, mode, stopDetail) => {
       || !Number.isFinite(triggerBetAmount) || triggerBetAmount <= 0) {
     return alert.detail;
   }
-  const betLabel = mode === "auto" ? "실제 GH 배팅액" : "GH 배팅액";
+  const appliedBetLabel = mode === "auto" ? "실제 GH 배팅액" : "GH 배팅액";
   const conditionLabel = conditionNo > 0 ? `${conditionNo}번 조건이 발동하여 ` : "";
-  return `${conditionLabel}${triggerRound}회차 ${betLabel} ${formatBetAmount(triggerBetAmount)} P가 기준금액에 도달하여 배팅이 정지되었습니다.`;
+  const triggerDetail = `${conditionLabel}${triggerRound}회차 ${appliedBetLabel} ${formatBetAmount(triggerBetAmount)} P가 기준금액에 도달`;
+  return recoveryCompleted
+    ? `${triggerDetail}한 후 진행 중이던 마틴 회수까지 완료되어 최종 배팅이 정지되었습니다.`
+    : `${triggerDetail}하여 배팅이 정지되었습니다.`;
 };
 
 export const claimOverallStopAlert = (
@@ -53,6 +67,7 @@ export const claimOverallStopAlert = (
   alertedGameIds.add(key);
   return {
     ...alert,
+    title: reason === "goal_reached" ? "전체 목표금액 달성" : alert.title,
     detail: stopAlertDetail(alert, reason, mode, stopDetail),
     modeLabel: mode === "auto" ? "오토" : "수동",
   };

@@ -65,7 +65,7 @@ export const buildGoalStatusItems = (
 
   items.push({
     key: "overall-pnl",
-    label: "GH Pnl",
+    label: "Pnl",
     target: overallTarget,
     pnl: overallPnl,
     reached: overallReached,

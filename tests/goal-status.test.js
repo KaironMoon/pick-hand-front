@@ -37,11 +37,11 @@ test("missing targets stay visible but dimmed and reached targets light up", () 
   assert.equal(items.find((item) => item.key === "SSR1").dimmed, true);
   assert.deepEqual(
     items.at(-1),
-    { key: "overall-pnl", label: "GH Pnl", target: 100, pnl: 40, reached: false, reachedRound: 0, dimmed: false },
+    { key: "overall-pnl", label: "Pnl", target: 100, pnl: 40, reached: false, reachedRound: 0, dimmed: false },
   );
 });
 
-test("GH Pnl uses the server round-state value while auto is running", () => {
+test("combined Pnl uses the server round-state value while auto is running", () => {
   const items = buildGoalStatusItems(
     {},
     { target: 100, pnl: 10, reason: null },
@@ -50,8 +50,13 @@ test("GH Pnl uses the server round-state value while auto is running", () => {
 
   assert.deepEqual(
     items.at(-1),
-    { key: "overall-pnl", label: "GH Pnl", target: 100, pnl: 10, reached: true, reachedRound: 42, dimmed: false },
+    { key: "overall-pnl", label: "Pnl", target: 100, pnl: 10, reached: true, reachedRound: 42, dimmed: false },
   );
+});
+
+test("overall goal keeps the combined Pnl label", () => {
+  const items = buildGoalStatusItems({}, { target: 10, pnl: 1 }, null);
+  assert.equal(items.at(-1).label, "Pnl");
 });
 
 test("goal amount formatting keeps at most one decimal place", () => {

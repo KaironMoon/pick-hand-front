@@ -16,6 +16,7 @@ export const createEmptyAutoStatus = () => ({
   pending_amount_p: 0,
   pending_amount_won: 0,
   keep_shoes_remaining: null,
+  martin_recovery: null,
 });
 
 export const shouldDisplayAutoError = (status, error = null) => Boolean(
@@ -62,6 +63,8 @@ export const mergePolledAutoStatus = (previous, status) => {
     play_mode: status?.play_mode ?? previous?.play_mode,
     keep_shoes_remaining:
       status?.keep_shoes_remaining ?? previous?.keep_shoes_remaining ?? null,
+    martin_recovery:
+      status?.martin_recovery ?? previous?.martin_recovery ?? null,
     stop_reason:
       status?.stop_reason ?? previous?.stop_reason ?? null,
     active_pot_count:

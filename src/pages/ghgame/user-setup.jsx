@@ -2037,7 +2037,7 @@ export default function GhUserSetupPage() {
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
-              GH 목표금액 (P)
+              전체 목표금액 (P)
             </Typography>
             <input
               type="number"
@@ -2065,7 +2065,7 @@ export default function GhUserSetupPage() {
               </Typography>
             )}
             <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              마틴 Z/B/C를 제외한 GH PNL이 목표에 도달하면 다음 회차부터 모든 배팅 중지
+              전체 PNL이 목표에 도달하면 GH를 정지하고 진행 중인 마틴 Z/B/C는 첫 적중까지 회수
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -2117,7 +2117,9 @@ export default function GhUserSetupPage() {
               }}
               style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 GH PNL 달성 시 최고 PNL에서</Typography>
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>
+              P 이상 달성 시 최고 PNL에서
+            </Typography>
             <input
               type="number"
               min="0"
@@ -2153,7 +2155,9 @@ export default function GhUserSetupPage() {
               }}
               style={{ width: 70, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>회차 이후 GH</Typography>
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>
+              회차 이후 GH
+            </Typography>
             <input
               type="number"
               min="0"
@@ -2166,7 +2170,7 @@ export default function GhUserSetupPage() {
               }}
               style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 배팅 시 이후 배팅 중지</Typography>
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 GH 배팅 시 이후 배팅 중지</Typography>
             {(Number(config.profit_stop_after_round || 0) === 0 || Number(config.profit_stop_bet_amount || 0) === 0) && (
               <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
             )}

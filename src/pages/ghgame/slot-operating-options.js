@@ -16,7 +16,7 @@ export const ghDrawdownStatusLabel = (status) => {
   const scaleDetail = effectiveStart > 0 && effectiveStart !== start
     ? ` · 판정 시작 ${formatConditionNumber(effectiveStart)} P`
     : "";
-  return `${formatConditionNumber(start)} P 이상 GH PNL 달성 시 최고 PNL에서 ${formatConditionNumber(percent)}% 이상 손실 나면 배팅 정지${scaleDetail}${state}`;
+  return `${formatConditionNumber(start)} P 이상 달성 시 최고 PNL에서 ${formatConditionNumber(percent)}% 이상 손실 나면 배팅 정지${scaleDetail}${state}`;
 };
 
 export const ghProfitStopStatusLabel = (status) => {
@@ -33,10 +33,10 @@ export const ghBetStopReasonLabel = (roundState) => {
   const overallStop = roundState?.overall_stop;
   const reason = overallStop?.reason;
   if (reason === "goal_reached") {
-    return `현재 GH PNL ${formatConditionNumber(overallStop?.pnl)} P가 목표 ${formatConditionNumber(overallStop?.target)} P에 도달 (GH 목표금액 달성)`;
+    return `현재 PNL ${formatConditionNumber(overallStop?.pnl)} P가 목표 ${formatConditionNumber(overallStop?.target)} P에 도달 (전체 목표금액 달성)`;
   }
   if (reason === "drawdown_reached") {
-    return `현재 GH PNL ${formatConditionNumber(overallStop?.pnl)} P가 최고 PNL ${formatConditionNumber(overallStop?.drawdown_peak)} P 대비 종료 기준 ${formatConditionNumber(overallStop?.drawdown_threshold)} P 이하에 도달 (GH 최고 PNL 손실률)`;
+    return `현재 PNL ${formatConditionNumber(overallStop?.pnl)} P가 최고 PNL ${formatConditionNumber(overallStop?.drawdown_peak)} P 대비 종료 기준 ${formatConditionNumber(overallStop?.drawdown_threshold)} P 이하에 도달 (최고 PNL 손실률)`;
   }
   if (reason === "end_round_reached") {
     return `현재 ${Math.max(0, Number(roundState?.round_num || 0))}회차가 마감 ${Math.max(0, Number(overallStop?.end_round || 0))}회차에 도달 (미달 마감)`;

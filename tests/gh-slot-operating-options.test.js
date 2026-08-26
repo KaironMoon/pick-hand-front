@@ -13,13 +13,14 @@ test("GH drawdown status distinguishes disabled, waiting, armed, and stopped", (
   assert.match(ghDrawdownStatusLabel({ drawdown_start: 10, drawdown_percent: 20, drawdown_armed: true, drawdown_peak: 15 }), /감시중 \(최고 15 P\)$/);
   assert.match(ghDrawdownStatusLabel({ drawdown_start: 10, drawdown_percent: 20, reason: "drawdown_reached" }), /중지$/);
   assert.match(ghDrawdownStatusLabel({ configured_drawdown_start: 10, effective_drawdown_start: 1, drawdown_percent: 20 }), /판정 시작 1 P/);
+  assert.match(ghDrawdownStatusLabel({ drawdown_start: 10, drawdown_percent: 20 }), /^10 P 이상 달성 시 최고 PNL에서/);
 });
 
 test("GH betting stop reason follows the persisted server round state", () => {
   assert.equal(ghBetStopReasonLabel({}), null);
   assert.equal(
     ghBetStopReasonLabel({ overall_stop: { reason: "goal_reached", pnl: 101, target: 100 } }),
-    "현재 GH PNL 101 P가 목표 100 P에 도달 (GH 목표금액 달성)",
+    "현재 PNL 101 P가 목표 100 P에 도달 (전체 목표금액 달성)",
   );
   assert.equal(
     ghBetStopReasonLabel({
@@ -30,7 +31,7 @@ test("GH betting stop reason follows the persisted server round state", () => {
         drawdown_threshold: 80,
       },
     }),
-    "현재 GH PNL 80 P가 최고 PNL 100 P 대비 종료 기준 80 P 이하에 도달 (GH 최고 PNL 손실률)",
+    "현재 PNL 80 P가 최고 PNL 100 P 대비 종료 기준 80 P 이하에 도달 (최고 PNL 손실률)",
   );
   assert.equal(
     ghBetStopReasonLabel({
@@ -96,4 +97,15 @@ test("GH profit protection status distinguishes disabled, active, and stopped", 
   assert.equal(ghProfitStopStatusLabel({}), "사용안함");
   assert.match(ghProfitStopStatusLabel({ after_round: 20, bet_limit: 5 }), /정상$/);
   assert.match(ghProfitStopStatusLabel({ after_round: 20, bet_limit: 5, stopped: true, mode: "actual", trigger_pnl: 3, trigger_bet_amount: 5 }), /GH PNL 3 P \/ GH 배팅 5 P · 중지$/);
+});
+
+test("fixed criteria keep combined goal and GH profit-protection wording", () => {
+  assert.equal(
+    ghBetStopReasonLabel({ overall_stop: { reason: "goal_reached", pnl: 101, target: 100 } }),
+    "현재 PNL 101 P가 목표 100 P에 도달 (전체 목표금액 달성)",
+  );
+  assert.match(
+    ghProfitStopStatusLabel({ after_round: 20, bet_limit: 5, stopped: true, trigger_pnl: 3, trigger_bet_amount: 5 }),
+    /GH PNL 3 P \/ GH 배팅 5 P · 중지$/,
+  );
 });

@@ -226,6 +226,17 @@ function GhLossStopStatus({ roundState, autoStatus }) {
       reason: autoStatus.stop_reason,
     }
     : roundState?.overall_stop;
+  const martinRecovery = roundState?.martin_recovery ?? autoStatus?.martin_recovery;
+  const recoveryTargets = martinRecovery?.targets || {};
+  const recoveryNames = { martin_z: "Z", martin_b: "B", martin_c: "C" };
+  const pendingRecovery = Object.entries(recoveryTargets)
+    .filter(([, target]) => target?.required && !target?.recovered)
+    .map(([key]) => recoveryNames[key] || key);
+  const recoveryDetail = martinRecovery?.active
+    ? `GH 정지 · 마틴 ${pendingRecovery.join("/")} 첫 적중 회수중`
+    : martinRecovery?.completed
+      ? "마틴 회수 완료 · 최종 배팅 정지"
+      : null;
   const betStopReason = ghBetStopReasonLabel(roundState);
   return (
     <>
@@ -240,6 +251,11 @@ function GhLossStopStatus({ roundState, autoStatus }) {
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.profit_stop?.stopped ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
           수익보호: {ghProfitStopStatusLabel(roundState?.profit_stop)}
         </Typography>
+        {recoveryDetail && (
+          <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,82,82,.55)", borderRadius: 1, color: martinRecovery?.active ? "#ffcc80" : "#ff8a80", fontWeight: 900 }}>
+            정지 처리: {recoveryDetail}
+          </Typography>
+        )}
       </Box>
       {betStopReason && (
         <Box sx={{ mb: 1.5, px: 1, py: 0.65, border: "1px solid rgba(255,82,82,.5)", borderRadius: 1, backgroundColor: "rgba(255,82,82,.08)" }}>
@@ -1345,6 +1361,7 @@ export default function GhUserGamePage() {
               effective_drawdown_start_amount: data.effective_drawdown_start_amount_p ?? prev.effective_drawdown_start_amount,
               drawdown_percent: data.drawdown_percent ?? prev.drawdown_percent,
               drawdown_peak_actual_p: data.drawdown_peak_actual_p ?? prev.drawdown_peak_actual_p,
+              martin_recovery: data.martin_recovery ?? prev.martin_recovery,
             }));
             showOverallStopAlert(
               data.game_id || gameId,
@@ -1369,6 +1386,7 @@ export default function GhUserGamePage() {
                 : prev.stop_reason,
               active_pot_count: data.active_pot_count ?? prev.active_pot_count,
               pot_stop_count: data.pot_stop_count ?? prev.pot_stop_count,
+              martin_recovery: data.martin_recovery ?? prev.martin_recovery,
             }));
             showOverallStopAlert(
               data.game_id || gameId,
@@ -1636,6 +1654,7 @@ export default function GhUserGamePage() {
       play_mode: slot?.play_mode || "one",
       keep_shoes_remaining: slot?.keep_shoes_remaining ?? null,
       actual_bet_scale: slot?.actual_bet_scale || 1,
+      martin_recovery: roundState?.martin_recovery || null,
     });
     setAutoError(slot?.phase === "error" ? {
       code: slot.error_code || "auto_error",
@@ -3133,9 +3152,9 @@ export default function GhUserGamePage() {
       })()}
 
       <Dialog open={goalDialog.open} onClose={() => setGoalDialog({ open: false, msgs: [] })}>
-        <DialogTitle sx={{ fontWeight: "bold" }}>GH 목표금액 도달</DialogTitle>
+        <DialogTitle sx={{ fontWeight: "bold" }}>목표금액 도달</DialogTitle>
         <DialogContent>
-          <Typography>GH 목표금액에 도달하여 배팅이 정지됩니다.</Typography>
+          <Typography>목표금액에 도달하여 배팅이 정지됩니다.</Typography>
           <Box sx={{ mt: 2 }}>
             {goalDialog.msgs.map((m) => (
               <Typography key={m} sx={{ fontSize: "0.85rem", color: "text.secondary" }}>
@@ -3263,6 +3282,7 @@ export default function GhUserGamePage() {
             gameId,
             resp.stop_reason,
             "auto",
+            resp,
           );
           if (resp.slot_no) setSelectedSlotNo(resp.slot_no);
           refreshGameSlots().catch(() => {});
