@@ -179,7 +179,6 @@ function MaxMissRoundAmountTable({ roundState }) {
   const globalhitDirection = globalhitAggregate.direction;
   const globalhitBetAmount = Number(globalhitAggregate.amount || 0);
   const globalhitDirectionColor = globalhitDirection === "P" ? "#1565d8" : globalhitDirection === "B" ? "#e53935" : "#555";
-  const roundBetLossStreak = Math.max(0, Number(roundState?.overall_stop?.round_bet_loss_streak || 0));
   const roundColor = (cell) => {
     const value = cell?.pick ?? cell?.side;
     if (value === "P") return "#1565d8";
@@ -216,11 +215,6 @@ function MaxMissRoundAmountTable({ roundState }) {
               <span>{label} PnL</span><span>{formatAmount(value)}</span>
             </Box>
           ))}
-        </Box>
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
-          <Box title="빈 회차를 제외한 최종 배팅액판의 현재 연속 미적중 횟수" sx={{ minWidth: 150, border: "1px solid #59616d", borderRadius: 1, backgroundColor: "#111821", color: roundBetLossStreak > 0 ? "#ffca28" : "#9aa3ad", fontSize: 11, fontWeight: "bold", px: 0.9, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-            <span>배팅액판 현재 연패</span><span>{roundBetLossStreak}연패</span>
-          </Box>
         </Box>
         <Box sx={{ display: "grid", gridTemplateRows: "repeat(10, 31px)", gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
           {cells.map((cell, index) => {
