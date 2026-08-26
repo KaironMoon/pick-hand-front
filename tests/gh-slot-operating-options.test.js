@@ -19,7 +19,7 @@ test("GH betting stop reason follows the persisted server round state", () => {
   assert.equal(ghBetStopReasonLabel({}), null);
   assert.equal(
     ghBetStopReasonLabel({ overall_stop: { reason: "goal_reached", pnl: 101, target: 100 } }),
-    "현재 PNL 101 P가 목표 100 P에 도달 (전체 목표금액 달성)",
+    "현재 GH PNL 101 P가 목표 100 P에 도달 (GH 목표금액 달성)",
   );
   assert.equal(
     ghBetStopReasonLabel({
@@ -30,7 +30,7 @@ test("GH betting stop reason follows the persisted server round state", () => {
         drawdown_threshold: 80,
       },
     }),
-    "현재 PNL 80 P가 최고 PNL 100 P 대비 종료 기준 80 P 이하에 도달 (최고 PNL 손실률)",
+    "현재 GH PNL 80 P가 최고 PNL 100 P 대비 종료 기준 80 P 이하에 도달 (GH 최고 PNL 손실률)",
   );
   assert.equal(
     ghBetStopReasonLabel({
@@ -59,7 +59,7 @@ test("GH betting stop reason follows the persisted server round state", () => {
         round_bet_loss_streak_compared_bet_limit: 10,
       },
     }),
-    "4연패 이후 11회차 배팅액 12.3 P가 종료 기준 10 P 이상에 도달 (배팅액판 연패중지)",
+    "4연패 이후 11회차 GH 배팅액 12.3 P가 종료 기준 10 P 이상에 도달 (배팅액판 연패중지)",
   );
   assert.equal(
     ghBetStopReasonLabel({
@@ -72,7 +72,7 @@ test("GH betting stop reason follows the persisted server round state", () => {
         round_bet_loss_streak_compared_bet_limit: 10,
       },
     }),
-    "3연패 이후 8회차 배팅액 10 P가 종료 기준 10 P 이상에 도달 (배팅액판 연패중지 2번)",
+    "3연패 이후 8회차 GH 배팅액 10 P가 종료 기준 10 P 이상에 도달 (배팅액판 연패중지 2번)",
   );
   assert.equal(
     ghBetStopReasonLabel({
@@ -84,7 +84,7 @@ test("GH betting stop reason follows the persisted server round state", () => {
         bet_limit: 10,
       },
     }),
-    "PNL 20 P 상태에서 11회차 배팅액 12.3 P가 종료 기준 10 P 이상에 도달 (수익보호)",
+    "GH PNL 20 P 상태에서 11회차 GH 배팅액 12.3 P가 종료 기준 10 P 이상에 도달 (수익보호)",
   );
   assert.equal(
     ghBetStopReasonLabel({ overall_stop: {}, profit_stop: { stopped: false } }),
@@ -95,5 +95,5 @@ test("GH betting stop reason follows the persisted server round state", () => {
 test("GH profit protection status distinguishes disabled, active, and stopped", () => {
   assert.equal(ghProfitStopStatusLabel({}), "사용안함");
   assert.match(ghProfitStopStatusLabel({ after_round: 20, bet_limit: 5 }), /정상$/);
-  assert.match(ghProfitStopStatusLabel({ after_round: 20, bet_limit: 5, stopped: true, mode: "actual", trigger_pnl: 3, trigger_bet_amount: 5 }), /실PNL 3 P \/ 배팅 5 P · 중지$/);
+  assert.match(ghProfitStopStatusLabel({ after_round: 20, bet_limit: 5, stopped: true, mode: "actual", trigger_pnl: 3, trigger_bet_amount: 5 }), /GH PNL 3 P \/ GH 배팅 5 P · 중지$/);
 });

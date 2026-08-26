@@ -168,6 +168,18 @@ function MaxMissRoundAmountTable({ roundState }) {
   const formatAmount = (value) => value === "N/A" ? "-" : Number(value || 0).toFixed(1);
   const finalSide = table.total_side;
   const finalSideColor = finalSide === "P" ? "#1565d8" : finalSide === "B" ? "#e53935" : "#555";
+  const pnlBreakdown = table.pnl_breakdown || { globalhit: table.total_pnl || 0 };
+  const basePnl = Number(pnlBreakdown.globalhit || 0);
+  const martinPnls = [
+    ["Z", Number(pnlBreakdown.martin_z || 0)],
+    ["B", Number(pnlBreakdown.martin_b || 0)],
+    ["C", Number(pnlBreakdown.martin_c || 0)],
+  ];
+  const globalhitAggregate = roundState?.globalhit_aggregate || {};
+  const globalhitDirection = globalhitAggregate.direction;
+  const globalhitBetAmount = Number(globalhitAggregate.amount || 0);
+  const globalhitDirectionColor = globalhitDirection === "P" ? "#1565d8" : globalhitDirection === "B" ? "#e53935" : "#555";
+  const roundBetLossStreak = Math.max(0, Number(roundState?.overall_stop?.round_bet_loss_streak || 0));
   const roundColor = (cell) => {
     const value = cell?.pick ?? cell?.side;
     if (value === "P") return "#1565d8";
@@ -186,7 +198,28 @@ function MaxMissRoundAmountTable({ roundState }) {
             <span>BET</span><span>{formatAmount(table.total_amount)}</span>
           </Box>
           <Box sx={{ width: 180, border: "1px solid #3f4650", backgroundColor: "#111821", color: Number(table.total_pnl || 0) >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.7, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span>PnL</span><span>{formatAmount(table.total_pnl)}</span>
+            <span>전체 PNL</span><span>{formatAmount(table.total_pnl)}</span>
+          </Box>
+        </Box>
+        <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "stretch", gap: 0.5, mb: 1 }}>
+          <Box sx={{ width: 28, minWidth: 28, border: "1px solid #3f4650", backgroundColor: globalhitDirectionColor, color: "#fff", fontSize: 13, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {globalhitDirection || "-"}
+          </Box>
+          <Box sx={{ width: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span>글로벌히트 BET</span><span>{formatAmount(globalhitBetAmount)}</span>
+          </Box>
+          <Box sx={{ width: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: basePnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span>글로벌히트 PNL</span><span>{formatAmount(basePnl)}</span>
+          </Box>
+          {martinPnls.map(([label, value]) => (
+            <Box key={label} sx={{ width: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: value >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>{label} PnL</span><span>{formatAmount(value)}</span>
+            </Box>
+          ))}
+        </Box>
+        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+          <Box title="빈 회차를 제외한 최종 배팅액판의 현재 연속 미적중 횟수" sx={{ minWidth: 150, border: "1px solid #59616d", borderRadius: 1, backgroundColor: "#111821", color: roundBetLossStreak > 0 ? "#ffca28" : "#9aa3ad", fontSize: 11, fontWeight: "bold", px: 0.9, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+            <span>배팅액판 현재 연패</span><span>{roundBetLossStreak}연패</span>
           </Box>
         </Box>
         <Box sx={{ display: "grid", gridTemplateRows: "repeat(10, 31px)", gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>

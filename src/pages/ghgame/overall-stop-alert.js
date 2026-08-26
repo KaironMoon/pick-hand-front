@@ -1,11 +1,11 @@
 const STOP_ALERTS = {
   goal_reached: {
-    title: "전체 목표금액 달성",
-    detail: "전체 목표금액을 달성하여 배팅이 정지되었습니다.",
+    title: "GH 목표금액 달성",
+    detail: "GH 목표금액을 달성하여 배팅이 정지되었습니다.",
   },
   drawdown_reached: {
     title: "최고 PNL 손실률 도달",
-    detail: "최고 PNL 대비 설정 손실률에 도달하여 배팅이 정지되었습니다.",
+    detail: "GH 최고 PNL 대비 설정 손실률에 도달하여 배팅이 정지되었습니다.",
   },
   end_round_reached: {
     title: "미달마감 도달",
@@ -17,7 +17,7 @@ const STOP_ALERTS = {
   },
   round_bet_loss_streak_reached: {
     title: "배팅액판 연패중지",
-    detail: "설정 연패 단계 이후 실제 주문액이 기준금액에 도달하여 배팅이 정지되었습니다.",
+    detail: "설정 연패 단계 이후 GH 배팅액이 기준금액에 도달하여 배팅이 정지되었습니다.",
   },
 };
 
@@ -34,7 +34,7 @@ const stopAlertDetail = (alert, reason, mode, stopDetail) => {
       || !Number.isFinite(triggerBetAmount) || triggerBetAmount <= 0) {
     return alert.detail;
   }
-  const betLabel = mode === "auto" ? "실제 주문액" : "배팅액";
+  const betLabel = mode === "auto" ? "실제 GH 배팅액" : "GH 배팅액";
   const conditionLabel = conditionNo > 0 ? `${conditionNo}번 조건이 발동하여 ` : "";
   return `${conditionLabel}${triggerRound}회차 ${betLabel} ${formatBetAmount(triggerBetAmount)} P가 기준금액에 도달하여 배팅이 정지되었습니다.`;
 };

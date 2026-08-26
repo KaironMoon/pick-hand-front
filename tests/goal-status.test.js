@@ -37,11 +37,11 @@ test("missing targets stay visible but dimmed and reached targets light up", () 
   assert.equal(items.find((item) => item.key === "SSR1").dimmed, true);
   assert.deepEqual(
     items.at(-1),
-    { key: "overall-pnl", label: "Pnl", target: 100, pnl: 40, reached: false, reachedRound: 0, dimmed: false },
+    { key: "overall-pnl", label: "GH Pnl", target: 100, pnl: 40, reached: false, reachedRound: 0, dimmed: false },
   );
 });
 
-test("overall Pnl uses actual auto PNL while auto is running", () => {
+test("GH Pnl uses the server round-state value while auto is running", () => {
   const items = buildGoalStatusItems(
     {},
     { target: 100, pnl: 10, reason: null },
@@ -50,7 +50,7 @@ test("overall Pnl uses actual auto PNL while auto is running", () => {
 
   assert.deepEqual(
     items.at(-1),
-    { key: "overall-pnl", label: "Pnl", target: 10, pnl: 10.1, reached: true, reachedRound: 42, dimmed: false },
+    { key: "overall-pnl", label: "GH Pnl", target: 100, pnl: 10, reached: true, reachedRound: 42, dimmed: false },
   );
 });
 
@@ -62,5 +62,5 @@ test("goal amount formatting keeps at most one decimal place", () => {
 test("goal indicators show only the first reached round without a suffix", () => {
   assert.equal(formatGoalIndicator({ label: "A", reached: false, reachedRound: 0 }), "A");
   assert.equal(formatGoalIndicator({ label: "S1", reached: true, reachedRound: 31 }), "S1 31");
-  assert.equal(formatGoalIndicator({ label: "Pnl", reached: true, reachedRound: 42 }), "Pnl 42");
+  assert.equal(formatGoalIndicator({ label: "GH Pnl", reached: true, reachedRound: 42 }), "GH Pnl 42");
 });

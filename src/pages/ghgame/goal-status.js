@@ -51,21 +51,21 @@ export const buildGoalStatusItems = (
     };
   });
 
-  const isAuto = Boolean(autoStatus?.running);
   const overallTarget = numberOrZero(
-    isAuto ? autoStatus?.goal_amount : overallStop?.target,
+    overallStop?.target ?? autoStatus?.goal_amount,
   );
   const overallPnl = numberOrZero(
-    isAuto ? autoStatus?.pnl_actual_p : overallStop?.pnl,
+    overallStop?.pnl ?? autoStatus?.pnl_actual_p,
   );
+  const stopReason = overallStop?.reason || autoStatus?.stop_reason;
   const overallReached = overallTarget > 0 && (
-    (isAuto ? autoStatus?.stop_reason : overallStop?.reason) === "goal_reached"
+    stopReason === "goal_reached"
     || overallPnl >= overallTarget
   );
 
   items.push({
     key: "overall-pnl",
-    label: "Pnl",
+    label: "GH Pnl",
     target: overallTarget,
     pnl: overallPnl,
     reached: overallReached,

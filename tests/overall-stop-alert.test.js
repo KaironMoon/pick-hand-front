@@ -9,8 +9,8 @@ test("overall goal alert is shown only once for an auto game", () => {
   assert.deepEqual(
     claimOverallStopAlert(alerted, 100, "goal_reached", "auto"),
     {
-      title: "전체 목표금액 달성",
-      detail: "전체 목표금액을 달성하여 배팅이 정지되었습니다.",
+      title: "GH 목표금액 달성",
+      detail: "GH 목표금액을 달성하여 배팅이 정지되었습니다.",
       modeLabel: "오토",
     },
   );
@@ -40,7 +40,7 @@ test("goal reason wins when callers report only the server-selected reason", () 
     "auto",
   );
 
-  assert.equal(alert.title, "전체 목표금액 달성");
+  assert.equal(alert.title, "GH 목표금액 달성");
 });
 
 test("drawdown alert explains that only betting stopped", () => {
@@ -53,7 +53,7 @@ test("drawdown alert explains that only betting stopped", () => {
 
   assert.deepEqual(alert, {
     title: "최고 PNL 손실률 도달",
-    detail: "최고 PNL 대비 설정 손실률에 도달하여 배팅이 정지되었습니다.",
+    detail: "GH 최고 PNL 대비 설정 손실률에 도달하여 배팅이 정지되었습니다.",
     modeLabel: "수동",
   });
 });
@@ -87,7 +87,7 @@ test("round betting board loss streak alert explains the stop", () => {
 
   assert.deepEqual(alert, {
     title: "배팅액판 연패중지",
-    detail: "11회차 실제 주문액 12.3 P가 기준금액에 도달하여 배팅이 정지되었습니다.",
+    detail: "11회차 실제 GH 배팅액 12.3 P가 기준금액에 도달하여 배팅이 정지되었습니다.",
     modeLabel: "오토",
   });
 });
@@ -107,7 +107,7 @@ test("round betting board loss streak alert identifies the triggered condition",
 
   assert.equal(
     alert.detail,
-    "3번 조건이 발동하여 15회차 배팅액 30 P가 기준금액에 도달하여 배팅이 정지되었습니다.",
+    "3번 조건이 발동하여 15회차 GH 배팅액 30 P가 기준금액에 도달하여 배팅이 정지되었습니다.",
   );
 });
 
