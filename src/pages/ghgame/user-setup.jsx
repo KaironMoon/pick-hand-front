@@ -7,6 +7,14 @@ import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 import { userAtom } from "@/store/auth-store";
 import { updatePbjStrategy } from "./pbj-goal.js";
 import { extendMartinAmounts, GH_FIXED_PASI_LEVELS, GH_STRATEGY_MAX_STEP } from "./strategy-step-capacity.js";
+import {
+  assistDisplayLabel,
+  GH_ASSIST_OPTIONS,
+  GH_ASSIST_SETUP_BOXES,
+  parseGhAssistTsv,
+  serializeGhAssistTsv,
+  writeGhAssistClipboard,
+} from "./assist-excel.js";
 
 const GREEN = "#4caf50";
 const LABEL_COLOR = "#c62828";
@@ -560,28 +568,7 @@ const BET_PROGRESS_MODES = [
 ];
 
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
-const ASSIST_OPTS = [
-  "해당반대", "해당진행", "3회 쉬기", "6회 쉬기", "고정P", "고정B", "이전3회", "J", "BF6", "BF6X", "6M", "6MX",
-  "G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)",
-  "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)", "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
-  "HB멀티(H1)", "HB멀티(%1)", "WH멀티(H1)", "WH멀티(%1)", "MH멀티(H1)", "MH멀티(%1)", "DH멀티(H1)", "DH멀티(%1)",
-];
-const ASSIST_DISPLAY_LABELS = {
-  BF6: "육전",
-  BF6X: "육전X",
-};
-const ASSIST_DISPLAY_PREFIXES = {
-  "A멀티": "A",
-  "S1멀티": "S1",
-  "S2멀티": "S2",
-  "S3멀티": "S3",
-  "HB멀티": "허니비",
-  "WH멀티": "W111",
-  "MH멀티": "M22",
-  "DH멀티": "D112",
-};
-const assistDisplayLabel = (value) => ASSIST_DISPLAY_LABELS[value] || Object.entries(ASSIST_DISPLAY_PREFIXES)
-  .reduce((label, [storedPrefix, displayPrefix]) => label.replace(storedPrefix, displayPrefix), value);
+const ASSIST_OPTS = GH_ASSIST_OPTIONS;
 const ASSIST_PROTECTION_OPTIONS = [
   "J", "BF6", "BF6X", "G(H1)", "G(%1)",
   "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)",
@@ -747,33 +734,7 @@ function defaultStrategySetup() {
 }
 
 // 렌더 순서 + variant. full(old/new+동률시+어시스트): AAR(A-AR), SSR1~3(S-SR). short: 나머지.
-const STRATEGY_SETUP_BOXES = [
-  { key: "AAR", variant: "full", aarLabel: "A-AR", label: "A멀티", sections: ["A", "AR", "AARO", "AARN"] },
-  { key: "SSR1", variant: "full", aarLabel: "S-SR", label: "S1세트", sections: ["S1", "SR1", "SSRO1", "SSRN1"] },
-  { key: "SSR2", variant: "full", aarLabel: "S-SR", label: "S2세트", sections: ["S2", "SR2", "SSRO2", "SSRN2"] },
-  { key: "SSR3", variant: "full", aarLabel: "S-SR", label: "S3세트", sections: ["S3", "SR3", "SSRO3", "SSRN3"] },
-  // FOR/SQ 세트: 한 박스 + 멀티섹션(공유 배당). 대표키 amounts를 멤버가 공유(백엔드 별칭).
-  { key: "FOR", variant: "full", label: "FOR세트", sections: ["FOR1", "FOR2", "FOR3"] },
-  { key: "FORX", variant: "full", label: "FORX세트", sections: ["FOR1X", "FOR2X", "FOR3X"] },
-  { key: "SQ", variant: "full", label: "SQ세트", sections: ["SQ1", "SQ2", "SQ3"] },
-  { key: "GOBH", legacyKey: "GOB", variant: "full", label: "GH 시리즈", sections: ["G(H1)", "G(H2)", "G(H3)", "G(H4)"] },
-  { key: "GOBP", legacyKey: "GOB", variant: "full", label: "G% 시리즈", sections: ["G(%1)", "G(%2)", "G(%3)", "G(%4)"] },
-  // 서브게임: full 멀티판 (정/R/SRO/SRN + 공유 배당)
-  { key: "허니비", variant: "full", label: "허니비", sections: ["허니비", "허니R2", "허니SR2O", "허니SRN"] },
-  { key: "W111", variant: "full", label: "위너히트", sections: ["W111", "위너R2", "위너SR2O", "위너SRN"] },
-  { key: "M22", variant: "full", label: "메가히트", sections: ["M22", "메가R2", "메가SR2O", "메가SRN"] },
-  { key: "D112", variant: "full", label: "드림히트", sections: ["D112", "드림R2", "드림SR2O", "드림SRN"] },
-  { key: "NC", variant: "full", label: "나이스초이스", sections: ["NC", "NCR", "NCSRO", "NCSRN"] },
-  { key: "D", variant: "short" },
-  { key: "G", variant: "short" },
-  { key: "TN", variant: "short" },
-  { key: "ONE", variant: "short" },
-  { key: "TWO", variant: "short" },
-  { key: "P", variant: "short", targetLabel: "목표금액(PBJ)" },
-  { key: "B", variant: "short", targetLabel: "목표금액(PBJ)" },
-  { key: "J", variant: "short", targetLabel: "목표금액(PBJ)" },
-  { key: "6MX", variant: "full", label: "6MX", sections: ["6M", "6MX"] },
-];
+const STRATEGY_SETUP_BOXES = GH_ASSIST_SETUP_BOXES;
 
 function normalizeAssistSectionMap(map) {
   if (!map || typeof map !== "object" || Array.isArray(map)) return {};
@@ -1782,6 +1743,9 @@ export default function GhUserSetupPage() {
   const [copyError, setCopyError] = useState("");
   const [copying, setCopying] = useState(false);
   const [ncRefRandomizing, setNcRefRandomizing] = useState(false);
+  const [assistExcelOpen, setAssistExcelOpen] = useState(false);
+  const [assistExcelText, setAssistExcelText] = useState("");
+  const [assistExcelResult, setAssistExcelResult] = useState(null);
 
   const blocker = useBlocker(dirty);
 
@@ -1863,6 +1827,41 @@ export default function GhUserSetupPage() {
     } finally {
       setCopying(false);
     }
+  };
+
+  const handleAssistExcelCopy = async () => {
+    const plainText = serializeGhAssistTsv(config);
+    try {
+      await writeGhAssistClipboard({ text: plainText });
+      setSnack({
+        open: true,
+        message: "전체 어시 설정을 복사했습니다. 엑셀 셀을 한 번 선택한 뒤 붙여넣어주세요.",
+        severity: "success",
+      });
+    } catch {
+      setSnack({ open: true, message: "클립보드 복사에 실패했습니다. 브라우저의 클립보드 권한을 확인해주세요.", severity: "error" });
+    }
+  };
+
+  const openAssistExcelInput = () => {
+    setAssistExcelText("");
+    setAssistExcelResult(null);
+    setAssistExcelOpen(true);
+  };
+
+  const validateAssistExcelInput = () => {
+    const result = parseGhAssistTsv(assistExcelText, config);
+    setAssistExcelResult(result);
+    return result;
+  };
+
+  const applyAssistExcelInput = () => {
+    const result = assistExcelResult || validateAssistExcelInput();
+    if (result.errors.length || !result.config) return;
+    setConfig(result.config);
+    setDirty(true);
+    setAssistExcelOpen(false);
+    setSnack({ open: true, message: `${result.rowCount}개 어시 행을 현재 설정에 적용했습니다. 저장 버튼을 눌러주세요.`, severity: "success" });
   };
 
   const handleRandomNcRef = async () => {
@@ -1968,7 +1967,7 @@ export default function GhUserSetupPage() {
   return (
     <Box sx={{ p: 2 }}>
       {/* 상단 바 */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
         <Box onClick={handleBack}
           sx={{ display: "inline-flex", alignItems: "center", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 1, px: 1.5, py: 0.5, cursor: "pointer", backgroundColor: "background.paper", "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } }}>
           <Typography variant="caption" sx={{ fontSize: 12 }}>&larr; 뒤로가기</Typography>
@@ -1988,6 +1987,14 @@ export default function GhUserSetupPage() {
             <Typography variant="caption" sx={{ fontSize: 12 }}>기존 사용자 값 복사</Typography>
           </Box>
         )}
+        <Box onClick={handleAssistExcelCopy}
+          sx={{ display: "inline-flex", alignItems: "center", border: "1px solid #2e7d32", borderRadius: 1, px: 1.5, py: 0.5, cursor: "pointer", backgroundColor: "rgba(46,125,50,0.16)", "&:hover": { backgroundColor: "rgba(46,125,50,0.3)" } }}>
+          <Typography variant="caption" sx={{ fontSize: 12 }}>어시 설정 엑셀로 복사</Typography>
+        </Box>
+        <Box onClick={openAssistExcelInput}
+          sx={{ display: "inline-flex", alignItems: "center", border: "1px solid #1565c0", borderRadius: 1, px: 1.5, py: 0.5, cursor: "pointer", backgroundColor: "rgba(21,101,192,0.16)", "&:hover": { backgroundColor: "rgba(21,101,192,0.3)" } }}>
+          <Typography variant="caption" sx={{ fontSize: 12 }}>엑셀 설정 입력</Typography>
+        </Box>
       </Box>
 
       {gameType === "gh" && (
@@ -2469,6 +2476,62 @@ export default function GhUserSetupPage() {
           <PointSection ghPoint={ghPoint} onChange={(v) => updateMartin("gh_point", v)} onRestore={restoreGhPoint} />
         </Box>
       )}
+
+      <Dialog open={assistExcelOpen} onClose={() => setAssistExcelOpen(false)} maxWidth="md" fullWidth
+        PaperProps={{ sx: { backgroundColor: "#1a1a1a", border: "1px solid #333" } }}>
+        <DialogTitle sx={{ color: "#fff" }}>GH 어시 설정 엑셀 입력</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: "#bbb", mb: 1 }}>
+            ‘어시 설정 엑셀로 복사’로 만든 표를 엑셀에서 수정한 뒤 전체 범위를 복사하여 아래에 붙여넣어주세요.
+            최고단계와 다른 GH 설정은 변경하지 않습니다.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={9}
+            maxRows={14}
+            placeholder="엑셀 표의 머리글부터 마지막 행까지 복사하여 여기에 붙여넣기"
+            value={assistExcelText}
+            onChange={(event) => {
+              setAssistExcelText(event.target.value);
+              setAssistExcelResult(null);
+            }}
+            sx={{
+              "& .MuiInputBase-root": { fontFamily: "D2Coding, Consolas, Menlo, monospace", fontSize: 12 },
+            }}
+          />
+          {assistExcelResult && assistExcelResult.errors.length === 0 && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              전체 {assistExcelResult.rowCount}개 어시 행을 확인했습니다. 설정에 적용할 수 있습니다.
+            </Alert>
+          )}
+          {assistExcelResult?.errors?.length > 0 && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: "bold", mb: 0.5 }}>
+                {assistExcelResult.errors.length}개 오류가 있어 적용할 수 없습니다.
+              </Typography>
+              <Box component="ul" sx={{ m: 0, pl: 2.5, maxHeight: 220, overflowY: "auto" }}>
+                {assistExcelResult.errors.slice(0, 100).map((error, index) => (
+                  <li key={`${index}-${error}`}>{error}</li>
+                ))}
+              </Box>
+              {assistExcelResult.errors.length > 100 && (
+                <Typography variant="caption">나머지 {assistExcelResult.errors.length - 100}개 오류는 먼저 표시된 오류를 수정한 뒤 다시 검사해주세요.</Typography>
+              )}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setAssistExcelOpen(false)} sx={{ color: "#888" }}>취소</Button>
+          <Button onClick={validateAssistExcelInput} variant="outlined" disabled={!assistExcelText.trim()}>검사</Button>
+          <Button onClick={applyAssistExcelInput} variant="contained"
+            disabled={!assistExcelResult || assistExcelResult.errors.length > 0 || !assistExcelResult.config}
+            sx={{ backgroundColor: "#2e7d32", "&:hover": { backgroundColor: "#1b5e20" } }}>
+            설정에 적용
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={copyInputOpen} onClose={() => setCopyInputOpen(false)}
         PaperProps={{ sx: { backgroundColor: "#1a1a1a", border: "1px solid #333", minWidth: 360 } }}>
