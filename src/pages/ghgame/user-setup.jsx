@@ -15,6 +15,11 @@ import {
   serializeGhAssistTsv,
   writeGhAssistClipboard,
 } from "./assist-excel.js";
+import {
+  parseGhBettingTsv,
+  serializeGhBettingTsv,
+  writeGhBettingClipboard,
+} from "./betting-excel.js";
 
 const GREEN = "#4caf50";
 const LABEL_COLOR = "#c62828";
@@ -1746,6 +1751,9 @@ export default function GhUserSetupPage() {
   const [assistExcelOpen, setAssistExcelOpen] = useState(false);
   const [assistExcelText, setAssistExcelText] = useState("");
   const [assistExcelResult, setAssistExcelResult] = useState(null);
+  const [bettingExcelOpen, setBettingExcelOpen] = useState(false);
+  const [bettingExcelText, setBettingExcelText] = useState("");
+  const [bettingExcelResult, setBettingExcelResult] = useState(null);
 
   const blocker = useBlocker(dirty);
 
@@ -1862,6 +1870,45 @@ export default function GhUserSetupPage() {
     setDirty(true);
     setAssistExcelOpen(false);
     setSnack({ open: true, message: `${result.rowCount}개 어시 행을 현재 설정에 적용했습니다. 저장 버튼을 눌러주세요.`, severity: "success" });
+  };
+
+  const handleBettingExcelCopy = async () => {
+    const plainText = serializeGhBettingTsv(config);
+    try {
+      await writeGhBettingClipboard({ text: plainText });
+      setSnack({
+        open: true,
+        message: "전체 배팅 설정을 복사했습니다. 엑셀 셀을 한 번 선택한 뒤 붙여넣어주세요.",
+        severity: "success",
+      });
+    } catch {
+      setSnack({ open: true, message: "클립보드 복사에 실패했습니다. 브라우저의 클립보드 권한을 확인해주세요.", severity: "error" });
+    }
+  };
+
+  const openBettingExcelInput = () => {
+    setBettingExcelText("");
+    setBettingExcelResult(null);
+    setBettingExcelOpen(true);
+  };
+
+  const validateBettingExcelInput = () => {
+    const result = parseGhBettingTsv(bettingExcelText, config);
+    setBettingExcelResult(result);
+    return result;
+  };
+
+  const applyBettingExcelInput = () => {
+    const result = bettingExcelResult || validateBettingExcelInput();
+    if (result.errors.length || !result.config) return;
+    setConfig(result.config);
+    setDirty(true);
+    setBettingExcelOpen(false);
+    setSnack({
+      open: true,
+      message: `${result.rowCount}개 배팅 행을 수동 배팅 설정으로 적용했습니다. 저장 버튼을 눌러주세요.`,
+      severity: "success",
+    });
   };
 
   const handleRandomNcRef = async () => {
@@ -1993,7 +2040,15 @@ export default function GhUserSetupPage() {
         </Box>
         <Box onClick={openAssistExcelInput}
           sx={{ display: "inline-flex", alignItems: "center", border: "1px solid #1565c0", borderRadius: 1, px: 1.5, py: 0.5, cursor: "pointer", backgroundColor: "rgba(21,101,192,0.16)", "&:hover": { backgroundColor: "rgba(21,101,192,0.3)" } }}>
-          <Typography variant="caption" sx={{ fontSize: 12 }}>엑셀 설정 입력</Typography>
+          <Typography variant="caption" sx={{ fontSize: 12 }}>어시 설정 엑셀 입력</Typography>
+        </Box>
+        <Box onClick={handleBettingExcelCopy}
+          sx={{ display: "inline-flex", alignItems: "center", border: "1px solid #ef6c00", borderRadius: 1, px: 1.5, py: 0.5, cursor: "pointer", backgroundColor: "rgba(239,108,0,0.16)", "&:hover": { backgroundColor: "rgba(239,108,0,0.3)" } }}>
+          <Typography variant="caption" sx={{ fontSize: 12 }}>배팅 설정 엑셀로 복사</Typography>
+        </Box>
+        <Box onClick={openBettingExcelInput}
+          sx={{ display: "inline-flex", alignItems: "center", border: "1px solid #7b1fa2", borderRadius: 1, px: 1.5, py: 0.5, cursor: "pointer", backgroundColor: "rgba(123,31,162,0.16)", "&:hover": { backgroundColor: "rgba(123,31,162,0.3)" } }}>
+          <Typography variant="caption" sx={{ fontSize: 12 }}>배팅 설정 엑셀 입력</Typography>
         </Box>
       </Box>
 
@@ -2528,6 +2583,62 @@ export default function GhUserSetupPage() {
           <Button onClick={applyAssistExcelInput} variant="contained"
             disabled={!assistExcelResult || assistExcelResult.errors.length > 0 || !assistExcelResult.config}
             sx={{ backgroundColor: "#2e7d32", "&:hover": { backgroundColor: "#1b5e20" } }}>
+            설정에 적용
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={bettingExcelOpen} onClose={() => setBettingExcelOpen(false)} maxWidth="md" fullWidth
+        PaperProps={{ sx: { backgroundColor: "#1a1a1a", border: "1px solid #333" } }}>
+        <DialogTitle sx={{ color: "#fff" }}>GH 배팅 설정 엑셀 입력</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: "#bbb", mb: 1 }}>
+            ‘배팅 설정 엑셀로 복사’로 만든 표에서 흰색하한·상한과 흰색·빨강·파랑 배팅액을 수정한 뒤
+            전체 범위를 복사하여 아래에 붙여넣어주세요. 적용되는 설정판의 배팅종류는 수동으로 변경됩니다.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={9}
+            maxRows={14}
+            placeholder="엑셀 표의 머리글부터 마지막 행까지 복사하여 여기에 붙여넣기"
+            value={bettingExcelText}
+            onChange={(event) => {
+              setBettingExcelText(event.target.value);
+              setBettingExcelResult(null);
+            }}
+            sx={{
+              "& .MuiInputBase-root": { fontFamily: "D2Coding, Consolas, Menlo, monospace", fontSize: 12 },
+            }}
+          />
+          {bettingExcelResult && bettingExcelResult.errors.length === 0 && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              전체 {bettingExcelResult.rowCount}개 배팅 행을 확인했습니다. 수동 배팅 설정으로 적용할 수 있습니다.
+            </Alert>
+          )}
+          {bettingExcelResult?.errors?.length > 0 && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: "bold", mb: 0.5 }}>
+                {bettingExcelResult.errors.length}개 오류가 있어 적용할 수 없습니다.
+              </Typography>
+              <Box component="ul" sx={{ m: 0, pl: 2.5, maxHeight: 220, overflowY: "auto" }}>
+                {bettingExcelResult.errors.slice(0, 100).map((error, index) => (
+                  <li key={`${index}-${error}`}>{error}</li>
+                ))}
+              </Box>
+              {bettingExcelResult.errors.length > 100 && (
+                <Typography variant="caption">나머지 {bettingExcelResult.errors.length - 100}개 오류는 먼저 표시된 오류를 수정한 뒤 다시 검사해주세요.</Typography>
+              )}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setBettingExcelOpen(false)} sx={{ color: "#888" }}>취소</Button>
+          <Button onClick={validateBettingExcelInput} variant="outlined" disabled={!bettingExcelText.trim()}>검사</Button>
+          <Button onClick={applyBettingExcelInput} variant="contained"
+            disabled={!bettingExcelResult || bettingExcelResult.errors.length > 0 || !bettingExcelResult.config}
+            sx={{ backgroundColor: "#7b1fa2", "&:hover": { backgroundColor: "#6a1b9a" } }}>
             설정에 적용
           </Button>
         </DialogActions>
