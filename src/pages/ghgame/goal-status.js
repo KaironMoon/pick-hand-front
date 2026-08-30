@@ -5,7 +5,6 @@ export const GOAL_STATUS_ITEMS = [
   { key: "SSR3", label: "S3" },
   { key: "FOR", label: "F" },
   { key: "FORX", label: "FX" },
-  { key: "SQ", label: "SQ" },
   { key: "GOBH", label: "GH" },
   { key: "GOBP", label: "G%" },
   { key: "허니비", label: "H" },

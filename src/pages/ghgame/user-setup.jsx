@@ -559,7 +559,7 @@ function LabouchereSection({ labouchere, onChange }) {
 
 // ─── 전략별 셋업 박스 (260620) ───
 // 목업(setup_page_mockup.html) 기준. 각 전략이 독립 진행방식·P배열·목표금액·베팅운용을 갖는다.
-// full(AAR/SSR1~3): row7에 old/new + 동률시 + 어시스트. short(SQ/SX/D/G/TN/ONE/TWO): 어시스트만.
+// full(AAR/SSR1~3): 기준/반대 멀티섹션 + 어시스트.
 const STRAT_BET_TYPES = ["manual", "martin", "cruise", "labouchere"];
 const STRAT_BET_LABELS = { manual: "수동", martin: "마틴", cruise: "크루즈", labouchere: "라보쉐르" };
 const STRAT_DIST_MODES = ["even", "asc", "desc"];
@@ -1422,9 +1422,9 @@ function StrategySetupSection({ name, strat, onChange, variant, sections, target
         <td style={mkRed}>마감미처리</td>
         <MkInput value={s.unsettled_stop || 0} suffix="S 종료" style={mkTeal} onChange={(v) => onChange({ ...s, unsettled_stop: v })} />
       </tr>
-      {/* 10행(full만): 멀티섹션 — 박스별 라벨 (A멀티: A AR AARO AARN / SQn세트: SQn SRn SSROn SSRNn) */}
+      {/* 10행(full만): 기준 픽과 단순 반대픽 멀티섹션 */}
       {isFull && (() => {
-        const secs = sections || ["A", "AR", "AARO", "AARN"];
+        const secs = sections || ["A", "AR"];
         const pad = 8 - secs.length * 2;  // 멀티섹션(2) + 섹션×2 = 10 맞추기. 3섹션이면 2칸 빈칸
         return (
         <tr>
@@ -2424,7 +2424,7 @@ export default function GhUserSetupPage() {
         </table>
       </Box>
 
-      {/* 전략별 셋업 박스 (260620) — 마틴Z 아래. full: AAR/SSR1~3 / short: SQ/SX/D/G/TN/ONE/TWO */}
+      {/* 전략별 셋업 박스 */}
       {gameType === "gh" && (
         <Box sx={{ overflowX: "auto", mt: 2 }}>
           {STRATEGY_SETUP_BOXES.map((b) => (

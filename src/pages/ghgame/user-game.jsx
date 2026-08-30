@@ -1040,7 +1040,7 @@ export default function GhUserGamePage() {
     ref.z = !!zReached;
     const goalLabels = {
       AAR: "A멀티", SSR1: "S1세트", SSR2: "S2세트", SSR3: "S3세트",
-      FOR: "FOR세트", FORX: "FORX세트", SQ: "SQ세트",
+      FOR: "FOR세트", FORX: "FORX세트",
       GOBH: "GH 시리즈", GOBP: "G% 시리즈",
       "허니비": "허니비", W111: "위너히트", M22: "메가히트", D112: "드림히트", NC: "나이스초이스",
     };
@@ -2119,15 +2119,6 @@ export default function GhUserGamePage() {
         const MISS_BG = "#ffeb3b";  // 노랑
         const WAIT_BG = "#ffffff";  // 흰색 (현재 회차)
         const resBg = (r) => r === "hit" ? HIT_BG : r === "miss" ? MISS_BG : WAIT_BG;
-
-        // s_tracks 데이터 (sc1/sc2/sc3) — S 로드 + 누적 그래프용 (260628 SQ→S 리네임)
-        const sqTracks = picksSnapshot?.s_tracks?.tracks;
-        const srTracks = picksSnapshot?.sr_tracks?.tracks;
-        const ssrTracks = picksSnapshot?.ssr_tracks?.tracks;
-        const ssroTracks = picksSnapshot?.ssro_tracks?.tracks;
-        const sxTracks = picksSnapshot?.sx_tracks?.tracks;
-        const forTracks = picksSnapshot?.for_tracks?.tracks;
-        const quarterTracks = picksSnapshot?.quarter_tracks?.tracks;
 
         return (
           <>

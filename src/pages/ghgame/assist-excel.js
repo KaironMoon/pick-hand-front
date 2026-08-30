@@ -2,7 +2,7 @@ import { GH_FIXED_PASI_LEVELS } from "./strategy-step-capacity.js";
 
 export const GH_ASSIST_OPTIONS = [
   "해당반대", "해당진행", "3회 쉬기", "6회 쉬기", "고정P", "고정B", "이전3회", "J", "BF6", "BF6X", "6M", "6MX",
-  "G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)",
+  "G(H1)", "G(H2)", "G(%1)", "G(%2)",
   "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)", "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
   "HB멀티(H1)", "HB멀티(%1)", "WH멀티(H1)", "WH멀티(%1)", "MH멀티(H1)", "MH멀티(%1)", "DH멀티(H1)", "DH멀티(%1)",
 ];
@@ -27,20 +27,19 @@ export const assistDisplayLabel = (value) => ASSIST_DISPLAY_LABELS[value] || Obj
   .reduce((label, [storedPrefix, displayPrefix]) => label.replace(storedPrefix, displayPrefix), value);
 
 export const GH_ASSIST_SETUP_BOXES = [
-  { key: "AAR", variant: "full", aarLabel: "A-AR", label: "A멀티", sections: ["A", "AR", "AARO", "AARN"] },
-  { key: "SSR1", variant: "full", aarLabel: "S-SR", label: "S1세트", sections: ["S1", "SR1", "SSRO1", "SSRN1"] },
-  { key: "SSR2", variant: "full", aarLabel: "S-SR", label: "S2세트", sections: ["S2", "SR2", "SSRO2", "SSRN2"] },
-  { key: "SSR3", variant: "full", aarLabel: "S-SR", label: "S3세트", sections: ["S3", "SR3", "SSRO3", "SSRN3"] },
+  { key: "AAR", variant: "full", aarLabel: "A-AR", label: "A멀티", sections: ["A", "AR"] },
+  { key: "SSR1", variant: "full", aarLabel: "S-SR", label: "S1세트", sections: ["S1", "SR1"] },
+  { key: "SSR2", variant: "full", aarLabel: "S-SR", label: "S2세트", sections: ["S2", "SR2"] },
+  { key: "SSR3", variant: "full", aarLabel: "S-SR", label: "S3세트", sections: ["S3", "SR3"] },
   { key: "FOR", variant: "full", label: "FOR세트", sections: ["FOR1", "FOR2", "FOR3"] },
   { key: "FORX", variant: "full", label: "FORX세트", sections: ["FOR1X", "FOR2X", "FOR3X"] },
-  { key: "SQ", variant: "full", label: "SQ세트", sections: ["SQ1", "SQ2", "SQ3"] },
-  { key: "GOBH", legacyKey: "GOB", variant: "full", label: "GH 시리즈", sections: ["G(H1)", "G(H2)", "G(H3)", "G(H4)"] },
-  { key: "GOBP", legacyKey: "GOB", variant: "full", label: "G% 시리즈", sections: ["G(%1)", "G(%2)", "G(%3)", "G(%4)"] },
-  { key: "허니비", variant: "full", label: "허니비", sections: ["허니비", "허니R2", "허니SR2O", "허니SRN"] },
-  { key: "W111", variant: "full", label: "위너히트", sections: ["W111", "위너R2", "위너SR2O", "위너SRN"] },
-  { key: "M22", variant: "full", label: "메가히트", sections: ["M22", "메가R2", "메가SR2O", "메가SRN"] },
-  { key: "D112", variant: "full", label: "드림히트", sections: ["D112", "드림R2", "드림SR2O", "드림SRN"] },
-  { key: "NC", variant: "full", label: "나이스초이스", sections: ["NC", "NCR", "NCSRO", "NCSRN"] },
+  { key: "GOBH", legacyKey: "GOB", variant: "full", label: "GH 시리즈", sections: ["G(H1)", "G(H2)"] },
+  { key: "GOBP", legacyKey: "GOB", variant: "full", label: "G% 시리즈", sections: ["G(%1)", "G(%2)"] },
+  { key: "허니비", variant: "full", label: "허니비", sections: ["허니비", "허니R2"] },
+  { key: "W111", variant: "full", label: "위너히트", sections: ["W111", "위너R2"] },
+  { key: "M22", variant: "full", label: "메가히트", sections: ["M22", "메가R2"] },
+  { key: "D112", variant: "full", label: "드림히트", sections: ["D112", "드림R2"] },
+  { key: "NC", variant: "full", label: "나이스초이스", sections: ["NC", "NCR"] },
   { key: "D", variant: "short" },
   { key: "G", variant: "short" },
   { key: "TN", variant: "short" },
