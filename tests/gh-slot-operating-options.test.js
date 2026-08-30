@@ -5,7 +5,28 @@ import {
   ghBetStopReasonLabel,
   ghDrawdownStatusLabel,
   ghProfitStopStatusLabel,
+  ghSlotLossStatusLabel,
 } from "../src/pages/ghgame/slot-operating-options.js";
+
+test("GH slot loss status shows current and projected loss conditions", () => {
+  assert.equal(ghSlotLossStatusLabel({}), "사용안함");
+  assert.equal(
+    ghSlotLossStatusLabel({
+      configured_limit: 500,
+      configured_projected_limit: 1000,
+      pnl: -490,
+      bet_amount: 600,
+      projected_pnl: -1090,
+      stopped: true,
+      trigger: "projected_loss",
+    }),
+    "현재손실 500 P · 패배예상손실 1,000 P · GH PNL -490 P · 다음 GH 600 P · 패배예상 PNL -1,090 P · 패배예상손실 중지",
+  );
+  assert.match(
+    ghSlotLossStatusLabel({ configured_limit: 500, configured_projected_limit: 0 }),
+    /^현재손실 500 P · 패배예상손실 미사용/,
+  );
+});
 
 test("GH drawdown status distinguishes disabled, waiting, armed, and stopped", () => {
   assert.equal(ghDrawdownStatusLabel({}), "사용안함");
@@ -74,6 +95,30 @@ test("GH betting stop reason follows the persisted server round state", () => {
       },
     }),
     "3연패 이후 8회차 GH 배팅액 10 P가 종료 기준 10 P 이상에 도달 (배팅액판 연패중지 2번)",
+  );
+  assert.equal(
+    ghBetStopReasonLabel({
+      globalhit_loss_stop: {
+        stopped: true,
+        trigger: "projected_loss",
+        pnl: -695,
+        bet_amount: 86,
+        projected_pnl: -781,
+        configured_projected_limit: 700,
+      },
+    }),
+    "GH PNL -695 P에서 다음 GH 배팅 86 P 패배 시 예상 PNL -781 P가 종료 기준 -700 P 이하에 도달 (패배예상손실)",
+  );
+  assert.equal(
+    ghBetStopReasonLabel({
+      globalhit_loss_stop: {
+        stopped: true,
+        trigger: "current_loss",
+        pnl: -500,
+        configured_limit: 500,
+      },
+    }),
+    "GH PNL -500 P가 종료 기준 -500 P 이하에 도달 (현재손실)",
   );
   assert.equal(
     ghBetStopReasonLabel({

@@ -20,7 +20,7 @@ import { getRoundStateSubgameBasis } from "./subgame-basis.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
 import { buildGoalStatusItems, formatGoalIndicator, formatGoalTarget } from "./goal-status.js";
 import { resolvePickMartinSummary } from "./pick-martin-summary.js";
-import { ghBetStopReasonLabel, ghDrawdownStatusLabel, ghProfitStopStatusLabel } from "./slot-operating-options.js";
+import { ghBetStopReasonLabel, ghDrawdownStatusLabel, ghProfitStopStatusLabel, ghSlotLossStatusLabel } from "./slot-operating-options.js";
 import {
   GH_KEEP_COUNT_DEFAULT,
   GH_KEEP_COUNT_MAX,
@@ -211,11 +211,7 @@ const buildResultRows = ({
 
 function GhLossStopStatus({ roundState, autoStatus }) {
   const status = roundState?.globalhit_loss_stop;
-  const configuredLimit = Number(status?.configured_limit || 0);
-  const enabled = configuredLimit > 0;
-  const detail = enabled
-    ? `설정 ${configuredLimit.toFixed(1)}P · 글로벌히트 PNL ${Number(status?.pnl || 0).toFixed(1)}P / 판정기준 -${Number(status?.limit || 0).toFixed(1)}P${status?.mode === "auto" && Number(status?.pnl_scale || 1) !== 1 ? ` (원값 ${Number(status?.globalhit_pnl || 0).toFixed(1)}P ×${Number(status.pnl_scale)})` : ""}${status?.stopped ? " · 중지" : " · 정상"}`
-    : "미사용";
+  const detail = ghSlotLossStatusLabel(status);
   const drawdownStatus = autoStatus?.running
     ? {
       configured_drawdown_start: autoStatus.drawdown_start_amount,
@@ -243,7 +239,7 @@ function GhLossStopStatus({ roundState, autoStatus }) {
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: betStopReason ? 0.5 : 1.5, px: 1, py: 0.7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
         <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>현재 게임 배팅조건</Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: status?.stopped ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
-          슬롯 글로벌히트 손실종료: {detail}
+          슬롯 GH 손실조건: {detail}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: drawdownStatus?.reason === "drawdown_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
           손실종료조건: {ghDrawdownStatusLabel(drawdownStatus)}
@@ -260,7 +256,7 @@ function GhLossStopStatus({ roundState, autoStatus }) {
       {betStopReason && (
         <Box sx={{ mb: 1.5, px: 1, py: 0.65, border: "1px solid rgba(255,82,82,.5)", borderRadius: 1, backgroundColor: "rgba(255,82,82,.08)" }}>
           <Typography variant="caption" sx={{ color: "#ff8a80", fontWeight: 900 }}>
-            배팅 종료 이유: {betStopReason}
+            GH 배팅 종료 이유: {betStopReason}
           </Typography>
         </Box>
       )}

@@ -2130,10 +2130,11 @@ export default function GhUserSetupPage() {
               전체 PNL이 목표에 도달하면 GH를 정지하고 진행 중인 마틴 Z/B/C는 첫 적중까지 회수
             </Typography>
           </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
             <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
-              슬롯 GH 손실종료
+              슬롯 GH 손실조건
             </Typography>
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>현재손실</Typography>
             <input
               type="number"
               min="0"
@@ -2145,7 +2146,7 @@ export default function GhUserSetupPage() {
                 setDirty(true);
               }}
               style={{
-                width: 140,
+                width: 90,
                 padding: "4px 6px",
                 background: "#16213e",
                 color: "#fff",
@@ -2154,13 +2155,34 @@ export default function GhUserSetupPage() {
                 fontSize: 12,
               }}
             />
-            {Number(config.slot_loss_stop_amount || 0) === 0 && (
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>패배예상손실</Typography>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={config.slot_loss_stop_projected_amount ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
+                setConfig((prev) => ({ ...prev, slot_loss_stop_projected_amount: value }));
+                setDirty(true);
+              }}
+              style={{
+                width: 90,
+                padding: "4px 6px",
+                background: "#16213e",
+                color: "#fff",
+                border: "1px solid #2a3a5a",
+                borderRadius: 4,
+                fontSize: 12,
+              }}
+            />
+            {Number(config.slot_loss_stop_amount || 0) === 0 && Number(config.slot_loss_stop_projected_amount || 0) === 0 && (
               <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>
                 (사용안함)
               </Typography>
             )}
             <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              마틴 Z/B/C를 제외한 GH PNL이 손실 한도에 도달하면 GH 배팅만 중지
+              마틴 Z/B/C를 제외한 현재 GH 손실 또는 다음 배팅 패배예상손실이 한도에 도달하면 GH 배팅만 중지
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
