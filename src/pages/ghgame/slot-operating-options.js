@@ -3,6 +3,23 @@ const formatConditionNumber = (value) => Number(value || 0).toLocaleString(
   { maximumFractionDigits: 1 },
 );
 
+export const ghSlotLossStatusLabel = (status) => {
+  const currentLimit = Number(status?.configured_limit || 0);
+  const projectedLimit = Number(status?.configured_projected_limit || 0);
+  if (currentLimit <= 0 && projectedLimit <= 0) return "사용안함";
+  const trigger = status?.trigger === "projected_loss" ? "패배예상손실" : "현재손실";
+  const scaleDetail = status?.mode === "auto" && Number(status?.pnl_scale || 1) !== 1
+    ? ` (원값 PNL ${formatConditionNumber(status?.globalhit_pnl)} P ×${formatConditionNumber(status?.pnl_scale)})`
+    : "";
+  return `현재손실 ${currentLimit > 0 ? `${formatConditionNumber(currentLimit)} P` : "미사용"}`
+    + ` · 패배예상손실 ${projectedLimit > 0 ? `${formatConditionNumber(projectedLimit)} P` : "미사용"}`
+    + ` · GH PNL ${formatConditionNumber(status?.pnl)} P`
+    + ` · 다음 GH ${formatConditionNumber(status?.bet_amount)} P`
+    + ` · 패배예상 PNL ${formatConditionNumber(status?.projected_pnl)} P`
+    + scaleDetail
+    + (status?.stopped ? ` · ${trigger} 중지` : " · 정상");
+};
+
 export const ghDrawdownStatusLabel = (status) => {
   const start = Number(status?.configured_drawdown_start ?? status?.drawdown_start ?? 0);
   const effectiveStart = Number(status?.effective_drawdown_start ?? status?.drawdown_start ?? 0);
@@ -52,6 +69,14 @@ export const ghBetStopReasonLabel = (roundState) => {
     const betLimit = Number(overallStop?.round_bet_loss_streak_compared_bet_limit || 0);
     const conditionLabel = conditionNo > 0 ? ` ${conditionNo}번` : "";
     return `${Math.max(0, lossStreakStop)}연패 이후 ${Math.max(0, triggerRound)}회차 GH 배팅액 ${formatConditionNumber(triggerBetAmount)} P가 종료 기준 ${formatConditionNumber(betLimit)} P 이상에 도달 (배팅액판 연패중지${conditionLabel})`;
+  }
+  const slotLossStop = roundState?.globalhit_loss_stop;
+  if (slotLossStop?.stopped) {
+    const pnl = formatConditionNumber(slotLossStop.pnl);
+    if (slotLossStop.trigger === "projected_loss") {
+      return `GH PNL ${pnl} P에서 다음 GH 배팅 ${formatConditionNumber(slotLossStop.bet_amount)} P 패배 시 예상 PNL ${formatConditionNumber(slotLossStop.projected_pnl)} P가 종료 기준 -${formatConditionNumber(slotLossStop.configured_projected_limit)} P 이하에 도달 (패배예상손실)`;
+    }
+    return `GH PNL ${pnl} P가 종료 기준 -${formatConditionNumber(slotLossStop.configured_limit)} P 이하에 도달 (현재손실)`;
   }
   if (roundState?.profit_stop?.stopped) {
     const profitStop = roundState.profit_stop;
