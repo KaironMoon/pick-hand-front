@@ -363,40 +363,46 @@ function GhRoundAmountTable({
     const actualCell = actualCells[idx] || {};
     return {
       ...strategyCell,
-      amount: Number(actualCell.bet_amount_p || 0),
-      pnl: Number(actualCell.actual_pnl_p || 0),
+      amount: Number(actualCell.server_bet_amount_p ?? actualCell.bet_amount_p ?? 0),
+      pnl: Number(actualCell.server_pnl_p || 0),
       betPlaced: !!actualCell.bet_placed,
       settled: !!actualCell.settled,
       failureCode: actualCell.failure_code || null,
       failureDetail: actualCell.failure_detail || null,
+      globalhit_pnl: Number(actualCell.server_component_pnl_p?.globalhit || 0),
+      martin_z_pnl: Number(actualCell.server_component_pnl_p?.martin_z || 0),
+      martin_b_pnl: Number(actualCell.server_component_pnl_p?.martin_b || 0),
+      martin_c_pnl: Number(actualCell.server_component_pnl_p?.martin_c || 0),
     };
   });
   const fmt = (v) => v === "N/A" ? "-" : Number(v || 0).toFixed(1);
   const finalSide = table.total_side;
   const currentRoundIdx = Math.max(0, Number(roundState?.round_num || 0));
   const totalAmount = amountMode === "actual"
-    ? Number(actualCells[currentRoundIdx]?.bet_amount_p || 0)
+    ? Number(actualTable.server_current_bet_p
+      ?? actualCells[currentRoundIdx]?.bet_amount_p
+      ?? 0)
     : Number(table.total_amount || 0);
   const totalPnl = amountMode === "actual"
-    ? Number(actualTable.total_pnl_p || 0)
+    ? Number(actualTable.server_total_pnl_p || 0)
     : Number(table.total_pnl || 0);
-  const pnlScale = amountMode === "actual"
-    ? Number(roundState?.conditional_martins?.martin_b?.pnl_scale
-      ?? roundState?.conditional_martins?.martin_c?.pnl_scale
-      ?? 1)
-    : 1;
-  const pnlBreakdown = table.pnl_breakdown || { globalhit: table.total_pnl || 0 };
+  const pnlBreakdown = amountMode === "actual"
+    ? actualTable.server_pnl_breakdown_p || {}
+    : table.pnl_breakdown || { globalhit: table.total_pnl || 0 };
   const componentPnls = [
     ["PnL", Number(pnlBreakdown.globalhit || 0)],
     ["Z", Number(pnlBreakdown.martin_z || 0)],
     ["B", Number(pnlBreakdown.martin_b || 0)],
     ["C", Number(pnlBreakdown.martin_c || 0)],
-  ].map(([label, value]) => [label, Math.round(value * pnlScale * 10) / 10]);
+  ];
   const basePnl = componentPnls[0][1];
   const martinPnls = componentPnls.slice(1);
+  const pnlColor = (value) => value >= 0 ? "#00e676" : "#ef5350";
   const globalhitAggregate = roundState?.globalhit_aggregate || {};
   const globalhitDirection = globalhitAggregate.direction;
-  const globalhitBetAmount = Number(globalhitAggregate.amount || 0);
+  const globalhitBetAmount = amountMode === "actual"
+    ? Number(actualTable.server_globalhit_bet_p ?? globalhitAggregate.amount ?? 0)
+    : Number(globalhitAggregate.amount || 0);
   const globalhitDirectionColor = globalhitDirection === "P" ? "#1565d8" : globalhitDirection === "B" ? "#e53935" : "#555";
   const martinContributionAmount = (cell) => [
     cell?.pick_martin_amount,
@@ -531,11 +537,11 @@ function GhRoundAmountTable({
         <Box sx={{ width: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>글로벌히트 BET</span><span>{fmt(globalhitBetAmount)}</span>
         </Box>
-        <Box sx={{ width: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: basePnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Box sx={{ width: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: pnlColor(basePnl), fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>글로벌히트 PNL</span><span>{fmt(basePnl)}</span>
         </Box>
         {martinPnls.map(([label, value]) => (
-          <Box key={label} sx={{ width: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: value >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Box key={label} sx={{ width: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: pnlColor(value), fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span>{label} PnL</span><span>{fmt(value)}</span>
           </Box>
         ))}
@@ -603,38 +609,6 @@ function applyActualBetAttempt(roundState, data) {
       total_amount_p: Number(table.total_amount_p || 0)
         - Number(previous.bet_amount_p || 0)
         + amountP,
-    },
-  };
-}
-
-function applyActualBetSettlement(roundState, data) {
-  if (!roundState?.actual_bet_table?.cells) return roundState;
-  const table = roundState.actual_bet_table;
-  const cells = [...table.cells];
-  const idx = cells.findIndex(
-    (cell) => cell?.external_game_id === data.external_game_id,
-  );
-  if (idx < 0) return roundState;
-  const previous = cells[idx] || {};
-  const pnlWon = Number(data.actual_pnl_won || 0);
-  const pnlP = Number(data.actual_pnl_p || 0);
-  cells[idx] = {
-    ...previous,
-    actual_pnl_won: pnlWon,
-    actual_pnl_p: pnlP,
-    settled: true,
-  };
-  return {
-    ...roundState,
-    actual_bet_table: {
-      ...table,
-      cells,
-      total_pnl_won: Number(table.total_pnl_won || 0)
-        - Number(previous.actual_pnl_won || 0)
-        + pnlWon,
-      total_pnl_p: Number(table.total_pnl_p || 0)
-        - Number(previous.actual_pnl_p || 0)
-        + pnlP,
     },
   };
 }
@@ -1418,7 +1392,8 @@ export default function GhUserGamePage() {
           } else if (t === "bet_attempt") {
             setRoundStateUpper((prev) => applyActualBetAttempt(prev, data));
           } else if (t === "bet_settled") {
-            setRoundStateUpper((prev) => applyActualBetSettlement(prev, data));
+            // PNL은 프론트에서 합산하지 않고 서버 계산 결과를 다시 조회한다.
+            restoreGame(data.game_id || gameId);
           } else if (t === "session_ended") {
             const reasonMap = {
               casino_shoe_ended: "카지노 슈 종료",

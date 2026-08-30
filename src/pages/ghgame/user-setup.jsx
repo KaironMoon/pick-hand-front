@@ -2094,7 +2094,7 @@ export default function GhUserSetupPage() {
               );
             })}
             <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              전략 계산액은 유지하고 실제 카지노 주문액에만 적용
+              서버 PNL·종료조건과 실제 카지노 주문액에 동일 적용 (로컬 안전조정은 전송액만 적용)
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
