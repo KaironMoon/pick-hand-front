@@ -111,6 +111,28 @@ test("round betting board loss streak alert identifies the triggered condition",
   );
 });
 
+test("round GH PNL range alert explains the inclusive window trigger", () => {
+  const alert = claimOverallStopAlert(
+    new Set(),
+    109,
+    "round_gh_pnl_range_reached",
+    "auto",
+    {
+      round_gh_pnl_trigger_condition: 2,
+      round_gh_pnl_trigger_start_round: 10,
+      round_gh_pnl_trigger_end_round: 20,
+      round_gh_pnl_trigger_pnl: -52.3,
+      round_gh_pnl_trigger_effective_pnl_limit: -50,
+    },
+  );
+
+  assert.deepEqual(alert, {
+    title: "구간 GH PNL 조건 도달",
+    detail: "2번 조건 10~20회 GH PNL -52.3 P가 기준 -50 P 이하에 도달하여 배팅이 정지되었습니다.",
+    modeLabel: "오토",
+  });
+});
+
 test("overall goal keeps the combined alert wording", () => {
   const alert = claimOverallStopAlert(new Set(), 108, "goal_reached", "manual");
   assert.equal(alert.title, "전체 목표금액 달성");

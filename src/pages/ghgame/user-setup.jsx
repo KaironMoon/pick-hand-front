@@ -2010,6 +2010,29 @@ export default function GhUserSetupPage() {
     });
     setDirty(true);
   };
+  const roundGhPnlStopConditions = Array.from({ length: 4 }, (_, index) => {
+    const saved = Array.isArray(config.round_gh_pnl_stop_conditions)
+      ? config.round_gh_pnl_stop_conditions[index]
+      : null;
+    return saved && typeof saved === "object"
+      ? saved
+      : { start_round: 0, end_round: 0, pnl_limit: 0 };
+  });
+  const updateRoundGhPnlStopCondition = (index, patch) => {
+    setConfig((prev) => {
+      const previousConditions = Array.from({ length: 4 }, (_, itemIndex) => {
+        const saved = Array.isArray(prev.round_gh_pnl_stop_conditions)
+          ? prev.round_gh_pnl_stop_conditions[itemIndex]
+          : null;
+        return saved && typeof saved === "object"
+          ? { ...saved }
+          : { start_round: 0, end_round: 0, pnl_limit: 0 };
+      });
+      previousConditions[index] = { ...previousConditions[index], ...patch };
+      return { ...prev, round_gh_pnl_stop_conditions: previousConditions };
+    });
+    setDirty(true);
+  };
 
   return (
     <Box sx={{ p: 2 }}>
@@ -2325,6 +2348,60 @@ export default function GhUserSetupPage() {
               목표가 설정된 활성 POT 수가 이 값 이하가 되면 다음 회차부터 모든 배팅 중지
             </Typography>
           </Box>
+          {roundGhPnlStopConditions.map((condition, index) => {
+            const startRound = Number(condition.start_round || 0);
+            const endRound = Number(condition.end_round || 0);
+            const enabled = startRound > 0 && endRound >= startRound;
+            return (
+              <Box key={`round-gh-pnl-${index}`} sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+                <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
+                  구간 GH PNL {index + 1}
+                </Typography>
+                <input
+                  type="number"
+                  min="0"
+                  max="80"
+                  step="1"
+                  value={condition.start_round ?? 0}
+                  onChange={(event) => updateRoundGhPnlStopCondition(index, {
+                    start_round: Math.max(0, Math.min(80, parseInt(event.target.value || "0", 10) || 0)),
+                  })}
+                  style={{ width: 58, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+                />
+                <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>회부터</Typography>
+                <input
+                  type="number"
+                  min="0"
+                  max="80"
+                  step="1"
+                  value={condition.end_round ?? 0}
+                  onChange={(event) => updateRoundGhPnlStopCondition(index, {
+                    end_round: Math.max(0, Math.min(80, parseInt(event.target.value || "0", 10) || 0)),
+                  })}
+                  style={{ width: 58, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+                />
+                <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>회까지 GH PNL</Typography>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={condition.pnl_limit ?? 0}
+                  onChange={(event) => updateRoundGhPnlStopCondition(index, {
+                    pnl_limit: parseFloat(event.target.value || "0") || 0,
+                  })}
+                  style={{ width: 78, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+                />
+                <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이하이면 배팅 중지</Typography>
+                {!enabled && (
+                  <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
+                )}
+                {index === 0 && (
+                  <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
+                    시작·종료 회차 포함 · GH PNL만 합산 · 종료 회차 결과 후 판정
+                  </Typography>
+                )}
+              </Box>
+            );
+          })}
           {roundBetLossStreakConditions.map((condition, index) => (
             <Box key={index} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
               <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>

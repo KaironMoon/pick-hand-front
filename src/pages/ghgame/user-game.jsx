@@ -20,7 +20,7 @@ import { getRoundStateSubgameBasis } from "./subgame-basis.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
 import { buildGoalStatusItems, formatGoalIndicator, formatGoalTarget } from "./goal-status.js";
 import { resolvePickMartinSummary } from "./pick-martin-summary.js";
-import { ghBetStopReasonLabel, ghDrawdownStatusLabel, ghProfitStopStatusLabel, ghSlotLossStatusLabel } from "./slot-operating-options.js";
+import { ghBetStopReasonLabel, ghDrawdownStatusLabel, ghProfitStopStatusLabel, ghRoundPnlStopStatusLabel, ghSlotLossStatusLabel } from "./slot-operating-options.js";
 import {
   GH_KEEP_COUNT_DEFAULT,
   GH_KEEP_COUNT_MAX,
@@ -246,6 +246,9 @@ function GhLossStopStatus({ roundState, autoStatus }) {
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.profit_stop?.stopped ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
           수익보호: {ghProfitStopStatusLabel(roundState?.profit_stop)}
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.overall_stop?.reason === "round_gh_pnl_range_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
+          구간 GH PNL: {ghRoundPnlStopStatusLabel(roundState?.overall_stop)}
         </Typography>
         {recoveryDetail && (
           <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,82,82,.55)", borderRadius: 1, color: martinRecovery?.active ? "#ffcc80" : "#ff8a80", fontWeight: 900 }}>
@@ -695,6 +698,8 @@ function GhBettingSummaryPanel({
         ? "POT중지"
         : stopReason === "round_bet_loss_streak_reached"
           ? "연패중지"
+          : stopReason === "round_gh_pnl_range_reached"
+            ? "구간PNL"
       : null;
   const autoPnl = Number(autoStatus?.pnl_actual_p || 0);
   const autoPnlText = `${autoPnl.toLocaleString(undefined, {
@@ -1345,7 +1350,7 @@ export default function GhUserGamePage() {
               pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
               pnl_actual_p: data.pnl_actual_p ?? prev.pnl_actual_p,
               round_count: data.round_count ?? prev.round_count,
-              stop_reason: ["goal_reached", "drawdown_reached", "end_round_reached", "active_pot_limit_reached", "round_bet_loss_streak_reached"].includes(data.reason)
+              stop_reason: ["goal_reached", "drawdown_reached", "end_round_reached", "active_pot_limit_reached", "round_bet_loss_streak_reached", "round_gh_pnl_range_reached"].includes(data.reason)
                 ? data.reason
                 : prev.stop_reason,
               active_pot_count: data.active_pot_count ?? prev.active_pot_count,
@@ -1527,6 +1532,7 @@ export default function GhUserGamePage() {
         gameId,
         data.round_state_upper?.overall_stop?.reason,
         "manual",
+        data.round_state_upper?.overall_stop,
       );
 
     } catch (err) {

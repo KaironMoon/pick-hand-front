@@ -46,6 +46,22 @@ export const ghProfitStopStatusLabel = (status) => {
   return `${Math.round(afterRound)}회차 이후 GH ${formatConditionNumber(betLimit)} P 이상 배팅 시 이후 배팅 중지${state}`;
 };
 
+export const ghRoundPnlStopStatusLabel = (overallStop) => {
+  const conditions = Array.isArray(overallStop?.round_gh_pnl_conditions)
+    ? overallStop.round_gh_pnl_conditions.filter((condition) => condition?.enabled)
+    : [];
+  if (conditions.length === 0) return "사용안함";
+  const configured = conditions.map((condition) => (
+    `${condition.condition_no}번 ${condition.start_round}~${condition.end_round}회 `
+    + `GH PNL ${formatConditionNumber(condition.pnl_limit)} P 이하`
+  )).join(" / ");
+  if (overallStop?.reason !== "round_gh_pnl_range_reached") {
+    return `${configured} · 대기`;
+  }
+  return `${configured} · ${overallStop.round_gh_pnl_trigger_condition}번 구간 `
+    + `GH PNL ${formatConditionNumber(overallStop.round_gh_pnl_trigger_pnl)} P · 중지`;
+};
+
 export const ghBetStopReasonLabel = (roundState) => {
   const overallStop = roundState?.overall_stop;
   const reason = overallStop?.reason;
@@ -69,6 +85,12 @@ export const ghBetStopReasonLabel = (roundState) => {
     const betLimit = Number(overallStop?.round_bet_loss_streak_compared_bet_limit || 0);
     const conditionLabel = conditionNo > 0 ? ` ${conditionNo}번` : "";
     return `${Math.max(0, lossStreakStop)}연패 이후 ${Math.max(0, triggerRound)}회차 GH 배팅액 ${formatConditionNumber(triggerBetAmount)} P가 종료 기준 ${formatConditionNumber(betLimit)} P 이상에 도달 (배팅액판 연패중지${conditionLabel})`;
+  }
+  if (reason === "round_gh_pnl_range_reached") {
+    return `${Math.max(0, Number(overallStop?.round_gh_pnl_trigger_start_round || 0))}~${Math.max(0, Number(overallStop?.round_gh_pnl_trigger_end_round || 0))}회 `
+      + `GH PNL ${formatConditionNumber(overallStop?.round_gh_pnl_trigger_pnl)} P가 종료 기준 `
+      + `${formatConditionNumber(overallStop?.round_gh_pnl_trigger_effective_pnl_limit)} P 이하에 도달 `
+      + `(구간 GH PNL 중지 ${Math.max(1, Number(overallStop?.round_gh_pnl_trigger_condition || 1))}번)`;
   }
   const slotLossStop = roundState?.globalhit_loss_stop;
   if (slotLossStop?.stopped) {

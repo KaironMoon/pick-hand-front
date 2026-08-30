@@ -5,6 +5,7 @@ import {
   ghBetStopReasonLabel,
   ghDrawdownStatusLabel,
   ghProfitStopStatusLabel,
+  ghRoundPnlStopStatusLabel,
   ghSlotLossStatusLabel,
 } from "../src/pages/ghgame/slot-operating-options.js";
 
@@ -142,6 +143,43 @@ test("GH profit protection status distinguishes disabled, active, and stopped", 
   assert.equal(ghProfitStopStatusLabel({}), "사용안함");
   assert.match(ghProfitStopStatusLabel({ after_round: 20, bet_limit: 5 }), /정상$/);
   assert.match(ghProfitStopStatusLabel({ after_round: 20, bet_limit: 5, stopped: true, mode: "actual", trigger_pnl: 3, trigger_bet_amount: 5 }), /GH PNL 3 P \/ GH 배팅 5 P · 중지$/);
+});
+
+test("GH round PNL range status shows four configured conditions and trigger", () => {
+  assert.equal(ghRoundPnlStopStatusLabel({}), "사용안함");
+  const conditions = [
+    { condition_no: 1, start_round: 10, end_round: 20, pnl_limit: -50, enabled: true },
+    { condition_no: 2, start_round: 30, end_round: 40, pnl_limit: 0, enabled: true },
+  ];
+  assert.equal(
+    ghRoundPnlStopStatusLabel({ round_gh_pnl_conditions: conditions }),
+    "1번 10~20회 GH PNL -50 P 이하 / 2번 30~40회 GH PNL 0 P 이하 · 대기",
+  );
+  assert.equal(
+    ghRoundPnlStopStatusLabel({
+      reason: "round_gh_pnl_range_reached",
+      round_gh_pnl_conditions: conditions,
+      round_gh_pnl_trigger_condition: 1,
+      round_gh_pnl_trigger_pnl: -52.3,
+    }),
+    "1번 10~20회 GH PNL -50 P 이하 / 2번 30~40회 GH PNL 0 P 이하 · 1번 구간 GH PNL -52.3 P · 중지",
+  );
+});
+
+test("GH round PNL range stop reason uses the persisted server trigger", () => {
+  assert.equal(
+    ghBetStopReasonLabel({
+      overall_stop: {
+        reason: "round_gh_pnl_range_reached",
+        round_gh_pnl_trigger_condition: 3,
+        round_gh_pnl_trigger_start_round: 10,
+        round_gh_pnl_trigger_end_round: 20,
+        round_gh_pnl_trigger_pnl: -52.3,
+        round_gh_pnl_trigger_effective_pnl_limit: -50,
+      },
+    }),
+    "10~20회 GH PNL -52.3 P가 종료 기준 -50 P 이하에 도달 (구간 GH PNL 중지 3번)",
+  );
 });
 
 test("fixed criteria keep combined goal and GH profit-protection wording", () => {

@@ -19,6 +19,10 @@ const STOP_ALERTS = {
     title: "배팅액판 연패중지",
     detail: "설정 연패 단계 이후 배팅액이 기준금액에 도달하여 배팅이 정지되었습니다.",
   },
+  round_gh_pnl_range_reached: {
+    title: "구간 GH PNL 조건 도달",
+    detail: "설정 회차 구간의 GH PNL이 기준값 이하가 되어 배팅이 정지되었습니다.",
+  },
 };
 
 const formatBetAmount = (value) => Number(value).toLocaleString(undefined, {
@@ -35,6 +39,17 @@ const stopAlertDetail = (alert, reason, mode, stopDetail) => {
   if (reason === "drawdown_reached") return recoveryCompleted
     ? "최고 PNL 손실률 도달 후 진행 중이던 마틴 회수까지 완료되어 최종 배팅이 정지되었습니다."
     : "최고 PNL 대비 설정 손실률에 도달하여 배팅이 정지되었습니다.";
+  if (reason === "round_gh_pnl_range_reached") {
+    const conditionNo = Math.max(1, Number(stopDetail?.round_gh_pnl_trigger_condition || 1));
+    const startRound = Math.max(0, Number(stopDetail?.round_gh_pnl_trigger_start_round || 0));
+    const endRound = Math.max(0, Number(stopDetail?.round_gh_pnl_trigger_end_round || 0));
+    const pnl = formatBetAmount(stopDetail?.round_gh_pnl_trigger_pnl || 0);
+    const limit = formatBetAmount(stopDetail?.round_gh_pnl_trigger_effective_pnl_limit || 0);
+    const triggerDetail = `${conditionNo}번 조건 ${startRound}~${endRound}회 GH PNL ${pnl} P가 기준 ${limit} P 이하에 도달`;
+    return recoveryCompleted
+      ? `${triggerDetail}한 후 진행 중이던 마틴 회수까지 완료되어 최종 배팅이 정지되었습니다.`
+      : `${triggerDetail}하여 배팅이 정지되었습니다.`;
+  }
   if (reason !== "round_bet_loss_streak_reached") return recoveryCompleted
     ? `${alert.title} 조건 발동 후 진행 중이던 마틴 회수까지 완료되어 최종 배팅이 정지되었습니다.`
     : alert.detail;
