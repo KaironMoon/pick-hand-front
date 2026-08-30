@@ -26,27 +26,30 @@ const flip = (p) => (p === "P" ? "B" : p === "B" ? "P" : null);
 const fmtValue = (v) => (v === "N/A" ? "-" : v);
 
 const SECTION_DEFS = [
-  { id: "A", label: "A멀티", kind: "normal", rows: [["A", "A"], ["AR", "AR"]] },
-  { id: "S1", label: "S1멀티", kind: "normal", rows: [["S1", "track:s:sc1"], ["S1R", "track:sr:sc1"]] },
-  { id: "S2", label: "S2멀티", kind: "normal", rows: [["S2", "track:s:sc2"], ["S2R", "track:sr:sc2"]] },
-  { id: "S3", label: "S3멀티", kind: "normal", rows: [["S3", "track:s:sc3"], ["S3R", "track:sr:sc3"]] },
+  { id: "A", label: "A멀티", kind: "normal", rows: [["A", "A"], ["AR", "AR"], ["AARO", "AARO"], ["AARN", "AAR"]] },
+  { id: "S1", label: "S1멀티", kind: "normal", rows: [["S1", "track:s:sc1"], ["S1R", "track:sr:sc1"], ["SSRO1", "track:ssro:sc1"], ["SSRN1", "track:ssr:sc1"]] },
+  { id: "S2", label: "S2멀티", kind: "normal", rows: [["S2", "track:s:sc2"], ["S2R", "track:sr:sc2"], ["SSRO2", "track:ssro:sc2"], ["SSRN2", "track:ssr:sc2"]] },
+  { id: "S3", label: "S3멀티", kind: "normal", rows: [["S3", "track:s:sc3"], ["S3R", "track:sr:sc3"], ["SSRO3", "track:ssro:sc3"], ["SSRN3", "track:ssr:sc3"]] },
   { id: "FOR", label: "FOR", kind: "for", rows: [["FOR1", "track:for:sc1", 0], ["FOR2", "track:for:sc2", 1], ["FOR3", "track:for:sc3", 2]] },
   { id: "FORX", label: "FORX", kind: "for", rows: [["FOR1X", "track:sx:sc1", 0], ["FOR2X", "track:sx:sc2", 1], ["FOR3X", "track:sx:sc3", 2]] },
   { id: "DGT", label: "DGT", kind: "normal", rows: [["D", "D"], ["G", "G"], ["TN", "TN"], ["ONE", "ONE"], ["TWO", "TWO"]] },
   { id: "PBJ", label: "PBJ", kind: "normal", rows: [["P", "P"], ["B", "B"], ["J", "J"]] },
   { id: "6MX", label: "6MX", kind: "normal", rows: [["6M", "6M"], ["6MX", "6MX"]] },
-  { id: "GH", label: "GH 시리즈", kind: "normal", rows: [["G(H1)", "G(H1)"], ["G(H2)", "G(H2)"]] },
-  { id: "GP", label: "G% 시리즈", kind: "normal", rows: [["G(%1)", "G(%1)"], ["G(%2)", "G(%2)"]] },
-  { id: "HB", label: "허니비멀티", kind: "subgame", xKey: "허니비", rows: [["허니비", "허니비"], ["허니R2", "허니R2"]] },
-  { id: "WH", label: "위너히트멀티", kind: "subgame", xKey: "W111", rows: [["W111", "W111"], ["위너R2", "위너R2"]] },
-  { id: "MH", label: "메가히트멀티", kind: "subgame", xKey: "M22", rows: [["M22", "M22"], ["메가R2", "메가R2"]] },
-  { id: "DH", label: "드림히트멀티", kind: "subgame", xKey: "D112", rows: [["D112", "D112"], ["드림R2", "드림R2"]] },
-  { id: "NC", label: "NC멀티", kind: "normal", rows: [["NC", "NC"], ["NCR", "NCR"]] },
+  { id: "GH", label: "GH 시리즈", kind: "normal", rows: [["G(H1)", "G(H1)"], ["G(H2)", "G(H2)"], ["G(H3)", "G(H3)"], ["G(H4)", "G(H4)"]] },
+  { id: "GP", label: "G% 시리즈", kind: "normal", rows: [["G(%1)", "G(%1)"], ["G(%2)", "G(%2)"], ["G(%3)", "G(%3)"], ["G(%4)", "G(%4)"]] },
+  { id: "HB", label: "허니비멀티", kind: "subgame", xKey: "허니비", rows: [["허니비", "허니비"], ["허니R2", "허니R2"], ["허니SR2O", "허니SR2O"], ["허니SRN", "허니SRN"]] },
+  { id: "WH", label: "위너히트멀티", kind: "subgame", xKey: "W111", rows: [["W111", "W111"], ["위너R2", "위너R2"], ["위너SR2O", "위너SR2O"], ["위너SRN", "위너SRN"]] },
+  { id: "MH", label: "메가히트멀티", kind: "subgame", xKey: "M22", rows: [["M22", "M22"], ["메가R2", "메가R2"], ["메가SR2O", "메가SR2O"], ["메가SRN", "메가SRN"]] },
+  { id: "DH", label: "드림히트멀티", kind: "subgame", xKey: "D112", rows: [["D112", "D112"], ["드림R2", "드림R2"], ["드림SR2O", "드림SR2O"], ["드림SRN", "드림SRN"]] },
+  { id: "NC", label: "NC멀티", kind: "normal", rows: [["NC", "NC"], ["NCR", "NCR"], ["NCSRO", "NCSRO"], ["NCSRN", "NCSRN"]] },
+  { id: "SQ", label: "SQ", kind: "normal", rows: [["SQ1", "track:quarter:sc1"], ["SQ2", "track:quarter:sc2"], ["SQ3", "track:quarter:sc3"]] },
 ];
 
 const Q_TRACK_KEYS = {
   s: ["S1", "S2", "S3"],
   sr: ["SR1", "SR2", "SR3"],
+  ssr: ["SSR1", "SSR2", "SSR3"],
+  ssro: ["SSRO1", "SSRO2", "SSRO3"],
   sx: ["FOR1X", "FOR2X", "FOR3X"],
   for: ["FOR1", "FOR2", "FOR3"],
 };
@@ -129,6 +132,7 @@ function sourceCells(actualSeq, offset, reverse = false) {
 function stateKeyForSpec(spec) {
   if (!spec?.startsWith("track:")) return spec;
   const [, family, sc] = spec.split(":");
+  if (family === "quarter") return `SQ${sc?.slice(-1) || ""}`;
   const idx = Number(String(sc || "").replace("sc", "")) - 1;
   return Q_TRACK_KEYS[family]?.[idx] || null;
 }

@@ -13,7 +13,7 @@ test("goal status uses the approved multi POT order and labels", () => {
     GOAL_STATUS_ITEMS.map(({ key, label }) => [key, label]),
     [
       ["AAR", "A"], ["SSR1", "S1"], ["SSR2", "S2"], ["SSR3", "S3"],
-      ["FOR", "F"], ["FORX", "FX"], ["GOBH", "GH"],
+      ["FOR", "F"], ["FORX", "FX"], ["SQ", "SQ"], ["GOBH", "GH"],
       ["GOBP", "G%"], ["허니비", "H"], ["W111", "W"], ["M22", "M"],
       ["D112", "D"], ["PBJ", "PJ"],
     ],

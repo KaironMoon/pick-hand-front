@@ -8,12 +8,12 @@ import {
 } from "./strategy-board-alerts.js";
 
 // ── 전략별 현황 전광판 (design-260615-gh-calc.html 260623 신버전 포팅) ──
-// 제거된 전략은 빈칸 없이 제외하고 남은 전략만 테이블에 배치한다.
+// 4개 테이블(G1~G4) · 각 16컬럼 · 10행.
 // 행: wait(대기 H녹/M노랑) / pick(P·B 칩) / pct(적중률%) / rec(전적) / rec2(보조)
 //     / pick2(보조픽) / pct2(적중률2) / assistRec(어시 총전적) / stage(단계) / idx1(배팅액) / idx2(PnL)
 // R쌍 분리(병합 없음). 각 전략 세트 뒤 OLD/NEW 컬럼.
 //   NEW = 합성본(A세트→AAR, S세트→SSR#, 서브게임 R2세트→실데이터). OLD = 위치만(빈칸, 추후 연결).
-// 실데이터: A/AR/D/G/TN/ONE/TWO/P/B/J/6M/6MX(stats) + S/SR/FOR/FORX 트랙.
+// 실데이터: A/AR/AAR/D/G/TN/ONE/TWO/P/B/J/6M/6MX(stats) + SQ/SR/SSR/SX(트랙).
 
 const HC_BLUE = "#2f9bff";
 const HC_RED = "#ff5b5b";
@@ -74,32 +74,38 @@ function edgeStyle(data, i, pos) {
 }
 
 // ── 테이블 정의 (전략명 + 그룹선/노란박스/헤더색). 값은 실데이터로 채움. ──
-// G1: A/AR + S/SR + FOR/FORX 세트.
-const G1n = ["A", "AR", "S1", "S1R", "S2", "S2R", "S3", "S3R", "FOR1", "FOR2", "FOR3", "FOR1X", "FOR2X", "FOR3X"];
+// G1: A/AR 세트 + S1/S2/S3 세트. 각 세트 OLD/NEW = AARO/AARN, SSROn/SSRNn. (260628)
+const G1n = ["A", "AR", "AARO", "AARN", "S1", "S1R", "SSRO1", "SSRN1", "S2", "S2R", "SSRO2", "SSRN2", "S3", "S3R", "SSRO3", "SSRN3"];
 const G1 = {
   name: G1n,
-  tableWidth: 900,
-  gstart: new Set([2, 4, 6, 8, 11]),
-  hlRanges: [[0, 1], [2, 3], [4, 5], [6, 7], [8, 10], [11, 13]],
-  headColors: [[0, 1, HC_BLUE], [2, 3, HC_RED], [4, 5, HC_BLUE], [6, 7, HC_RED], [8, 10, HC_BLUE], [11, 13, HC_RED]],
+  gstart: new Set([4, 8, 12]),
+  hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
+  headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
 };
-// G2: D/G/TN/ONE/TWO + P/B/J + 6M/6MX + GH/G%.
-const G2n = ["D", "G", "TN", "ONE", "TWO", "P", "B", "J", "6M", "6MX", "G(H1)", "G(H2)", "G(%1)", "G(%2)"];
+// G2: FOR1/2/3(따라) + FOR1X/2X/3X(반대) + D/G/TN/ONE/TWO + P/B/J/6M/6MX
+// FOR1/2/3·FOR1X/2X/3X 각각 한 묶음(노란박스). 헤더색은 묶음별 번갈아(파/빨).
+const G2n = ["FOR1", "FOR2", "FOR3", "FOR1X", "FOR2X", "FOR3X", "D", "G", "TN", "ONE", "TWO", "P", "B", "J", "6M", "6MX"];
 const G2 = {
   name: G2n,
-  tableWidth: 840,
-  gstart: new Set([5, 8, 10, 12]),
-  hlRanges: [[0, 4], [5, 7], [8, 9], [10, 11], [12, 13]],
-  headColors: [[0, 4, HC_BLUE], [5, 7, HC_RED], [8, 9, "#de6a08"], [10, 11, HC_BLUE], [12, 13, HC_RED]],
+  gstart: new Set([3, 6, 11, 14]),
+  hlRanges: [[0, 2], [3, 5], [6, 10], [11, 13], [14, 15]],
+  headColors: [[0, 2, HC_BLUE], [3, 5, HC_RED], [6, 10, HC_BLUE], [11, 13, HC_RED], [14, 15, "#de6a08"]],
 };
-// G3: 서브게임 정픽/반대픽.
-const G3n = ["허니비", "허니R2", "W111", "위너R2", "M22", "메가R2", "D112", "드림R2", "NC", "NCR"];
+// G3: GH 시리즈 + G% 시리즈 + 허니비/W111 세트(정픽/R/SRO/SRN).
+const G3n = ["G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)", "허니비", "허니R2", "허니SR2O", "허니SRN", "W111", "위너R2", "위너SR2O", "위너SRN"];
 const G3 = {
   name: G3n,
-  tableWidth: 660,
-  gstart: new Set([2, 4, 6, 8]),
-  hlRanges: [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]],
-  headColors: [[0, 1, HC_BLUE], [2, 3, HC_RED], [4, 5, HC_BLUE], [6, 7, HC_RED], [8, 9, HC_BLUE]],
+  gstart: new Set([4, 8, 12]),
+  hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
+  headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
+};
+// G4: M22세트 + D112세트 + NC세트(정픽/R/SRO/SRN) + SQ1/2/3(쿼터배팅, S와 픽 공유) + 빈칸 1.
+const G4n = ["M22", "메가R2", "메가SR2O", "메가SRN", "D112", "드림R2", "드림SR2O", "드림SRN", "NC", "NCR", "NCSRO", "NCSRN", "SQ1", "SQ2", "SQ3", ""];
+const G4 = {
+  name: G4n,
+  gstart: new Set([4, 8, 12]),
+  hlRanges: [[0, 3], [4, 7], [8, 11], [12, 14]],
+  headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 14, HC_BLUE]],
 };
 
 // ── 셀 렌더 헬퍼 ──
@@ -300,9 +306,8 @@ function LblCell({ text, color = "#fff", edge, onClick, title }) {
 
 function StrategyTable({ data, showLabels = true, maxBlinkActive, onMaxLabelClick }) {
   const rowLabel = (text) => showLabels ? text : undefined;
-  const tableWidth = data.tableWidth || (showLabels ? 1020 : 960);
   return (
-    <Box component="table" sx={{ borderCollapse: "collapse", backgroundColor: "#000", tableLayout: "fixed", width: tableWidth }}>
+    <Box component="table" sx={{ borderCollapse: "collapse", backgroundColor: "#000", tableLayout: "fixed", width: showLabels ? 1020 : 960 }}>
       <thead>
         <tr>
           {showLabels && <LblCell text="섹션" edge="head" />}
@@ -410,8 +415,12 @@ const sectionFor = (ctx, key) => (key ? ctx.roundState?.sections?.[key] : null);
 const assistStateFor = (ctx, assist) => sectionFor(ctx, assist?._key)?.assist_h || null;
 const qAssistStateFor = (ctx, qas) => sectionFor(ctx, qas?._key)?.assist_q || null;
 const GOB_KEY_TO_LABEL = {
+  AAR: "AARN",
+  AARO: "AARO",
   S1: "S1", S2: "S2", S3: "S3",
   SR1: "S1R", SR2: "S2R", SR3: "S3R",
+  SSR1: "SSRN1", SSR2: "SSRN2", SSR3: "SSRN3",
+  SSRO1: "SSRO1", SSRO2: "SSRO2", SSRO3: "SSRO3",
   FOR1: "FOR1", FOR2: "FOR2", FOR3: "FOR3",
   FOR1X: "FOR1X", FOR2X: "FOR2X", FOR3X: "FOR3X",
 };
@@ -522,8 +531,9 @@ function buildColData(label, i, data, ctx) {
   const STAT_KEYS = { A: "A", AR: "AR", D: "D", G: "G", TN: "TN", ONE: "ONE", TWO: "TWO", J: "J", P: "P", B: "B", "6M": "6M", "6MX": "6MX" };
   if (STAT_KEYS[label]) return fromStats(ctx, STAT_KEYS[label]);
   // 서브게임 세트: 정픽/R2/SR2O/SRN — stats 키가 라벨과 동일. NC 계열은 기존 키 유지.
-  const SUBGAME_LABELS = ["허니비", "허니R2", "W111", "위너R2", "M22", "메가R2",
-    "D112", "드림R2", "NC", "NCR"];
+  const SUBGAME_LABELS = ["허니비", "허니R2", "허니SR2O", "허니SRN", "W111", "위너R2", "위너SR2O", "위너SRN",
+    "M22", "메가R2", "메가SR2O", "메가SRN", "D112", "드림R2", "드림SR2O", "드림SRN",
+    "NC", "NCR", "NCSRO", "NCSRN"];
   if (SUBGAME_LABELS.includes(label)) return fromStats(ctx, label);
   // G(H1~H4/%1~%4) — 다른 섹션 메트릭으로 산출된 픽.
   if (/^G\((H|%)[1-4]\)$/.test(label)) return fromStats(ctx, label);
@@ -535,6 +545,16 @@ function buildColData(label, i, data, ctx) {
   if (m) return fromSection(ctx, `SR${m[1]}`);
   m = label.match(/^S([123])$/);
   if (m) return fromSection(ctx, `S${m[1]}`);
+  m = label.match(/^SQ([123])$/);
+  if (m) return fromSection(ctx, `SQ${m[1]}`);
+  // AARN(A세트 NEW) → AAR 합성 stats / AARO(A세트 OLD) → AARO stats
+  if (label === "AARN") return fromStats(ctx, "AAR");
+  if (label === "AARO") return fromStats(ctx, "AARO");
+  // SSRN1/2/3(S세트 NEW) → SSR 트랙 / SSRO1/2/3(S세트 OLD) → SSRO 트랙
+  m = label.match(/^SSRN([123])$/);
+  if (m) return fromSection(ctx, `SSR${m[1]}`);
+  m = label.match(/^SSRO([123])$/);
+  if (m) return fromSection(ctx, `SSRO${m[1]}`);
   // 아직 별도 매핑이 없는 컬럼은 위치만 유지한다.
   return null;
 }
@@ -570,6 +590,23 @@ function withLiveData(base, ctx) {
   });
   out.waitSourceMarks = base.name.map(() => []);
   out.pctSourceMarks = base.name.map(() => []);
+  const subgameSrnKeys = new Set(["허니SRN", "위너SRN", "메가SRN", "드림SRN", "NCSRN"]);
+  const subgameSroKeys = new Set(["허니SR2O", "위너SR2O", "메가SR2O", "드림SR2O", "NCSRO"]);
+  const addSourceMark = (target, src, key, label) => {
+    const selected = src?.tie === "x" ? src?.x : src?.tie === "xr" ? src?.xr : null;
+    if (!selected) return;
+    base.name.forEach((name, idx) => {
+      if (name === selected) target[idx] = [...(target[idx] || []), { key, label }];
+    });
+  };
+  Object.entries(ctx.roundState?.xx_sources || {}).forEach(([key, src]) => {
+    if (!src?.x || !src?.xr) return;
+    if (key === "AAR" || /^SSRN[123]$/.test(key) || subgameSrnKeys.has(key)) {
+      addSourceMark(out.waitSourceMarks, src, key, key === "AAR" ? "AARN" : key);
+    } else if (key === "AARO" || /^SSRO[123]$/.test(key) || subgameSroKeys.has(key)) {
+      addSourceMark(out.pctSourceMarks, src, key, key);
+    }
+  });
   base.name.forEach((label, i) => {
     if (!label) return; // 빈 컬럼
     if (markPct.has(label)) out.pctBg[i] = markPct.get(label);
@@ -600,7 +637,7 @@ export default function GhStrategyBoard({ roundState }) {
   };
   const hasData = !!roundState?.sections;
   const ctx = { roundState };
-  const tables = [G1, G2, G3].map((t) => (hasData ? withLiveData(t, ctx) : t));
+  const tables = [G1, G2, G3, G4].map((t) => (hasData ? withLiveData(t, ctx) : t));
   return (
     <Box sx={{ overflowX: "auto", mb: 2 }}>
       <Box sx={{ display: "inline-grid", gridTemplateColumns: "repeat(2, max-content)", backgroundColor: "#000" }}>
