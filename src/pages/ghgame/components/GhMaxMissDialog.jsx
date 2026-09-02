@@ -173,7 +173,11 @@ function MaxMissRoundAmountTable({ roundState }) {
   const martinPnls = [
     ["Z", Number(pnlBreakdown.martin_z || 0)],
     ["B", Number(pnlBreakdown.martin_b || 0)],
-    ["C", Number(pnlBreakdown.martin_c || 0)],
+    ["C1", Number(pnlBreakdown.martin_c || 0)],
+    ["C2", Number(pnlBreakdown.martin_c2 || 0)],
+    ["C3", Number(pnlBreakdown.martin_c3 || 0)],
+    ["C4", Number(pnlBreakdown.martin_c4 || 0)],
+    ["C5", Number(pnlBreakdown.martin_c5 || 0)],
   ];
   const globalhitAggregate = roundState?.globalhit_aggregate || {};
   const globalhitDirection = globalhitAggregate.direction;

@@ -38,12 +38,90 @@ export const ghDrawdownStatusLabel = (status) => {
 
 export const ghProfitStopStatusLabel = (status) => {
   const afterRound = Number(status?.after_round || 0);
-  const betLimit = Number(status?.bet_limit || 0);
-  if (afterRound <= 0 || betLimit <= 0) return "사용안함";
+  if (afterRound <= 0) return "사용안함";
   const state = status?.stopped
     ? ` · GH PNL ${formatConditionNumber(status.trigger_pnl)} P / GH 배팅 ${formatConditionNumber(status.trigger_bet_amount)} P · 중지`
     : " · 정상";
-  return `${Math.round(afterRound)}회차 이후 GH ${formatConditionNumber(betLimit)} P 이상 배팅 시 이후 배팅 중지${state}`;
+  return `${Math.round(afterRound)}회차 이후 GH PNL이 +인 경우 현재 GH PNL 이상 배팅 금지${state}`;
+};
+
+export const martinGoalStatusLabel = (status) => {
+  const target = Number(status?.configured_target || 0);
+  if (target <= 0) return "사용안함";
+  const state = status?.reason === "martin_c_goal_reached" ? " · 중지" : " · 정상";
+  return `목표 ${formatConditionNumber(target)} P · 마틴C PNL ${formatConditionNumber(status?.pnl)} P${state}`;
+};
+
+export const martinSlotLossStatusLabel = (status) => {
+  const currentLimit = Number(status?.configured_loss_limit || 0);
+  const projectedLimit = Number(status?.configured_projected_loss_limit || 0);
+  if (currentLimit <= 0 && projectedLimit <= 0) return "사용안함";
+  const stopped = ["martin_c_current_loss_reached", "martin_c_projected_loss_reached"].includes(status?.reason);
+  return `현재손실 ${currentLimit > 0 ? `${formatConditionNumber(currentLimit)} P` : "미사용"}`
+    + ` · 패배예상손실 ${projectedLimit > 0 ? `${formatConditionNumber(projectedLimit)} P` : "미사용"}`
+    + ` · 마틴C PNL ${formatConditionNumber(status?.pnl)} P`
+    + ` · 다음 마틴C ${formatConditionNumber(status?.bet_amount)} P`
+    + ` · 패배예상 PNL ${formatConditionNumber(status?.projected_pnl)} P`
+    + (stopped ? " · 중지" : " · 정상");
+};
+
+export const martinDrawdownStatusLabel = (status) => {
+  const start = Number(status?.configured_drawdown_start || 0);
+  const percent = Number(status?.drawdown_percent || 0);
+  if (start <= 0 || percent <= 0) return "사용안함";
+  const state = status?.reason === "martin_c_drawdown_reached"
+    ? " · 중지"
+    : status?.drawdown_armed
+      ? ` · 감시중 (최고 ${formatConditionNumber(status?.drawdown_peak)} P)`
+      : " · 대기";
+  return `${formatConditionNumber(start)} P 이상 달성 시 최고 마틴C PNL에서 ${formatConditionNumber(percent)}% 이상 손실 나면 배팅 정지${state}`;
+};
+
+export const martinProfitStopStatusLabel = (status) => {
+  const afterRound = Number(status?.profit_after_round || 0);
+  if (afterRound <= 0) return "사용안함";
+  const state = status?.reason === "martin_c_profit_bet_limit_reached"
+    ? ` · 마틴C PNL ${formatConditionNumber(status?.trigger_pnl)} P / 마틴C 배팅 ${formatConditionNumber(status?.trigger_bet_amount)} P · 중지`
+    : " · 정상";
+  return `${Math.round(afterRound)}회차 이후 마틴C PNL이 +인 경우 현재 마틴C PNL 이상 배팅 금지${state}`;
+};
+
+export const martinBetStopReasonLabel = (status) => {
+  if (!status?.stopped) return null;
+  if (status.reason === "martin_c_goal_reached") {
+    return `마틴C PNL ${formatConditionNumber(status.trigger_pnl)} P가 목표 ${formatConditionNumber(status.target)} P에 도달`;
+  }
+  if (status.reason === "martin_c_current_loss_reached") {
+    return `마틴C PNL ${formatConditionNumber(status.trigger_pnl)} P가 종료 기준 -${formatConditionNumber(status.configured_loss_limit)} P 이하에 도달`;
+  }
+  if (status.reason === "martin_c_projected_loss_reached") {
+    return `마틴C PNL ${formatConditionNumber(status.trigger_pnl)} P에서 다음 마틴C 배팅 ${formatConditionNumber(status.trigger_bet_amount)} P 패배 시 예상손실 기준에 도달`;
+  }
+  if (status.reason === "martin_c_drawdown_reached") {
+    return `마틴C PNL ${formatConditionNumber(status.trigger_pnl)} P가 최고 ${formatConditionNumber(status.drawdown_peak)} P 대비 종료 기준 ${formatConditionNumber(status.drawdown_threshold)} P 이하에 도달`;
+  }
+  if (status.reason === "martin_c_profit_bet_limit_reached") {
+    return `마틴C PNL ${formatConditionNumber(status.trigger_pnl)} P 상태에서 다음 마틴C 배팅 ${formatConditionNumber(status.trigger_bet_amount)} P가 현재 마틴C PNL 이상에 도달`;
+  }
+  return "마틴C 운영조건에 도달";
+};
+
+export const martinCBetAdjustmentStatusLabel = (status) => {
+  if (!status) return "사용안함";
+  const original = formatConditionNumber(status.original_net_amount);
+  const adjusted = formatConditionNumber(status.adjusted_net_amount);
+  if (status.mode === "fixed" && Number(status.fixed_amount || 0) > 0) {
+    return `C 합산 ${original} P → 고정 ${adjusted} P`;
+  }
+  const applied = Object.entries(status.items || {})
+    .filter(([, item]) => item?.applied_condition)
+    .map(([key, item]) => {
+      const cNo = key === "martin_c" ? 1 : Number(key.replace("martin_c", ""));
+      return `C${cNo} ${formatConditionNumber(item.net_amount)}→${formatConditionNumber(item.adjusted_net_amount)} P (`
+        + `${formatConditionNumber(item.applied_condition.start_amount)} P 초과~${formatConditionNumber(item.applied_condition.end_amount)} P 이하, `
+        + `${formatConditionNumber(item.applied_condition.bet_percent)}%)`;
+    });
+  return applied.length > 0 ? applied.join(" / ") : "적용 없음";
 };
 
 export const ghRoundPnlStopStatusLabel = (overallStop) => {
@@ -102,7 +180,7 @@ export const ghBetStopReasonLabel = (roundState) => {
   }
   if (roundState?.profit_stop?.stopped) {
     const profitStop = roundState.profit_stop;
-    return `GH PNL ${formatConditionNumber(profitStop.trigger_pnl)} P 상태에서 ${Math.max(0, Number(profitStop.stopped_at_round || 0))}회차 GH 배팅액 ${formatConditionNumber(profitStop.trigger_bet_amount)} P가 종료 기준 ${formatConditionNumber(profitStop.bet_limit)} P 이상에 도달 (수익보호)`;
+    return `GH PNL ${formatConditionNumber(profitStop.trigger_pnl)} P 상태에서 ${Math.max(0, Number(profitStop.stopped_at_round || 0))}회차 GH 배팅액 ${formatConditionNumber(profitStop.trigger_bet_amount)} P가 현재 GH PNL 이상에 도달 (수익보호)`;
   }
   return null;
 };

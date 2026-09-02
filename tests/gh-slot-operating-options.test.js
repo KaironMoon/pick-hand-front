@@ -7,6 +7,12 @@ import {
   ghProfitStopStatusLabel,
   ghRoundPnlStopStatusLabel,
   ghSlotLossStatusLabel,
+  martinBetStopReasonLabel,
+  martinCBetAdjustmentStatusLabel,
+  martinDrawdownStatusLabel,
+  martinGoalStatusLabel,
+  martinProfitStopStatusLabel,
+  martinSlotLossStatusLabel,
 } from "../src/pages/ghgame/slot-operating-options.js";
 
 test("GH slot loss status shows current and projected loss conditions", () => {
@@ -125,13 +131,13 @@ test("GH betting stop reason follows the persisted server round state", () => {
     ghBetStopReasonLabel({
       profit_stop: {
         stopped: true,
-        trigger_pnl: 20,
+        trigger_pnl: 10,
         stopped_at_round: 11,
         trigger_bet_amount: 12.3,
         bet_limit: 10,
       },
     }),
-    "GH PNL 20 P 상태에서 11회차 GH 배팅액 12.3 P가 종료 기준 10 P 이상에 도달 (수익보호)",
+    "GH PNL 10 P 상태에서 11회차 GH 배팅액 12.3 P가 현재 GH PNL 이상에 도달 (수익보호)",
   );
   assert.equal(
     ghBetStopReasonLabel({ overall_stop: {}, profit_stop: { stopped: false } }),
@@ -141,7 +147,8 @@ test("GH betting stop reason follows the persisted server round state", () => {
 
 test("GH profit protection status distinguishes disabled, active, and stopped", () => {
   assert.equal(ghProfitStopStatusLabel({}), "사용안함");
-  assert.match(ghProfitStopStatusLabel({ after_round: 20, bet_limit: 5 }), /정상$/);
+  assert.match(ghProfitStopStatusLabel({ after_round: 20, bet_limit: 0 }), /정상$/);
+  assert.match(ghProfitStopStatusLabel({ after_round: 20 }), /현재 GH PNL 이상 배팅 금지/);
   assert.match(ghProfitStopStatusLabel({ after_round: 20, bet_limit: 5, stopped: true, mode: "actual", trigger_pnl: 3, trigger_bet_amount: 5 }), /GH PNL 3 P \/ GH 배팅 5 P · 중지$/);
 });
 
@@ -190,5 +197,86 @@ test("fixed criteria keep combined goal and GH profit-protection wording", () =>
   assert.match(
     ghProfitStopStatusLabel({ after_round: 20, bet_limit: 5, stopped: true, trigger_pnl: 3, trigger_bet_amount: 5 }),
     /GH PNL 3 P \/ GH 배팅 5 P · 중지$/,
+  );
+});
+
+test("Martin C operating labels use C-only PNL and bet wording", () => {
+  assert.equal(martinGoalStatusLabel({}), "사용안함");
+  assert.match(
+    martinGoalStatusLabel({ configured_target: 20, pnl: 15 }),
+    /목표 20 P · 마틴C PNL 15 P · 정상$/,
+  );
+  assert.match(
+    martinSlotLossStatusLabel({
+      configured_loss_limit: 10,
+      configured_projected_loss_limit: 20,
+      pnl: -5,
+      bet_amount: 15,
+      projected_pnl: -20,
+      reason: "martin_c_projected_loss_reached",
+    }),
+    /다음 마틴C 15 P · 패배예상 PNL -20 P · 중지$/,
+  );
+  assert.match(
+    martinDrawdownStatusLabel({
+      configured_drawdown_start: 10,
+      drawdown_percent: 20,
+      drawdown_armed: true,
+      drawdown_peak: 12,
+    }),
+    /최고 마틴C PNL.*감시중 \(최고 12 P\)$/,
+  );
+  assert.match(
+    martinProfitStopStatusLabel({
+      profit_after_round: 20,
+      reason: "martin_c_profit_bet_limit_reached",
+      trigger_pnl: 3,
+      trigger_bet_amount: 5,
+    }),
+    /마틴C PNL 3 P \/ 마틴C 배팅 5 P · 중지$/,
+  );
+});
+
+test("Martin C stop reason reports the persisted trigger", () => {
+  assert.equal(martinBetStopReasonLabel({}), null);
+  assert.equal(
+    martinBetStopReasonLabel({
+      stopped: true,
+      reason: "martin_c_profit_bet_limit_reached",
+      trigger_pnl: 3,
+      trigger_bet_amount: 5,
+    }),
+    "마틴C PNL 3 P 상태에서 다음 마틴C 배팅 5 P가 현재 마틴C PNL 이상에 도달",
+  );
+});
+
+test("Martin C amount adjustment shows fixed priority and per-C down results", () => {
+  assert.equal(martinCBetAdjustmentStatusLabel(), "사용안함");
+  assert.equal(
+    martinCBetAdjustmentStatusLabel({
+      mode: "fixed",
+      fixed_amount: 10,
+      original_net_amount: 40,
+      adjusted_net_amount: 10,
+    }),
+    "C 합산 40 P → 고정 10 P",
+  );
+  assert.equal(
+    martinCBetAdjustmentStatusLabel({
+      mode: "down",
+      items: {
+        martin_c: {
+          net_amount: 120,
+          adjusted_net_amount: 36,
+          applied_condition: { start_amount: 100, end_amount: 200, bet_percent: 30 },
+        },
+        martin_c2: {
+          net_amount: 80,
+          adjusted_net_amount: 80,
+          applied_condition: null,
+        },
+      },
+    }),
+    "C1 120→36 P (100 P 초과~200 P 이하, 30%)",
   );
 });

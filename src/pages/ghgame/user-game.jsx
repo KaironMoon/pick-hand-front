@@ -20,7 +20,19 @@ import { getRoundStateSubgameBasis } from "./subgame-basis.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
 import { buildGoalStatusItems, formatGoalIndicator, formatGoalTarget } from "./goal-status.js";
 import { resolvePickMartinSummary } from "./pick-martin-summary.js";
-import { ghBetStopReasonLabel, ghDrawdownStatusLabel, ghProfitStopStatusLabel, ghRoundPnlStopStatusLabel, ghSlotLossStatusLabel } from "./slot-operating-options.js";
+import {
+  ghBetStopReasonLabel,
+  ghDrawdownStatusLabel,
+  ghProfitStopStatusLabel,
+  ghRoundPnlStopStatusLabel,
+  ghSlotLossStatusLabel,
+  martinBetStopReasonLabel,
+  martinCBetAdjustmentStatusLabel,
+  martinDrawdownStatusLabel,
+  martinGoalStatusLabel,
+  martinProfitStopStatusLabel,
+  martinSlotLossStatusLabel,
+} from "./slot-operating-options.js";
 import {
   GH_KEEP_COUNT_DEFAULT,
   GH_KEEP_COUNT_MAX,
@@ -47,6 +59,13 @@ if (typeof document !== "undefined" && !document.getElementById("gh-blink-style"
 
 const LSC_COLOR = "#000000";  // LSC: 검정 (모든 배경에서 고대비)
 const DS_COLOR = "#FF6600";   // 데칼/그림자: 형광 주황
+const MARTIN_C_ITEMS = [
+  ["martin_c", "C1"],
+  ["martin_c2", "C2"],
+  ["martin_c3", "C3"],
+  ["martin_c4", "C4"],
+  ["martin_c5", "C5"],
+];
 
 const buildShoePreviewGrid = (actuals) => {
   const cols = Math.max(1, Math.ceil((actuals?.length || 0) / GRID_ROWS));
@@ -224,7 +243,11 @@ function GhLossStopStatus({ roundState, autoStatus }) {
     : roundState?.overall_stop;
   const martinRecovery = roundState?.martin_recovery ?? autoStatus?.martin_recovery;
   const recoveryTargets = martinRecovery?.targets || {};
-  const recoveryNames = { martin_z: "Z", martin_b: "B", martin_c: "C" };
+  const recoveryNames = {
+    martin_z: "Z",
+    martin_b: "B",
+    ...Object.fromEntries(MARTIN_C_ITEMS),
+  };
   const pendingRecovery = Object.entries(recoveryTargets)
     .filter(([, target]) => target?.required && !target?.recovered)
     .map(([key]) => recoveryNames[key] || key);
@@ -234,6 +257,9 @@ function GhLossStopStatus({ roundState, autoStatus }) {
       ? "마틴 회수 완료 · 최종 배팅 정지"
       : null;
   const betStopReason = ghBetStopReasonLabel(roundState);
+  const martinOperatingStop = roundState?.martin_c_operating_stop;
+  const martinCBetAdjustment = roundState?.martin_c_bet_adjustment;
+  const martinStopReason = martinBetStopReasonLabel(martinOperatingStop);
   return (
     <>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: betStopReason ? 0.5 : 1.5, px: 1, py: 0.7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
@@ -242,13 +268,28 @@ function GhLossStopStatus({ roundState, autoStatus }) {
           슬롯 GH 손실조건: {detail}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: drawdownStatus?.reason === "drawdown_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
-          손실종료조건: {ghDrawdownStatusLabel(drawdownStatus)}
+          GH손실종료조건: {ghDrawdownStatusLabel(drawdownStatus)}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.profit_stop?.stopped ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
-          수익보호: {ghProfitStopStatusLabel(roundState?.profit_stop)}
+          GH수익보호: {ghProfitStopStatusLabel(roundState?.profit_stop)}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.overall_stop?.reason === "round_gh_pnl_range_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
           구간 GH PNL: {ghRoundPnlStopStatusLabel(roundState?.overall_stop)}
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_c_goal_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
+          마틴C 목표금액: {martinGoalStatusLabel(martinOperatingStop)}
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: ["martin_c_current_loss_reached", "martin_c_projected_loss_reached"].includes(martinOperatingStop?.reason) ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
+          슬롯 마틴C 손실조건: {martinSlotLossStatusLabel(martinOperatingStop)}
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_c_drawdown_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
+          마틴C손실종료조건: {martinDrawdownStatusLabel(martinOperatingStop)}
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_c_profit_bet_limit_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
+          마틴C수익보호: {martinProfitStopStatusLabel(martinOperatingStop)}
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: "#ffab91", fontWeight: 800 }}>
+          마틴C 금액조정: {martinCBetAdjustmentStatusLabel(martinCBetAdjustment)}
         </Typography>
         {recoveryDetail && (
           <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,82,82,.55)", borderRadius: 1, color: martinRecovery?.active ? "#ffcc80" : "#ff8a80", fontWeight: 900 }}>
@@ -260,6 +301,13 @@ function GhLossStopStatus({ roundState, autoStatus }) {
         <Box sx={{ mb: 1.5, px: 1, py: 0.65, border: "1px solid rgba(255,82,82,.5)", borderRadius: 1, backgroundColor: "rgba(255,82,82,.08)" }}>
           <Typography variant="caption" sx={{ color: "#ff8a80", fontWeight: 900 }}>
             GH 배팅 종료 이유: {betStopReason}
+          </Typography>
+        </Box>
+      )}
+      {martinStopReason && (
+        <Box sx={{ mb: 1.5, px: 1, py: 0.65, border: "1px solid rgba(255,87,34,.55)", borderRadius: 1, backgroundColor: "rgba(255,87,34,.08)" }}>
+          <Typography variant="caption" sx={{ color: "#ff8a80", fontWeight: 900 }}>
+            마틴C 배팅 종료 이유: {martinStopReason} (GH와 마틴 Z/B 배팅은 계속)
           </Typography>
         </Box>
       )}
@@ -351,6 +399,9 @@ function GhRoundAmountTable({
     },
   ];
   const cellCount = 80;
+  const amountGridRowCount = 10;
+  const amountGridColumnCount = Math.ceil(cellCount / amountGridRowCount);
+  const amountGridWidth = amountGridColumnCount * 84 + (amountGridColumnCount - 1) * 2;
   const strategyCells = table.cells || [];
   const actualCells = actualTable.cells || [];
   const cells = Array.from({ length: cellCount }, (_, idx) => {
@@ -376,6 +427,10 @@ function GhRoundAmountTable({
       martin_z_pnl: Number(actualCell.server_component_pnl_p?.martin_z || 0),
       martin_b_pnl: Number(actualCell.server_component_pnl_p?.martin_b || 0),
       martin_c_pnl: Number(actualCell.server_component_pnl_p?.martin_c || 0),
+      martin_c2_pnl: Number(actualCell.server_component_pnl_p?.martin_c2 || 0),
+      martin_c3_pnl: Number(actualCell.server_component_pnl_p?.martin_c3 || 0),
+      martin_c4_pnl: Number(actualCell.server_component_pnl_p?.martin_c4 || 0),
+      martin_c5_pnl: Number(actualCell.server_component_pnl_p?.martin_c5 || 0),
     };
   });
   const fmt = (v) => v === "N/A" ? "-" : Number(v || 0).toFixed(1);
@@ -396,7 +451,7 @@ function GhRoundAmountTable({
     ["PnL", Number(pnlBreakdown.globalhit || 0)],
     ["Z", Number(pnlBreakdown.martin_z || 0)],
     ["B", Number(pnlBreakdown.martin_b || 0)],
-    ["C", Number(pnlBreakdown.martin_c || 0)],
+    ...MARTIN_C_ITEMS.map(([key, label]) => [label, Number(pnlBreakdown[key] || 0)]),
   ];
   const basePnl = componentPnls[0][1];
   const martinPnls = componentPnls.slice(1);
@@ -407,13 +462,8 @@ function GhRoundAmountTable({
     ? Number(actualTable.server_globalhit_bet_p ?? globalhitAggregate.amount ?? 0)
     : Number(globalhitAggregate.amount || 0);
   const globalhitDirectionColor = globalhitDirection === "P" ? "#1565d8" : globalhitDirection === "B" ? "#e53935" : "#555";
-  const martinContributionAmount = (cell) => [
-    cell?.pick_martin_amount,
-    cell?.martin_b_amount,
-    cell?.martin_c_p_amount,
-    cell?.martin_c_b_amount,
-  ].reduce((sum, value) => sum + Number(value || 0), 0);
-  const currentMartinAmount = martinContributionAmount(strategyCells[currentRoundIdx]);
+  const martinNetAmount = (cell) => Number(cell?.martin_net_amount || 0);
+  const currentMartinAmount = martinNetAmount(strategyCells[currentRoundIdx]);
   const betAmountLabel = amountMode !== "actual" && currentMartinAmount > 0
     ? `${fmt(totalAmount)} (${fmt(currentMartinAmount)})`
     : fmt(totalAmount);
@@ -445,7 +495,7 @@ function GhRoundAmountTable({
   };
   return (
     <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1.4, p: 0.5, backgroundColor: "#0d1014", borderRadius: 1 }}>
-      <Box sx={{ position: "relative", display: "flex", alignItems: "stretch", gap: 0.5, width: "100%" }}>
+      <Box sx={{ position: "relative", display: "flex", alignItems: "stretch", gap: 0.5, width: amountGridWidth, maxWidth: "100%" }}>
         {slotBusy && (
           <Box
             role="status"
@@ -533,7 +583,7 @@ function GhRoundAmountTable({
           <span>전체 PNL</span><span>{fmt(totalPnl)}</span>
         </Box>
       </Box>
-      <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "stretch", gap: 0.5, width: "100%" }}>
+      <Box sx={{ display: "flex", justifyContent: "flex-start", alignItems: "stretch", gap: 0.5, width: "100%", flexWrap: "wrap" }}>
         <Box sx={{ width: 28, minWidth: 28, border: "1px solid #3f4650", backgroundColor: globalhitDirectionColor, color: "#fff", fontSize: 13, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {globalhitDirection || "-"}
         </Box>
@@ -544,19 +594,22 @@ function GhRoundAmountTable({
           <span>글로벌히트 PNL</span><span>{fmt(basePnl)}</span>
         </Box>
         {martinPnls.map(([label, value]) => (
-          <Box key={label} sx={{ width: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: pnlColor(value), fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span>{label} PnL</span><span>{fmt(value)}</span>
-          </Box>
+          <React.Fragment key={label}>
+            {label === "C1" && <Box sx={{ flexBasis: "100%", height: 0 }} />}
+            <Box sx={{ width: label === "Z" ? 112 : 118, border: "1px solid #3f4650", backgroundColor: "#111821", color: pnlColor(value), fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>{label} PnL</span><span>{fmt(value)}</span>
+            </Box>
+          </React.Fragment>
         ))}
       </Box>
-      <Box sx={{ display: "grid", gridTemplateRows: "repeat(10, 31px)", gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
+      <Box sx={{ display: "grid", gridTemplateRows: `repeat(${amountGridRowCount}, 31px)`, gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
         {Array.from({ length: cellCount }, (_, idx) => {
-          const martinAmount = martinContributionAmount(strategyCells[idx]);
+          const martinAmount = martinNetAmount(strategyCells[idx]);
           const amountLabel = amountMode !== "actual" && martinAmount > 0
             ? `${fmt(cells[idx]?.amount)} (${fmt(martinAmount)})`
             : fmt(cells[idx]?.amount);
           return (
-            <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / Z+B+C ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)} / C ${fmt(cells[idx]?.martin_c_pnl)}`}>
+            <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / Z+B+C1~C5 상계 ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)}${MARTIN_C_ITEMS.map(([key, label]) => ` / ${label} ${fmt(cells[idx]?.[`${key}_pnl`])}`).join("")}`}>
               <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
               <Box sx={{ color: "#fff", fontSize: martinAmount > 0 && amountMode !== "actual" ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>{amountLabel}</Box>
             </Box>
@@ -2368,46 +2421,89 @@ export default function GhUserGamePage() {
                 </Box>
 
                 {/* 행1-2: 배팅금액판과 실제 주문에 합산되는 조건부 마틴 B/C */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                  {(() => {
+                {(() => {
+                  const itemSx = { width: 120, display: "flex", alignItems: "center", gap: "4px" };
+                  const conditionRowSx = {
+                    width: 372,
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 120px)",
+                    columnGap: "6px",
+                  };
+                  const compactTagSx = (color) => ({
+                    ...tagSx(color),
+                    width: 44,
+                    minWidth: 44,
+                    px: 0,
+                  });
+                  const compactFieldSx = {
+                    ...fieldSx,
+                    width: 72,
+                    minWidth: 72,
+                    px: 0.3,
+                    gap: 0.25,
+                    boxSizing: "border-box",
+                    overflow: "hidden",
+                  };
+
+                  const martinItems = (() => {
                     const martinB = roundState?.conditional_martins?.martin_b || {};
-                    const amount = Number(martinB.amount || 0);
-                    const direction = martinB.direction || "";
-                    return (
-                      <>
-                        <Box sx={tagSx("#7b1fa2")} title="마틴B (배팅액 합산)">
-                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>B</Typography>
-                        </Box>
-                        <Box sx={{ ...fieldSx, minWidth: 84, px: 0.6 }}>
-                          <Typography variant="caption" sx={{ fontSize: 10, color: "#ba68c8" }}>
-                            {martinB.active ? `${martinB.step || 1}S` : "대기"}
+                    return [{
+                      key: "martin_b",
+                      label: "B",
+                      color: "#7b1fa2",
+                      amount: Number(martinB.amount || 0),
+                      direction: martinB.direction || "",
+                      active: !!martinB.active,
+                      step: martinB.step || 1,
+                    }, ...MARTIN_C_ITEMS.map(([key, label]) => {
+                      const martinC = roundState?.conditional_martins?.[key] || {};
+                      return {
+                        key,
+                        label,
+                        color: "#ef6c00",
+                        amount: Number(martinC.amount || 0),
+                        direction: martinC.direction || "",
+                      };
+                    })];
+                  })();
+
+                  const renderMartinItem = (item) => (
+                    <Box key={item.key} sx={itemSx}>
+                      <Box sx={compactTagSx(item.color)} title={`마틴${item.label} 배팅액`}>
+                        <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{item.label}</Typography>
+                      </Box>
+                      <Box sx={compactFieldSx}>
+                        {item.label === "B" && item.active && (
+                          <Typography variant="caption" sx={{ fontSize: 9, color: "#ba68c8", whiteSpace: "nowrap" }}>
+                            {item.step}S
                           </Typography>
-                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: amount > 0 ? "#ce93d8" : "#666" }}>
-                            {amount > 0 ? `${amount.toLocaleString()}${direction}` : "0"}
-                          </Typography>
-                        </Box>
-                      </>
-                    );
-                  })()}
-                  {(() => {
-                    const martinC = roundState?.conditional_martins?.martin_c || {};
-                    const amount = Number(martinC.amount || 0);
-                    const direction = martinC.direction || "";
-                    return (
-                      <>
-                        <Box sx={tagSx("#ef6c00")} title="마틴C 합산 (배팅액 합산)">
-                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>C</Typography>
-                        </Box>
-                        <Box sx={{ ...fieldSx, minWidth: 84, px: 0.6 }}>
-                          <Typography variant="caption" sx={{ fontSize: 10, color: "#ffb74d" }}>합산</Typography>
-                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: amount > 0 ? "#ff9800" : "#666" }}>
-                            {amount > 0 ? `${amount.toLocaleString()}${direction}` : "0"}
-                          </Typography>
-                        </Box>
-                      </>
-                    );
-                  })()}
-                </Box>
+                        )}
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: 10,
+                            fontWeight: "bold",
+                            color: item.amount > 0 ? (item.label === "B" ? "#ce93d8" : "#ff9800") : "#666",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {item.amount > 0 ? `${item.amount.toLocaleString()}${item.direction}` : "0"}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+
+                  return (
+                    <Box sx={{ width: 372, display: "flex", flexDirection: "column", rowGap: 0.5 }}>
+                      <Box sx={conditionRowSx}>
+                        {martinItems.slice(0, 3).map(renderMartinItem)}
+                      </Box>
+                      <Box sx={conditionRowSx}>
+                        {martinItems.slice(3, 6).map(renderMartinItem)}
+                      </Box>
+                    </Box>
+                  );
+                })()}
 
                 {/* 행2: 회차 + P/B/T 결과 입력 + 횟수 + del */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>

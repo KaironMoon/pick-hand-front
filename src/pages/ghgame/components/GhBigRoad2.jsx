@@ -489,7 +489,7 @@ function NormalSection({ section, ctx, selectedBasis, onSelectBasis }) {
           ))}
         </Block>
       )}
-      <Block title="마틴C" color={MARTIN_C_COLOR}>
+      <Block title="마틴C1" color={MARTIN_C_COLOR}>
         {section.rows.map(([label, key]) => {
           const hCells = getMartinCCells(ctx, key, "assist_h");
           const qCells = getMartinCCells(ctx, key, "assist_q");

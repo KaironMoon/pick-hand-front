@@ -344,8 +344,8 @@ function StrategyTable({ data, showLabels = true, maxBlinkActive, onMaxLabelClic
         <SimpleRow data={data} dataKey="stage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label={rowLabel("단계-AS")} labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="idx1" render={(v, i, row) => amountText(v, row.idx1Zone?.[i])} pos="mid" label={rowLabel("회차P")} labelColor={LBL_RED} />
         <SimpleRow data={data} dataKey="idx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("누적P")} labelColor={LBL_RED} />
-        <SimpleRow data={data} dataKey="martinCStepH" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("마틴C 단계")} labelColor={LBL_ORANGE} />
-        <SimpleRow data={data} dataKey="martinCAmountH" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("마틴C 금액")} labelColor={LBL_ORANGE} />
+        <SimpleRow data={data} dataKey="martinCStepH" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("마틴C1 단계")} labelColor={LBL_ORANGE} />
+        <SimpleRow data={data} dataKey="martinCAmountH" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("마틴C1 금액")} labelColor={LBL_ORANGE} />
         <QAssistRow data={data} pos="mid" label={rowLabel("어시Q픽")} />
         <SimpleRow data={data} dataKey="qWait2" render={waitCell} pos="mid" label={rowLabel("쿼터연속")}
           shouldBlink={(v) => isMissStreakAtLeast(v, MISS_STREAK_BLINK_MIN)} />
@@ -358,8 +358,8 @@ function StrategyTable({ data, showLabels = true, maxBlinkActive, onMaxLabelClic
         <SimpleRow data={data} dataKey="qstage" render={(v) => <span style={{ color: "#e0e0e0" }}>{v}</span>} pos="mid" label={rowLabel("단계-AS")} />
         <SimpleRow data={data} dataKey="qidx1" render={(v, i, row) => amountText(v, row.qidx1Zone?.[i])} pos="mid" label={rowLabel("쿼터P")} />
         <SimpleRow data={data} dataKey="qidx2" render={(v) => <span style={{ color: String(v).startsWith("-") ? "#ef5350" : "#2e9e5b", fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("누적P")} />
-        <SimpleRow data={data} dataKey="martinCStepQ" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("마틴C 단계")} labelColor={LBL_ORANGE} />
-        <SimpleRow data={data} dataKey="martinCAmountQ" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="last" label={rowLabel("마틴C 금액")} labelColor={LBL_ORANGE} />
+        <SimpleRow data={data} dataKey="martinCStepQ" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="mid" label={rowLabel("마틴C1 단계")} labelColor={LBL_ORANGE} />
+        <SimpleRow data={data} dataKey="martinCAmountQ" render={(v) => <span style={{ color: LBL_ORANGE, fontWeight: "bold" }}>{v}</span>} pos="last" label={rowLabel("마틴C1 금액")} labelColor={LBL_ORANGE} />
       </tbody>
     </Box>
   );
