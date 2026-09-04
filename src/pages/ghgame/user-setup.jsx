@@ -342,6 +342,87 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
   );
 }
 
+const EMPTY_MARTIN_PATTERN_RULE = {
+  enabled: false,
+  pattern: [],
+  include_inverse: false,
+};
+
+function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
+  const rule = martin[ruleKey] && typeof martin[ruleKey] === "object"
+    ? martin[ruleKey]
+    : EMPTY_MARTIN_PATTERN_RULE;
+  const cells = Array.from({ length: 6 }, (_, index) => {
+    const value = Array.isArray(rule.pattern) ? rule.pattern[index] : "";
+    return value === "P" || value === "B" ? value : "";
+  });
+  const updateRule = (patch) => onChange({
+    ...martin,
+    [ruleKey]: { ...EMPTY_MARTIN_PATTERN_RULE, ...rule, ...patch },
+  });
+  const cycleCell = (index) => {
+    const next = [...cells];
+    next[index] = next[index] === "" ? "B" : next[index] === "B" ? "P" : "";
+    updateRule({ pattern: next });
+  };
+  return (
+    <tr>
+      <td style={{ ...labelCellStyle, color }}>{label}</td>
+      <td colSpan={5} style={normalCell}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
+          {cells.map((value, index) => (
+            <Box
+              key={`${ruleKey}-${index}`}
+              onClick={() => cycleCell(index)}
+              title="클릭할 때마다 빈칸 → B → P 순서로 변경"
+              sx={{
+                width: 28,
+                height: 28,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "1px solid #777",
+                borderRadius: 0.5,
+                backgroundColor: value === "B" ? "#d32f2f" : value === "P" ? "#1976d2" : "#333",
+                color: "#fff",
+                fontWeight: "bold",
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              {value}
+            </Box>
+          ))}
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={Boolean(rule.include_inverse)}
+              onChange={(event) => updateRule({ include_inverse: event.target.checked })}
+            />
+            BP반전도 포함
+          </label>
+          <Box
+            onClick={() => updateRule({ enabled: !rule.enabled })}
+            sx={{
+              ml: 0.5,
+              px: 1.25,
+              py: 0.5,
+              borderRadius: 1,
+              backgroundColor: rule.enabled ? GREEN : "#333",
+              color: rule.enabled ? "#1b2e1b" : "#888",
+              fontWeight: "bold",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            {rule.enabled ? "사용함" : "사용안함"}
+          </Box>
+        </Box>
+      </td>
+    </tr>
+  );
+}
+
 function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
   const isB = kind === "B";
   const color = isB ? "#6a1b9a" : "#ef6c00";
@@ -396,10 +477,17 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
           {isB
             ? "이상에서 1단계 발동"
             : triggerMode === "S"
-              ? "단계가 설정에 도달후 다음회차부터 1단계 발동"
-              : "연속 미적중 도달 후 다음 회차부터 1단계 발동"}
+              ? "설정 단계와 정확히 일치한 다음 회차부터 1단계 발동"
+              : "연속 미적중이 설정값과 정확히 일치하면 1단계 발동"}
         </td>
       </tr>
+      <MartinPatternRow
+        martin={martin}
+        onChange={onChange}
+        ruleKey="pattern_block"
+        label="패턴일 때 배팅 안 하기"
+        color={color}
+      />
       <tr>
         <td style={{ ...labelCellStyle, color }}>배팅금지</td>
         <td colSpan={2} style={normalCell}>설정 회차부터 금지</td>
@@ -423,6 +511,20 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
         />
         <td colSpan={2} style={normalCell}>0은 제한 없음</td>
       </tr>
+      {!isB && (
+        <>
+          <tr>
+            <td colSpan={6} style={normalCell}>이 배팅은 별도 트랙으로 배팅됩니다.</td>
+          </tr>
+          <MartinPatternRow
+            martin={martin}
+            onChange={onChange}
+            ruleKey="pattern_only"
+            label="패턴일 때만 배팅하기"
+            color={color}
+          />
+        </>
+      )}
     </>
   );
 }
@@ -1749,6 +1851,26 @@ const DEFAULT_MARTIN = {
   step_max: 20,
   amounts: new Array(20).fill(0),
 };
+const DEFAULT_MARTIN_Z = {
+  ...DEFAULT_MARTIN,
+  pattern_block: { ...EMPTY_MARTIN_PATTERN_RULE },
+  pattern_only: { ...EMPTY_MARTIN_PATTERN_RULE },
+};
+const DEFAULT_MARTIN_B = {
+  ...DEFAULT_MARTIN,
+  trigger_bet_amount: 0,
+  stop_bet_round: 0,
+  pattern_block: { ...EMPTY_MARTIN_PATTERN_RULE },
+};
+const DEFAULT_MARTIN_C = {
+  ...DEFAULT_MARTIN,
+  trigger_mode: "M",
+  trigger_miss_streak: 0,
+  trigger_step: 0,
+  stop_bet_round: 0,
+  pattern_block: { ...EMPTY_MARTIN_PATTERN_RULE },
+  pattern_only: { ...EMPTY_MARTIN_PATTERN_RULE },
+};
 const DEFAULT_FAIL = {
   ...DEFAULT_MARTIN,
   fail_count: 2,
@@ -1990,14 +2112,14 @@ export default function GhUserSetupPage() {
   if (!config) return <Box sx={{ p: 2, color: "#888" }}>불러오는 중...</Box>;
 
   const martinA = config.martin_a || { ...DEFAULT_MARTIN, enabled: true };
-  const martinZ = config.martin_z || { ...DEFAULT_MARTIN };
-  const martinB = config.martin_b || { ...DEFAULT_MARTIN, trigger_bet_amount: 0, stop_bet_round: 0 };
-  const martinC = config.martin_c || { ...DEFAULT_MARTIN, trigger_mode: "M", trigger_miss_streak: 0, trigger_step: 0, stop_bet_round: 0 };
+  const martinZ = config.martin_z || { ...DEFAULT_MARTIN_Z };
+  const martinB = config.martin_b || { ...DEFAULT_MARTIN_B };
+  const martinC = config.martin_c || { ...DEFAULT_MARTIN_C };
   const martinCs = [
     ["martin_c", "마틴C1", martinC],
     ...[2, 3, 4, 5].map((number) => {
       const key = `martin_c${number}`;
-      return [key, `마틴C${number}`, config[key] || { ...DEFAULT_MARTIN, trigger_mode: "M", trigger_miss_streak: 0, trigger_step: 0, stop_bet_round: 0 }];
+      return [key, `마틴C${number}`, config[key] || { ...DEFAULT_MARTIN_C }];
     }),
   ];
   const cruise = config.cruise || { ...DEFAULT_MARTIN };
@@ -2747,6 +2869,20 @@ export default function GhUserSetupPage() {
             <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={(m) => updateMartin("martin_a", m)} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={(m) => updateMartin("martin_z", m)} />
+            <MartinPatternRow
+              martin={martinZ}
+              onChange={(m) => updateMartin("martin_z", m)}
+              ruleKey="pattern_block"
+              label="패턴일 때 배팅 안 하기"
+              color="#1565c0"
+            />
+            <MartinPatternRow
+              martin={martinZ}
+              onChange={(m) => updateMartin("martin_z", m)}
+              ruleKey="pattern_only"
+              label="패턴일 때만 배팅하기"
+              color="#1565c0"
+            />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             <ConditionalMartinSection kind="B" martin={martinB} onChange={(m) => updateMartin("martin_b", m)} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
