@@ -346,6 +346,7 @@ const EMPTY_MARTIN_PATTERN_RULE = {
   enabled: false,
   pattern: [],
   include_inverse: false,
+  direction: "",
 };
 
 function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
@@ -356,6 +357,8 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
     const value = Array.isArray(rule.pattern) ? rule.pattern[index] : "";
     return value === "P" || value === "B" ? value : "";
   });
+  const usesFixedDirection = ruleKey === "pattern_only";
+  const direction = rule.direction === "P" || rule.direction === "B" ? rule.direction : "";
   const updateRule = (patch) => onChange({
     ...martin,
     [ruleKey]: { ...EMPTY_MARTIN_PATTERN_RULE, ...rule, ...patch },
@@ -364,6 +367,23 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
     const next = [...cells];
     next[index] = next[index] === "" ? "B" : next[index] === "B" ? "P" : "";
     updateRule({ pattern: next });
+  };
+  const cycleDirection = () => {
+    const next = direction === "" ? "B" : direction === "B" ? "P" : "";
+    updateRule({ direction: next });
+  };
+  const toggleEnabled = () => {
+    if (!rule.enabled && usesFixedDirection) {
+      const warnings = [];
+      if (Number(martin.step_max || 20) !== 1) {
+        warnings.push("패턴일 때만 배팅하기는 최고 1단계 사용을 권장합니다. 현재 최고 단계 설정으로 계속 진행합니다.");
+      }
+      if (!direction) {
+        warnings.push("배팅 방향이 비어 있어 패턴이 맞아도 발동하지 않습니다.");
+      }
+      if (warnings.length > 0) window.alert(warnings.join("\n"));
+    }
+    updateRule({ enabled: !rule.enabled });
   };
   return (
     <tr>
@@ -393,6 +413,31 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
               {value}
             </Box>
           ))}
+          {usesFixedDirection && (
+            <>
+              <span style={{ marginLeft: 6 }}>배팅방향</span>
+              <Box
+                onClick={cycleDirection}
+                title="클릭할 때마다 빈칸 → B → P 순서로 변경"
+                sx={{
+                  width: 28,
+                  height: 28,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid #777",
+                  borderRadius: 0.5,
+                  backgroundColor: direction === "B" ? "#d32f2f" : direction === "P" ? "#1976d2" : "#333",
+                  color: "#fff",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                {direction}
+              </Box>
+            </>
+          )}
           <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
             <input
               type="checkbox"
@@ -402,7 +447,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
             BP반전도 포함
           </label>
           <Box
-            onClick={() => updateRule({ enabled: !rule.enabled })}
+            onClick={toggleEnabled}
             sx={{
               ml: 0.5,
               px: 1.25,
