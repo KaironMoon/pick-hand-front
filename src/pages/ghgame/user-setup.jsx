@@ -349,95 +349,72 @@ const EMPTY_MARTIN_PATTERN_RULE = {
   direction: "",
 };
 
+const PATTERN_BLOCK_CELL_COUNT = 10;
+const PATTERN_ONLY_CELL_COUNT = 15;
+const PATTERN_ONLY_ROW_COUNT = 20;
+
+function PatternCell({ value, onClick, cellKey }) {
+  return (
+    <Box
+      key={cellKey}
+      onClick={onClick}
+      title="클릭할 때마다 빈칸 → B → P 순서로 변경"
+      sx={{
+        width: 28,
+        height: 28,
+        flex: "0 0 28px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        border: "1px solid #777",
+        borderRadius: 0.5,
+        backgroundColor: value === "B" ? "#d32f2f" : value === "P" ? "#1976d2" : "#333",
+        color: "#fff",
+        fontWeight: "bold",
+        cursor: "pointer",
+        userSelect: "none",
+      }}
+    >
+      {value}
+    </Box>
+  );
+}
+
+function patternCells(rule, count) {
+  return Array.from({ length: count }, (_, index) => {
+    const value = Array.isArray(rule.pattern) ? rule.pattern[index] : "";
+    return value === "P" || value === "B" ? value : "";
+  });
+}
+
+function cyclePatternCell(cells, index) {
+  const next = [...cells];
+  next[index] = next[index] === "" ? "B" : next[index] === "B" ? "P" : "";
+  return next;
+}
+
 function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   const rule = martin[ruleKey] && typeof martin[ruleKey] === "object"
     ? martin[ruleKey]
     : EMPTY_MARTIN_PATTERN_RULE;
-  const cells = Array.from({ length: 6 }, (_, index) => {
-    const value = Array.isArray(rule.pattern) ? rule.pattern[index] : "";
-    return value === "P" || value === "B" ? value : "";
-  });
-  const usesFixedDirection = ruleKey === "pattern_only";
-  const direction = rule.direction === "P" || rule.direction === "B" ? rule.direction : "";
+  const cells = patternCells(rule, PATTERN_BLOCK_CELL_COUNT);
   const updateRule = (patch) => onChange({
     ...martin,
     [ruleKey]: { ...EMPTY_MARTIN_PATTERN_RULE, ...rule, ...patch },
   });
-  const cycleCell = (index) => {
-    const next = [...cells];
-    next[index] = next[index] === "" ? "B" : next[index] === "B" ? "P" : "";
-    updateRule({ pattern: next });
-  };
-  const cycleDirection = () => {
-    const next = direction === "" ? "B" : direction === "B" ? "P" : "";
-    updateRule({ direction: next });
-  };
-  const toggleEnabled = () => {
-    if (!rule.enabled && usesFixedDirection) {
-      const warnings = [];
-      if (Number(martin.step_max || 20) !== 1) {
-        warnings.push("패턴일 때만 배팅하기는 최고 1단계 사용을 권장합니다. 현재 최고 단계 설정으로 계속 진행합니다.");
-      }
-      if (!direction) {
-        warnings.push("배팅 방향이 비어 있어 패턴이 맞아도 발동하지 않습니다.");
-      }
-      if (warnings.length > 0) window.alert(warnings.join("\n"));
-    }
-    updateRule({ enabled: !rule.enabled });
-  };
   return (
     <tr>
       <td style={{ ...labelCellStyle, color }}>{label}</td>
       <td colSpan={5} style={normalCell}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
           {cells.map((value, index) => (
-            <Box
+            <PatternCell
               key={`${ruleKey}-${index}`}
-              onClick={() => cycleCell(index)}
-              title="클릭할 때마다 빈칸 → B → P 순서로 변경"
-              sx={{
-                width: 28,
-                height: 28,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "1px solid #777",
-                borderRadius: 0.5,
-                backgroundColor: value === "B" ? "#d32f2f" : value === "P" ? "#1976d2" : "#333",
-                color: "#fff",
-                fontWeight: "bold",
-                cursor: "pointer",
-                userSelect: "none",
-              }}
-            >
-              {value}
-            </Box>
+              cellKey={`${ruleKey}-${index}`}
+              value={value}
+              onClick={() => updateRule({ pattern: cyclePatternCell(cells, index) })}
+            />
           ))}
-          {usesFixedDirection && (
-            <>
-              <span style={{ marginLeft: 6 }}>배팅방향</span>
-              <Box
-                onClick={cycleDirection}
-                title="클릭할 때마다 빈칸 → B → P 순서로 변경"
-                sx={{
-                  width: 28,
-                  height: 28,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "1px solid #777",
-                  borderRadius: 0.5,
-                  backgroundColor: direction === "B" ? "#d32f2f" : direction === "P" ? "#1976d2" : "#333",
-                  color: "#fff",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                }}
-              >
-                {direction}
-              </Box>
-            </>
-          )}
           <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
             <input
               type="checkbox"
@@ -447,7 +424,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
             BP반전도 포함
           </label>
           <Box
-            onClick={toggleEnabled}
+            onClick={() => updateRule({ enabled: !rule.enabled })}
             sx={{
               ml: 0.5,
               px: 1.25,
@@ -463,6 +440,107 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
             {rule.enabled ? "사용함" : "사용안함"}
           </Box>
         </Box>
+      </td>
+    </tr>
+  );
+}
+
+function MartinPatternOnlyRows({ martin, onChange, color }) {
+  const rawRules = Array.isArray(martin.pattern_only)
+    ? martin.pattern_only
+    : martin.pattern_only && typeof martin.pattern_only === "object"
+      ? [martin.pattern_only]
+      : [];
+  const rules = Array.from({ length: PATTERN_ONLY_ROW_COUNT }, (_, index) => ({
+    ...EMPTY_MARTIN_PATTERN_RULE,
+    ...(rawRules[index] && typeof rawRules[index] === "object" ? rawRules[index] : {}),
+  }));
+  const updateRule = (index, patch) => {
+    const next = rules.map((rule, ruleIndex) => (
+      ruleIndex === index ? { ...rule, ...patch } : rule
+    ));
+    onChange({ ...martin, pattern_only: next });
+  };
+  const toggleEnabled = (index, rule, direction) => {
+    if (!rule.enabled) {
+      const warnings = [];
+      if (Number(martin.step_max || 20) !== 1) {
+        warnings.push("패턴일 때만 배팅하기는 최고 1단계 사용을 권장합니다. 현재 최고 단계 설정으로 계속 진행합니다.");
+      }
+      if (!direction) {
+        warnings.push("배팅 방향이 비어 있어 패턴이 맞아도 발동하지 않습니다.");
+      }
+      if (warnings.length > 0) window.alert(warnings.join("\n"));
+    }
+    updateRule(index, { enabled: !rule.enabled });
+  };
+
+  return (
+    <tr>
+      <td colSpan={6} style={{ ...normalCell, padding: 0, textAlign: "left" }}>
+        <Box sx={{ px: 1, py: 0.75, color, fontWeight: "bold", backgroundColor: "rgba(255,255,255,0.04)" }}>
+          패턴일 때만 배팅하기
+        </Box>
+        {rules.map((rule, rowIndex) => {
+          const cells = patternCells(rule, PATTERN_ONLY_CELL_COUNT);
+          const direction = rule.direction === "P" || rule.direction === "B" ? rule.direction : "";
+          const nextDirection = direction === "" ? "B" : direction === "B" ? "P" : "";
+          return (
+            <Box
+              key={`pattern-only-row-${rowIndex}`}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.75,
+                px: 0.75,
+                py: 0.5,
+                borderTop: CELL_BORDER,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {cells.map((value, cellIndex) => (
+                <PatternCell
+                  key={`pattern-only-${rowIndex}-${cellIndex}`}
+                  cellKey={`pattern-only-${rowIndex}-${cellIndex}`}
+                  value={value}
+                  onClick={() => updateRule(rowIndex, {
+                    pattern: cyclePatternCell(cells, cellIndex),
+                  })}
+                />
+              ))}
+              <span style={{ marginLeft: 6 }}>배팅방향</span>
+              <PatternCell
+                cellKey={`pattern-only-direction-${rowIndex}`}
+                value={direction}
+                onClick={() => updateRule(rowIndex, { direction: nextDirection })}
+              />
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(rule.include_inverse)}
+                  onChange={(event) => updateRule(rowIndex, { include_inverse: event.target.checked })}
+                />
+                BP반전도 포함
+              </label>
+              <Box
+                onClick={() => toggleEnabled(rowIndex, rule, direction)}
+                sx={{
+                  ml: 0.5,
+                  px: 1.25,
+                  py: 0.5,
+                  borderRadius: 1,
+                  backgroundColor: rule.enabled ? GREEN : "#333",
+                  color: rule.enabled ? "#1b2e1b" : "#888",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                {rule.enabled ? "사용함" : "사용안함"}
+              </Box>
+            </Box>
+          );
+        })}
       </td>
     </tr>
   );
@@ -561,11 +639,9 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
           <tr>
             <td colSpan={6} style={normalCell}>이 배팅은 별도 트랙으로 배팅됩니다.</td>
           </tr>
-          <MartinPatternRow
+          <MartinPatternOnlyRows
             martin={martin}
             onChange={onChange}
-            ruleKey="pattern_only"
-            label="패턴일 때만 배팅하기"
             color={color}
           />
         </>
@@ -2921,11 +2997,9 @@ export default function GhUserSetupPage() {
               label="패턴일 때 배팅 안 하기"
               color="#1565c0"
             />
-            <MartinPatternRow
+            <MartinPatternOnlyRows
               martin={martinZ}
               onChange={(m) => updateMartin("martin_z", m)}
-              ruleKey="pattern_only"
-              label="패턴일 때만 배팅하기"
               color="#1565c0"
             />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
