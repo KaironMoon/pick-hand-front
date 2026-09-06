@@ -611,17 +611,7 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
         label="패턴일 때 배팅 안 하기"
         color={color}
       />
-      <tr>
-        <td style={{ ...labelCellStyle, color }}>배팅금지</td>
-        <td colSpan={2} style={normalCell}>설정 회차부터 금지</td>
-        <EditableCell
-          value={martin.stop_bet_round || 0}
-          onChange={(value) => onChange({ ...martin, stop_bet_round: Math.max(0, Math.min(80, value)) })}
-          suffix="회차"
-          style={greenCell}
-        />
-        <td colSpan={2} style={normalCell}>0은 제한 없음</td>
-      </tr>
+      <MartinStopBetRoundRow martin={martin} onChange={onChange} color={color} />
       <tr>
         <td style={{ ...labelCellStyle, color }}>목표금액</td>
         <td colSpan={2} style={normalCell}>누적손익 목표</td>
@@ -647,6 +637,22 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
         </>
       )}
     </>
+  );
+}
+
+function MartinStopBetRoundRow({ martin, onChange, color }) {
+  return (
+    <tr>
+      <td style={{ ...labelCellStyle, color }}>배팅금지</td>
+      <td colSpan={2} style={normalCell}>설정 회차부터 금지</td>
+      <EditableCell
+        value={martin.stop_bet_round || 0}
+        onChange={(value) => onChange({ ...martin, stop_bet_round: Math.max(0, Math.min(80, value)) })}
+        suffix="회차"
+        style={greenCell}
+      />
+      <td colSpan={2} style={normalCell}>0은 제한 없음</td>
+    </tr>
   );
 }
 
@@ -1974,6 +1980,7 @@ const DEFAULT_MARTIN = {
 };
 const DEFAULT_MARTIN_Z = {
   ...DEFAULT_MARTIN,
+  stop_bet_round: 0,
   pattern_block: { ...EMPTY_MARTIN_PATTERN_RULE },
   pattern_only: { ...EMPTY_MARTIN_PATTERN_RULE },
 };
@@ -2574,12 +2581,12 @@ export default function GhUserSetupPage() {
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1, order: 1 }}>
             <Typography
               variant="caption"
-              sx={{ mt: 0.5, pt: 1, borderTop: "1px solid rgba(255,87,34,0.45)", fontSize: 11, color: "#ff5722", fontWeight: "bold" }}
+              sx={{ mt: 0.5, pt: 1, borderTop: "1px solid rgba(255,255,255,0.35)", fontSize: 11, color: "#fff", fontWeight: "bold" }}
             >
               마틴C 운영 옵션
             </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#ff3d00", minWidth: 140 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
               마틴C 목표금액 (P)
             </Typography>
             <input
@@ -2599,7 +2606,7 @@ export default function GhUserSetupPage() {
             )}
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#ff3d00", minWidth: 140 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
               슬롯 마틴C 손실조건
             </Typography>
             <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>현재손실</Typography>
@@ -2633,7 +2640,7 @@ export default function GhUserSetupPage() {
             )}
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#ff3d00", minWidth: 140 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
               마틴C손실종료조건
             </Typography>
             <input
@@ -2668,7 +2675,7 @@ export default function GhUserSetupPage() {
             )}
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#ff3d00", minWidth: 140 }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
               마틴C수익보호
             </Typography>
             <input
@@ -2693,7 +2700,7 @@ export default function GhUserSetupPage() {
           </Box>
           {martinBetDownConditions.map((condition, index) => (
             <Box key={`martin-bet-down-${index}`} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Typography variant="caption" sx={{ fontSize: 12, color: "#ff3d00", minWidth: 140 }}>
+              <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
                 마틴C 배팅액 하향 조건 {index + 1}
               </Typography>
               <input
@@ -2729,14 +2736,14 @@ export default function GhUserSetupPage() {
                 })}
                 style={{ width: 70, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
               />
-              <Typography variant="caption" sx={{ fontSize: 11, color: "#ff3d00" }}>%로 하향하여 배팅</Typography>
+              <Typography variant="caption" sx={{ fontSize: 11, color: "#fff" }}>%로 하향하여 배팅</Typography>
               {Number(condition.start_amount || 0) === 0 && Number(condition.end_amount || 0) === 0 && (
                 <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
               )}
             </Box>
           ))}
             <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Typography variant="caption" sx={{ fontSize: 12, color: "#ff3d00", minWidth: 140 }}>
+              <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
                 마틴C 회차별 고정배팅
               </Typography>
               <input
@@ -2751,8 +2758,51 @@ export default function GhUserSetupPage() {
                 }}
                 style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
               />
-              <Typography variant="caption" sx={{ fontSize: 11, color: "#ff3d00" }}>금액 무시하고 지정한 금액만 베팅</Typography>
+              <Typography variant="caption" sx={{ fontSize: 11, color: "#fff" }}>금액 무시하고 지정한 금액만 베팅</Typography>
               {Number(config.martin_c_round_fixed_bet_amount || 0) === 0 && (
+                <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
+              )}
+            </Box>
+          </Box>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1, order: 2 }}>
+            <Typography
+              variant="caption"
+              sx={{ mt: 0.5, pt: 1, borderTop: "1px solid rgba(255,255,255,0.35)", fontSize: 11, color: "#fff", fontWeight: "bold" }}
+            >
+              마틴 Z 운영 옵션
+            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+              <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
+                마틴Z손실종료조건
+              </Typography>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={config.martin_z_drawdown_start_amount ?? 0}
+                onChange={(event) => {
+                  const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
+                  setConfig((prev) => ({ ...prev, martin_z_drawdown_start_amount: value }));
+                  setDirty(true);
+                }}
+                style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+              />
+              <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 달성 시 최고 마틴Z PNL에서</Typography>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={config.martin_z_drawdown_percent ?? 0}
+                onChange={(event) => {
+                  const value = Math.max(0, Math.min(100, parseFloat(event.target.value || "0") || 0));
+                  setConfig((prev) => ({ ...prev, martin_z_drawdown_percent: value }));
+                  setDirty(true);
+                }}
+                style={{ width: 70, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+              />
+              <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>% 이상 손실 나면 마틴Z 배팅 정지</Typography>
+              {(Number(config.martin_z_drawdown_start_amount || 0) === 0 || Number(config.martin_z_drawdown_percent || 0) === 0) && (
                 <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
               )}
             </Box>
@@ -2998,6 +3048,11 @@ export default function GhUserSetupPage() {
               color="#1565c0"
             />
             <MartinPatternOnlyRows
+              martin={martinZ}
+              onChange={(m) => updateMartin("martin_z", m)}
+              color="#1565c0"
+            />
+            <MartinStopBetRoundRow
               martin={martinZ}
               onChange={(m) => updateMartin("martin_z", m)}
               color="#1565c0"

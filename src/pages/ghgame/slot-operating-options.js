@@ -77,6 +77,18 @@ export const martinDrawdownStatusLabel = (status) => {
   return `${formatConditionNumber(start)} P 이상 달성 시 최고 마틴C PNL에서 ${formatConditionNumber(percent)}% 이상 손실 나면 배팅 정지${state}`;
 };
 
+export const martinZDrawdownStatusLabel = (status) => {
+  const start = Number(status?.configured_drawdown_start || 0);
+  const percent = Number(status?.drawdown_percent || 0);
+  if (start <= 0 || percent <= 0) return "사용안함";
+  const state = status?.reason === "martin_z_drawdown_reached"
+    ? " · 중지"
+    : status?.drawdown_armed
+      ? ` · 감시중 (최고 ${formatConditionNumber(status?.drawdown_peak)} P)`
+      : " · 대기";
+  return `${formatConditionNumber(start)} P 이상 달성 시 최고 마틴Z PNL에서 ${formatConditionNumber(percent)}% 이상 손실 나면 배팅 정지${state}`;
+};
+
 export const martinProfitStopStatusLabel = (status) => {
   const afterRound = Number(status?.profit_after_round || 0);
   if (afterRound <= 0) return "사용안함";

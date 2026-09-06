@@ -29,6 +29,7 @@ import {
   martinBetStopReasonLabel,
   martinCBetAdjustmentStatusLabel,
   martinDrawdownStatusLabel,
+  martinZDrawdownStatusLabel,
   martinGoalStatusLabel,
   martinProfitStopStatusLabel,
   martinSlotLossStatusLabel,
@@ -258,6 +259,7 @@ function GhLossStopStatus({ roundState, autoStatus }) {
       : null;
   const betStopReason = ghBetStopReasonLabel(roundState);
   const martinOperatingStop = roundState?.martin_c_operating_stop;
+  const martinZOperatingStop = roundState?.martin_z_operating_stop;
   const martinCBetAdjustment = roundState?.martin_c_bet_adjustment;
   const martinStopReason = martinBetStopReasonLabel(martinOperatingStop);
   return (
@@ -290,6 +292,9 @@ function GhLossStopStatus({ roundState, autoStatus }) {
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: "#ffab91", fontWeight: 800 }}>
           마틴C 금액조정: {martinCBetAdjustmentStatusLabel(martinCBetAdjustment)}
+        </Typography>
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,255,255,.45)", borderRadius: 1, color: martinZOperatingStop?.reason === "martin_z_drawdown_reached" ? "#ff8a80" : "#fff", fontWeight: 800 }}>
+          마틴Z손실종료조건: {martinZDrawdownStatusLabel(martinZOperatingStop)}
         </Typography>
         {recoveryDetail && (
           <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,82,82,.55)", borderRadius: 1, color: martinRecovery?.active ? "#ffcc80" : "#ff8a80", fontWeight: 900 }}>

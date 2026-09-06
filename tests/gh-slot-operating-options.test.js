@@ -10,10 +10,19 @@ import {
   martinBetStopReasonLabel,
   martinCBetAdjustmentStatusLabel,
   martinDrawdownStatusLabel,
+  martinZDrawdownStatusLabel,
   martinGoalStatusLabel,
   martinProfitStopStatusLabel,
   martinSlotLossStatusLabel,
 } from "../src/pages/ghgame/slot-operating-options.js";
+
+test("Martin Z drawdown status distinguishes disabled, waiting, armed, and stopped", () => {
+  assert.equal(martinZDrawdownStatusLabel({}), "사용안함");
+  assert.match(martinZDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20 }), /대기$/);
+  assert.match(martinZDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20, drawdown_armed: true, drawdown_peak: 15 }), /감시중 \(최고 15 P\)$/);
+  assert.match(martinZDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20, reason: "martin_z_drawdown_reached" }), /중지$/);
+  assert.match(martinZDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20 }), /최고 마틴Z PNL/);
+});
 
 test("GH slot loss status shows current and projected loss conditions", () => {
   assert.equal(ghSlotLossStatusLabel({}), "사용안함");
