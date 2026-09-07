@@ -29,8 +29,8 @@ import {
   martinBetStopReasonLabel,
   martinCBetAdjustmentStatusLabel,
   martinDrawdownStatusLabel,
-  martinZDrawdownStatusLabel,
   martinGoalStatusLabel,
+  martinOperatingStopReasonLabel,
   martinProfitStopStatusLabel,
   martinSlotLossStatusLabel,
 } from "./slot-operating-options.js";
@@ -258,10 +258,11 @@ function GhLossStopStatus({ roundState, autoStatus }) {
       ? "마틴 회수 완료 · 최종 배팅 정지"
       : null;
   const betStopReason = ghBetStopReasonLabel(roundState);
-  const martinOperatingStop = roundState?.martin_c_operating_stop;
-  const martinZOperatingStop = roundState?.martin_z_operating_stop;
+  const martinOperatingStop = roundState?.martin_operating_stop;
+  const martinCOperatingStop = roundState?.martin_c_operating_stop;
   const martinCBetAdjustment = roundState?.martin_c_bet_adjustment;
-  const martinStopReason = martinBetStopReasonLabel(martinOperatingStop);
+  const martinStopReason = martinOperatingStopReasonLabel(martinOperatingStop);
+  const martinCStopReason = martinBetStopReasonLabel(martinCOperatingStop);
   return (
     <>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: betStopReason ? 0.5 : 1.5, px: 1, py: 0.7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
@@ -278,23 +279,20 @@ function GhLossStopStatus({ roundState, autoStatus }) {
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.overall_stop?.reason === "round_gh_pnl_range_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
           구간 GH PNL: {ghRoundPnlStopStatusLabel(roundState?.overall_stop)}
         </Typography>
-        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_c_goal_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
-          마틴C 목표금액: {martinGoalStatusLabel(martinOperatingStop)}
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_goal_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
+          마틴(Z+B+C) 목표금액: {martinGoalStatusLabel(martinOperatingStop)}
         </Typography>
-        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: ["martin_c_current_loss_reached", "martin_c_projected_loss_reached"].includes(martinOperatingStop?.reason) ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
-          슬롯 마틴C 손실조건: {martinSlotLossStatusLabel(martinOperatingStop)}
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_drawdown_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
+          마틴(Z+B+C) 손실종료조건: {martinDrawdownStatusLabel(martinOperatingStop)}
         </Typography>
-        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_c_drawdown_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
-          마틴C손실종료조건: {martinDrawdownStatusLabel(martinOperatingStop)}
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: ["martin_c_current_loss_reached", "martin_c_projected_loss_reached"].includes(martinCOperatingStop?.reason) ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
+          슬롯 마틴C 손실조건: {martinSlotLossStatusLabel(martinCOperatingStop)}
         </Typography>
-        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_c_profit_bet_limit_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
-          마틴C수익보호: {martinProfitStopStatusLabel(martinOperatingStop)}
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinCOperatingStop?.reason === "martin_c_profit_bet_limit_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
+          마틴C수익보호: {martinProfitStopStatusLabel(martinCOperatingStop)}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: "#ffab91", fontWeight: 800 }}>
           마틴C 금액조정: {martinCBetAdjustmentStatusLabel(martinCBetAdjustment)}
-        </Typography>
-        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,255,255,.45)", borderRadius: 1, color: martinZOperatingStop?.reason === "martin_z_drawdown_reached" ? "#ff8a80" : "#fff", fontWeight: 800 }}>
-          마틴Z손실종료조건: {martinZDrawdownStatusLabel(martinZOperatingStop)}
         </Typography>
         {recoveryDetail && (
           <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,82,82,.55)", borderRadius: 1, color: martinRecovery?.active ? "#ffcc80" : "#ff8a80", fontWeight: 900 }}>
@@ -312,7 +310,14 @@ function GhLossStopStatus({ roundState, autoStatus }) {
       {martinStopReason && (
         <Box sx={{ mb: 1.5, px: 1, py: 0.65, border: "1px solid rgba(255,87,34,.55)", borderRadius: 1, backgroundColor: "rgba(255,87,34,.08)" }}>
           <Typography variant="caption" sx={{ color: "#ff8a80", fontWeight: 900 }}>
-            마틴C 배팅 종료 이유: {martinStopReason} (GH와 마틴 Z/B 배팅은 계속)
+            마틴 배팅 종료 이유: {martinStopReason} (GH 배팅은 계속)
+          </Typography>
+        </Box>
+      )}
+      {martinCStopReason && (
+        <Box sx={{ mb: 1.5, px: 1, py: 0.65, border: "1px solid rgba(255,87,34,.55)", borderRadius: 1, backgroundColor: "rgba(255,87,34,.08)" }}>
+          <Typography variant="caption" sx={{ color: "#ff8a80", fontWeight: 900 }}>
+            마틴C 배팅 종료 이유: {martinCStopReason} (GH와 마틴 Z/B 배팅은 계속)
           </Typography>
         </Box>
       )}

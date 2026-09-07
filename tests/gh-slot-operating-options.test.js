@@ -10,18 +10,30 @@ import {
   martinBetStopReasonLabel,
   martinCBetAdjustmentStatusLabel,
   martinDrawdownStatusLabel,
-  martinZDrawdownStatusLabel,
   martinGoalStatusLabel,
+  martinOperatingStopReasonLabel,
   martinProfitStopStatusLabel,
   martinSlotLossStatusLabel,
 } from "../src/pages/ghgame/slot-operating-options.js";
 
-test("Martin Z drawdown status distinguishes disabled, waiting, armed, and stopped", () => {
-  assert.equal(martinZDrawdownStatusLabel({}), "사용안함");
-  assert.match(martinZDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20 }), /대기$/);
-  assert.match(martinZDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20, drawdown_armed: true, drawdown_peak: 15 }), /감시중 \(최고 15 P\)$/);
-  assert.match(martinZDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20, reason: "martin_z_drawdown_reached" }), /중지$/);
-  assert.match(martinZDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20 }), /최고 마틴Z PNL/);
+test("Martin combined goal status distinguishes disabled, active, and stopped", () => {
+  assert.equal(martinGoalStatusLabel({}), "사용안함");
+  assert.equal(
+    martinGoalStatusLabel({ configured_target: 50, pnl: 30 }),
+    "목표 50 P · 마틴 Z+B+C PNL 30 P · 정상",
+  );
+  assert.equal(
+    martinGoalStatusLabel({ configured_target: 50, pnl: 50, reason: "martin_goal_reached" }),
+    "목표 50 P · 마틴 Z+B+C PNL 50 P · 중지",
+  );
+});
+
+test("Martin combined drawdown status distinguishes disabled, waiting, armed, and stopped", () => {
+  assert.equal(martinDrawdownStatusLabel({}), "사용안함");
+  assert.match(martinDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20 }), /대기$/);
+  assert.match(martinDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20, drawdown_armed: true, drawdown_peak: 15 }), /감시중 \(최고 15 P\)$/);
+  assert.match(martinDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20, reason: "martin_drawdown_reached" }), /중지$/);
+  assert.match(martinDrawdownStatusLabel({ configured_drawdown_start: 10, drawdown_percent: 20 }), /최고 마틴 Z\+B\+C PNL/);
 });
 
 test("GH slot loss status shows current and projected loss conditions", () => {
@@ -209,11 +221,11 @@ test("fixed criteria keep combined goal and GH profit-protection wording", () =>
   );
 });
 
-test("Martin C operating labels use C-only PNL and bet wording", () => {
+test("Martin combined and C-only operating labels use their own PNL wording", () => {
   assert.equal(martinGoalStatusLabel({}), "사용안함");
   assert.match(
     martinGoalStatusLabel({ configured_target: 20, pnl: 15 }),
-    /목표 20 P · 마틴C PNL 15 P · 정상$/,
+    /목표 20 P · 마틴 Z\+B\+C PNL 15 P · 정상$/,
   );
   assert.match(
     martinSlotLossStatusLabel({
@@ -233,7 +245,7 @@ test("Martin C operating labels use C-only PNL and bet wording", () => {
       drawdown_armed: true,
       drawdown_peak: 12,
     }),
-    /최고 마틴C PNL.*감시중 \(최고 12 P\)$/,
+    /최고 마틴 Z\+B\+C PNL.*감시중 \(최고 12 P\)$/,
   );
   assert.match(
     martinProfitStopStatusLabel({
@@ -243,6 +255,19 @@ test("Martin C operating labels use C-only PNL and bet wording", () => {
       trigger_bet_amount: 5,
     }),
     /마틴C PNL 3 P \/ 마틴C 배팅 5 P · 중지$/,
+  );
+});
+
+test("Martin combined stop reason reports the persisted trigger", () => {
+  assert.equal(martinOperatingStopReasonLabel({}), null);
+  assert.equal(
+    martinOperatingStopReasonLabel({
+      stopped: true,
+      reason: "martin_goal_reached",
+      trigger_pnl: 50,
+      target: 50,
+    }),
+    "마틴 Z+B+C PNL 50 P가 목표 50 P에 도달",
   );
 });
 

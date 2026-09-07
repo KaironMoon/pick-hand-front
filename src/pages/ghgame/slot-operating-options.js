@@ -48,8 +48,8 @@ export const ghProfitStopStatusLabel = (status) => {
 export const martinGoalStatusLabel = (status) => {
   const target = Number(status?.configured_target || 0);
   if (target <= 0) return "사용안함";
-  const state = status?.reason === "martin_c_goal_reached" ? " · 중지" : " · 정상";
-  return `목표 ${formatConditionNumber(target)} P · 마틴C PNL ${formatConditionNumber(status?.pnl)} P${state}`;
+  const state = status?.reason === "martin_goal_reached" ? " · 중지" : " · 정상";
+  return `목표 ${formatConditionNumber(target)} P · 마틴 Z+B+C PNL ${formatConditionNumber(status?.pnl)} P${state}`;
 };
 
 export const martinSlotLossStatusLabel = (status) => {
@@ -69,24 +69,23 @@ export const martinDrawdownStatusLabel = (status) => {
   const start = Number(status?.configured_drawdown_start || 0);
   const percent = Number(status?.drawdown_percent || 0);
   if (start <= 0 || percent <= 0) return "사용안함";
-  const state = status?.reason === "martin_c_drawdown_reached"
+  const state = status?.reason === "martin_drawdown_reached"
     ? " · 중지"
     : status?.drawdown_armed
       ? ` · 감시중 (최고 ${formatConditionNumber(status?.drawdown_peak)} P)`
       : " · 대기";
-  return `${formatConditionNumber(start)} P 이상 달성 시 최고 마틴C PNL에서 ${formatConditionNumber(percent)}% 이상 손실 나면 배팅 정지${state}`;
+  return `${formatConditionNumber(start)} P 이상 달성 시 최고 마틴 Z+B+C PNL에서 ${formatConditionNumber(percent)}% 이상 손실 나면 배팅 정지${state}`;
 };
 
-export const martinZDrawdownStatusLabel = (status) => {
-  const start = Number(status?.configured_drawdown_start || 0);
-  const percent = Number(status?.drawdown_percent || 0);
-  if (start <= 0 || percent <= 0) return "사용안함";
-  const state = status?.reason === "martin_z_drawdown_reached"
-    ? " · 중지"
-    : status?.drawdown_armed
-      ? ` · 감시중 (최고 ${formatConditionNumber(status?.drawdown_peak)} P)`
-      : " · 대기";
-  return `${formatConditionNumber(start)} P 이상 달성 시 최고 마틴Z PNL에서 ${formatConditionNumber(percent)}% 이상 손실 나면 배팅 정지${state}`;
+export const martinOperatingStopReasonLabel = (status) => {
+  if (!status?.stopped) return null;
+  if (status.reason === "martin_goal_reached") {
+    return `마틴 Z+B+C PNL ${formatConditionNumber(status.trigger_pnl)} P가 목표 ${formatConditionNumber(status.target)} P에 도달`;
+  }
+  if (status.reason === "martin_drawdown_reached") {
+    return `마틴 Z+B+C PNL ${formatConditionNumber(status.trigger_pnl)} P가 최고 ${formatConditionNumber(status.drawdown_peak)} P 대비 종료 기준 ${formatConditionNumber(status.drawdown_threshold)} P 이하에 도달`;
+  }
+  return "마틴 운영조건에 도달";
 };
 
 export const martinProfitStopStatusLabel = (status) => {
@@ -100,17 +99,11 @@ export const martinProfitStopStatusLabel = (status) => {
 
 export const martinBetStopReasonLabel = (status) => {
   if (!status?.stopped) return null;
-  if (status.reason === "martin_c_goal_reached") {
-    return `마틴C PNL ${formatConditionNumber(status.trigger_pnl)} P가 목표 ${formatConditionNumber(status.target)} P에 도달`;
-  }
   if (status.reason === "martin_c_current_loss_reached") {
     return `마틴C PNL ${formatConditionNumber(status.trigger_pnl)} P가 종료 기준 -${formatConditionNumber(status.configured_loss_limit)} P 이하에 도달`;
   }
   if (status.reason === "martin_c_projected_loss_reached") {
     return `마틴C PNL ${formatConditionNumber(status.trigger_pnl)} P에서 다음 마틴C 배팅 ${formatConditionNumber(status.trigger_bet_amount)} P 패배 시 예상손실 기준에 도달`;
-  }
-  if (status.reason === "martin_c_drawdown_reached") {
-    return `마틴C PNL ${formatConditionNumber(status.trigger_pnl)} P가 최고 ${formatConditionNumber(status.drawdown_peak)} P 대비 종료 기준 ${formatConditionNumber(status.drawdown_threshold)} P 이하에 도달`;
   }
   if (status.reason === "martin_c_profit_bet_limit_reached") {
     return `마틴C PNL ${formatConditionNumber(status.trigger_pnl)} P 상태에서 다음 마틴C 배팅 ${formatConditionNumber(status.trigger_bet_amount)} P가 현재 마틴C PNL 이상에 도달`;
