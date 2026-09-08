@@ -628,7 +628,7 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
   );
 }
 
-function MartinStopBetRoundRow({ martin, onChange, color }) {
+function MartinStopBetRoundRow({ martin, onChange, color, showStepRecovery = false }) {
   return (
     <tr>
       <td style={{ ...labelCellStyle, color }}>배팅금지</td>
@@ -639,7 +639,19 @@ function MartinStopBetRoundRow({ martin, onChange, color }) {
         suffix="회차"
         style={greenCell}
       />
-      <td colSpan={2} style={normalCell}>0은 제한 없음</td>
+      <td colSpan={2} style={normalCell}>
+        0은 제한 없음
+        {showStepRecovery && (
+          <label style={{ display: "block", cursor: "pointer", whiteSpace: "nowrap" }}>
+            <input
+              type="checkbox"
+              checked={Boolean(martin.stop_after_step_recovery)}
+              onChange={(event) => onChange({ ...martin, stop_after_step_recovery: event.target.checked })}
+            />
+            단계해소후 종료
+          </label>
+        )}
+      </td>
     </tr>
   );
 }
@@ -1969,6 +1981,7 @@ const DEFAULT_MARTIN = {
 const DEFAULT_MARTIN_Z = {
   ...DEFAULT_MARTIN,
   stop_bet_round: 0,
+  stop_after_step_recovery: false,
   pattern_block: { ...EMPTY_MARTIN_PATTERN_RULE },
   pattern_only: { ...EMPTY_MARTIN_PATTERN_RULE },
 };
@@ -3007,6 +3020,7 @@ export default function GhUserSetupPage() {
             />
             <MartinStopBetRoundRow
               martin={martinZ}
+              showStepRecovery
               onChange={(m) => updateMartin("martin_z", m)}
               color="#1565c0"
             />
