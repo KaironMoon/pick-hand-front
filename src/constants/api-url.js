@@ -76,6 +76,7 @@ const USER_BET_SETTINGS_API = {
   ADMIN_GET_GH: (userId) => `/api/v1/user-settings/admin/${userId}/gh`,
   ADMIN_SAVE_GH: (userId) => `/api/v1/user-settings/admin/${userId}/gh`,
   COPY_GH: "/api/v1/user-settings/gh/copy",
+  GH_PICK_SETS: "/api/v1/user-settings/gh/pick-sets",
 };
 
 const NC_GAMES_API = {

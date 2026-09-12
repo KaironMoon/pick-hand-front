@@ -82,30 +82,27 @@ const G1 = {
   hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
   headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
 };
-// G2: FOR1/2/3(따라) + FOR1X/2X/3X(반대) + D/G/TN/ONE/TWO + P/B/J/6M/6MX
-// FOR1/2/3·FOR1X/2X/3X 각각 한 묶음(노란박스). 헤더색은 묶음별 번갈아(파/빨).
-const G2n = ["FOR1", "FOR2", "FOR3", "FOR1X", "FOR2X", "FOR3X", "D", "G", "TN", "ONE", "TWO", "P", "B", "J", "6M", "6MX"];
+const G2n = ["FOR1", "FOR1X", "D", "G", "TN", "ONE", "TWO", "P", "B", "J", "6M", "6MX", "NC", "NCR", "NCSRO", "NCSRN"];
 const G2 = {
   name: G2n,
-  gstart: new Set([3, 6, 11, 14]),
-  hlRanges: [[0, 2], [3, 5], [6, 10], [11, 13], [14, 15]],
-  headColors: [[0, 2, HC_BLUE], [3, 5, HC_RED], [6, 10, HC_BLUE], [11, 13, HC_RED], [14, 15, "#de6a08"]],
+  gstart: new Set([1, 2, 7, 10, 12]),
+  hlRanges: [[0, 0], [1, 1], [2, 6], [7, 9], [10, 11], [12, 15]],
+  headColors: [[0, 0, HC_BLUE], [1, 1, HC_RED], [2, 6, HC_BLUE], [7, 9, HC_RED], [10, 11, "#de6a08"], [12, 15, HC_BLUE]],
 };
-// G3: GH 시리즈 + G% 시리즈 + 허니비/W111 세트(정픽/R/SRO/SRN).
-const G3n = ["G(H1)", "G(H2)", "G(H3)", "G(H4)", "G(%1)", "G(%2)", "G(%3)", "G(%4)", "허니비", "허니R2", "허니SR2O", "허니SRN", "W111", "위너R2", "위너SR2O", "위너SRN"];
+const G3n = ["허니비", "허니R2", "허니SR2O", "허니SRN", "W111", "위너R2", "위너SR2O", "위너SRN", "M22", "메가R2", "메가SR2O", "메가SRN", "D112", "드림R2", "드림SR2O", "드림SRN"];
 const G3 = {
   name: G3n,
   gstart: new Set([4, 8, 12]),
   hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
   headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
 };
-// G4: M22세트 + D112세트 + NC세트(정픽/R/SRO/SRN) + SQ1/2/3(쿼터배팅, S와 픽 공유) + 빈칸 1.
-const G4n = ["M22", "메가R2", "메가SR2O", "메가SRN", "D112", "드림R2", "드림SR2O", "드림SRN", "NC", "NCR", "NCSRO", "NCSRN", "SQ1", "SQ2", "SQ3", ""];
+// G4: SQ1/2/3 + G(H1)/G(%1) + JMH1~10 + 빈칸 1.
+const G4n = ["SQ1", "SQ2", "SQ3", "G(H1)", "G(%1)", ...Array.from({ length: 10 }, (_, index) => `JMH${index + 1}`), ""];
 const G4 = {
   name: G4n,
-  gstart: new Set([4, 8, 12]),
-  hlRanges: [[0, 3], [4, 7], [8, 11], [12, 14]],
-  headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 14, HC_BLUE]],
+  gstart: new Set([3, 4, 5]),
+  hlRanges: [[0, 2], [3, 3], [4, 4], [5, 14]],
+  headColors: [[0, 2, HC_BLUE], [3, 3, HC_BLUE], [4, 4, HC_RED], [5, 14, HC_BLUE]],
 };
 
 // ── 셀 렌더 헬퍼 ──
@@ -421,8 +418,8 @@ const GOB_KEY_TO_LABEL = {
   SR1: "S1R", SR2: "S2R", SR3: "S3R",
   SSR1: "SSRN1", SSR2: "SSRN2", SSR3: "SSRN3",
   SSRO1: "SSRO1", SSRO2: "SSRO2", SSRO3: "SSRO3",
-  FOR1: "FOR1", FOR2: "FOR2", FOR3: "FOR3",
-  FOR1X: "FOR1X", FOR2X: "FOR2X", FOR3X: "FOR3X",
+  FOR1: "FOR1",
+  FOR1X: "FOR1X",
 };
 const gobLabelOf = (key) => GOB_KEY_TO_LABEL[key] || key;
 const addGobBg = (map, label, color) => {
@@ -535,6 +532,7 @@ function buildColData(label, i, data, ctx) {
     "M22", "메가R2", "메가SR2O", "메가SRN", "D112", "드림R2", "드림SR2O", "드림SRN",
     "NC", "NCR", "NCSRO", "NCSRN"];
   if (SUBGAME_LABELS.includes(label)) return fromStats(ctx, label);
+  if (/^JMH(?:10|[1-9])$/.test(label)) return fromStats(ctx, label);
   // G(H1~H4/%1~%4) — 다른 섹션 메트릭으로 산출된 픽.
   if (/^G\((H|%)[1-4]\)$/.test(label)) return fromStats(ctx, label);
   let m = label.match(/^FOR([123])X$/);
@@ -575,7 +573,7 @@ function withLiveData(base, ctx) {
   const markWaitMiss = new Map();
   const markPct = new Map();
   const gobMarks = ctx.roundState?.gob_marks || {};
-  [1, 2, 3, 4].forEach((rank) => {
+  [1].forEach((rank) => {
     const bg = GOB_RANK_BG[rank] || GOB_TOP_BG;
     if ((gobMarks[`GH${rank}`] || []).length) {
       const idx = base.name.indexOf(`G(H${rank})`);
@@ -620,6 +618,7 @@ function withLiveData(base, ctx) {
       out.waitBg[i] = markWaitMiss.get(label);
     }
   });
+  out.name = base.name.map((label) => ctx.roundState?.display_names?.[label] || label);
   return out;
 }
 

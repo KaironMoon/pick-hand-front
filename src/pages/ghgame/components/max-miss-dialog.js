@@ -39,27 +39,17 @@ export const MAX_MISS_SECTION_ROWS = [
   ],
   [
     { key: "FOR1", label: "FOR1" },
-    { key: "FOR2", label: "FOR2" },
-    { key: "FOR3", label: "FOR3" },
     null,
   ],
   [
     { key: "FOR1X", label: "FORX1" },
-    { key: "FOR2X", label: "FORX2" },
-    { key: "FOR3X", label: "FORX3" },
     null,
   ],
   [
     { key: "G(H1)", label: "GH1" },
-    { key: "G(H2)", label: "GH2" },
-    { key: "G(H3)", label: "GH3" },
-    { key: "G(H4)", label: "GH4" },
   ],
   [
     { key: "G(%1)", label: "G%1" },
-    { key: "G(%2)", label: "G%2" },
-    { key: "G(%3)", label: "G%3" },
-    { key: "G(%4)", label: "G%4" },
   ],
   [
     { key: "허니비", label: "허니비" },
@@ -91,6 +81,12 @@ export const MAX_MISS_SECTION_ROWS = [
     { key: "NCSRO", label: "NCSRO" },
     { key: "NCSRN", label: "NCSRN" },
   ],
+  ...Array.from({ length: 5 }, (_, index) => [
+    { key: `JMH${index * 2 + 1}`, label: `JMH${index * 2 + 1}` },
+    { key: `JMH${index * 2 + 2}`, label: `JMH${index * 2 + 2}` },
+    null,
+    null,
+  ]),
   [
     { key: "J", label: "J", always: true },
     { key: "6M", label: "6M" },

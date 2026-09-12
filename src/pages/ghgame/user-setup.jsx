@@ -1308,7 +1308,7 @@ export function GhConditionalAmountSetup({ name, strat, onChange }) {
   );
 }
 
-function StrategySetupSection({ name, strat, onChange, variant, sections, targetLabel = "목표금액" }) {
+function StrategySetupSection({ name, displayName = name, strat, onChange, variant, sections, targetLabel = "목표금액" }) {
   // 단위: 만원. 입력값 그대로 저장(1=1만원, 0.1=1천원). 전광판/백엔드도 만원 단위로 통일.
   const s = strat || defaultStrategySetup();
   const isFull = variant === "full";
@@ -1596,7 +1596,7 @@ function StrategySetupSection({ name, strat, onChange, variant, sections, target
     <>
       {/* 1행: 전략명 | 사용함 | 수동 마틴 크루즈 라보쉐르 | 갯수 | 균등 증가 감소 */}
       <tr>
-        <td style={mkRed}>{name}</td>
+        <td style={mkRed}>{displayName}</td>
         <td style={s.enabled ? { ...mkGreen, cursor: "pointer", userSelect: "none" } : { ...mkMethod }}
           onClick={() => onChange({ ...s, enabled: !s.enabled })}>
           {s.enabled ? "사용함" : "사용안함"}
@@ -2019,6 +2019,7 @@ export default function GhUserSetupPage() {
     && targetUserId > 0
   );
   const [config, setConfig] = useState(null);
+  const [jmhPickSets, setJmhPickSets] = useState([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
@@ -2051,7 +2052,22 @@ export default function GhUserSetupPage() {
     apiCaller.get(url).then((res) => {
       setConfig(res.data.config);
     });
+    apiCaller.get(USER_BET_SETTINGS_API.GH_PICK_SETS).then((res) => {
+      setJmhPickSets(Array.isArray(res.data) ? res.data : []);
+    });
   }, [editingTargetUser, gameType, targetUserId]);
+
+  const updateJmhPickSet = (key, rawValue) => {
+    const setId = rawValue ? Number(rawValue) : null;
+    setConfig((prev) => ({
+      ...prev,
+      jmh_pick_sets: {
+        ...(prev?.jmh_pick_sets || {}),
+        [key]: setId,
+      },
+    }));
+    setDirty(true);
+  };
 
   const handleSave = async () => {
     if (!dirty) return;
@@ -2343,6 +2359,14 @@ export default function GhUserSetupPage() {
     });
     setDirty(true);
   };
+  const assignedJmhPickSetNames = Object.fromEntries(
+    Array.from({ length: 10 }, (_, index) => {
+      const key = `JMH${index + 1}`;
+      const selectedId = Number(config.jmh_pick_sets?.[key]);
+      const pickSet = jmhPickSets.find((item) => Number(item.set_id) === selectedId);
+      return [key, pickSet?.set_name || null];
+    }),
+  );
 
   return (
     <Box sx={{ p: 2 }}>
@@ -3047,11 +3071,55 @@ export default function GhUserSetupPage() {
       {gameType === "gh" && (
         <Box sx={{ overflowX: "auto", mt: 2 }}>
           {STRATEGY_SETUP_BOXES.map((b) => (
-            <Box key={b.key} sx={{ mb: 1.5 }}>
+            <Fragment key={b.key}>
+              {b.key === "JMH1" && (
+                <Box sx={{ width: 840, boxSizing: "border-box", mb: 2, p: 1.5, border: "1px solid #555", borderRadius: 1, backgroundColor: "#111" }}>
+                  <Typography sx={{ color: "#fff", fontWeight: "bold", mb: 1 }}>JM Helper Pick 세트 지정</Typography>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 403px)", gap: 1 }}>
+                    {Array.from({ length: 10 }, (_, index) => {
+                      const key = `JMH${index + 1}`;
+                      const selected = config.jmh_pick_sets?.[key] ?? "";
+                      const usedByOtherSlot = new Set(
+                        Object.entries(config.jmh_pick_sets || {})
+                          .filter(([slot, value]) => slot !== key && value != null)
+                          .map(([, value]) => Number(value)),
+                      );
+                      return (
+                        <Box key={key} sx={{ display: "flex", alignItems: "center", gap: 1, width: 403 }}>
+                          <Box sx={{ width: 130, flexShrink: 0, color: "#90caf9", fontWeight: "bold", fontSize: 13 }}>
+                            {`JM Helper Pick ${index + 1}`}
+                          </Box>
+                          <Box
+                            component="select"
+                            value={selected}
+                            onChange={(event) => updateJmhPickSet(key, event.target.value)}
+                            sx={{ width: 265, height: 32, boxSizing: "border-box", backgroundColor: "#1b1b1b", color: "#fff", border: "1px solid #666", borderRadius: 1 }}
+                          >
+                            <option value="">미지정</option>
+                            {jmhPickSets.map((pickSet) => (
+                              <option
+                                key={pickSet.set_id}
+                                value={pickSet.set_id}
+                                disabled={usedByOtherSlot.has(Number(pickSet.set_id))}
+                              >
+                                {pickSet.set_name}
+                              </option>
+                            ))}
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                  <Typography sx={{ color: "#aaa", fontSize: 12, mt: 1 }}>
+                    지정 변경과 pick-helper 데이터 변경은 다음 새 게임부터 적용됩니다. 삭제된 세트는 미지정으로 처리됩니다.
+                  </Typography>
+                </Box>
+              )}
+              <Box sx={{ mb: 1.5 }}>
               {/* 라벨 박스 (전략명 + variant 구분색) */}
               <Box sx={{ display: "inline-block", backgroundColor: b.variant === "full" ? "#c62828" : "#1565c0",
                 color: "#fff", fontWeight: "bold", borderRadius: 1, px: 1.5, py: 0.3, fontSize: 13, mb: 0.5 }}>
-                {b.label || b.key}
+                {assignedJmhPickSetNames[b.key] || b.label || b.key}
               </Box>
               <table style={{ borderCollapse: "collapse", tableLayout: "fixed", width: 840 }}>
                 {/* 시안과 동일: 10열 × 84px 고정 격자 → colSpan 섞여도 네모반듯 */}
@@ -3060,7 +3128,8 @@ export default function GhUserSetupPage() {
                 </colgroup>
                 <tbody>
                   <StrategySetupSection
-                    name={b.label || b.key} variant={b.variant} aarLabel={b.aarLabel} sections={b.sections}
+                    name={b.key.startsWith("JMH") ? b.key : (b.label || b.key)} variant={b.variant} aarLabel={b.aarLabel} sections={b.sections}
+                    displayName={assignedJmhPickSetNames[b.key] || (b.key.startsWith("JMH") ? b.key : (b.label || b.key))}
                     targetLabel={b.targetLabel}
                     strat={config[b.key] || (b.legacyKey ? config[b.legacyKey] : null) || defaultStrategySetup()}
                     onChange={(o) => updateMartin(b.key, o)} />
@@ -3110,7 +3179,8 @@ export default function GhUserSetupPage() {
                   )}
                 </tbody>
               </table>
-            </Box>
+              </Box>
+            </Fragment>
           ))}
         </Box>
       )}

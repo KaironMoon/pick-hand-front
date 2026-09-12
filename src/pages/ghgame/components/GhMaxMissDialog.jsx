@@ -59,11 +59,16 @@ const valueCellSx = {
 
 function MaxMissGrid({ roundState, trackKey, color, title, threshold }) {
   const sections = roundState?.sections || {};
+  const sectionRows = MAX_MISS_SECTION_ROWS.map((row) => row.map((section) => (
+    section
+      ? { ...section, label: roundState?.display_names?.[section.key] || section.label }
+      : null
+  )));
   return (
     <Box>
       <Typography sx={{ mb: 0.7, color, fontWeight: 900, textAlign: "center" }}>{title}</Typography>
       <Box sx={{ border: "2px solid #b39b5d", width: "max-content" }}>
-        {MAX_MISS_SECTION_ROWS.map((row, rowIndex) => (
+        {sectionRows.map((row, rowIndex) => (
           <Box key={rowIndex} sx={{ display: "flex" }}>
             {row.map((section, colIndex) => {
               if (!section) {
@@ -272,7 +277,11 @@ export default function GhMaxMissPanel({ roundState, gameId, replayRound = null 
     setCopyStatus(null);
     const payload = buildMaxMissClipboardPayload({
       sections: roundState?.sections || {},
-      sectionRows: MAX_MISS_SECTION_ROWS,
+      sectionRows: MAX_MISS_SECTION_ROWS.map((row) => row.map((section) => (
+        section
+          ? { ...section, label: roundState?.display_names?.[section.key] || section.label }
+          : null
+      ))),
       threshold,
       gameId,
       roundNum,
