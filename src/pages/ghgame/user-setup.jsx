@@ -2360,7 +2360,7 @@ export default function GhUserSetupPage() {
     setDirty(true);
   };
   const assignedJmhPickSetNames = Object.fromEntries(
-    Array.from({ length: 10 }, (_, index) => {
+    Array.from({ length: 50 }, (_, index) => {
       const key = `JMH${index + 1}`;
       const selectedId = Number(config.jmh_pick_sets?.[key]);
       const pickSet = jmhPickSets.find((item) => Number(item.set_id) === selectedId);
@@ -3076,7 +3076,7 @@ export default function GhUserSetupPage() {
                 <Box sx={{ width: 840, boxSizing: "border-box", mb: 2, p: 1.5, border: "1px solid #555", borderRadius: 1, backgroundColor: "#111" }}>
                   <Typography sx={{ color: "#fff", fontWeight: "bold", mb: 1 }}>JM Helper Pick 세트 지정</Typography>
                   <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 403px)", gap: 1 }}>
-                    {Array.from({ length: 10 }, (_, index) => {
+                    {Array.from({ length: 50 }, (_, index) => {
                       const key = `JMH${index + 1}`;
                       const selected = config.jmh_pick_sets?.[key] ?? "";
                       const usedByOtherSlot = new Set(

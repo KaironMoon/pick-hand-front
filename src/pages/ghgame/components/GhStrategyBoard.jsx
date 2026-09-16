@@ -74,36 +74,14 @@ function edgeStyle(data, i, pos) {
 }
 
 // ── 테이블 정의 (전략명 + 그룹선/노란박스/헤더색). 값은 실데이터로 채움. ──
-// G1: A/AR 세트 + S1/S2/S3 세트. 각 세트 OLD/NEW = AARO/AARN, SSROn/SSRNn. (260628)
-const G1n = ["A", "AR", "AARO", "AARN", "S1", "S1R", "SSRO1", "SSRN1", "S2", "S2R", "SSRO2", "SSRN2", "S3", "S3R", "SSRO3", "SSRN3"];
-const G1 = {
-  name: G1n,
-  gstart: new Set([4, 8, 12]),
-  hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
-  headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
-};
-const G2n = ["FOR1", "FOR1X", "D", "G", "TN", "ONE", "TWO", "P", "B", "J", "6M", "6MX", "NC", "NCR", "NCSRO", "NCSRN"];
-const G2 = {
-  name: G2n,
-  gstart: new Set([1, 2, 7, 10, 12]),
-  hlRanges: [[0, 0], [1, 1], [2, 6], [7, 9], [10, 11], [12, 15]],
-  headColors: [[0, 0, HC_BLUE], [1, 1, HC_RED], [2, 6, HC_BLUE], [7, 9, HC_RED], [10, 11, "#de6a08"], [12, 15, HC_BLUE]],
-};
-const G3n = ["허니비", "허니R2", "허니SR2O", "허니SRN", "W111", "위너R2", "위너SR2O", "위너SRN", "M22", "메가R2", "메가SR2O", "메가SRN", "D112", "드림R2", "드림SR2O", "드림SRN"];
-const G3 = {
-  name: G3n,
-  gstart: new Set([4, 8, 12]),
-  hlRanges: [[0, 3], [4, 7], [8, 11], [12, 15]],
-  headColors: [[0, 3, HC_BLUE], [4, 7, HC_RED], [8, 11, HC_BLUE], [12, 15, HC_RED]],
-};
-// G4: SQ1/2/3 + G(H1)/G(%1) + JMH1~10 + 빈칸 1.
-const G4n = ["SQ1", "SQ2", "SQ3", "G(H1)", "G(%1)", ...Array.from({ length: 10 }, (_, index) => `JMH${index + 1}`), ""];
-const G4 = {
-  name: G4n,
-  gstart: new Set([3, 4, 5]),
-  hlRanges: [[0, 2], [3, 3], [4, 4], [5, 14]],
-  headColors: [[0, 2, HC_BLUE], [3, 3, HC_BLUE], [4, 4, HC_RED], [5, 14, HC_BLUE]],
-};
+const BOARD_NAMES = ["A", "AR", "G(H1)", "G(%1)", "S1", "S1R",
+  ...Array.from({ length: 50 }, (_, index) => `JMH${index + 1}`)];
+const BOARD_TABLES = Array.from({ length: Math.ceil(BOARD_NAMES.length / 16) }, (_, index) => ({
+  name: Array.from({ length: 16 }, (_, offset) => BOARD_NAMES[index * 16 + offset] || ""),
+  gstart: new Set(),
+  hlRanges: [],
+  headColors: [],
+}));
 
 // ── 셀 렌더 헬퍼 ──
 const recHTML = (v) => {
@@ -304,7 +282,11 @@ function LblCell({ text, color = "#fff", edge, onClick, title }) {
 function StrategyTable({ data, showLabels = true, maxBlinkActive, onMaxLabelClick }) {
   const rowLabel = (text) => showLabels ? text : undefined;
   return (
-    <Box component="table" sx={{ borderCollapse: "collapse", backgroundColor: "#000", tableLayout: "fixed", width: showLabels ? 1020 : 960 }}>
+    <Box component="table" sx={{ borderCollapse: "collapse", backgroundColor: "#000", tableLayout: "fixed", width: showLabels ? 1050 : 960 }}>
+      <colgroup>
+        {showLabels && <col style={{ width: 90 }} />}
+        {data.name.map((_, index) => <col key={index} style={{ width: 60 }} />)}
+      </colgroup>
       <thead>
         <tr>
           {showLabels && <LblCell text="섹션" edge="head" />}
@@ -532,7 +514,7 @@ function buildColData(label, i, data, ctx) {
     "M22", "메가R2", "메가SR2O", "메가SRN", "D112", "드림R2", "드림SR2O", "드림SRN",
     "NC", "NCR", "NCSRO", "NCSRN"];
   if (SUBGAME_LABELS.includes(label)) return fromStats(ctx, label);
-  if (/^JMH(?:10|[1-9])$/.test(label)) return fromStats(ctx, label);
+  if (/^JMH(?:[1-9]|[1-4][0-9]|50)$/.test(label)) return fromStats(ctx, label);
   // G(H1~H4/%1~%4) — 다른 섹션 메트릭으로 산출된 픽.
   if (/^G\((H|%)[1-4]\)$/.test(label)) return fromStats(ctx, label);
   let m = label.match(/^FOR([123])X$/);
@@ -636,7 +618,7 @@ export default function GhStrategyBoard({ roundState }) {
   };
   const hasData = !!roundState?.sections;
   const ctx = { roundState };
-  const tables = [G1, G2, G3, G4].map((t) => (hasData ? withLiveData(t, ctx) : t));
+  const tables = BOARD_TABLES.map((t) => (hasData ? withLiveData(t, ctx) : t));
   return (
     <Box sx={{ overflowX: "auto", mb: 2 }}>
       <Box sx={{ display: "inline-grid", gridTemplateColumns: "repeat(2, max-content)", backgroundColor: "#000" }}>

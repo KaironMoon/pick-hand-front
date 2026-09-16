@@ -22,7 +22,7 @@ function configWithAssistValues() {
   return {
     untouched: { value: 17 },
     AAR: { step_max: 16, miss_threshold: 7, pasi },
-    D: { step_max: 9, miss_threshold: 4, pasi },
+    JMH50: { step_max: 9, miss_threshold: 4, pasi },
   };
 }
 
@@ -42,7 +42,7 @@ test("GH assist export contains every setup line and stages 2 through 20", () =>
   assert.deepEqual(GH_ASSIST_EXCEL_HEADERS.slice(-2), ["19단계", "20단계"]);
   assert.equal(tsv.split(/\r?\n/).length, rows.length + 1);
   assert.match(tsv, /AAR\tA멀티\tA\t회차어시\tJ/);
-  assert.match(tsv, /D\tD\tD\t회차어시\t육전/);
+  assert.match(tsv, /JMH50\tJM Helper Pick 50\tJMH50\t회차어시\t육전/);
 });
 
 test("GH assist HTML export includes spreadsheet-friendly round and quarter colors", () => {
@@ -102,18 +102,18 @@ test("GH assist export can be imported without changing highest steps or unrelat
 
   assert.deepEqual(result.errors, []);
   assert.equal(result.config.AAR.step_max, 16);
-  assert.equal(result.config.D.step_max, 9);
+  assert.equal(result.config.JMH50.step_max, 9);
   assert.equal(result.config.AAR.miss_threshold, 7);
-  assert.equal(result.config.D.miss_threshold, 4);
+  assert.equal(result.config.JMH50.miss_threshold, 4);
   assert.deepEqual(result.config.untouched, { value: 17 });
   assert.equal(result.config.AAR.pasi[0].assist_h_by_section.A, "J");
-  assert.equal(result.config.D.pasi[0].assist1, "BF6");
-  assert.equal(result.config.D.pasi[1].assist2, "고정B");
+  assert.equal(result.config.JMH50.pasi[0].assist1, "BF6");
+  assert.equal(result.config.JMH50.pasi[1].assist2, "고정B");
 });
 
 test("GH assist import rejects unknown values instead of replacing them", () => {
   const current = configWithAssistValues();
-  const edited = editTsvCell(serializeGhAssistTsv(current), "D", "D", "회차어시", 4, "없는어시");
+  const edited = editTsvCell(serializeGhAssistTsv(current), "JMH50", "JMH50", "회차어시", 4, "없는어시");
   const result = parseGhAssistTsv(edited, current);
 
   assert.equal(result.config, null);
@@ -124,25 +124,25 @@ test("GH assist import rebuilds valid six-step 6M bundle metadata", () => {
   const current = configWithAssistValues();
   let edited = serializeGhAssistTsv(current);
   for (let level = 2; level <= 7; level += 1) {
-    edited = editTsvCell(edited, "D", "D", "회차어시", level, "6M");
+    edited = editTsvCell(edited, "JMH50", "JMH50", "회차어시", level, "6M");
   }
   const result = parseGhAssistTsv(edited, current);
 
   assert.deepEqual(result.errors, []);
-  assert.deepEqual(result.config.D.pasi.slice(0, 6).map((row) => row.assist1), Array(6).fill("6M"));
-  assert.deepEqual(result.config.D.pasi.slice(0, 6).map((row) => row.assist1_6m_bundle_start), Array(6).fill(2));
-  assert.equal(result.config.D.step_max, 9);
+  assert.deepEqual(result.config.JMH50.pasi.slice(0, 6).map((row) => row.assist1), Array(6).fill("6M"));
+  assert.deepEqual(result.config.JMH50.pasi.slice(0, 6).map((row) => row.assist1_6m_bundle_start), Array(6).fill(2));
+  assert.equal(result.config.JMH50.step_max, 9);
 });
 
 test("GH assist import rejects incomplete or out-of-range 6M bundles", () => {
   const current = configWithAssistValues();
-  const incomplete = editTsvCell(serializeGhAssistTsv(current), "D", "D", "회차어시", 2, "6M");
+  const incomplete = editTsvCell(serializeGhAssistTsv(current), "JMH50", "JMH50", "회차어시", 2, "6M");
   const incompleteResult = parseGhAssistTsv(incomplete, current);
   assert.ok(incompleteResult.errors.some((error) => error.includes("6칸 단위")));
 
   let beyondMax = serializeGhAssistTsv(current);
   for (let level = 5; level <= 10; level += 1) {
-    beyondMax = editTsvCell(beyondMax, "D", "D", "쿼터어시", level, "6MX");
+    beyondMax = editTsvCell(beyondMax, "JMH50", "JMH50", "쿼터어시", level, "6MX");
   }
   const beyondResult = parseGhAssistTsv(beyondMax, current);
   assert.ok(beyondResult.errors.some((error) => error.includes("현재 최고단계 9")));

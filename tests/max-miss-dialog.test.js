@@ -49,13 +49,15 @@ test("maximum miss thresholds cover 3M through 20M", () => {
   assert.deepEqual(MAX_MISS_THRESHOLDS, Array.from({ length: 18 }, (_, index) => index + 3));
 });
 
-test("maximum miss grid keeps J, 6M, and 6MX while excluding P and B", () => {
+test("maximum miss grid keeps only calculator strategies and all 50 JMH slots", () => {
   assert.deepEqual(MAX_MISS_SECTION_ROWS.at(-1), [
-    { key: "J", label: "J", always: true },
-    { key: "6M", label: "6M" },
-    { key: "6MX", label: "6MX" },
+    { key: "JMH49", label: "JMH49" },
+    { key: "JMH50", label: "JMH50" },
+    null,
     null,
   ]);
+  assert.equal(MAX_MISS_SECTION_ROWS.flat().filter((section) => section?.key.startsWith("JMH")).length, 50);
+  assert.equal(MAX_MISS_SECTION_ROWS.flat().some((section) => section?.key === "J"), false);
   assert.equal(MAX_MISS_SECTION_ROWS.flat().some((section) => section?.key === "P"), false);
   assert.equal(MAX_MISS_SECTION_ROWS.flat().some((section) => section?.key === "B"), false);
 });
@@ -158,7 +160,7 @@ test("Excel clipboard payload keeps layout, colors, threshold, and aliased value
   assert.deepEqual(payload.text.split("\n").slice(1).map((row) => row.split("\t").length), [17, 17, 17]);
 });
 
-test("clipboard keeps J round and quarter values together with 6M and 6MX", () => {
+test("clipboard keeps JMH49 and JMH50 round and quarter values", () => {
   const payload = buildMaxMissClipboardPayload({
     sections: {
       J: {
@@ -166,11 +168,11 @@ test("clipboard keeps J round and quarter values together with 6M and 6MX", () =
         assist_h: { max_miss_streak: 2, max_miss_round: 7 },
         assist_q: { max_miss_streak: 3, max_miss_round: 9 },
       },
-      "6M": {
+      "JMH49": {
         assist_h: { max_miss_streak: 9, max_miss_round: 20 },
         assist_q: { max_miss_streak: 10, max_miss_round: 21 },
       },
-      "6MX": {
+      "JMH50": {
         assist_h: { max_miss_streak: 11, max_miss_round: 22 },
         assist_q: { max_miss_streak: 12, max_miss_round: 23 },
       },
@@ -179,7 +181,7 @@ test("clipboard keeps J round and quarter values together with 6M and 6MX", () =
     threshold: 9,
   });
 
-  for (const value of ["2M7", "3M9", "9M20", "10M21", "11M22", "12M23"]) {
+  for (const value of ["9M20", "10M21", "11M22", "12M23"]) {
     assert.match(payload.html, new RegExp(`>${value}<`));
   }
 });

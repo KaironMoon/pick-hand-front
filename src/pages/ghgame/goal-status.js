@@ -1,18 +1,11 @@
 export const GOAL_STATUS_ITEMS = [
   { key: "AAR", label: "A" },
-  { key: "SSR1", label: "S1" },
-  { key: "SSR2", label: "S2" },
-  { key: "SSR3", label: "S3" },
-  { key: "FOR", label: "F" },
-  { key: "FORX", label: "FX" },
-  { key: "SQ", label: "SQ" },
   { key: "GOBH", label: "GH" },
   { key: "GOBP", label: "G%" },
-  { key: "허니비", label: "H" },
-  { key: "W111", label: "W" },
-  { key: "M22", label: "M" },
-  { key: "D112", label: "D" },
-  { key: "PBJ", label: "PJ" },
+  { key: "SSR1", label: "S1" },
+  ...Array.from({ length: 50 }, (_, index) => ({
+    key: `JMH${index + 1}`, label: `JMH${index + 1}`,
+  })),
 ];
 
 const numberOrZero = (value) => {
