@@ -1144,7 +1144,7 @@ export default function GhUserGamePage() {
     setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
     applySavedRoundState(data);
     setGlobalhitData(data.globalhit || []);
-    setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundStateUpper(data.round_state_upper || null); setRoundStateLower(data.round_state_lower || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
+    setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
     setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
     setUserSummary(data.user_summary || null);
     setUserMartinDashboard(data.user_martin_dashboard || null);
