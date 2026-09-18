@@ -1906,12 +1906,11 @@ export default function GhUserGamePage() {
       keepRefreshing = true;
       const scheduleStateRefresh = () => {
         stateRefreshTimer = window.setTimeout(() => {
-          stateRefreshPromise = apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user")
+          stateRefreshPromise = apiCaller.get(GH_GAMES_API.SHOE_COPY_PROGRESS(gameId))
             .then((stateRes) => {
-              applyGameData(stateRes.data);
               setShoeCopyProgress((prev) => ({
                 ...prev,
-                completed: Math.min(getShoeResultCount(stateRes.data), prev.total),
+                completed: Math.min(stateRes.data.completed_results, prev.total),
               }));
             })
             .catch(() => {})
