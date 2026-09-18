@@ -13,7 +13,7 @@ import {
 function configWithBettingValues() {
   return {
     untouched: { value: 17 },
-    AAR: {
+    A: {
       enabled: true,
       bet_type: "martin",
       step_min: 2,
@@ -43,18 +43,18 @@ test("GH betting export contains white, red, and blue amounts for every setup bo
 
   assert.equal(rows.length, GH_ASSIST_SETUP_BOXES.length * 3);
   assert.deepEqual(GH_BETTING_EXCEL_HEADERS.slice(-2), ["19단계", "20단계"]);
-  assert.match(tsv, /AAR\tA멀티\t35\t68\t흰색\t1\t2/);
-  assert.match(tsv, /AAR\tA멀티\t35\t68\t빨강\t2\t4/);
-  assert.match(tsv, /AAR\tA멀티\t35\t68\t파랑\t0.1\t0.2/);
+  assert.match(tsv, /A\tA\t35\t68\t흰색\t1\t2/);
+  assert.match(tsv, /A\tA\t35\t68\t빨강\t2\t4/);
+  assert.match(tsv, /A\tA\t35\t68\t파랑\t0.1\t0.2/);
 });
 
 test("GH betting import updates thresholds and all colors, switches to manual, and preserves unrelated settings", () => {
   const current = configWithBettingValues();
-  let edited = editRows(serializeGhBettingTsv(current), "AAR", (row) => {
+  let edited = editRows(serializeGhBettingTsv(current), "A", (row) => {
     row[2] = "40";
     row[3] = "75";
   });
-  edited = editRows(edited, "AAR", (row) => {
+  edited = editRows(edited, "A", (row) => {
     if (row[4] === "흰색") row[5] = "11.5";
     if (row[4] === "빨강") row[5] = "22.5";
     if (row[4] === "파랑") row[5] = "3.5";
@@ -63,22 +63,22 @@ test("GH betting import updates thresholds and all colors, switches to manual, a
   const result = parseGhBettingTsv(edited, current);
 
   assert.deepEqual(result.errors, []);
-  assert.equal(result.config.AAR.bet_type, "manual");
-  assert.equal(result.config.AAR.cond_lo, 40);
-  assert.equal(result.config.AAR.cond_hi, 75);
-  assert.equal(result.config.AAR.amounts_white[0], 11.5);
-  assert.equal(result.config.AAR.amounts_red[0], 22.5);
-  assert.equal(result.config.AAR.amounts_blue[0], 3.5);
-  assert.equal(result.config.AAR.step_min, 2);
-  assert.equal(result.config.AAR.step_max, 16);
-  assert.equal(result.config.AAR.miss_threshold, 7);
+  assert.equal(result.config.A.bet_type, "manual");
+  assert.equal(result.config.A.cond_lo, 40);
+  assert.equal(result.config.A.cond_hi, 75);
+  assert.equal(result.config.A.amounts_white[0], 11.5);
+  assert.equal(result.config.A.amounts_red[0], 22.5);
+  assert.equal(result.config.A.amounts_blue[0], 3.5);
+  assert.equal(result.config.A.step_min, 2);
+  assert.equal(result.config.A.step_max, 16);
+  assert.equal(result.config.A.miss_threshold, 7);
   assert.deepEqual(result.config.untouched, { value: 17 });
   assert.ok(GH_ASSIST_SETUP_BOXES.every((box) => result.config[box.key].bet_type === "manual"));
 });
 
 test("GH betting import rejects inconsistent color thresholds", () => {
   const current = configWithBettingValues();
-  const edited = editRows(serializeGhBettingTsv(current), "AAR", (row) => {
+  const edited = editRows(serializeGhBettingTsv(current), "A", (row) => {
     if (row[4] === "빨강") row[2] = "36";
   });
   const result = parseGhBettingTsv(edited, current);
@@ -89,7 +89,7 @@ test("GH betting import rejects inconsistent color thresholds", () => {
 
 test("GH betting import rejects reversed thresholds and invalid amounts", () => {
   const current = configWithBettingValues();
-  const edited = editRows(serializeGhBettingTsv(current), "AAR", (row) => {
+  const edited = editRows(serializeGhBettingTsv(current), "A", (row) => {
     row[2] = "80";
     row[3] = "70";
     if (row[4] === "파랑") row[5] = "-1";
@@ -119,4 +119,15 @@ test("GH betting clipboard uses the same spreadsheet text fallback", async () =>
 
   assert.equal(format, "text");
   assert.equal(writtenText, "설정판\t흰색하한(%)\t1단계");
+});
+
+test("editing AR amounts leaves the A amounts unchanged", () => {
+  const current = configWithBettingValues();
+  const edited = editRows(serializeGhBettingTsv(current), "AR", (row) => {
+    if (row[4] === "흰색") row[5] = "17";
+  });
+  const result = parseGhBettingTsv(edited, current);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.config.AR.amounts_white[0], 17);
+  assert.equal(result.config.A.amounts_white[0], 1);
 });

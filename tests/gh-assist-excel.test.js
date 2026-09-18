@@ -21,7 +21,7 @@ function configWithAssistValues() {
   }));
   return {
     untouched: { value: 17 },
-    AAR: { step_max: 16, miss_threshold: 7, pasi },
+    A: { step_max: 16, miss_threshold: 7, pasi },
     JMH50: { step_max: 9, miss_threshold: 4, pasi },
   };
 }
@@ -41,7 +41,7 @@ test("GH assist export contains every setup line and stages 2 through 20", () =>
 
   assert.deepEqual(GH_ASSIST_EXCEL_HEADERS.slice(-2), ["19단계", "20단계"]);
   assert.equal(tsv.split(/\r?\n/).length, rows.length + 1);
-  assert.match(tsv, /AAR\tA멀티\tA\t회차어시\tJ/);
+  assert.match(tsv, /A\tA\tA\t회차어시\t육전/);
   assert.match(tsv, /JMH50\tJM Helper Pick 50\tJMH50\t회차어시\t육전/);
 });
 
@@ -101,12 +101,12 @@ test("GH assist export can be imported without changing highest steps or unrelat
   const result = parseGhAssistTsv(serializeGhAssistTsv(current), current);
 
   assert.deepEqual(result.errors, []);
-  assert.equal(result.config.AAR.step_max, 16);
+  assert.equal(result.config.A.step_max, 16);
   assert.equal(result.config.JMH50.step_max, 9);
-  assert.equal(result.config.AAR.miss_threshold, 7);
+  assert.equal(result.config.A.miss_threshold, 7);
   assert.equal(result.config.JMH50.miss_threshold, 4);
   assert.deepEqual(result.config.untouched, { value: 17 });
-  assert.equal(result.config.AAR.pasi[0].assist_h_by_section.A, "J");
+  assert.equal(result.config.A.pasi[0].assist1, "BF6");
   assert.equal(result.config.JMH50.pasi[0].assist1, "BF6");
   assert.equal(result.config.JMH50.pasi[1].assist2, "고정B");
 });
@@ -155,4 +155,19 @@ test("GH assist import requires the complete exported table", () => {
 
   assert.equal(result.config, null);
   assert.ok(result.errors.some((error) => error.includes("행이 없습니다")));
+});
+
+test("single GH tables import scalar H/Q settings independently", () => {
+  const current = configWithAssistValues();
+  let edited = serializeGhAssistTsv(current);
+  edited = editTsvCell(edited, "GOBH", "G(H1)", "회차어시", 2, "고정P");
+  edited = editTsvCell(edited, "GOBP", "G(%1)", "쿼터어시", 2, "고정B");
+  edited = editTsvCell(edited, "AR", "AR", "회차어시", 2, "해당반대");
+  const result = parseGhAssistTsv(edited, current);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.config.GOBH.pasi[0].assist1, "고정P");
+  assert.equal(result.config.GOBP.pasi[0].assist2, "고정B");
+  assert.equal(result.config.GOBH.pasi[0].assist2, "해당진행");
+  assert.equal(result.config.AR.pasi[0].assist1, "해당반대");
+  assert.equal(result.config.A.pasi[0].assist1, "BF6");
 });

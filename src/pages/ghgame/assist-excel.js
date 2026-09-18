@@ -27,10 +27,12 @@ export const assistDisplayLabel = (value) => ASSIST_DISPLAY_LABELS[value] || Obj
   .reduce((label, [storedPrefix, displayPrefix]) => label.replace(storedPrefix, displayPrefix), value);
 
 export const GH_ASSIST_SETUP_BOXES = [
-  { key: "AAR", variant: "full", aarLabel: "A-AR", label: "A멀티", sections: ["A", "AR"] },
-  { key: "SSR1", variant: "full", aarLabel: "S-SR", label: "S1세트", sections: ["S1", "SR1"] },
-  { key: "GOBH", legacyKey: "GOB", variant: "full", label: "GH 시리즈", sections: ["G(H1)"] },
-  { key: "GOBP", legacyKey: "GOB", variant: "full", label: "G% 시리즈", sections: ["G(%1)"] },
+  { key: "A", variant: "short", label: "A" },
+  { key: "AR", variant: "short", label: "AR" },
+  { key: "S1", variant: "short", label: "S1" },
+  { key: "SR1", variant: "short", label: "SR1" },
+  { key: "GOBH", legacyKey: "GOB", variant: "short", label: "GH1", sections: ["G(H1)"] },
+  { key: "GOBP", legacyKey: "GOB", variant: "short", label: "G%1", sections: ["G(%1)"] },
   ...Array.from({ length: 50 }, (_, index) => ({
     key: `JMH${index + 1}`,
     variant: "short",
@@ -100,7 +102,7 @@ export function buildGhAssistExcelRows(config) {
     const valueField = isRound ? "assist1" : "assist2";
     const sectionField = isRound ? "assist_h_by_section" : "assist_q_by_section";
     const values = rows.map((row) => {
-      const value = box.sections?.length
+      const value = box.variant === "full"
         ? row?.[sectionField]?.[section]
         : row?.[valueField];
       return assistDisplayLabel(GH_ASSIST_OPTIONS.includes(value) ? value : "해당진행");
@@ -312,7 +314,7 @@ export function parseGhAssistTsv(text, currentConfig) {
     strategy.pasi.forEach((row, index) => {
       const value = values[index];
       const start = starts.get(index);
-      if (line.box.sections?.length) {
+      if (line.box.variant === "full") {
         setSectionValue(row, sectionField, line.section, value);
         if (start == null) clearSectionValue(row, sectionMetaField, line.section);
         else setSectionValue(row, sectionMetaField, line.section, start);

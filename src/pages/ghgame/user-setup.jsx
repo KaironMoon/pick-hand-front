@@ -3128,7 +3128,7 @@ export default function GhUserSetupPage() {
                 </colgroup>
                 <tbody>
                   <StrategySetupSection
-                    name={b.key.startsWith("JMH") ? b.key : (b.label || b.key)} variant={b.variant} aarLabel={b.aarLabel} sections={b.sections}
+                    name={b.sections?.[0] || b.key} variant={b.variant} aarLabel={b.aarLabel} sections={b.sections}
                     displayName={assignedJmhPickSetNames[b.key] || (b.key.startsWith("JMH") ? b.key : (b.label || b.key))}
                     targetLabel={b.targetLabel}
                     strat={config[b.key] || (b.legacyKey ? config[b.legacyKey] : null) || defaultStrategySetup()}

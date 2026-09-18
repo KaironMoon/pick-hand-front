@@ -12,7 +12,7 @@ test("goal status uses the approved multi POT order and labels", () => {
   assert.deepEqual(
     GOAL_STATUS_ITEMS.map(({ key, label }) => [key, label]),
     [
-      ["AAR", "A"], ["GOBH", "GH"], ["GOBP", "G%"], ["SSR1", "S1"],
+      ["A", "A"], ["AR", "AR"], ["GOBH", "GH"], ["GOBP", "G%"], ["S1", "S1"], ["SR1", "SR1"],
       ...Array.from({ length: 50 }, (_, index) => [`JMH${index + 1}`, `JMH${index + 1}`]),
     ],
   );
@@ -21,18 +21,18 @@ test("goal status uses the approved multi POT order and labels", () => {
 test("missing targets stay visible but dimmed and reached targets light up", () => {
   const items = buildGoalStatusItems(
     {
-      AAR: { target: 30, pnl: 31, reached: true, reached_round: 23 },
-      SSR1: { target: 0, pnl: 5, reached: false },
+      A: { target: 30, pnl: 31, reached: true, reached_round: 23 },
+      S1: { target: 0, pnl: 5, reached: false },
     },
     { target: 100, pnl: 40, reason: null },
     { running: false },
   );
 
   assert.deepEqual(
-    items.find((item) => item.key === "AAR"),
-    { key: "AAR", label: "A", target: 30, pnl: 31, reached: true, reachedRound: 23, dimmed: false },
+    items.find((item) => item.key === "A"),
+    { key: "A", label: "A", target: 30, pnl: 31, reached: true, reachedRound: 23, dimmed: false },
   );
-  assert.equal(items.find((item) => item.key === "SSR1").dimmed, true);
+  assert.equal(items.find((item) => item.key === "S1").dimmed, true);
   assert.deepEqual(
     items.at(-1),
     { key: "overall-pnl", label: "Pnl", target: 100, pnl: 40, reached: false, reachedRound: 0, dimmed: false },
