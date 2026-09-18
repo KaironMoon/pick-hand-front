@@ -1119,11 +1119,7 @@ export default function GhUserGamePage() {
   })();
   const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
-  const applyGameData = useCallback((data, { preserveGameId = false } = {}) => {
-    setLegacyRestoreBlocked(false);
-    if (!preserveGameId) setGameId(data.game_id);
-    setConfig(data.config);
-    setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
+  const applySavedRoundState = useCallback((data) => {
     const seq = data.seq || "";
     const picks = data.round_picks || [];
     const statuses = data.round_status || [];
@@ -1137,12 +1133,22 @@ export default function GhUserGamePage() {
       statusesAr,
       dsMarks,
     }));
+    setRoundStateUpper(data.round_state_upper || null);
+    setRoundStateLower(data.round_state_lower || null);
+  }, []);
+
+  const applyGameData = useCallback((data, { preserveGameId = false } = {}) => {
+    setLegacyRestoreBlocked(false);
+    if (!preserveGameId) setGameId(data.game_id);
+    setConfig(data.config);
+    setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
+    applySavedRoundState(data);
     setGlobalhitData(data.globalhit || []);
     setTopGhSections(data.top_gh_sections || []); setTopNextRound(data.top_next_round ?? null); setLscMatches(data.lsc_matches || []); setLscPick(data.lsc_pick ?? null); setRoundLscList(data.round_lsc_picks || []); setTwoPick(data.two_pick ?? null); setRoundTwoList(data.round_two_picks || []); setPicksSnapshot(data.picks_snapshot || null); setRoundStateUpper(data.round_state_upper || null); setRoundStateLower(data.round_state_lower || null); setDecalPick(data.decal_pick ?? null); setShadowPick(data.shadow_pick ?? null); setDecalAxis(data.decal_axis ?? null); setShadowAxis(data.shadow_axis ?? null); setRoundDsList(data.round_decal_shadow || []);
     setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
     setUserSummary(data.user_summary || null);
     setUserMartinDashboard(data.user_martin_dashboard || null);
-  }, []);
+  }, [applySavedRoundState]);
 
   const refreshGameSlots = useCallback(async () => {
     const res = await apiCaller.get(GH_GAMES_API.SLOTS);
@@ -1908,6 +1914,7 @@ export default function GhUserGamePage() {
         stateRefreshTimer = window.setTimeout(() => {
           stateRefreshPromise = apiCaller.get(GH_GAMES_API.SHOE_COPY_PROGRESS(gameId))
             .then((stateRes) => {
+              applySavedRoundState(stateRes.data);
               setShoeCopyProgress((prev) => ({
                 ...prev,
                 completed: Math.min(stateRes.data.completed_results, prev.total),
