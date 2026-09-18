@@ -142,7 +142,13 @@ function getRowCells(ctx, spec, assist = false) {
   const stateKey = stateKeyForSpec(spec);
   const stateRows = getRoundStatePart(ctx, stateKey, assist ? "h_assist" : "picks");
   const state = getRoundStateTrack(ctx, stateKey, assist);
-  return cellsFromStateBigRoad2(stateRows || [], state?.pick, { status: bigRoadCurrentStatus(state), generatedPickMark: state?.generated_pick_mark }, ctx.actualSeq);
+  const cells = cellsFromStateBigRoad2(stateRows || [], state?.pick, { status: bigRoadCurrentStatus(state), generatedPickMark: state?.generated_pick_mark }, ctx.actualSeq);
+  if (!assist) {
+    cells.forEach((cell, index) => {
+      if (cell) cell.pickLabel = index === ctx.actualSeq?.length ? state?.pick_label : stateRows?.[index]?.pick_label;
+    });
+  }
+  return cells;
 }
 
 function getRoundStateQAssist(ctx, key) {
@@ -205,7 +211,7 @@ function Cell({ cell, onClick }) {
   let color = "#777";
   let insetBorder;
   const title = cell?.pick && cell?.round
-    ? `${cell.round}회차${cell.martinCStep ? ` · C ${cell.martinCStep}S · ${Number(cell.martinCAmount || 0).toLocaleString()}P` : ""}`
+    ? `${cell.round}회차${cell.pickLabel ? ` · ${cell.pickLabel} · ${cell.pick}` : ""}${cell.martinCStep ? ` · C ${cell.martinCStep}S · ${Number(cell.martinCAmount || 0).toLocaleString()}P` : ""}`
     : undefined;
   const generatedPickMark = cell?.generatedPickMark || cell?.generated_pick_mark;
   if (cell?.basis) {
@@ -254,6 +260,7 @@ function Cell({ cell, onClick }) {
     content = "W";
     color = bg === CURRENT_BG ? "#333" : "#f7f7f7";
   }
+  if (cell?.pickLabel && (cell.pick === "P" || cell.pick === "B")) content = cell.pickLabel;
   const glowBorder = generatedPickMark ? `0 0 8px ${GENERATED_PICK_BORDER}` : null;
   const boxShadow = [insetBorder, glowBorder].filter(Boolean).join(", ") || undefined;
   const box = (
@@ -281,7 +288,7 @@ function Cell({ cell, onClick }) {
         },
       } : {}),
       color,
-      fontSize: 10.5,
+      fontSize: cell?.pickLabel ? Math.min(10.5, (CELL_W - 2) / (String(cell.pickLabel).length * 0.65)) : 10.5,
       fontWeight: content === "P" || content === "B" || content === "W" ? "bold" : undefined,
       cursor: onClick ? "pointer" : "default",
     }}>{content}</Box>
