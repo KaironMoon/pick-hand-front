@@ -995,6 +995,7 @@ export default function GhUserGamePage() {
     "gh",
   ));
   const [sourceGameInput, setSourceGameInput] = useState("");
+  const [helperGameCodeInput, setHelperGameCodeInput] = useState("");
   const [shoePreview, setShoePreview] = useState(null);
   const [shoeCopyError, setShoeCopyError] = useState("");
   const [shoeCopyLoading, setShoeCopyLoading] = useState(false);
@@ -1862,6 +1863,7 @@ export default function GhUserGamePage() {
       return;
     }
     setSourceGameInput("");
+    setHelperGameCodeInput("");
     setShoePreview(null);
     setShoeCopyError("");
     setShoeCopyOpen(true);
@@ -1883,6 +1885,27 @@ export default function GhUserGamePage() {
     } catch (err) {
       setShoePreview(null);
       setShoeCopyError(err.response?.data?.detail || "기존 슈를 조회하지 못했습니다.");
+    } finally {
+      setShoeCopyLoading(false);
+    }
+  };
+
+  const loadHelperShoePreview = async () => {
+    const sourceGameId = Number(helperGameCodeInput);
+    if (!Number.isInteger(sourceGameId) || sourceGameId <= 0) {
+      setShoeCopyError("올바른 헬퍼 게임 코드를 입력하세요.");
+      return;
+    }
+    setShoeCopyLoading(true);
+    setShoeCopyError("");
+    try {
+      const res = await apiCaller.get(GH_GAMES_API.SHOE_COPY_PREVIEW(sourceGameId), {
+        source_game_type: "helper",
+      });
+      setShoePreview(res.data);
+    } catch (err) {
+      setShoePreview(null);
+      setShoeCopyError(err.response?.data?.detail || "헬퍼 게임을 조회하지 못했습니다.");
     } finally {
       setShoeCopyLoading(false);
     }
@@ -2860,6 +2883,29 @@ export default function GhUserGamePage() {
               }}
             />
             <Button variant="outlined" disabled={shoeCopyLoading || shoeCopyExecuting} onClick={loadShoePreview}>
+              {shoeCopyLoading ? "조회 중..." : "조회"}
+            </Button>
+          </Box>
+
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 2, flexWrap: "wrap" }}>
+            <TextField
+              size="small"
+              label="헬퍼 게임 코드"
+              type="number"
+              value={helperGameCodeInput}
+              disabled={shoeCopyExecuting}
+              onChange={(event) => {
+                setHelperGameCodeInput(event.target.value);
+                setShoePreview(null);
+                setShoeCopyError("");
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                if (!shoeCopyLoading && !shoeCopyExecuting) loadHelperShoePreview();
+              }}
+            />
+            <Button variant="outlined" disabled={shoeCopyLoading || shoeCopyExecuting} onClick={loadHelperShoePreview}>
               {shoeCopyLoading ? "조회 중..." : "조회"}
             </Button>
           </Box>
