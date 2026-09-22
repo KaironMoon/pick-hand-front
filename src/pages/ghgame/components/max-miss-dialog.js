@@ -7,9 +7,6 @@ export const MAX_MISS_CAPTURE_SECTION_ORDER = [
   "round-amount-table",
 ];
 export const MAX_MISS_SECTION_ROWS = [
-  [{ key: "A", label: "A" }, { key: "AR", label: "AR" }],
-  [{ key: "G(H1)", label: "GH1" }, { key: "G(%1)", label: "G%1" }],
-  [{ key: "S1", label: "S1" }, { key: "SR1", label: "S1R" }],
   ...Array.from({ length: 25 }, (_, index) => [
     { key: `JMH${index * 2 + 1}`, label: `JMH${index * 2 + 1}` },
     { key: `JMH${index * 2 + 2}`, label: `JMH${index * 2 + 2}` },
@@ -63,16 +60,8 @@ export async function compressPngBlob(
   }
 }
 
-const MAX_MISS_SECTION_KEY_ALIASES = {
-  AARN: "AAR",
-  SSRN1: "SSR1",
-  SSRN2: "SSR2",
-  SSRN3: "SSR3",
-};
-
 export function maxMissTrackForSection(sections, sectionKey, trackKey) {
-  const stateKey = MAX_MISS_SECTION_KEY_ALIASES[sectionKey] || sectionKey;
-  const section = sections?.[stateKey] || sections?.[sectionKey];
+  const section = sections?.[sectionKey];
   return section?.[trackKey];
 }
 

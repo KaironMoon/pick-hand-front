@@ -833,8 +833,7 @@ const BET_PROGRESS_MODES = [
 // 어시스트 셀렉트 옵션 (setup_page_mockup.html ASSIST_OPTS, 260624)
 const ASSIST_OPTS = GH_ASSIST_OPTIONS;
 const ASSIST_PROTECTION_OPTIONS = [
-  "J", "BF6", "BF6X", "G(H1)", "G(%1)",
-  "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)",
+  "J", "BF6", "BF6X",
   "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
   "HB멀티(H1)", "HB멀티(%1)", "WH멀티(H1)", "WH멀티(%1)",
   "MH멀티(H1)", "MH멀티(%1)", "DH멀티(H1)", "DH멀티(%1)",
@@ -954,16 +953,10 @@ const DEFAULT_STRATEGY_SETUP = {
   bet_close: 40,
   bet_extend: 55,
   unsettled_stop: 0,
-  // full(멀티판) 전용
-  multi_sections: { A: true, AR: true, OLD: true, NEW: true },  // 사용함 여부
-  tie_old: "G(H1)",   // 동률시 어시스트 (OLD)
-  tie_new: "G(%1)",   // 동률시 어시스트 (NEW)
   assiHLimit1: 0,
   assiHLimit2: 0,
   assiQLimit1: 0,
   assiQLimit2: 0,
-  priority_version: "new",
-  tie_priority: "A",
   // 최상위조건설정 + 패시 어시스트 (멀티/일반판 공통)
   miss_threshold: 5,    // NMiss
   miss_occur: 2,        // 발생 N회
@@ -990,7 +983,6 @@ function defaultStrategySetup() {
     amounts_white: new Array(GH_STRATEGY_MAX_STEP).fill(0),
     amounts_blue: new Array(GH_STRATEGY_MAX_STEP).fill(0),
     amounts_red: new Array(GH_STRATEGY_MAX_STEP).fill(0),
-    multi_sections: { A: true, AR: true, OLD: true, NEW: true },
     pasi: defaultPasi(),
     sequence: [],
   };

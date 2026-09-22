@@ -84,7 +84,7 @@ test("J can always show its positive maximum miss value", () => {
   assert.equal(maxMissLabel({ max_miss_streak: 0 }, 9, true), "");
 });
 
-test("display aliases resolve to their round state section keys", () => {
+test("retired display aliases do not resolve to round state sections", () => {
   const sections = {
     AAR: { assist_h: { max_miss_streak: 9 } },
     SSR1: {
@@ -95,11 +95,10 @@ test("display aliases resolve to their round state section keys", () => {
     SSR3: { assist_h: { max_miss_streak: 12 } },
   };
 
-  assert.equal(maxMissTrackForSection(sections, "AARN", "assist_h")?.max_miss_streak, 9);
-  assert.equal(maxMissTrackForSection(sections, "SSRN1", "assist_h")?.max_miss_streak, 10);
-  assert.equal(maxMissTrackForSection(sections, "SSRN1", "assist_q")?.max_miss_streak, 8);
-  assert.equal(maxMissTrackForSection(sections, "SSRN2", "assist_h")?.max_miss_streak, 11);
-  assert.equal(maxMissTrackForSection(sections, "SSRN3", "assist_h")?.max_miss_streak, 12);
+  assert.equal(maxMissTrackForSection(sections, "AARN", "assist_h"), undefined);
+  assert.equal(maxMissTrackForSection(sections, "SSRN1", "assist_h"), undefined);
+  assert.equal(maxMissTrackForSection(sections, "SSRN2", "assist_h"), undefined);
+  assert.equal(maxMissTrackForSection(sections, "SSRN3", "assist_h"), undefined);
 });
 
 test("sections without aliases keep using their original keys", () => {
@@ -118,19 +117,19 @@ test("maximum miss title shows threshold, game, and round in the requested order
   );
 });
 
-test("Excel clipboard payload keeps layout, colors, threshold, and aliased values", () => {
+test("Excel clipboard payload keeps layout, colors, threshold, and JMH values", () => {
   const payload = buildMaxMissClipboardPayload({
     sections: {
       J: {
         base: { max_miss_streak: 4, max_miss_round: 12 },
       },
-      SSR1: {
+      JMH1: {
         assist_h: { max_miss_streak: 10, max_miss_round: 31 },
         assist_q: { max_miss_streak: 8 },
       },
     },
     sectionRows: [[
-      { key: "SSRN1", label: "SSRN1" },
+      { key: "JMH1", label: "JMH1" },
       null,
       null,
       null,
@@ -146,7 +145,7 @@ test("Excel clipboard payload keeps layout, colors, threshold, and aliased value
   assert.match(payload.html, /color:#ff74df[^>]*>J</);
   assert.match(payload.html, />4M12</);
   assert.match(payload.html, /background-color:#181a1d/);
-  assert.match(payload.html, /SSRN1/);
+  assert.match(payload.html, /JMH1/);
   assert.match(payload.html, /10M31/);
   assert.doesNotMatch(payload.html, />8M</);
   assert.doesNotMatch(payload.html, /colspan=/i);
@@ -156,7 +155,7 @@ test("Excel clipboard payload keeps layout, colors, threshold, and aliased value
   );
   assert.match(payload.text, /^고연패 현황\(9M 이상\) #123 45회차/);
   assert.match(payload.text, /J\t4M12/);
-  assert.match(payload.text, /SSRN1\t10M31/);
+  assert.match(payload.text, /JMH1\t10M31/);
   assert.deepEqual(payload.text.split("\n").slice(1).map((row) => row.split("\t").length), [17, 17, 17]);
 });
 

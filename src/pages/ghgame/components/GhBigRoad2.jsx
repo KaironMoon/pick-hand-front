@@ -26,10 +26,6 @@ const flip = (p) => (p === "P" ? "B" : p === "B" ? "P" : null);
 const fmtValue = (v) => (v === "N/A" ? "-" : v);
 
 const SECTION_DEFS = [
-  { id: "A", label: "A멀티", kind: "normal", rows: [["A", "A"], ["AR", "AR"]] },
-  { id: "GH", label: "GH 시리즈", kind: "normal", rows: [["G(H1)", "G(H1)"]] },
-  { id: "GP", label: "G% 시리즈", kind: "normal", rows: [["G(%1)", "G(%1)"]] },
-  { id: "S1", label: "S1멀티", kind: "normal", rows: [["S1", "track:s:sc1"], ["S1R", "track:sr:sc1"]] },
   { id: "JMH", label: "JM Helper Pick", kind: "normal", rows: Array.from({ length: 50 }, (_, index) => [`JMH${index + 1}`, `JMH${index + 1}`]) },
 ];
 

@@ -1065,10 +1065,6 @@ export default function GhUserGamePage() {
   const gridResults = strategyResults.map((r, i) => ({ ...r, status: amountTableStatusFor(i) }));
   const grid = calculateGhCircleGrid(gridResults);
 
-  // LEGACY COMPAT ONLY: 하단 보조 표시용. 현재 판/전략보드/빅로드 표시는 roundState 사용.
-  const roundArList = displaySnapshot?.round_picks?.AR || [];
-  const roundJList = displaySnapshot?.round_picks?.J || [];
-
   const checkGoalAlert = useCallback((summary, strategyGoals) => {
     const ref = goalAlertedRef.current;
     const aReached = summary?.martin_a?.goal_reached;
@@ -1078,15 +1074,9 @@ export default function GhUserGamePage() {
     if (zReached && !ref.z) msgs.push("마틴 Z");
     ref.a = !!aReached;
     ref.z = !!zReached;
-    const goalLabels = {
-      AAR: "A멀티", SSR1: "S1세트", SSR2: "S2세트", SSR3: "S3세트",
-      FOR: "FOR세트", FORX: "FORX세트", SQ: "SQ세트",
-      GOBH: "GH 시리즈", GOBP: "G% 시리즈",
-      "허니비": "허니비", W111: "위너히트", M22: "메가히트", D112: "드림히트", NC: "나이스초이스",
-    };
     Object.entries(strategyGoals || {}).forEach(([key, goal]) => {
       const refKey = `strategy:${key}`;
-      if (goal?.reached && !ref[refKey]) msgs.push(goalLabels[key] || key);
+      if (goal?.reached && !ref[refKey]) msgs.push(key);
       ref[refKey] = !!goal?.reached;
     });
     if (msgs.length > 0) setGoalDialog({ open: true, msgs });

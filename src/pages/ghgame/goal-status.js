@@ -1,10 +1,4 @@
 export const GOAL_STATUS_ITEMS = [
-  { key: "A", label: "A" },
-  { key: "AR", label: "AR" },
-  { key: "GOBH", label: "GH" },
-  { key: "GOBP", label: "G%" },
-  { key: "S1", label: "S1" },
-  { key: "SR1", label: "SR1" },
   ...Array.from({ length: 50 }, (_, index) => ({
     key: `JMH${index + 1}`, label: `JMH${index + 1}`,
   })),

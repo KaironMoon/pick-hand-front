@@ -74,8 +74,7 @@ function edgeStyle(data, i, pos) {
 }
 
 // ── 테이블 정의 (전략명 + 그룹선/노란박스/헤더색). 값은 실데이터로 채움. ──
-const BOARD_NAMES = ["A", "AR", "G(H1)", "G(%1)", "S1", "S1R",
-  ...Array.from({ length: 50 }, (_, index) => `JMH${index + 1}`)];
+const BOARD_NAMES = Array.from({ length: 50 }, (_, index) => `JMH${index + 1}`);
 const BOARD_TABLES = Array.from({ length: Math.ceil(BOARD_NAMES.length / 16) }, (_, index) => ({
   name: Array.from({ length: 16 }, (_, offset) => BOARD_NAMES[index * 16 + offset] || ""),
   gstart: new Set(),

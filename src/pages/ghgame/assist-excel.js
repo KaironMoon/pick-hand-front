@@ -2,8 +2,7 @@ import { GH_FIXED_PASI_LEVELS } from "./strategy-step-capacity.js";
 
 export const GH_ASSIST_OPTIONS = [
   "해당반대", "해당진행", "3회 쉬기", "6회 쉬기", "고정P", "고정B", "이전3회", "J", "BF6", "BF6X", "6M", "6MX",
-  "G(H1)", "G(%1)",
-  "A멀티(H1)", "A멀티(%1)", "S1멀티(H1)", "S1멀티(%1)", "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
+  "S2멀티(H1)", "S2멀티(%1)", "S3멀티(H1)", "S3멀티(%1)",
   "HB멀티(H1)", "HB멀티(%1)", "WH멀티(H1)", "WH멀티(%1)", "MH멀티(H1)", "MH멀티(%1)", "DH멀티(H1)", "DH멀티(%1)",
 ];
 
@@ -13,8 +12,6 @@ const ASSIST_DISPLAY_LABELS = {
 };
 
 const ASSIST_DISPLAY_PREFIXES = {
-  "A멀티": "A",
-  "S1멀티": "S1",
   "S2멀티": "S2",
   "S3멀티": "S3",
   "HB멀티": "허니비",
@@ -27,12 +24,6 @@ export const assistDisplayLabel = (value) => ASSIST_DISPLAY_LABELS[value] || Obj
   .reduce((label, [storedPrefix, displayPrefix]) => label.replace(storedPrefix, displayPrefix), value);
 
 export const GH_ASSIST_SETUP_BOXES = [
-  { key: "A", variant: "short", label: "A" },
-  { key: "AR", variant: "short", label: "AR" },
-  { key: "S1", variant: "short", label: "S1" },
-  { key: "SR1", variant: "short", label: "SR1" },
-  { key: "GOBH", legacyKey: "GOB", variant: "short", label: "GH1", sections: ["G(H1)"] },
-  { key: "GOBP", legacyKey: "GOB", variant: "short", label: "G%1", sections: ["G(%1)"] },
   ...Array.from({ length: 50 }, (_, index) => ({
     key: `JMH${index + 1}`,
     variant: "short",
