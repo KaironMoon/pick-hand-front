@@ -15,7 +15,15 @@ export default function MaintenanceGate({ children }) {
   const [warningOpen, setWarningOpen] = useState(false);
   const warnedVersionRef = useRef(null);
 
+  // 이전 폴링이 아직 응답을 못 받았으면 새 요청을 또 쏘지 않는다 — 서버가
+  // 느려질 때 setInterval이 5초마다 계속 새 요청을 쌓아서(응답을 기다리지
+  // 않으므로) 브라우저 동시연결을 다 점유해버리고, 그 뒤로 다른 API 요청
+  // (설정 저장 등)이 밀려서 실패하는 문제가 있었다(260922).
+  const inFlightRef = useRef(false);
+
   const refresh = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       const next = await maintenanceService.getStatus();
       setStatus(next);
@@ -30,6 +38,8 @@ export default function MaintenanceGate({ children }) {
     } catch {
       // 점검 상태 조회 장애가 일반 서비스 전체 차단으로 이어지지 않게 fail-open.
       setStatus((prev) => prev || { enabled: false });
+    } finally {
+      inFlightRef.current = false;
     }
   }, [user?.role]);
 
