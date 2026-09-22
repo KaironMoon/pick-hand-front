@@ -14,3 +14,10 @@ export function findGhSlotReplacement(slots, currentGameId, selectedSlotNo) {
   const selected = items.find((slot) => slot.slot_no === slotNo && slot.occupied);
   return selected && Number(selected.game_id) !== currentId ? selected : null;
 }
+
+export function findGhSlotByNumber(slots, slotNo) {
+  const selected = Number(slotNo);
+  if (!Number.isInteger(selected) || selected < 1 || selected > 6) return null;
+  const items = Array.isArray(slots) ? slots : [];
+  return items.find((slot) => Number(slot.slot_no) === selected) || null;
+}

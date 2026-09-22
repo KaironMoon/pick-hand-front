@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { findGhSlotReplacement } from "../src/pages/ghgame/slot-sync.js";
+import { findGhSlotByNumber, findGhSlotReplacement } from "../src/pages/ghgame/slot-sync.js";
 
 test("GH slot sync follows a replacement linked to the stale game", () => {
   const replacement = findGhSlotReplacement([
@@ -22,4 +22,15 @@ test("GH slot sync does nothing while the current game is still mapped", () => {
   assert.equal(findGhSlotReplacement([
     { slot_no: 1, occupied: true, game_id: 10, previous_game_id: 9 },
   ], 10, 1), null);
+});
+
+test("GH slot lookup resolves the latest occupied slot by number", () => {
+  const slot = findGhSlotByNumber([
+    { slot_no: 1, occupied: false },
+    { slot_no: 2, occupied: true, game_id: 20 },
+  ], 2);
+
+  assert.equal(slot.game_id, 20);
+  assert.equal(findGhSlotByNumber([], 2), null);
+  assert.equal(findGhSlotByNumber([{ slot_no: 2 }], 7), null);
 });

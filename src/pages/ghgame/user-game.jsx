@@ -17,7 +17,7 @@ import {
   shouldDisplaySlotAutoError,
 } from "./auto-status";
 import { getRoundStateSubgameBasis } from "./subgame-basis.js";
-import { findGhSlotReplacement } from "./slot-sync.js";
+import { findGhSlotByNumber, findGhSlotReplacement } from "./slot-sync.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
 import { buildGoalStatusItems, formatGoalIndicator, formatGoalTarget } from "./goal-status.js";
 import { resolvePickMartinSummary } from "./pick-martin-summary.js";
@@ -1143,7 +1143,11 @@ export default function GhUserGamePage() {
   }, [applySavedRoundState]);
 
   const refreshGameSlots = useCallback(async () => {
-    const res = await apiCaller.get(GH_GAMES_API.SLOTS);
+    const res = await apiCaller.get(
+      GH_GAMES_API.SLOTS,
+      { _ts: Date.now() },
+      { headers: { "Cache-Control": "no-cache" } },
+    );
     const slots = Array.isArray(res.data?.slots) ? res.data.slots : [];
     setGameSlots(slots);
     return slots;
@@ -1223,8 +1227,14 @@ export default function GhUserGamePage() {
         }
         if (Number.isInteger(urlSlotNo) && urlSlotNo >= 1 && urlSlotNo <= 6) {
           setSelectedSlotNo(urlSlotNo);
-          const selected = slots.find((slot) => slot.slot_no === urlSlotNo);
-          if (!selected?.occupied) clearCurrentGameView();
+          const selected = findGhSlotByNumber(slots, urlSlotNo);
+          if (selected?.occupied) {
+            skipRestoreGameIdRef.current = selected.game_id;
+            setSearchParams({ gameId: selected.game_id, slot: selected.slot_no }, { replace: true });
+            await restoreGame(selected.game_id);
+          } else {
+            clearCurrentGameView();
+          }
           return;
         }
         const firstOccupied = slots.find((slot) => slot.occupied);
@@ -1735,9 +1745,10 @@ export default function GhUserGamePage() {
   const handleSlotSelect = async (slotNo) => {
     if (slotBusyRef.current) return;
     slotBusyRef.current = true;
-    const slot = gameSlots.find((item) => item.slot_no === slotNo);
     setSlotBusy(true);
     try {
+      const latestSlots = await refreshGameSlots();
+      const slot = findGhSlotByNumber(latestSlots, slotNo);
       setSelectedSlotNo(slotNo);
       if (slot?.occupied) {
         syncAutoStatusFromSlot(slot);
@@ -1751,12 +1762,18 @@ export default function GhUserGamePage() {
       await refreshGameSlots();
     } catch (err) {
       const code = err.response?.data?.detail?.error;
-      setRejectMsg(
-        code === "game_slot_occupied"
-          ? "다른 요청에서 슬롯이 먼저 사용됐습니다. 슬롯 상태를 새로고침합니다."
-          : "게임 슬롯을 전환하지 못했습니다.",
-      );
-      await refreshGameSlots().catch(() => {});
+      const latestSlots = await refreshGameSlots().catch(() => []);
+      const occupied = findGhSlotByNumber(latestSlots, slotNo);
+      if (code === "game_slot_occupied" && occupied?.occupied) {
+        setSelectedSlotNo(occupied.slot_no);
+        syncAutoStatusFromSlot(occupied);
+        skipRestoreGameIdRef.current = occupied.game_id;
+        setSearchParams({ gameId: occupied.game_id, slot: occupied.slot_no }, { replace: true });
+        await restoreGame(occupied.game_id);
+        setRejectMsg("");
+      } else {
+        setRejectMsg("게임 슬롯을 전환하지 못했습니다.");
+      }
     } finally {
       slotBusyRef.current = false;
       setSlotBusy(false);
