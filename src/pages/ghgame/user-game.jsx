@@ -17,6 +17,7 @@ import {
   shouldDisplaySlotAutoError,
 } from "./auto-status";
 import { getRoundStateSubgameBasis } from "./subgame-basis.js";
+import { findGhSlotReplacement } from "./slot-sync.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
 import { buildGoalStatusItems, formatGoalIndicator, formatGoalTarget } from "./goal-status.js";
 import { resolvePickMartinSummary } from "./pick-martin-summary.js";
@@ -1170,8 +1171,12 @@ export default function GhUserGamePage() {
       // 새 게임 응답을 전체 적용해 이전 게임의 results/빅로드/손익/베팅 상태를 함께 초기화한다.
       applyGameData(res.data);
       skipRestoreGameIdRef.current = res.data.game_id;
-      setSearchParams({ gameId: res.data.game_id }, { replace: true });
-      if (res.data.slot_no) setSelectedSlotNo(res.data.slot_no);
+      const responseSlotNo = res.data.slot_no || slotNo;
+      setSearchParams({
+        gameId: res.data.game_id,
+        ...(responseSlotNo ? { slot: responseSlotNo } : {}),
+      }, { replace: true });
+      if (responseSlotNo) setSelectedSlotNo(responseSlotNo);
       await refreshGameSlots();
       return res.data;
     } catch (err) {
@@ -1202,6 +1207,22 @@ export default function GhUserGamePage() {
         if (urlGameId) {
           const gid = parseInt(urlGameId);
           const slot = slots.find((item) => item.game_id === gid);
+          const replacement = !slot && (
+            slots.find((item) => item.occupied && Number(item.previous_game_id) === gid)
+            || (Number.isInteger(urlSlotNo) && urlSlotNo >= 1 && urlSlotNo <= 6
+              ? slots.find((item) => item.occupied && item.slot_no === urlSlotNo)
+              : null)
+          );
+          if (replacement) {
+            setSelectedSlotNo(replacement.slot_no);
+            skipRestoreGameIdRef.current = replacement.game_id;
+            setSearchParams({
+              gameId: replacement.game_id,
+              slot: replacement.slot_no,
+            }, { replace: true });
+            await restoreGame(replacement.game_id);
+            return;
+          }
           setSelectedSlotNo(slot?.slot_no ?? null);
           if (skipRestoreGameIdRef.current === gid) {
             skipRestoreGameIdRef.current = null;
@@ -1219,7 +1240,7 @@ export default function GhUserGamePage() {
         const firstOccupied = slots.find((slot) => slot.occupied);
         if (firstOccupied) {
           setSelectedSlotNo(firstOccupied.slot_no);
-          setSearchParams({ gameId: firstOccupied.game_id }, { replace: true });
+          setSearchParams({ gameId: firstOccupied.game_id, slot: firstOccupied.slot_no }, { replace: true });
           await restoreGame(firstOccupied.game_id);
         }
       } catch (err) {
@@ -1230,7 +1251,7 @@ export default function GhUserGamePage() {
     return () => { cancelled = true; };
   }, [searchParams.get("new"), searchParams.get("gameId"), searchParams.get("slot")]);
 
-  const restoreGame = async (gid) => {
+  const restoreGame = useCallback(async (gid) => {
     try {
       const res = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user");
       applyGameData(res.data);
@@ -1251,7 +1272,21 @@ export default function GhUserGamePage() {
       setRejectMsg("게임판을 불러오지 못했습니다. 슬롯 상태를 다시 확인해주세요.");
       refreshGameSlots().catch(() => {});
     }
-  };
+  }, [applyGameData, refreshGameSlots]);
+
+  const syncToReplacementSlot = useCallback(async (slots, staleGameId, slotNo) => {
+    const replacement = findGhSlotReplacement(slots, staleGameId, slotNo);
+    if (!replacement) return false;
+    setSelectedSlotNo(replacement.slot_no);
+    skipRestoreGameIdRef.current = replacement.game_id;
+    setSearchParams({
+      gameId: replacement.game_id,
+      slot: replacement.slot_no,
+    }, { replace: true });
+    await restoreGame(replacement.game_id);
+    setRejectMsg("");
+    return true;
+  }, [restoreGame, setSearchParams]);
 
   const openMaxMissPopup = () => {
     const targetGameId = replay.active ? replay.sourceGameId : gameId;
@@ -1296,7 +1331,11 @@ export default function GhUserGamePage() {
         const slots = await refreshGameSlots();
         if (!cancelled && gameId) {
           const current = slots.find((slot) => slot.game_id === Number(gameId));
-          if (current) setSelectedSlotNo(current.slot_no);
+          if (current) {
+            setSelectedSlotNo(current.slot_no);
+          } else {
+            await syncToReplacementSlot(slots, gameId, selectedSlotNo);
+          }
         }
       } catch (err) {
         if (!cancelled) console.error("Failed to refresh game slots:", err);
@@ -1304,7 +1343,7 @@ export default function GhUserGamePage() {
     };
     const id = setInterval(tick, 5000);
     return () => { cancelled = true; clearInterval(id); };
-  }, [gameId, refreshGameSlots]);
+  }, [gameId, refreshGameSlots, selectedSlotNo, syncToReplacementSlot]);
 
   // Auto 상태 폴링 (1초)
   useEffect(() => {
@@ -1713,7 +1752,7 @@ export default function GhUserGamePage() {
       if (slot?.occupied) {
         syncAutoStatusFromSlot(slot);
         skipRestoreGameIdRef.current = slot.game_id;
-        setSearchParams({ gameId: slot.game_id }, { replace: true });
+        setSearchParams({ gameId: slot.game_id, slot: slot.slot_no }, { replace: true });
         await restoreGame(slot.game_id);
       } else {
         clearCurrentGameView();
@@ -1746,6 +1785,8 @@ export default function GhUserGamePage() {
       await refreshGameSlots();
     } catch (err) {
       const code = err.response?.data?.detail?.error;
+      const slots = await refreshGameSlots().catch(() => []);
+      if (await syncToReplacementSlot(slots, gameId, selectedSlotNo)) return;
       setRejectMsg(
         code === "auto_running_stop_first"
           ? "오토를 먼저 정지한 뒤 새 게임을 시작해주세요."
@@ -2027,7 +2068,7 @@ export default function GhUserGamePage() {
         setSelectedSlotNo(nextSlot.slot_no);
         syncAutoStatusFromSlot(nextSlot);
         skipRestoreGameIdRef.current = nextSlot.game_id;
-        setSearchParams({ gameId: nextSlot.game_id }, { replace: true });
+        setSearchParams({ gameId: nextSlot.game_id, slot: nextSlot.slot_no }, { replace: true });
         await restoreGame(nextSlot.game_id);
       }
     } catch (err) {
