@@ -4,7 +4,7 @@ import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, D
 import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
-import { ghSelectedSlotNo, ghSetupsArray, replaceGhSlotSetup, updateGhGameSearchParams } from "./slot-navigation.js";
+import { ghSelectedSlotNo, updateGhGameSearchParams } from "./slot-navigation.js";
 import { userAtom } from "@/store/auth-store";
 import { updatePbjStrategy } from "./pbj-goal.js";
 import { extendMartinAmounts, GH_FIXED_PASI_LEVELS, GH_STRATEGY_MAX_STEP } from "./strategy-step-capacity.js";
@@ -1019,16 +1019,6 @@ function normalizeUnknownAssistOptions(cfg) {
   return next;
 }
 
-// 슬롯1~6 전체(gh_setups)에 동일한 정규화를 적용한다. 저장 시 사용.
-function normalizeUnknownAssistOptionsForAllSlots(raw) {
-  if (!raw || typeof raw !== "object") return raw;
-  const next = normalizeUnknownAssistOptions(raw);
-  if (Array.isArray(raw.gh_setups)) {
-    next.gh_setups = raw.gh_setups.map((setup) => normalizeUnknownAssistOptions(setup));
-  }
-  return next;
-}
-
 // 목업 셀 스타일 (setup_page_mockup.html). 10열 통일, 84px 셀.
 const mkCell = { border: "1px solid #c9ccd1", width: 84, height: 22, lineHeight: 1.1, textAlign: "center", verticalAlign: "middle", fontSize: 13, padding: "1px 4px", whiteSpace: "nowrap", boxSizing: "border-box" };
 const mkGreen = { ...mkCell, background: "#009900", color: "#fff" };
@@ -2022,7 +2012,7 @@ export default function GhUserSetupPage() {
     && Number.isInteger(targetUserId)
     && targetUserId > 0
   );
-  const [rawConfig, setRawConfig] = useState(null);
+  const [config, setConfig] = useState(null);
   const [jmhPickSets, setJmhPickSets] = useState([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -2040,20 +2030,6 @@ export default function GhUserSetupPage() {
   const [bettingExcelText, setBettingExcelText] = useState("");
   const [bettingExcelResult, setBettingExcelResult] = useState(null);
 
-  const ghSetups = ghSetupsArray(rawConfig);
-  const config = ghSetups[selectedSlotNo - 1] || null;
-  // 필드 단위 수정은 전부 이 함수를 거쳐 rawConfig.gh_setups[선택 슬롯]에 반영된다.
-  // (setConfig(value) 또는 setConfig((prev) => next) 모두 지원 — 기존 useState 설정자와 동일한 호출부 유지)
-  const setConfig = (updater) => {
-    setRawConfig((prevRaw) => {
-      if (prevRaw == null) return prevRaw;
-      const prevSetups = ghSetupsArray(prevRaw);
-      const prevSelected = prevSetups[selectedSlotNo - 1] || null;
-      const nextSelected = typeof updater === "function" ? updater(prevSelected) : updater;
-      return { ...prevRaw, gh_setups: replaceGhSlotSetup(prevSetups, selectedSlotNo, nextSelected) };
-    });
-  };
-
   const blocker = useBlocker(dirty);
 
   useEffect(() => {
@@ -2064,16 +2040,27 @@ export default function GhUserSetupPage() {
   }, [dirty]);
 
   useEffect(() => {
+    let active = true;
     const url = editingTargetUser
-      ? USER_BET_SETTINGS_API.ADMIN_GET_GH(targetUserId)
-      : USER_BET_SETTINGS_API.GET(gameType);
+      ? USER_BET_SETTINGS_API.ADMIN_GH_SLOT(targetUserId, selectedSlotNo)
+      : USER_BET_SETTINGS_API.GH_SLOT(selectedSlotNo);
+    setConfig(null);
     apiCaller.get(url).then((res) => {
-      setRawConfig(res.data.config);
+      if (!active) return;
+      setConfig(res.data.config);
+      setDirty(false);
+    }).catch((err) => {
+      if (!active) return;
+      setSnack({ open: true, message: err?.response?.data?.detail || "설정을 불러오지 못했습니다.", severity: "error" });
     });
+    return () => { active = false; };
+  }, [editingTargetUser, selectedSlotNo, targetUserId]);
+
+  useEffect(() => {
     apiCaller.get(USER_BET_SETTINGS_API.GH_PICK_SETS).then((res) => {
       setJmhPickSets(Array.isArray(res.data) ? res.data : []);
     });
-  }, [editingTargetUser, gameType, targetUserId]);
+  }, []);
 
   const updateJmhPickSet = (key, rawValue) => {
     const setId = rawValue ? Number(rawValue) : null;
@@ -2092,10 +2079,10 @@ export default function GhUserSetupPage() {
     setSaving(true);
     try {
       const url = editingTargetUser
-        ? USER_BET_SETTINGS_API.ADMIN_SAVE_GH(targetUserId)
-        : USER_BET_SETTINGS_API.SAVE(gameType);
-      const res = await apiCaller.put(url, { config: normalizeUnknownAssistOptionsForAllSlots(rawConfig) });
-      setRawConfig(res.data.config);
+        ? USER_BET_SETTINGS_API.ADMIN_GH_SLOT(targetUserId, selectedSlotNo)
+        : USER_BET_SETTINGS_API.GH_SLOT(selectedSlotNo);
+      const res = await apiCaller.put(url, { config: normalizeUnknownAssistOptions(config) });
+      setConfig(res.data.config);
       setDirty(false);
       setSnack({
         open: true,
@@ -2137,8 +2124,9 @@ export default function GhUserSetupPage() {
       const res = await apiCaller.post(USER_BET_SETTINGS_API.COPY_GH, {
         source_username: copySource,
         target_user_id: editingTargetUser ? targetUserId : currentUser.id,
+        slot_no: selectedSlotNo,
       });
-      setRawConfig(res.data.config);
+      setConfig(res.data.config);
       setDirty(false);
       setCopyConfirmOpen(false);
       setSnack({ open: true, message: "GH 설정을 복사했습니다.", severity: "success" });
@@ -2257,6 +2245,10 @@ export default function GhUserSetupPage() {
   };
 
   const selectSlot = (slotNo) => {
+    if (dirty) {
+      setSnack({ open: true, message: "현재 슬롯 설정을 저장한 뒤 다른 슬롯을 선택해주세요.", severity: "warning" });
+      return;
+    }
     setSearchParams(updateGhGameSearchParams(searchParams, { slotNo }), { replace: true });
   };
 
