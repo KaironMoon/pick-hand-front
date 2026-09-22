@@ -4,6 +4,7 @@ import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, D
 import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
+import { ghSelectedSlotNo, ghSetupsArray, replaceGhSlotSetup, updateGhGameSearchParams } from "./slot-navigation.js";
 import { userAtom } from "@/store/auth-store";
 import { updatePbjStrategy } from "./pbj-goal.js";
 import { extendMartinAmounts, GH_FIXED_PASI_LEVELS, GH_STRATEGY_MAX_STEP } from "./strategy-step-capacity.js";
@@ -1018,6 +1019,16 @@ function normalizeUnknownAssistOptions(cfg) {
   return next;
 }
 
+// 슬롯1~6 전체(gh_setups)에 동일한 정규화를 적용한다. 저장 시 사용.
+function normalizeUnknownAssistOptionsForAllSlots(raw) {
+  if (!raw || typeof raw !== "object") return raw;
+  const next = normalizeUnknownAssistOptions(raw);
+  if (Array.isArray(raw.gh_setups)) {
+    next.gh_setups = raw.gh_setups.map((setup) => normalizeUnknownAssistOptions(setup));
+  }
+  return next;
+}
+
 // 목업 셀 스타일 (setup_page_mockup.html). 10열 통일, 84px 셀.
 const mkCell = { border: "1px solid #c9ccd1", width: 84, height: 22, lineHeight: 1.1, textAlign: "center", verticalAlign: "middle", fontSize: 13, padding: "1px 4px", whiteSpace: "nowrap", boxSizing: "border-box" };
 const mkGreen = { ...mkCell, background: "#009900", color: "#fff" };
@@ -2002,7 +2013,8 @@ export default function GhUserSetupPage() {
   const gameType = "gh";
   const currentUser = useAtomValue(userAtom);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedSlotNo = ghSelectedSlotNo(searchParams.get("slot"));
   const targetUserId = Number(searchParams.get("targetUserId"));
   const targetUsername = searchParams.get("targetUsername") || "";
   const editingTargetUser = (
@@ -2010,7 +2022,7 @@ export default function GhUserSetupPage() {
     && Number.isInteger(targetUserId)
     && targetUserId > 0
   );
-  const [config, setConfig] = useState(null);
+  const [rawConfig, setRawConfig] = useState(null);
   const [jmhPickSets, setJmhPickSets] = useState([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -2028,6 +2040,20 @@ export default function GhUserSetupPage() {
   const [bettingExcelText, setBettingExcelText] = useState("");
   const [bettingExcelResult, setBettingExcelResult] = useState(null);
 
+  const ghSetups = ghSetupsArray(rawConfig);
+  const config = ghSetups[selectedSlotNo - 1] || null;
+  // 필드 단위 수정은 전부 이 함수를 거쳐 rawConfig.gh_setups[선택 슬롯]에 반영된다.
+  // (setConfig(value) 또는 setConfig((prev) => next) 모두 지원 — 기존 useState 설정자와 동일한 호출부 유지)
+  const setConfig = (updater) => {
+    setRawConfig((prevRaw) => {
+      if (prevRaw == null) return prevRaw;
+      const prevSetups = ghSetupsArray(prevRaw);
+      const prevSelected = prevSetups[selectedSlotNo - 1] || null;
+      const nextSelected = typeof updater === "function" ? updater(prevSelected) : updater;
+      return { ...prevRaw, gh_setups: replaceGhSlotSetup(prevSetups, selectedSlotNo, nextSelected) };
+    });
+  };
+
   const blocker = useBlocker(dirty);
 
   useEffect(() => {
@@ -2042,7 +2068,7 @@ export default function GhUserSetupPage() {
       ? USER_BET_SETTINGS_API.ADMIN_GET_GH(targetUserId)
       : USER_BET_SETTINGS_API.GET(gameType);
     apiCaller.get(url).then((res) => {
-      setConfig(res.data.config);
+      setRawConfig(res.data.config);
     });
     apiCaller.get(USER_BET_SETTINGS_API.GH_PICK_SETS).then((res) => {
       setJmhPickSets(Array.isArray(res.data) ? res.data : []);
@@ -2068,8 +2094,8 @@ export default function GhUserSetupPage() {
       const url = editingTargetUser
         ? USER_BET_SETTINGS_API.ADMIN_SAVE_GH(targetUserId)
         : USER_BET_SETTINGS_API.SAVE(gameType);
-      const res = await apiCaller.put(url, { config: normalizeUnknownAssistOptions(config) });
-      setConfig(res.data.config);
+      const res = await apiCaller.put(url, { config: normalizeUnknownAssistOptionsForAllSlots(rawConfig) });
+      setRawConfig(res.data.config);
       setDirty(false);
       setSnack({
         open: true,
@@ -2112,7 +2138,7 @@ export default function GhUserSetupPage() {
         source_username: copySource,
         target_user_id: editingTargetUser ? targetUserId : currentUser.id,
       });
-      setConfig(res.data.config);
+      setRawConfig(res.data.config);
       setDirty(false);
       setCopyConfirmOpen(false);
       setSnack({ open: true, message: "GH 설정을 복사했습니다.", severity: "success" });
@@ -2224,7 +2250,14 @@ export default function GhUserSetupPage() {
     const backPaths = GAME_BACK_PATHS[gameType];
     const path = backPaths.user;
     const gid = searchParams.get("gameId");
-    navigate(gid ? `${path}?gameId=${gid}` : path);
+    const qs = new URLSearchParams();
+    qs.set("slot", String(selectedSlotNo));
+    if (gid) qs.set("gameId", gid);
+    navigate(`${path}?${qs.toString()}`);
+  };
+
+  const selectSlot = (slotNo) => {
+    setSearchParams(updateGhGameSearchParams(searchParams, { slotNo }), { replace: true });
   };
 
   const updateMartin = (key, martin) => {
@@ -2362,6 +2395,33 @@ export default function GhUserSetupPage() {
 
   return (
     <Box sx={{ p: 2 }}>
+      {/* 슬롯 선택 */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, p: 1, border: "1px solid rgba(0,168,90,.55)", borderRadius: 1, backgroundColor: "rgba(0,168,90,.06)", flexWrap: "wrap" }}>
+        <Typography variant="caption" sx={{ fontSize: 12, color: "#00e676", minWidth: 90, fontWeight: "bold" }}>슬롯별 설정</Typography>
+        <Box sx={{ display: "flex", gap: .7, flexWrap: "wrap" }}>
+          {Array.from({ length: 6 }, (_, index) => index + 1).map((slotNo) => {
+            const selected = selectedSlotNo === slotNo;
+            return <Box
+              key={slotNo}
+              role="button"
+              tabIndex={saving ? undefined : 0}
+              onClick={saving ? undefined : () => selectSlot(slotNo)}
+              onKeyDown={saving ? undefined : (event) => {
+                if (event.key === "Enter" || event.key === " ") selectSlot(slotNo);
+              }}
+              sx={{
+                minWidth: 44, px: 1, py: .45, borderRadius: 1,
+                border: `1px solid ${selected ? "#00a85a" : "#555"}`,
+                backgroundColor: selected ? "#17482f" : "#171a1f",
+                color: selected ? "#00e676" : "#aaa",
+                textAlign: "center", fontSize: 12, fontWeight: "bold",
+                cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .5 : 1, userSelect: "none",
+              }}
+            >S{slotNo}</Box>;
+          })}
+        </Box>
+        <Typography variant="caption" sx={{ fontSize: 10, color: "#999" }}>아래 모든 설정은 선택한 슬롯에만 적용됩니다</Typography>
+      </Box>
       {/* 상단 바 */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
         <Box onClick={handleBack}

@@ -2632,7 +2632,13 @@ export default function GhUserGamePage() {
           <GhRoundAmountTable
             roundState={roundState}
             amountMode={amountViewMode}
-            onSetup={() => navigate(`/ghgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
+            onSetup={() => {
+              const qs = new URLSearchParams();
+              if (gameId) qs.set("gameId", gameId);
+              if (selectedSlotNo) qs.set("slot", String(selectedSlotNo));
+              const q = qs.toString();
+              navigate(`/ghgame/user-setup${q ? `?${q}` : ""}`);
+            }}
             setupDisabled={!isAdmin || replay.active}
             onNew={() => setShowNewConfirm(true)}
             newDisabled={processing || slotBusy || autoStatus.running || !gameId || !selectedSlotNo || (replay.active && !replay.external)}
