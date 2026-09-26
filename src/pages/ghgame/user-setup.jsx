@@ -353,6 +353,7 @@ const EMPTY_MARTIN_PATTERN_RULE = {
 const PATTERN_BLOCK_CELL_COUNT = 10;
 const PATTERN_ONLY_CELL_COUNT = 15;
 const PATTERN_ONLY_ROW_COUNT = 20;
+const MARTIN_Z_PATTERN_ONLY_ROW_COUNT = 40;
 
 function PatternCell({ value, onClick, cellKey }) {
   return (
@@ -446,13 +447,13 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-function MartinPatternOnlyRows({ martin, onChange, color }) {
+function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
       ? [martin.pattern_only]
       : [];
-  const rules = Array.from({ length: PATTERN_ONLY_ROW_COUNT }, (_, index) => ({
+  const rules = Array.from({ length: rowCount }, (_, index) => ({
     ...EMPTY_MARTIN_PATTERN_RULE,
     ...(rawRules[index] && typeof rawRules[index] === "object" ? rawRules[index] : {}),
   }));
@@ -565,7 +566,7 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
         <td colSpan={2} style={normalCell}>
           {isB ? "계산기판 총 BET" : (
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5 }}>
-              <span>회차·쿼터어시</span>
+              <span>메인 빅로드</span>
               {["M", "S"].map((mode) => (
                 <label key={mode} style={{ display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer" }}>
                   <input
@@ -667,6 +668,19 @@ function KpkpSection({ name, label, martin, onChange }) {
       {(isK || isP) && <KpkpChoiceRow label="어시스트" value={martin.assist_wait_losses || 0}
         choices={[[0, "해당진행"], [1, "1패후진행"], [2, "2패후진행"], [3, "3패후진행"]]}
         onSelect={(value) => update({ assist_wait_losses: value })} />}
+      {(isP || name === "martin_kp") && <>
+        <KpkpChoiceRow label="어시스트2" value={martin.assist2_k_losses || 0}
+          choices={[[0, "해당진행"], [2, "2패시K"], [3, "3패시K"], [4, "4패시K"]]}
+          onSelect={(value) => update({ assist2_k_losses: value })} />
+        <tr>
+          <td style={labelCellStyle}>{isP ? "어시스트2 KP 연동" : "어시스트2 KP 복귀"}</td>
+          <td colSpan={2} style={normalCell}>K 배팅 대기</td>
+          <EditableCell value={martin.assist2_wait_rounds || 0}
+            onChange={(value) => update({ assist2_wait_rounds: Math.max(0, Math.min(80, value)) })}
+            suffix="회차" style={greenCell} />
+          <td colSpan={2} style={normalCell}>0은 KP 전환 없음</td>
+        </tr>
+      </>}
       {isK && <>
         <KpkpChoiceRow label="미션진행중 추가발생처리" value={martin.additional_mission_limit || 0}
           choices={[[0, "전체진행"], [2, "2미션이상제외"], [3, "3미션이상제외"]]}
@@ -2063,9 +2077,10 @@ const DEFAULT_MARTIN_K = { ...DEFAULT_MARTIN, assist_wait_losses: 0,
   additional_mission_limit: 0, additional_miss_limit: 0, distribution_limit: 0,
   bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
 const DEFAULT_MARTIN_P = { ...DEFAULT_MARTIN, trigger_bet_amount: 0,
-  assist_wait_losses: 0, bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
+  assist_wait_losses: 0, assist2_k_losses: 0, assist2_wait_rounds: 0,
+  bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
 const DEFAULT_MARTIN_KP = { ...DEFAULT_MARTIN, bet_start_round: 1,
-  stop_bet_round: 0, finish_round: 0 };
+  stop_bet_round: 0, finish_round: 0, assist2_k_losses: 0, assist2_wait_rounds: 0 };
 const DEFAULT_FAIL = {
   ...DEFAULT_MARTIN,
   fail_count: 2,
@@ -3164,6 +3179,7 @@ export default function GhUserSetupPage() {
               martin={martinZ}
               onChange={(m) => updateMartin("martin_z", m)}
               color="#1565c0"
+              rowCount={MARTIN_Z_PATTERN_ONLY_ROW_COUNT}
             />
             <MartinStopBetRoundRow
               martin={martinZ}

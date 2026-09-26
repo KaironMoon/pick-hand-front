@@ -171,10 +171,8 @@ function getQuarterCells(ctx, spec, assist = false) {
   );
 }
 
-function getMartinCCells(ctx, spec, part) {
-  const stateKey = stateKeyForSpec(spec);
-  if (!stateKey || (part === "assist_q" && HIDE_QUARTER_KEYS.has(stateKey))) return null;
-  const track = ctx.roundState?.conditional_martins?.martin_c?.tracks?.[`${stateKey}:${part}`];
+function getMartinCCells(ctx, martinKey) {
+  const track = ctx.roundState?.conditional_martins?.[martinKey]?.tracks?.main_bigroad;
   if (!track) return null;
   const cells = new Array(MAX_CELLS).fill(null);
   (track.history || []).forEach((entry) => {
@@ -482,18 +480,6 @@ function NormalSection({ section, ctx, selectedBasis, onSelectBasis }) {
           ))}
         </Block>
       )}
-      <Block title="마틴C1" color={MARTIN_C_COLOR}>
-        {section.rows.map(([label, key]) => {
-          const hCells = getMartinCCells(ctx, key, "assist_h");
-          const qCells = getMartinCCells(ctx, key, "assist_q");
-          return (
-            <Box key={`mc-${label}`}>
-              {Array.isArray(hCells) && <RoadRow label={`${displayRowLabel(ctx, label, key)}-H C`} cells={hCells} labelColor={MARTIN_C_COLOR} />}
-              {Array.isArray(qCells) && <RoadRow label={`${displayRowLabel(ctx, label, key)}-Q C`} cells={qCells} labelColor={MARTIN_C_COLOR} />}
-            </Box>
-          );
-        })}
-      </Block>
     </>
   );
 }
@@ -510,12 +496,6 @@ function ForSection({ section, ctx }) {
             <RoadRow label={`${label} 회차어시스트`} cells={getRowCells(ctx, key, true)} />
             {Array.isArray(qAssistCells) && (
               <RoadRow label={`${label} 쿼터어시스트`} cells={qAssistCells} />
-            )}
-            {Array.isArray(getMartinCCells(ctx, key, "assist_h")) && (
-              <RoadRow label={`${label}-H C`} cells={getMartinCCells(ctx, key, "assist_h")} labelColor={MARTIN_C_COLOR} />
-            )}
-            {Array.isArray(getMartinCCells(ctx, key, "assist_q")) && (
-              <RoadRow label={`${label}-Q C`} cells={getMartinCCells(ctx, key, "assist_q")} labelColor={MARTIN_C_COLOR} />
             )}
           </Box>
         );
@@ -662,6 +642,13 @@ export default function GhBigRoad2({
           </Box>
         ))}
       </Box>
+      <Block title="메인 빅로드 마틴 C1~C5" color={MARTIN_C_COLOR}>
+        {[1, 2, 3, 4, 5].map((number) => {
+          const key = number === 1 ? "martin_c" : `martin_c${number}`;
+          const cells = getMartinCCells(ctx, key);
+          return Array.isArray(cells) && <RoadRow key={key} label={`마틴C${number}`} cells={cells} labelColor={MARTIN_C_COLOR} />;
+        })}
+      </Block>
       {active.length === 0
         ? <Box sx={{ color: "#777", fontSize: 12, py: 1 }}>표시할 섹션을 선택하세요.</Box>
         : active.map((section) => (
