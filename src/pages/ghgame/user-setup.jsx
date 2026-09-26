@@ -630,7 +630,7 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
   );
 }
 
-function KpkpChoiceRow({ label, value, choices, onSelect }) {
+function KpkpChoiceRow({ label, value, choices, onSelect, children }) {
   return (
     <tr>
       <td style={labelCellStyle}>{label}</td>
@@ -643,6 +643,7 @@ function KpkpChoiceRow({ label, value, choices, onSelect }) {
               {text}
             </button>
           ))}
+          {children}
         </Box>
       </td>
     </tr>
@@ -668,19 +669,22 @@ function KpkpSection({ name, label, martin, onChange }) {
       {(isK || isP) && <KpkpChoiceRow label="어시스트" value={martin.assist_wait_losses || 0}
         choices={[[0, "해당진행"], [1, "1패후진행"], [2, "2패후진행"], [3, "3패후진행"]]}
         onSelect={(value) => update({ assist_wait_losses: value })} />}
-      {(isP || name === "martin_kp") && <>
+      {(isP || name === "martin_kp") && (
         <KpkpChoiceRow label="어시스트2" value={martin.assist2_k_losses || 0}
           choices={[[0, "해당진행"], [2, "2패시K"], [3, "3패시K"], [4, "4패시K"]]}
-          onSelect={(value) => update({ assist2_k_losses: value })} />
-        <tr>
-          <td style={labelCellStyle}>{isP ? "어시스트2 KP 연동" : "어시스트2 KP 복귀"}</td>
-          <td colSpan={2} style={normalCell}>K 배팅 대기</td>
-          <EditableCell value={martin.assist2_wait_rounds || 0}
-            onChange={(value) => update({ assist2_wait_rounds: Math.max(0, Math.min(80, value)) })}
-            suffix="회차" style={greenCell} />
-          <td colSpan={2} style={normalCell}>0은 KP 전환 없음</td>
-        </tr>
-      </>}
+          onSelect={(value) => update({ assist2_k_losses: value })}>
+          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, whiteSpace: "nowrap", ml: 1 }}>
+            <input type="number" min={0} max={80} inputMode="numeric"
+              aria-label={`${label} K 발동 대기 회차`}
+              title="0이면 KP 전환 없이 K 배팅을 기다립니다."
+              placeholder="X"
+              value={martin.assist2_wait_rounds || ""}
+              onChange={(event) => update({ assist2_wait_rounds: Math.max(0, Math.min(80, Number(event.target.value) || 0)) })}
+              style={{ width: 42, padding: "3px 4px", background: "#1b1b1b", color: "#fff", border: "1px solid #777", borderRadius: 3, textAlign: "center" }} />
+            <span>회까지 발동안되면 KP</span>
+          </Box>
+        </KpkpChoiceRow>
+      )}
       {isK && <>
         <KpkpChoiceRow label="미션진행중 추가발생처리" value={martin.additional_mission_limit || 0}
           choices={[[0, "전체진행"], [2, "2미션이상제외"], [3, "3미션이상제외"]]}
