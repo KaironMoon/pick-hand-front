@@ -68,6 +68,13 @@ const MARTIN_C_ITEMS = [
   ["martin_c4", "C4"],
   ["martin_c5", "C5"],
 ];
+const MARTIN_KPKP_ITEMS = [
+  ["martin_k", "K"],
+  ["martin_p1", "P1"],
+  ["martin_p2", "P2"],
+  ["martin_p3", "P3"],
+  ["martin_kp", "KP"],
+];
 
 const buildShoePreviewGrid = (actuals) => {
   const cols = Math.max(1, Math.ceil((actuals?.length || 0) / GRID_ROWS));
@@ -281,10 +288,10 @@ function GhLossStopStatus({ roundState, autoStatus }) {
           구간 GH PNL: {ghRoundPnlStopStatusLabel(roundState?.overall_stop)}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_goal_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
-          마틴(Z+B+C) 목표금액: {martinGoalStatusLabel(martinOperatingStop)}
+          마틴(Z+B+C+K+P+KP) 목표금액: {martinGoalStatusLabel(martinOperatingStop)}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_drawdown_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
-          마틴(Z+B+C) 손실종료조건: {martinDrawdownStatusLabel(martinOperatingStop)}
+          마틴(Z+B+C+K+P+KP) 손실종료조건: {martinDrawdownStatusLabel(martinOperatingStop)}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: ["martin_c_current_loss_reached", "martin_c_projected_loss_reached"].includes(martinCOperatingStop?.reason) ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
           슬롯 마틴C 손실조건: {martinSlotLossStatusLabel(martinCOperatingStop)}
@@ -437,6 +444,7 @@ function GhRoundAmountTable({
       globalhit_pnl: Number(actualCell.server_component_pnl_p?.globalhit || 0),
       martin_z_pnl: Number(actualCell.server_component_pnl_p?.martin_z || 0),
       martin_b_pnl: Number(actualCell.server_component_pnl_p?.martin_b || 0),
+      ...Object.fromEntries(MARTIN_KPKP_ITEMS.map(([key]) => [`${key}_pnl`, Number(actualCell.server_component_pnl_p?.[key] || 0)])),
       martin_c_pnl: Number(actualCell.server_component_pnl_p?.martin_c || 0),
       martin_c2_pnl: Number(actualCell.server_component_pnl_p?.martin_c2 || 0),
       martin_c3_pnl: Number(actualCell.server_component_pnl_p?.martin_c3 || 0),
@@ -463,6 +471,7 @@ function GhRoundAmountTable({
     ["Z", Number(pnlBreakdown.martin_z || 0)],
     ["B", Number(pnlBreakdown.martin_b || 0)],
     ...MARTIN_C_ITEMS.map(([key, label]) => [label, Number(pnlBreakdown[key] || 0)]),
+    ...MARTIN_KPKP_ITEMS.map(([key, label]) => [label, Number(pnlBreakdown[key] || 0)]),
   ];
   const basePnl = componentPnls[0][1];
   const martinPnls = componentPnls.slice(1);
@@ -606,7 +615,7 @@ function GhRoundAmountTable({
         </Box>
         {martinPnls.map(([label, value]) => (
           <React.Fragment key={label}>
-            {label === "C1" && <Box sx={{ flexBasis: "100%", height: 0 }} />}
+            {(label === "C1" || label === "K") && <Box sx={{ flexBasis: "100%", height: 0 }} />}
             <Box sx={{ width: label === "Z" ? 112 : 118, border: "1px solid #3f4650", backgroundColor: "#111821", color: pnlColor(value), fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span>{label} PnL</span><span>{fmt(value)}</span>
             </Box>
@@ -620,7 +629,7 @@ function GhRoundAmountTable({
             ? `${fmt(cells[idx]?.amount)} (${fmt(martinAmount)})`
             : fmt(cells[idx]?.amount);
           return (
-            <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / Z+B+C1~C5 상계 ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)}${MARTIN_C_ITEMS.map(([key, label]) => ` / ${label} ${fmt(cells[idx]?.[`${key}_pnl`])}`).join("")}`}>
+            <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / 마틴 상계 ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)}${[...MARTIN_C_ITEMS, ...MARTIN_KPKP_ITEMS].map(([key, label]) => ` / ${label} ${fmt(cells[idx]?.[`${key}_pnl`])}`).join("")}`}>
               <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
               <Box sx={{ color: "#fff", fontSize: martinAmount > 0 && amountMode !== "actual" ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>{amountLabel}</Box>
             </Box>
@@ -2553,6 +2562,12 @@ export default function GhUserGamePage() {
                       };
                     })];
                   })();
+                  const kpkpItems = MARTIN_KPKP_ITEMS.map(([key, label]) => {
+                    const martin = roundState?.kpkp_martins?.[key] || {};
+                    return { key, label, color: "#00897b", amount: Number(martin.amount || 0),
+                      direction: martin.direction || "", active: key === "martin_k" ? (martin.missions?.length || 0) > 0 : !!martin.active,
+                      step: key === "martin_k" ? (martin.missions?.length || 0) : martin.step || 1 };
+                  });
 
                   const renderMartinItem = (item) => (
                     <Box key={item.key} sx={itemSx}>
@@ -2560,9 +2575,9 @@ export default function GhUserGamePage() {
                         <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{item.label}</Typography>
                       </Box>
                       <Box sx={compactFieldSx}>
-                        {item.label === "B" && item.active && (
+                        {item.active && (
                           <Typography variant="caption" sx={{ fontSize: 9, color: "#ba68c8", whiteSpace: "nowrap" }}>
-                            {item.step}S
+                            {item.label === "K" ? `${item.step}개` : `${item.step}S`}
                           </Typography>
                         )}
                         <Typography
@@ -2570,7 +2585,7 @@ export default function GhUserGamePage() {
                           sx={{
                             fontSize: 10,
                             fontWeight: "bold",
-                            color: item.amount > 0 ? (item.label === "B" ? "#ce93d8" : "#ff9800") : "#666",
+                            color: item.amount > 0 ? (item.color === "#00897b" ? "#80cbc4" : item.label === "B" ? "#ce93d8" : "#ff9800") : "#666",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -2587,6 +2602,12 @@ export default function GhUserGamePage() {
                       </Box>
                       <Box sx={conditionRowSx}>
                         {martinItems.slice(3, 6).map(renderMartinItem)}
+                      </Box>
+                      <Box sx={conditionRowSx}>
+                        {kpkpItems.slice(0, 3).map(renderMartinItem)}
+                      </Box>
+                      <Box sx={conditionRowSx}>
+                        {kpkpItems.slice(3).map(renderMartinItem)}
                       </Box>
                     </Box>
                   );

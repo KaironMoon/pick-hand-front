@@ -218,7 +218,7 @@ function cruiseStepLabel(idx) {
 
 function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp }) {
   const isCruise = name === "cruise";
-  const usesDecimalP = ["martin_a", "martin_z", "martin_b"].includes(name) || name.startsWith("martin_c");
+  const usesDecimalP = ["martin_a", "martin_z", "martin_b", "martin_k", "martin_kp"].includes(name) || name.startsWith("martin_c") || name.startsWith("martin_p");
   const enabled = martin.enabled;
   // 크루즈는 29 단계(15-2까지)를 위해 6행×5칸 = 30칸 사용, 다른 섹션은 4행×5 = 20
   const totalSteps = isCruise ? 30 : 20;
@@ -625,6 +625,72 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
           />
         </>
       )}
+    </>
+  );
+}
+
+function KpkpChoiceRow({ label, value, choices, onSelect }) {
+  return (
+    <tr>
+      <td style={labelCellStyle}>{label}</td>
+      <td colSpan={5} style={{ ...normalCell, textAlign: "left" }}>
+        <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+          {choices.map(([choice, text]) => (
+            <button key={choice} type="button" onClick={() => onSelect(choice)}
+              aria-pressed={value === choice}
+              style={{ background: value === choice ? "#388e3c" : "#252525", color: "#fff", border: "1px solid #555", borderRadius: 3, padding: "4px 8px", cursor: "pointer" }}>
+              {text}
+            </button>
+          ))}
+        </Box>
+      </td>
+    </tr>
+  );
+}
+
+function KpkpSection({ name, label, martin, onChange }) {
+  const isK = name === "martin_k";
+  const isP = name.startsWith("martin_p") && name !== "martin_kp";
+  const update = (patch) => onChange({ ...martin, ...patch });
+  return (
+    <>
+      <MartinSection name={name} label={label} martin={martin} onChange={onChange} labelColor={isK ? "#c62828" : isP ? "#1565c0" : "#8e24aa"} />
+      <tr>
+        <td style={labelCellStyle}>발동조건</td>
+        <td colSpan={2} style={normalCell}>순수 글로벌히트 BET</td>
+        {isP ? <EditableCell value={martin.trigger_bet_amount || 0}
+          onChange={(value) => update({ trigger_bet_amount: Math.max(0, value) })}
+          suffix="P" style={greenCell} decimal />
+          : <td style={greenCell}>{isK ? "0.0P" : "항상"}</td>}
+        <td colSpan={2} style={normalCell}>{isK ? "다음 회차부터 진행" : isP ? "해당 포인트에서만 진행" : "방향이 있을 때 진행"}</td>
+      </tr>
+      {(isK || isP) && <KpkpChoiceRow label="어시스트" value={martin.assist_wait_losses || 0}
+        choices={[[0, "해당진행"], [1, "1패후진행"], [2, "2패후진행"], [3, "3패후진행"]]}
+        onSelect={(value) => update({ assist_wait_losses: value })} />}
+      {isK && <>
+        <KpkpChoiceRow label="미션진행중 추가발생처리" value={martin.additional_mission_limit || 0}
+          choices={[[0, "전체진행"], [2, "2미션이상제외"], [3, "3미션이상제외"]]}
+          onSelect={(value) => update({ additional_mission_limit: value, distribution_limit: value ? 0 : martin.distribution_limit || 0 })} />
+        <KpkpChoiceRow label="진행미션연패중 추가발생" value={martin.additional_miss_limit || 0}
+          choices={[[0, "전체진행"], [2, "2패시발생제외"], [3, "3패시발생제외"], [4, "4패시발생제외"]]}
+          onSelect={(value) => update({ additional_miss_limit: value, distribution_limit: value ? 0 : martin.distribution_limit || 0 })} />
+        <KpkpChoiceRow label="분산처리" value={martin.distribution_limit || 0}
+          choices={[[0, "사용안함"], [1, "1개씩처리"], [2, "2개씩처리"]]}
+          onSelect={(value) => update({ distribution_limit: value,
+            ...(value ? { additional_mission_limit: 0, additional_miss_limit: 0 } : {}) })} />
+      </>}
+      {[["베팅시작", "bet_start_round", "설정 회차부터 시작"],
+        ["베팅금지", "stop_bet_round", "설정 회차부터 신규 발동 금지"],
+        ["미처리종료 조건", "finish_round", "설정 회차까지 처리 후 종료"]].map(([rowLabel, field, hint]) => (
+          <tr key={field}>
+            <td style={labelCellStyle}>{rowLabel}</td>
+            <td colSpan={2} style={normalCell}>{hint}</td>
+            <EditableCell value={martin[field] || 0}
+              onChange={(value) => update({ [field]: Math.max(0, Math.min(80, value)) })}
+              suffix="회차" style={greenCell} />
+            <td colSpan={2} style={normalCell}>0은 제한 없음</td>
+          </tr>
+        ))}
     </>
   );
 }
@@ -1993,6 +2059,13 @@ const DEFAULT_MARTIN_C = {
   pattern_block: { ...EMPTY_MARTIN_PATTERN_RULE },
   pattern_only: { ...EMPTY_MARTIN_PATTERN_RULE },
 };
+const DEFAULT_MARTIN_K = { ...DEFAULT_MARTIN, assist_wait_losses: 0,
+  additional_mission_limit: 0, additional_miss_limit: 0, distribution_limit: 0,
+  bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
+const DEFAULT_MARTIN_P = { ...DEFAULT_MARTIN, trigger_bet_amount: 0,
+  assist_wait_losses: 0, bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
+const DEFAULT_MARTIN_KP = { ...DEFAULT_MARTIN, bet_start_round: 1,
+  stop_bet_round: 0, finish_round: 0 };
 const DEFAULT_FAIL = {
   ...DEFAULT_MARTIN,
   fail_count: 2,
@@ -2284,6 +2357,12 @@ export default function GhUserSetupPage() {
       return [key, `마틴C${number}`, config[key] || { ...DEFAULT_MARTIN_C }];
     }),
   ];
+  const martinK = config.martin_k || { ...DEFAULT_MARTIN_K };
+  const martinPs = [0.2, 0.4, 0.6].map((trigger, index) => {
+    const key = `martin_p${index + 1}`;
+    return [key, `마틴P${index + 1}`, config[key] || { ...DEFAULT_MARTIN_P, trigger_bet_amount: trigger }];
+  });
+  const martinKp = config.martin_kp || { ...DEFAULT_MARTIN_KP };
   const cruise = config.cruise || { ...DEFAULT_MARTIN };
   const martinS = config.martin_s || { ...DEFAULT_MARTIN };
   const allp = config.allp || { ...DEFAULT_MARTIN };
@@ -2656,7 +2735,7 @@ export default function GhUserSetupPage() {
             </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
             <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
-              마틴(Z+B+C) 목표금액 (P)
+              마틴(Z+B+C+K+P+KP) 목표금액 (P)
             </Typography>
             <input
               type="number"
@@ -2676,7 +2755,7 @@ export default function GhUserSetupPage() {
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
             <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
-              마틴(Z+B+C) 손실종료조건
+              마틴(Z+B+C+K+P+KP) 손실종료조건
             </Typography>
             <input
               type="number"
@@ -2690,7 +2769,7 @@ export default function GhUserSetupPage() {
               }}
               style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 달성 시 최고 마틴 Z+B+C PNL에서</Typography>
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 달성 시 최고 마틴 Z+B+C+K+P+KP PNL에서</Typography>
             <input
               type="number"
               min="0"
@@ -2704,7 +2783,7 @@ export default function GhUserSetupPage() {
               }}
               style={{ width: 70, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>% 이상 손실 나면 마틴 Z·B·C 배팅 정지</Typography>
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>% 이상 손실 나면 마틴 Z·B·C·K·P·KP 배팅 정지</Typography>
             {(Number(config.martin_drawdown_start_amount || 0) === 0 || Number(config.martin_drawdown_percent || 0) === 0) && (
               <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
             )}
@@ -3107,6 +3186,14 @@ export default function GhUserSetupPage() {
                 />
               </Fragment>
             ))}
+            <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+            <KpkpSection name="martin_k" label="마틴K" martin={martinK} onChange={(value) => updateMartin("martin_k", value)} />
+            {martinPs.map(([key, label, martin]) => <Fragment key={key}>
+              <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+              <KpkpSection name={key} label={label} martin={martin} onChange={(value) => updateMartin(key, value)} />
+            </Fragment>)}
+            <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
+            <KpkpSection name="martin_kp" label="마틴KP" martin={martinKp} onChange={(value) => updateMartin("martin_kp", value)} />
           </tbody>
         </table>
       </Box>
