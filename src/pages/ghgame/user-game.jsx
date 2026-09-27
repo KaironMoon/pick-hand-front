@@ -483,10 +483,11 @@ function GhRoundAmountTable({
     : Number(globalhitAggregate.amount || 0);
   const globalhitDirectionColor = globalhitDirection === "P" ? "#1565d8" : globalhitDirection === "B" ? "#e53935" : "#555";
   const martinNetAmount = (cell) => Number(cell?.martin_net_amount || 0);
+  const hasMartinCBet = (cell) => cell?.martin_c_included ?? MARTIN_C_ITEMS.some(([key]) =>
+    Number(cell?.[`${key}_p_amount`] || 0) > 0 || Number(cell?.[`${key}_b_amount`] || 0) > 0
+  );
   const currentMartinAmount = martinNetAmount(strategyCells[currentRoundIdx]);
-  const betAmountLabel = amountMode !== "actual" && currentMartinAmount > 0
-    ? `${fmt(totalAmount)} (${fmt(currentMartinAmount)})`
-    : fmt(totalAmount);
+  const showCurrentMartinAmount = amountMode !== "actual" && currentMartinAmount > 0;
   const finalSideColor = finalSide === "P" ? "#1565d8" : finalSide === "B" ? "#e53935" : "#555";
   const cellSx = (idx) => {
     const cell = cells[idx] || {};
@@ -597,7 +598,10 @@ function GhRoundAmountTable({
           {finalSide || "-"}
         </Box>
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>BET</span><span>{betAmountLabel}</span>
+          <span>BET</span><span>
+            {fmt(totalAmount)}
+            {showCurrentMartinAmount && <span style={{ color: hasMartinCBet(strategyCells[currentRoundIdx]) ? "#ef5350" : "inherit" }}> ({fmt(currentMartinAmount)})</span>}
+          </span>
         </Box>
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: totalPnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>전체 PNL</span><span>{fmt(totalPnl)}</span>
@@ -625,13 +629,14 @@ function GhRoundAmountTable({
       <Box sx={{ display: "grid", gridTemplateRows: `repeat(${amountGridRowCount}, 31px)`, gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
         {Array.from({ length: cellCount }, (_, idx) => {
           const martinAmount = martinNetAmount(strategyCells[idx]);
-          const amountLabel = amountMode !== "actual" && martinAmount > 0
-            ? `${fmt(cells[idx]?.amount)} (${fmt(martinAmount)})`
-            : fmt(cells[idx]?.amount);
+          const showMartinAmount = amountMode !== "actual" && martinAmount > 0;
           return (
             <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / 마틴 상계 ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)}${[...MARTIN_C_ITEMS, ...MARTIN_KPKP_ITEMS].map(([key, label]) => ` / ${label} ${fmt(cells[idx]?.[`${key}_pnl`])}`).join("")}`}>
               <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
-              <Box sx={{ color: "#fff", fontSize: martinAmount > 0 && amountMode !== "actual" ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>{amountLabel}</Box>
+              <Box sx={{ color: "#fff", fontSize: showMartinAmount ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>
+                {fmt(cells[idx]?.amount)}
+                {showMartinAmount && <span style={{ color: hasMartinCBet(strategyCells[idx]) ? "#ef5350" : "inherit" }}> ({fmt(martinAmount)})</span>}
+              </Box>
             </Box>
           );
         })}
