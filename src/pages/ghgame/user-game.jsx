@@ -483,9 +483,7 @@ function GhRoundAmountTable({
     : Number(globalhitAggregate.amount || 0);
   const globalhitDirectionColor = globalhitDirection === "P" ? "#1565d8" : globalhitDirection === "B" ? "#e53935" : "#555";
   const martinNetAmount = (cell) => Number(cell?.martin_net_amount || 0);
-  const hasMartinCBet = (cell) => cell?.martin_c_included ?? MARTIN_C_ITEMS.some(([key]) =>
-    Number(cell?.[`${key}_p_amount`] || 0) > 0 || Number(cell?.[`${key}_b_amount`] || 0) > 0
-  );
+  const hasMartinZBet = (cell) => cell?.martin_z_included ?? Number(cell?.pick_martin_amount || 0) > 0;
   const currentMartinAmount = martinNetAmount(strategyCells[currentRoundIdx]);
   const showCurrentMartinAmount = amountMode !== "actual" && currentMartinAmount > 0;
   const finalSideColor = finalSide === "P" ? "#1565d8" : finalSide === "B" ? "#e53935" : "#555";
@@ -600,7 +598,7 @@ function GhRoundAmountTable({
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>BET</span><span>
             {fmt(totalAmount)}
-            {showCurrentMartinAmount && <span style={{ color: hasMartinCBet(strategyCells[currentRoundIdx]) ? "#ef5350" : "inherit" }}> ({fmt(currentMartinAmount)})</span>}
+            {showCurrentMartinAmount && <span style={{ color: hasMartinZBet(strategyCells[currentRoundIdx]) ? "#ef5350" : "inherit" }}> ({fmt(currentMartinAmount)})</span>}
           </span>
         </Box>
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: totalPnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -635,7 +633,7 @@ function GhRoundAmountTable({
               <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
               <Box sx={{ color: "#fff", fontSize: showMartinAmount ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>
                 {fmt(cells[idx]?.amount)}
-                {showMartinAmount && <span style={{ color: hasMartinCBet(strategyCells[idx]) ? "#ef5350" : "inherit" }}> ({fmt(martinAmount)})</span>}
+                {showMartinAmount && <span style={{ color: hasMartinZBet(strategyCells[idx]) ? "#ef5350" : "inherit" }}> ({fmt(martinAmount)})</span>}
               </Box>
             </Box>
           );
