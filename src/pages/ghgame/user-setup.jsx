@@ -447,7 +447,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT }) {
+function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -540,6 +540,21 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
               >
                 {rule.enabled ? "사용함" : "사용안함"}
               </Box>
+              {showMissCondition && (
+                <select
+                  aria-label={`패턴 ${rowIndex + 1} 발동 M 조건`}
+                  value={rule.min_miss_streak ?? 0}
+                  onChange={(event) => updateRule(rowIndex, {
+                    min_miss_streak: Number(event.target.value),
+                  })}
+                  style={{ fontSize: 13, padding: "4px 6px" }}
+                >
+                  <option value={0}>항상</option>
+                  {[2, 3, 4, 5, 6].map((missCount) => (
+                    <option key={missCount} value={missCount}>{missCount}M 이상</option>
+                  ))}
+                </select>
+              )}
             </Box>
           );
         })}
@@ -3184,6 +3199,7 @@ export default function GhUserSetupPage() {
               onChange={(m) => updateMartin("martin_z", m)}
               color="#1565c0"
               rowCount={MARTIN_Z_PATTERN_ONLY_ROW_COUNT}
+              showMissCondition
             />
             <MartinStopBetRoundRow
               martin={martinZ}
