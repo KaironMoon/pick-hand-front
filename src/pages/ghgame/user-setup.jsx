@@ -524,6 +524,21 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
                 />
                 BP반전도 포함
               </label>
+              {showMissCondition && (
+                <select
+                  aria-label={`패턴 ${rowIndex + 1} 발동 M 조건`}
+                  value={rule.min_miss_streak ?? 0}
+                  onChange={(event) => updateRule(rowIndex, {
+                    min_miss_streak: Number(event.target.value),
+                  })}
+                  style={{ fontSize: 13, padding: "4px 6px" }}
+                >
+                  <option value={0}>항상</option>
+                  {[2, 3, 4, 5, 6].map((missCount) => (
+                    <option key={missCount} value={missCount}>{missCount}M 이상</option>
+                  ))}
+                </select>
+              )}
               <Box
                 onClick={() => toggleEnabled(rowIndex, rule, direction)}
                 sx={{
@@ -540,21 +555,6 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
               >
                 {rule.enabled ? "사용함" : "사용안함"}
               </Box>
-              {showMissCondition && (
-                <select
-                  aria-label={`패턴 ${rowIndex + 1} 발동 M 조건`}
-                  value={rule.min_miss_streak ?? 0}
-                  onChange={(event) => updateRule(rowIndex, {
-                    min_miss_streak: Number(event.target.value),
-                  })}
-                  style={{ fontSize: 13, padding: "4px 6px" }}
-                >
-                  <option value={0}>항상</option>
-                  {[2, 3, 4, 5, 6].map((missCount) => (
-                    <option key={missCount} value={missCount}>{missCount}M 이상</option>
-                  ))}
-                </select>
-              )}
             </Box>
           );
         })}
