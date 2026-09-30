@@ -566,7 +566,7 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
 function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
   const isB = kind === "B";
   const color = isB ? "#6a1b9a" : "#ef6c00";
-  const triggerMode = String(martin.trigger_mode || "M").toUpperCase() === "S" ? "S" : "M";
+  const triggerMode = String(martin.trigger_mode || "M").toUpperCase() === "H" ? "H" : "M";
   return (
     <>
       <MartinSection
@@ -582,7 +582,7 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
           {isB ? "계산기판 총 BET" : (
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5 }}>
               <span>메인 빅로드</span>
-              {["M", "S"].map((mode) => (
+              {["M", "H"].map((mode) => (
                 <label key={mode} style={{ display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer" }}>
                   <input
                     type="radio"
@@ -600,12 +600,12 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
         <EditableCell
           value={isB
             ? (martin.trigger_bet_amount || 0)
-            : triggerMode === "S"
-              ? (martin.trigger_step || 0)
+            : triggerMode === "H"
+              ? (martin.trigger_hit_streak || 0)
               : (martin.trigger_miss_streak || 0)}
           onChange={(value) => onChange({
             ...martin,
-            [isB ? "trigger_bet_amount" : triggerMode === "S" ? "trigger_step" : "trigger_miss_streak"]: isB
+            [isB ? "trigger_bet_amount" : triggerMode === "H" ? "trigger_hit_streak" : "trigger_miss_streak"]: isB
               ? Math.max(0, value)
               : Math.max(0, Math.min(20, value)),
           })}
@@ -616,8 +616,8 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
         <td colSpan={2} style={normalCell}>
           {isB
             ? "이상에서 1단계 발동"
-            : triggerMode === "S"
-              ? "설정 단계와 정확히 일치한 다음 회차부터 1단계 발동"
+            : triggerMode === "H"
+              ? "연속 적중이 설정값과 정확히 일치하면 1단계 발동"
               : "연속 미적중이 설정값과 정확히 일치하면 1단계 발동"}
         </td>
       </tr>
@@ -2087,7 +2087,7 @@ const DEFAULT_MARTIN_C = {
   ...DEFAULT_MARTIN,
   trigger_mode: "M",
   trigger_miss_streak: 0,
-  trigger_step: 0,
+  trigger_hit_streak: 0,
   stop_bet_round: 0,
   pattern_block: { ...EMPTY_MARTIN_PATTERN_RULE },
   pattern_only: { ...EMPTY_MARTIN_PATTERN_RULE },
@@ -2129,6 +2129,10 @@ export default function GhUserSetupPage() {
   const [copySource, setCopySource] = useState("");
   const [copyError, setCopyError] = useState("");
   const [copying, setCopying] = useState(false);
+  const [slotCopyOpen, setSlotCopyOpen] = useState(false);
+  const [slotCopySource, setSlotCopySource] = useState("");
+  const [slotCopyConfirmOpen, setSlotCopyConfirmOpen] = useState(false);
+  const [slotCopying, setSlotCopying] = useState(false);
   const [ncRefRandomizing, setNcRefRandomizing] = useState(false);
   const [assistExcelOpen, setAssistExcelOpen] = useState(false);
   const [assistExcelText, setAssistExcelText] = useState("");
@@ -2201,6 +2205,24 @@ export default function GhUserSetupPage() {
     } catch (err) {
       setSnack({ open: true, message: err?.response?.data?.detail || "저장 실패", severity: "error" });
     } finally { setSaving(false); }
+  };
+
+  const handleSlotCopyConfirm = async () => {
+    setSlotCopying(true);
+    try {
+      const baseUrl = editingTargetUser
+        ? USER_BET_SETTINGS_API.ADMIN_GH_SLOT(targetUserId, Number(slotCopySource))
+        : USER_BET_SETTINGS_API.GH_SLOT(Number(slotCopySource));
+      const res = await apiCaller.get(baseUrl);
+      setConfig(res.data.config);
+      setDirty(true);
+      setSlotCopyConfirmOpen(false);
+      setSnack({ open: true, message: `S${slotCopySource}의 전체 설정을 S${selectedSlotNo}에 불러왔습니다. 저장 버튼을 눌러야 저장됩니다.`, severity: "success" });
+    } catch (err) {
+      setSnack({ open: true, message: err?.response?.data?.detail || "슬롯 설정 복사에 실패했습니다.", severity: "error" });
+    } finally {
+      setSlotCopying(false);
+    }
   };
 
   const openCopyInput = () => {
@@ -2525,6 +2547,8 @@ export default function GhUserSetupPage() {
             >S{slotNo}</Box>;
           })}
         </Box>
+        <Button size="small" variant="outlined" disabled={saving || copying || slotCopying}
+          onClick={() => { setSlotCopySource(""); setSlotCopyOpen(true); }}>슬롯복사</Button>
         <Typography variant="caption" sx={{ fontSize: 10, color: "#999" }}>아래 모든 설정은 선택한 슬롯에만 적용됩니다</Typography>
       </Box>
       {/* 상단 바 */}
@@ -3496,6 +3520,40 @@ export default function GhUserSetupPage() {
             disabled={!bettingExcelResult || bettingExcelResult.errors.length > 0 || !bettingExcelResult.config}
             sx={{ backgroundColor: "#7b1fa2", "&:hover": { backgroundColor: "#6a1b9a" } }}>
             설정에 적용
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={slotCopyOpen} onClose={() => setSlotCopyOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>슬롯복사 — 원본 슬롯 선택</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>현재 슬롯 S{selectedSlotNo}에 가져올 원본 슬롯을 선택하세요.</Typography>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            {Array.from({ length: 6 }, (_, index) => index + 1)
+              .filter((slotNo) => slotNo !== selectedSlotNo)
+              .map((slotNo) => (
+                <Button key={slotNo} variant="outlined" onClick={() => {
+                  setSlotCopySource(String(slotNo));
+                  setSlotCopyOpen(false);
+                  setSlotCopyConfirmOpen(true);
+                }}>S{slotNo}</Button>
+              ))}
+          </Box>
+        </DialogContent>
+        <DialogActions><Button onClick={() => setSlotCopyOpen(false)}>취소</Button></DialogActions>
+      </Dialog>
+
+      <Dialog open={slotCopyConfirmOpen} onClose={slotCopying ? undefined : () => setSlotCopyConfirmOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>슬롯복사 확인</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontWeight: "bold", fontSize: 20, mb: 2 }}>원본 S{slotCopySource} → 대상 S{selectedSlotNo}</Typography>
+          <Typography>S{slotCopySource}의 저장된 전체 설정을 현재 슬롯 S{selectedSlotNo} 화면에 불러옵니다. 저장 버튼을 눌러야 S{selectedSlotNo}의 기존 설정을 덮어씁니다.</Typography>
+          {dirty && <Typography sx={{ mt: 1 }} color="warning.main">현재 화면의 저장하지 않은 변경사항도 복사한 설정으로 대체됩니다.</Typography>}
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={slotCopying} onClick={() => setSlotCopyConfirmOpen(false)}>취소</Button>
+          <Button disabled={slotCopying} variant="contained" color="error" onClick={handleSlotCopyConfirm}>
+            {slotCopying ? "복사 중..." : "확인"}
           </Button>
         </DialogActions>
       </Dialog>
