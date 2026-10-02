@@ -51,6 +51,11 @@ const autoService = {
     return resp.data;
   },
 
+  async getAutoHistory(params) {
+    const resp = await apiCaller.get(ABOO_API.AUTO_HISTORY, params);
+    return resp.data;
+  },
+
   async discoverTables(pickhandId, refresh = false) {
     const resp = await apiCaller.get(ABOO_API.DISCOVER_TABLES, {
       caller_user_id: pickhandId,

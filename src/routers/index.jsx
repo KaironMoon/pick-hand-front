@@ -1,5 +1,6 @@
 import { lazy } from "react";
 import { createBrowserRouter } from "react-router-dom";
+import AutoHistoryPage from "../pages/auto-history";
 import Home from "../pages/home";
 import Info from "../pages/info";
 import GamePage from "../pages/t9game";
@@ -94,6 +95,10 @@ const router = createBrowserRouter([
           {
             path: "/",
             element: <Home />,
+          },
+          {
+            path: "/auto-history",
+            element: <AutoHistoryPage />,
           },
           {
             path: "/info",

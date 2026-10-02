@@ -963,6 +963,7 @@ export default function GhUserGamePage() {
   const user = useAtomValue(userAtom);
   const isAdmin = user?.role === "admin";
   const [searchParams, setSearchParams] = useSearchParams();
+  const historyReplayGameId = searchParams.get("replayGameId");
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const [results, setResults] = useState([]);
   const [globalhitData, setGlobalhitData] = useState([]);
@@ -1205,6 +1206,27 @@ export default function GhUserGamePage() {
       try {
         const slots = await refreshGameSlots();
         if (cancelled) return;
+        if (historyReplayGameId) {
+          const sourceGameId = Number(historyReplayGameId);
+          if (!Number.isSafeInteger(sourceGameId) || sourceGameId <= 0) {
+            setRejectMsg("올바른 게임번호를 입력하세요.");
+            return;
+          }
+          setSelectedSlotNo(1);
+          setReplayLoading(true);
+          try {
+            const response = await apiCaller.get(GH_GAMES_API.REPLAY(sourceGameId));
+            if (cancelled) return;
+            setGameId(sourceGameId);
+            applyReplayState(response.data, true);
+            setReplayControlsOpen(true);
+          } catch (err) {
+            if (!cancelled) setRejectMsg(err.response?.data?.detail || "리플레이 데이터를 불러오지 못했습니다.");
+          } finally {
+            if (!cancelled) setReplayLoading(false);
+          }
+          return;
+        }
         if (isNew) {
           const empty = slots.find((slot) => !slot.occupied);
           if (empty) await startGame({ slotNo: empty.slot_no });
@@ -1261,7 +1283,7 @@ export default function GhUserGamePage() {
     };
     initialize();
     return () => { cancelled = true; };
-  }, [searchParams.get("new"), searchParams.get("gameId"), searchParams.get("slot")]);
+  }, [searchParams.get("new"), searchParams.get("gameId"), searchParams.get("slot"), historyReplayGameId]);
 
   const restoreGame = useCallback(async (gid) => {
     try {
@@ -1337,6 +1359,7 @@ export default function GhUserGamePage() {
   }, [autoStatus.running]);
 
   useEffect(() => {
+    if (historyReplayGameId || replay.active) return undefined;
     let cancelled = false;
     const tick = async () => {
       try {
@@ -1355,11 +1378,11 @@ export default function GhUserGamePage() {
     };
     const id = setInterval(tick, 5000);
     return () => { cancelled = true; clearInterval(id); };
-  }, [gameId, refreshGameSlots, selectedSlotNo, syncToReplacementSlot]);
+  }, [gameId, refreshGameSlots, selectedSlotNo, syncToReplacementSlot, historyReplayGameId, replay.active]);
 
   // Auto 상태 폴링 (1초)
   useEffect(() => {
-    if (!gameId || !autoFeatureAvailable) return undefined;
+    if (!gameId || !autoFeatureAvailable || historyReplayGameId || replay.active) return undefined;
     let cancelled = false;
     const tick = async () => {
       try {
@@ -1385,11 +1408,11 @@ export default function GhUserGamePage() {
     tick();
     const id = setInterval(tick, 5000);  // auto-status 폴링 1s → 5s로 완화 (호출량 감소 260603)
     return () => { cancelled = true; clearInterval(id); };
-  }, [gameId, autoFeatureAvailable, autoStatus.running]);
+  }, [gameId, autoFeatureAvailable, autoStatus.running, historyReplayGameId, replay.active]);
 
   // ── Auto WebSocket 구독 (실시간 이벤트 푸시) ───────────
   useEffect(() => {
-    if (!autoFeatureAvailable) return undefined;
+    if (!autoFeatureAvailable || historyReplayGameId || replay.active) return undefined;
     if (!autoStatus.running) return undefined;
     const token = sessionStorage.getItem("pick_hand_token");
     if (!token) return undefined;
@@ -1557,7 +1580,7 @@ export default function GhUserGamePage() {
       try { ws && ws.close(); } catch (_) {}
     };
 
-  }, [autoFeatureAvailable, autoStatus.running, autoStatus.autoSessionId, gameId, showOverallStopAlert]);
+  }, [autoFeatureAvailable, autoStatus.running, autoStatus.autoSessionId, gameId, showOverallStopAlert, historyReplayGameId, replay.active]);
 
   const handleAutoToggle = async () => {
     if (!autoFeatureAvailable) return;
@@ -1908,6 +1931,12 @@ export default function GhUserGamePage() {
 
   const exitReplay = async () => {
     if (!replay.active) return;
+    if (historyReplayGameId) {
+      setReplay({ active: false, external: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
+      setGameId(null);
+      navigate("/ghgame/user?slot=1", { replace: true });
+      return;
+    }
     setReplayLoading(true);
     try {
       await restoreGame(gameId);

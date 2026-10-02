@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider, Button, Dialog, DialogTitle, DialogContent, DialogActions, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
+import HistoryIcon from "@mui/icons-material/History";
 import InfoIcon from "@mui/icons-material/Info";
 import PublicIcon from "@mui/icons-material/Public";
 import StarIcon from "@mui/icons-material/Star";
@@ -174,6 +175,15 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
           </List>
         </>
       )}
+      <Divider sx={{ bgcolor: "military.border", my: 1 }} />
+      <List>
+        <ListItem disablePadding>
+          <ListItemButton onClick={() => handleNavClick("/auto-history")}>
+            <ListItemIcon><HistoryIcon /></ListItemIcon>
+            <ListItemText primary="오토플레이 기록" />
+          </ListItemButton>
+        </ListItem>
+      </List>
       {user?.role === "admin" && (
         <>
           <Divider sx={{ bgcolor: "military.border", my: 1 }} />

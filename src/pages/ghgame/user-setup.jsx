@@ -482,6 +482,20 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
       <td colSpan={6} style={{ ...normalCell, padding: 0, textAlign: "left" }}>
         <Box sx={{ px: 1, py: 0.75, color, fontWeight: "bold", backgroundColor: "rgba(255,255,255,0.04)" }}>
           패턴일 때만 배팅하기
+          <button
+            type="button"
+            onClick={() => onChange({
+              ...martin,
+              pattern_only: Array.from({ length: rowCount }, () => ({
+                ...EMPTY_MARTIN_PATTERN_RULE,
+                pattern: [],
+                ...(showMissCondition ? { min_miss_streak: 0 } : {}),
+              })),
+            })}
+            style={{ marginLeft: 12, cursor: "pointer" }}
+          >
+            입력된 패턴 전체초기화하기
+          </button>
         </Box>
         {rules.map((rule, rowIndex) => {
           const cells = patternCells(rule, PATTERN_ONLY_CELL_COUNT);
@@ -681,9 +695,12 @@ function KpkpSection({ name, label, martin, onChange }) {
           : <td style={greenCell}>{isK ? "0.0P" : "항상"}</td>}
         <td colSpan={2} style={normalCell}>{isK ? "다음 회차부터 진행" : isP ? "해당 포인트에서만 진행" : "방향이 있을 때 진행"}</td>
       </tr>
-      {(isK || isP) && <KpkpChoiceRow label="어시스트" value={martin.assist_wait_losses || 0}
+      <KpkpChoiceRow label="어시스트" value={martin.assist_wait_losses || 0}
         choices={[[0, "해당진행"], [1, "1패후진행"], [2, "2패후진행"], [3, "3패후진행"]]}
-        onSelect={(value) => update({ assist_wait_losses: value })} />}
+        onSelect={(value) => update({ assist_wait_losses: value, ...(value ? { assist_wait_wins: 0 } : {}) })} />
+      <KpkpChoiceRow label="어시스트3" value={martin.assist_wait_wins || 0}
+        choices={[[0, "해당진행"], [1, "1승후진행"], [2, "2승후진행"], [3, "3승후진행"]]}
+        onSelect={(value) => update({ assist_wait_wins: value, ...(value ? { assist_wait_losses: 0 } : {}) })} />
       {(isP || name === "martin_kp") && (
         <KpkpChoiceRow label="어시스트2" value={martin.assist2_k_losses || 0}
           choices={[[0, "해당진행"], [2, "2패시K"], [3, "3패시K"], [4, "4패시K"]]}
@@ -2092,13 +2109,13 @@ const DEFAULT_MARTIN_C = {
   pattern_block: { ...EMPTY_MARTIN_PATTERN_RULE },
   pattern_only: { ...EMPTY_MARTIN_PATTERN_RULE },
 };
-const DEFAULT_MARTIN_K = { ...DEFAULT_MARTIN, assist_wait_losses: 0,
+const DEFAULT_MARTIN_K = { ...DEFAULT_MARTIN, assist_wait_losses: 0, assist_wait_wins: 0,
   additional_mission_limit: 0, additional_miss_limit: 0, distribution_limit: 0,
   bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
 const DEFAULT_MARTIN_P = { ...DEFAULT_MARTIN, trigger_bet_amount: 0,
-  assist_wait_losses: 0, assist2_k_losses: 0, assist2_wait_rounds: 0,
+  assist_wait_losses: 0, assist_wait_wins: 0, assist2_k_losses: 0, assist2_wait_rounds: 0,
   bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
-const DEFAULT_MARTIN_KP = { ...DEFAULT_MARTIN, bet_start_round: 1,
+const DEFAULT_MARTIN_KP = { ...DEFAULT_MARTIN, assist_wait_losses: 0, assist_wait_wins: 0, bet_start_round: 1,
   stop_bet_round: 0, finish_round: 0, assist2_k_losses: 0, assist2_wait_rounds: 0 };
 const DEFAULT_FAIL = {
   ...DEFAULT_MARTIN,

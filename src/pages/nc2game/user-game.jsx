@@ -399,6 +399,7 @@ export default function Nc2UserGamePage() {
   const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
   const [searchParams, setSearchParams] = useSearchParams();
+  const historyReplayGameId = searchParams.get("replayGameId");
   const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -634,6 +635,36 @@ export default function Nc2UserGamePage() {
       try {
         const slots = await refreshGameSlots();
         if (cancelled) return;
+        if (historyReplayGameId) {
+          const sourceGameId = Number(historyReplayGameId);
+          if (!Number.isSafeInteger(sourceGameId) || sourceGameId <= 0) {
+            setError("올바른 게임번호를 입력하세요.");
+            return;
+          }
+          setSelectedSlotNo(1);
+          gameResponseGuardRef.current.clear();
+          setReplayLoading(true);
+          try {
+            const response = await apiCaller.get(NC2_GAMES_API.REPLAY(sourceGameId));
+            if (cancelled) return;
+            const data = response.data;
+            setGame(data);
+            setReplay({
+              active: true,
+              sourceGameId: data.game_id,
+              originGameId: slots.find((slot) => slot.slot_no === 1)?.game_id ?? null,
+              roundNum: Number(data.round_state?.round_num || 0),
+              totalRounds: Number(data.total_rounds || 0),
+            });
+            setRoundInput(String(data.round_state?.round_num || 0));
+            setReplayControlsOpen(true);
+          } catch (err) {
+            if (!cancelled) setError(err.response?.data?.detail || "리플레이 데이터를 불러오지 못했습니다.");
+          } finally {
+            if (!cancelled) setReplayLoading(false);
+          }
+          return;
+        }
         const gameId = Number(searchParams.get("gameId"));
         const urlSlotNo = Number(searchParams.get("slot"));
         if (gameId > 0) {
@@ -683,10 +714,10 @@ export default function Nc2UserGamePage() {
     };
     initialize();
     return () => { cancelled = true; };
-  }, []);
+  }, [historyReplayGameId]);
 
   useEffect(() => {
-    if (!game?.game_id) return undefined;
+    if (!game?.game_id || historyReplayGameId || replay.active) return undefined;
     let cancelled = false;
     const poll = () => autoService.getAutoStatus(game.game_id, "nc2").then((status) => {
       if (cancelled || !gameResponseGuardRef.current.isActive(game.game_id)) return;
@@ -714,7 +745,7 @@ export default function Nc2UserGamePage() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [game?.game_id, refreshGameSlots, restore]);
+  }, [game?.game_id, refreshGameSlots, restore, historyReplayGameId, replay.active]);
 
   useEffect(() => {
     setAmountViewMode(autoStatus.running ? "actual" : "calculated");
@@ -722,7 +753,7 @@ export default function Nc2UserGamePage() {
 
   // GH와 동일하게 오토 이벤트를 실시간 구독하고, 결과 확정 시 서버 상태를 다시 읽는다.
   useEffect(() => {
-    if (!game?.game_id || !autoStatus.running) return undefined;
+    if (!game?.game_id || !autoStatus.running || historyReplayGameId || replay.active) return undefined;
     const token = sessionStorage.getItem("pick_hand_token");
     if (!token) return undefined;
 
@@ -851,7 +882,7 @@ export default function Nc2UserGamePage() {
       clearTimeout(reconnectTimer);
       try { ws?.close(); } catch (_) {}
     };
-  }, [autoStatus.running, autoStatus.auto_session_id, game?.game_id, restore]);
+  }, [autoStatus.running, autoStatus.auto_session_id, game?.game_id, restore, historyReplayGameId, replay.active]);
 
   const record = async (actual) => {
     if (!game?.game_id || loading || replay.active) return;
@@ -1032,6 +1063,11 @@ export default function Nc2UserGamePage() {
   };
 
   const exitReplay = async () => {
+    if (historyReplayGameId) {
+      clearCurrentGame();
+      navigate("/nc2game/user?slot=1", { replace: true });
+      return;
+    }
     const originGameId = replay.originGameId;
     if (!originGameId) return;
     setReplayLoading(true);
