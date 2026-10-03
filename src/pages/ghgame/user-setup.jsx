@@ -639,7 +639,7 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
           {isB
             ? "이상에서 1단계 발동"
             : noCondition
-              ? "승패 횟수 조건 없이 1단계 발동"
+              ? "승패 횟수 조건 생략 (패턴 조건 유지)"
               : triggerMode === "H"
               ? "연속 적중이 설정값과 정확히 일치하면 1단계 발동"
               : "연속 미적중이 설정값과 정확히 일치하면 1단계 발동"}
