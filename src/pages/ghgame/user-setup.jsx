@@ -581,6 +581,8 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
   const isB = kind === "B";
   const color = isB ? "#6a1b9a" : "#ef6c00";
   const triggerMode = String(martin.trigger_mode || "M").toUpperCase() === "H" ? "H" : "M";
+  const triggerKey = triggerMode === "H" ? "trigger_hit_streak" : "trigger_miss_streak";
+  const noCondition = Number(martin[triggerKey] || 0) === 0;
   return (
     <>
       <MartinSection
@@ -596,6 +598,12 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
           {isB ? "계산기판 총 BET" : (
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5 }}>
               <span>메인 빅로드</span>
+              <button type="button"
+                aria-pressed={noCondition}
+                onClick={() => onChange({ ...martin, [triggerKey]: 0 })}
+                style={{ background: noCondition ? "#388e3c" : "#252525", color: "#fff", border: "1px solid #555", borderRadius: 3, padding: "4px 8px", cursor: "pointer" }}>
+                조건 없음
+              </button>
               {["M", "H"].map((mode) => (
                 <label key={mode} style={{ display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer" }}>
                   <input
@@ -630,7 +638,9 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
         <td colSpan={2} style={normalCell}>
           {isB
             ? "이상에서 1단계 발동"
-            : triggerMode === "H"
+            : noCondition
+              ? "승패 횟수 조건 없이 1단계 발동"
+              : triggerMode === "H"
               ? "연속 적중이 설정값과 정확히 일치하면 1단계 발동"
               : "연속 미적중이 설정값과 정확히 일치하면 1단계 발동"}
         </td>
