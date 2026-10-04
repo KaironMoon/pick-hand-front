@@ -35,9 +35,11 @@ import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import SettingsIcon from "@mui/icons-material/Settings";
 import StopCircleIcon from "@mui/icons-material/StopCircle";
+import SwitchAccountIcon from "@mui/icons-material/SwitchAccount";
 import { useNavigate } from "react-router-dom";
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
+import authService from "@/services/auth-service";
 import { USERS_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 import { emergencyStopResultMessage } from "@/utils/emergency-stop-result";
 
@@ -68,6 +70,7 @@ function UsersPage() {
   const [copying, setCopying] = useState(false);
   const [emergencyStoppingId, setEmergencyStoppingId] = useState(null);
   const [rouletteStoppingId, setRouletteStoppingId] = useState(null);
+  const [impersonatingId, setImpersonatingId] = useState(null);
   const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
 
   const fetchUsers = useCallback(async () => {
@@ -95,6 +98,19 @@ function UsersPage() {
       </Box>
     );
   }
+
+  const handleImpersonate = async (user) => {
+    if (impersonatingId !== null) return;
+    setImpersonatingId(user.id);
+    try {
+      await authService.impersonate(user.id);
+      // Reinitialize stores and subscriptions with the selected user's session.
+      window.location.replace("/");
+    } catch (error) {
+      setSnack({ open: true, severity: "error", message: error.response?.data?.detail || error.message || "사용자 전환에 실패했습니다." });
+      setImpersonatingId(null);
+    }
+  };
 
   const handleAddSubmit = async () => {
     setAddError("");
@@ -397,6 +413,19 @@ function UsersPage() {
                   </TableCell>
                   <TableCell sx={cellSx}>{formatDate(user.created_at)}</TableCell>
                   <TableCell sx={{ ...cellSx, textAlign: "center" }}>
+                    <Tooltip title="이 사용자로 접속">
+                      <span>
+                        <IconButton
+                          size="small"
+                          aria-label={`${user.username} 사용자로 접속`}
+                          disabled={!user.is_active || impersonatingId !== null}
+                          onClick={() => handleImpersonate(user)}
+                          sx={{ color: "#ab47bc" }}
+                        >
+                          <SwitchAccountIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
                     <Tooltip title={user.has_running_auto ? "GH·나이스초이스 Auto 비상정지" : "실행 중인 Auto 없음"}>
                       <span>
                         <IconButton

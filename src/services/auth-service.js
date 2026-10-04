@@ -1,35 +1,48 @@
 import apiCaller from "./api-caller";
-import { AUTH_API } from "@/constants/api-url";
-
-const TOKEN_KEY = "pick_hand_token";
+import { AUTH_API, USERS_API } from "@/constants/api-url";
+import {
+  applyAuthenticatedResponse, clearSessionToken, getSessionToken, setSessionToken,
+} from "./auth-session";
 
 const authService = {
   async login(username, password) {
     const response = await apiCaller.post(AUTH_API.LOGIN, { username, password });
     const { access_token, user } = response.data;
-    sessionStorage.setItem(TOKEN_KEY, access_token);
+    setSessionToken(access_token);
     return user;
   },
 
   logout() {
-    sessionStorage.removeItem(TOKEN_KEY);
+    clearSessionToken();
   },
 
   getToken() {
-    return sessionStorage.getItem(TOKEN_KEY);
+    return getSessionToken();
   },
 
   async getMe() {
     const response = await apiCaller.get(AUTH_API.ME);
     // 토큰 갱신
     if (response.data.access_token) {
-      sessionStorage.setItem(TOKEN_KEY, response.data.access_token);
+      applyAuthenticatedResponse(response);
     }
     return response.data;
   },
 
   isAuthenticated() {
-    return !!sessionStorage.getItem(TOKEN_KEY);
+    return !!getSessionToken();
+  },
+
+  async impersonate(userId) {
+    const response = await apiCaller.post(USERS_API.IMPERSONATE(userId));
+    applyAuthenticatedResponse(response);
+    return response.data.user;
+  },
+
+  async stopImpersonating() {
+    const response = await apiCaller.post(AUTH_API.STOP_IMPERSONATING);
+    applyAuthenticatedResponse(response);
+    return response.data.user;
   },
 };
 

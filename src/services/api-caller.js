@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearSessionToken, getSessionToken, updateSessionToken } from "./auth-session";
 
 function getUrl(baseUrl, url) {
   if (url.indexOf("http") === -1) {
@@ -125,7 +126,7 @@ const TOKEN_REFRESH_THRESHOLD = 12 * 60 * 60; // 12시간 (초)
 let _refreshing = null;
 
 async function refreshTokenIfNeeded() {
-  const token = sessionStorage.getItem("pick_hand_token");
+  const token = getSessionToken();
   if (!token) return;
   const exp = getTokenExp(token);
   const remaining = exp - Date.now() / 1000;
@@ -137,7 +138,7 @@ async function refreshTokenIfNeeded() {
     { headers: { Authorization: `Bearer ${token}` } },
   ).then((res) => {
     if (res.data.access_token) {
-      sessionStorage.setItem("pick_hand_token", res.data.access_token);
+      updateSessionToken(token, res.data.access_token);
     }
   }).catch(() => {}).finally(() => { _refreshing = null; });
   return _refreshing;
@@ -164,7 +165,7 @@ class ApiInterceptors {
         if (!config.url?.includes("/auth/me")) {
           await refreshTokenIfNeeded();
         }
-        const token = sessionStorage.getItem("pick_hand_token");
+        const token = getSessionToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -189,8 +190,9 @@ class ApiInterceptors {
       (error) => {
         console.warn("%cHTTP RESPONSE ERROR\n%s", "color: red", error);
 
-        if (error.response && error.response.status === 401) {
-          sessionStorage.removeItem("pick_hand_token");
+        if (error.response && error.response.status === 401
+          && error.config?.headers?.Authorization === `Bearer ${getSessionToken()}`) {
+          clearSessionToken();
           if (window.location.pathname !== "/login") {
             window.location.href = "/login";
           }

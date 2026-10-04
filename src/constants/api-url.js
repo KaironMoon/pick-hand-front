@@ -3,11 +3,13 @@ const API_URL = "";
 const AUTH_API = {
   LOGIN: "/api/v1/auth/login",
   ME: "/api/v1/auth/me",
+  STOP_IMPERSONATING: "/api/v1/auth/impersonate/stop",
 };
 
 const USERS_API = {
   BASE: "/api/v1/users",
   DETAIL: (id) => `/api/v1/users/${id}`,
+  IMPERSONATE: (id) => `/api/v1/users/${id}/impersonate`,
   EMERGENCY_STOP: (id) => `/api/v1/users/${id}/emergency-stop`,
   ROULETTE_KEEPER_STOP: (id) => `/api/v1/users/${id}/roulette-keeper/stop`,
 };
