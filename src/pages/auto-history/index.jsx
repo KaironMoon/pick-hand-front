@@ -20,6 +20,9 @@ export default function AutoHistoryPage() {
   const [gameType, setGameType] = useState("");
   const [status, setStatus] = useState("");
   const [gameNumber, setGameNumber] = useState("");
+  const [pnlMin, setPnlMin] = useState("");
+  const [pnlMax, setPnlMax] = useState("");
+  const [maxLossStreakMin, setMaxLossStreakMin] = useState("");
   const [query, setQuery] = useState({});
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -28,6 +31,7 @@ export default function AutoHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [inputError, setInputError] = useState("");
+  const [filterError, setFilterError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -42,17 +46,36 @@ export default function AutoHistoryPage() {
 
   const search = (event) => {
     event.preventDefault();
+    setInputError("");
+    setFilterError("");
     const value = gameNumber.trim();
     if (value && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) <= 0)) {
       setInputError("올바른 게임번호를 입력하세요.");
       return;
     }
-    setInputError("");
+    const minimum = pnlMin.trim();
+    const maximum = pnlMax.trim();
+    const streak = maxLossStreakMin.trim();
+    if ([minimum, maximum].some((amount) => amount && (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(amount) || !Number.isFinite(Number(amount))))) {
+      setFilterError("PNL 금액은 숫자로 입력하세요. 음수와 소수를 입력할 수 있습니다.");
+      return;
+    }
+    if (minimum && maximum && Number(minimum) > Number(maximum)) {
+      setFilterError("PNL 이상 금액은 이하 금액보다 클 수 없습니다.");
+      return;
+    }
+    if (streak && (!/^\d+$/.test(streak) || !Number.isSafeInteger(Number(streak)))) {
+      setFilterError("최고연패는 0 이상의 정수로 입력하세요.");
+      return;
+    }
     setPage(0);
     setQuery({
       ...(gameType ? { game_type: gameType } : {}),
       ...(status ? { result_status: status } : {}),
       ...(value ? { game_id: Number(value) } : {}),
+      ...(minimum ? { pnl_min_p: minimum } : {}),
+      ...(maximum ? { pnl_max_p: maximum } : {}),
+      ...(streak ? { max_loss_streak_min: Number(streak) } : {}),
     });
   };
 
@@ -69,23 +92,28 @@ export default function AutoHistoryPage() {
           {Object.entries(STATUS_LABELS).map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
         </TextField>
         <TextField label="게임 번호" size="small" value={gameNumber} onChange={(e) => setGameNumber(e.target.value)} inputProps={{ inputMode: "numeric" }} error={Boolean(inputError)} helperText={inputError} />
+        <TextField label="PNL 이상 (P)" size="small" value={pnlMin} onChange={(e) => setPnlMin(e.target.value)} inputProps={{ inputMode: "text" }} sx={{ width: 160 }} />
+        <TextField label="PNL 이하 (P)" size="small" value={pnlMax} onChange={(e) => setPnlMax(e.target.value)} inputProps={{ inputMode: "text" }} sx={{ width: 160 }} />
+        <TextField label="최고연패 이상 (패)" size="small" value={maxLossStreakMin} onChange={(e) => setMaxLossStreakMin(e.target.value)} inputProps={{ inputMode: "numeric" }} sx={{ width: 170 }} />
         <Button type="submit" variant="contained">검색</Button>
         <Button onClick={() => setRevision((value) => value + 1)} disabled={loading}>새로고침</Button>
       </Box>
+      {filterError && <Alert severity="error" sx={{ mb: 2 }}>{filterError}</Alert>}
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>PNL은 실제 오토 베팅 손익(P), 시각은 한국 시간 기준입니다.</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>최고연패는 최종 계산픽 기준이며 종료·중지·오류 시 저장됩니다. 미집계 기록은 최고연패 검색에서 제외됩니다.</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Paper>
         <TableContainer>
           <Table size="small" aria-label="오토플레이 실행 기록" sx={{ minWidth: 850 }}>
             <TableHead>
               <TableRow>
-                {["게임 종류", "게임 번호", "PNL (P)", "진행 회차", "시작 시각", "종료 시각", "상태"].map((label) => <TableCell key={label}>{label}</TableCell>)}
+                {["게임 종류", "게임 번호", "PNL (P)", "최고연패", "진행 회차", "시작 시각", "종료 시각", "상태"].map((label) => <TableCell key={label}>{label}</TableCell>)}
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? <TableRow><TableCell colSpan={7} align="center"><CircularProgress size={24} aria-label="기록 불러오는 중" /></TableCell></TableRow>
-                : error ? <TableRow><TableCell colSpan={7} align="center">기록을 조회할 수 없습니다.</TableCell></TableRow>
-                : data.items.length === 0 ? <TableRow><TableCell colSpan={7} align="center">조건에 맞는 오토플레이 기록이 없습니다.</TableCell></TableRow>
+              {loading ? <TableRow><TableCell colSpan={8} align="center"><CircularProgress size={24} aria-label="기록 불러오는 중" /></TableCell></TableRow>
+                : error ? <TableRow><TableCell colSpan={8} align="center">기록을 조회할 수 없습니다.</TableCell></TableRow>
+                : data.items.length === 0 ? <TableRow><TableCell colSpan={8} align="center">조건에 맞는 오토플레이 기록이 없습니다.</TableCell></TableRow>
                 : data.items.map((row) => (
                   <TableRow key={row.id} hover>
                     <TableCell>{GAME_LABELS[row.game_type]}</TableCell>
@@ -95,6 +123,7 @@ export default function AutoHistoryPage() {
                       </Link>
                     </TableCell>
                     <TableCell>{Number(row.pnl_actual_p).toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</TableCell>
+                    <TableCell>{row.max_loss_streak == null ? (row.status === "running" ? "진행 중" : "미집계") : `${row.max_loss_streak}패`}</TableCell>
                     <TableCell>{row.round_count}회차</TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>{formatTime(row.started_at)}</TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>{formatTime(row.stopped_at)}</TableCell>
