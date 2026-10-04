@@ -1116,12 +1116,7 @@ export default function GhUserGamePage() {
     );
   }, [gameId, roundState?.round_num, roundState?.overall_stop, showOverallStopAlert]);
 
-  const displayPick = (() => {
-    const umComb = betData?.user_martin?.combined?.direction;
-    if (umComb && umComb !== "wait") return umComb;
-    const adComb = betData?.combined?.direction;
-    return adComb && adComb !== "wait" ? adComb : null;
-  })();
+  const { direction: displayPick } = resolvePickMartinSummary(roundState, autoStatus);
   const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
   const applySavedRoundState = useCallback((data) => {
@@ -2645,7 +2640,7 @@ export default function GhUserGamePage() {
                   );
                 })()}
 
-                {/* 행2: 회차 + P/B/T 결과 입력 + 횟수 + del */}
+                {/* 행2: 회차 + P/B 결과 입력 + 횟수 + del + 픽 */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box sx={turnBoxSx}>
                     <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 16 }}>{currentTurn}</Typography>
@@ -2681,6 +2676,12 @@ export default function GhUserGamePage() {
                       </Box>
                     );
                   })()}
+                  <Box
+                    component="img"
+                    src={pickImage}
+                    alt={displayPick === "P" ? "다음 픽 P" : displayPick === "B" ? "다음 픽 B" : "다음 픽 대기"}
+                    sx={{ width: 48, height: 48, objectFit: "contain", flexShrink: 0 }}
+                  />
                 </Box>
 
               </Box>
