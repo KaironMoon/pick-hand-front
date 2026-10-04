@@ -447,7 +447,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false }) {
+function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false, highlightDuplicates = false }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -457,6 +457,13 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
     ...EMPTY_MARTIN_PATTERN_RULE,
     ...(rawRules[index] && typeof rawRules[index] === "object" ? rawRules[index] : {}),
   }));
+  const patternKeys = highlightDuplicates
+    ? rules.map((rule) => patternCells(rule, PATTERN_ONLY_CELL_COUNT).join(""))
+    : [];
+  const patternCounts = new Map();
+  for (const key of patternKeys) {
+    if (key) patternCounts.set(key, (patternCounts.get(key) || 0) + 1);
+  }
   const updateRule = (index, patch) => {
     const next = rules.map((rule, ruleIndex) => (
       ruleIndex === index ? { ...rule, ...patch } : rule
@@ -499,6 +506,7 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
         </Box>
         {rules.map((rule, rowIndex) => {
           const cells = patternCells(rule, PATTERN_ONLY_CELL_COUNT);
+          const isDuplicate = (patternCounts.get(patternKeys[rowIndex]) || 0) > 1;
           const direction = rule.direction === "P" || rule.direction === "B" ? rule.direction : "";
           const nextDirection = direction === "" ? "B" : direction === "B" ? "P" : "";
           return (
@@ -514,16 +522,29 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
                 whiteSpace: "nowrap",
               }}
             >
-              {cells.map((value, cellIndex) => (
-                <PatternCell
-                  key={`pattern-only-${rowIndex}-${cellIndex}`}
-                  cellKey={`pattern-only-${rowIndex}-${cellIndex}`}
-                  value={value}
-                  onClick={() => updateRule(rowIndex, {
-                    pattern: cyclePatternCell(cells, cellIndex),
-                  })}
-                />
-              ))}
+              <Box
+                role="group"
+                aria-label={`패턴 ${rowIndex + 1}${isDuplicate ? " (중복)" : ""}`}
+                title={isDuplicate ? "동일한 패턴이 중복 입력되어 있습니다." : undefined}
+                sx={{
+                  display: "flex",
+                  gap: 0.75,
+                  outline: isDuplicate ? "2px solid #ff5252" : "none",
+                  outlineOffset: 2,
+                  borderRadius: 0.5,
+                }}
+              >
+                {cells.map((value, cellIndex) => (
+                  <PatternCell
+                    key={`pattern-only-${rowIndex}-${cellIndex}`}
+                    cellKey={`pattern-only-${rowIndex}-${cellIndex}`}
+                    value={value}
+                    onClick={() => updateRule(rowIndex, {
+                      pattern: cyclePatternCell(cells, cellIndex),
+                    })}
+                  />
+                ))}
+              </Box>
               <span style={{ marginLeft: 6 }}>배팅방향</span>
               <PatternCell
                 cellKey={`pattern-only-direction-${rowIndex}`}
@@ -662,6 +683,7 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
             martin={martin}
             onChange={onChange}
             color={color}
+            highlightDuplicates
           />
         </>
       )}
@@ -3251,6 +3273,7 @@ export default function GhUserSetupPage() {
               color="#1565c0"
               rowCount={MARTIN_Z_PATTERN_ONLY_ROW_COUNT}
               showMissCondition
+              highlightDuplicates
             />
             <MartinStopBetRoundRow
               martin={martinZ}
