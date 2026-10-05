@@ -8,6 +8,7 @@ import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
 import GhBigRoad2 from "./components/GhBigRoad2";
+import GhRoundBetDetailDialog from "./components/GhRoundBetDetailDialog";
 import {
   autoStatusLookupError,
   createEmptyAutoStatus,
@@ -353,6 +354,18 @@ function GhRoundAmountTable({
   endDisabled = true,
   endDisabledReason,
 }) {
+  const [detailSelection, setDetailSelection] = useState(null);
+  const selectedGameId = gameSlots.find((slot) => slot.slot_no === selectedSlotNo)?.game_id;
+  useEffect(() => {
+    setDetailSelection(null);
+  }, [selectedSlotNo, selectedGameId]);
+  useEffect(() => {
+    if (slotBusy) setDetailSelection(null);
+  }, [slotBusy]);
+  const detailOpen = detailSelection !== null
+    && detailSelection.slotNo === selectedSlotNo
+    && detailSelection.gameId === selectedGameId
+    && !slotBusy;
   const table = roundState?.round_amount_table || {};
   const actualTable = roundState?.actual_bet_table || {};
   const toolbarButtons = [
@@ -629,7 +642,17 @@ function GhRoundAmountTable({
           const martinAmount = martinNetAmount(strategyCells[idx]);
           const showMartinAmount = amountMode !== "actual" && martinAmount > 0;
           return (
-            <Box key={idx} sx={cellSx(idx)} title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / 마틴 상계 ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)}${[...MARTIN_C_ITEMS, ...MARTIN_KPKP_ITEMS].map(([key, label]) => ` / ${label} ${fmt(cells[idx]?.[`${key}_pnl`])}`).join("")}`}>
+            <Box
+              key={idx}
+              component="button"
+              type="button"
+              disabled={slotBusy}
+              aria-label={`${idx + 1}회차 배팅 상세 보기`}
+              onClick={() => setDetailSelection({ index: idx, slotNo: selectedSlotNo, gameId: selectedGameId })}
+              sx={{ ...cellSx(idx), p: 0, font: "inherit", cursor: "pointer",
+                "&:focus-visible": { outline: "2px solid #2f9bff", outlineOffset: -2 },
+              }}
+              title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / 마틴 상계 ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)}${[...MARTIN_C_ITEMS, ...MARTIN_KPKP_ITEMS].map(([key, label]) => ` / ${label} ${fmt(cells[idx]?.[`${key}_pnl`])}`).join("")}`}>
               <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
               <Box sx={{ color: "#fff", fontSize: showMartinAmount ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>
                 {fmt(cells[idx]?.amount)}
@@ -639,6 +662,14 @@ function GhRoundAmountTable({
           );
         })}
       </Box>
+      <GhRoundBetDetailDialog
+        open={detailOpen}
+        onClose={() => setDetailSelection(null)}
+        round={detailSelection === null ? null : detailSelection.index + 1}
+        detail={strategyCells[detailSelection?.index]?.bet_detail}
+        actualCell={actualCells[detailSelection?.index]}
+        amountMode={amountMode}
+      />
     </Box>
   );
 }
