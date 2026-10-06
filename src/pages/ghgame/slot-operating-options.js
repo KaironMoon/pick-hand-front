@@ -20,6 +20,12 @@ export const ghSlotLossStatusLabel = (status) => {
     + (status?.stopped ? ` · ${trigger} 중지` : " · 정상");
 };
 
+export const overallLossStopStatusLabel = (status) => {
+  if (Number(status?.configured_loss_limit || 0) <= 0) return "사용안함";
+  return `전체 PNL ${formatConditionNumber(status?.loss_threshold)}P 이하에서 전체 배팅 종료`
+    + (status?.reason === "overall_loss_limit_reached" ? " · 중지" : " · 정상");
+};
+
 export const ghDrawdownStatusLabel = (status) => {
   const start = Number(status?.configured_drawdown_start ?? status?.drawdown_start ?? 0);
   const effectiveStart = Number(status?.effective_drawdown_start ?? status?.drawdown_start ?? 0);
@@ -148,6 +154,9 @@ export const ghRoundPnlStopStatusLabel = (overallStop) => {
 export const ghBetStopReasonLabel = (roundState) => {
   const overallStop = roundState?.overall_stop;
   const reason = overallStop?.reason;
+  if (reason === "overall_loss_limit_reached") {
+    return `전체 합산 PNL ${formatConditionNumber(overallStop?.pnl)}P가 종료 기준 ${formatConditionNumber(overallStop?.loss_threshold)}P 이하에 도달 (전체 배팅 즉시 정지)`;
+  }
   if (reason === "goal_reached") {
     return `현재 PNL ${formatConditionNumber(overallStop?.pnl)} P가 목표 ${formatConditionNumber(overallStop?.target)} P에 도달 (전체 목표금액 달성)`;
   }

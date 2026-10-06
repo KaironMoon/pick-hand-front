@@ -28,6 +28,7 @@ import {
   ghProfitStopStatusLabel,
   ghRoundPnlStopStatusLabel,
   ghSlotLossStatusLabel,
+  overallLossStopStatusLabel,
   martinBetStopReasonLabel,
   martinCBetAdjustmentStatusLabel,
   martinDrawdownStatusLabel,
@@ -276,6 +277,9 @@ function GhLossStopStatus({ roundState, autoStatus }) {
     <>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: betStopReason ? 0.5 : 1.5, px: 1, py: 0.7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
         <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>현재 게임 배팅조건</Typography>
+        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.overall_stop?.reason === "overall_loss_limit_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
+          전체 손실종료조건: {overallLossStopStatusLabel(roundState?.overall_stop)}
+        </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: status?.stopped ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
           슬롯 GH 손실조건: {detail}
         </Typography>
@@ -799,6 +803,8 @@ function GhBettingSummaryPanel({
   const stopReason = autoStatus?.stop_reason || roundState?.overall_stop?.reason;
   const monitoringReason = stopReason === "goal_reached"
     ? "목표중지"
+    : stopReason === "overall_loss_limit_reached"
+      ? "손실종료"
     : stopReason === "end_round_reached"
       ? "마감중지"
       : stopReason === "active_pot_limit_reached"
@@ -1520,7 +1526,7 @@ export default function GhUserGamePage() {
               pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
               pnl_actual_p: data.pnl_actual_p ?? prev.pnl_actual_p,
               round_count: data.round_count ?? prev.round_count,
-              stop_reason: ["goal_reached", "drawdown_reached", "end_round_reached", "active_pot_limit_reached", "round_bet_loss_streak_reached", "round_gh_pnl_range_reached"].includes(data.reason)
+              stop_reason: ["goal_reached", "drawdown_reached", "overall_loss_limit_reached", "end_round_reached", "active_pot_limit_reached", "round_bet_loss_streak_reached", "round_gh_pnl_range_reached"].includes(data.reason)
                 ? data.reason
                 : prev.stop_reason,
               active_pot_count: data.active_pot_count ?? prev.active_pot_count,

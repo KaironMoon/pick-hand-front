@@ -2719,6 +2719,30 @@ export default function GhUserSetupPage() {
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
             <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
+              전체 손실종료조건
+            </Typography>
+            <Typography component="span" sx={{ color: "#fff", fontWeight: 700 }}>−</Typography>
+            <input
+              aria-label="전체 손실종료 금액 (P)"
+              type="number"
+              min="0"
+              step="0.1"
+              value={config.auto_loss_stop_amount ?? 0}
+              onChange={(event) => {
+                const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
+                setConfig((prev) => ({ ...prev, auto_loss_stop_amount: value }));
+                setDirty(true);
+              }}
+              style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#aaa" }}>
+              {Number(config.auto_loss_stop_amount || 0) > 0
+                ? `전체 합산 PNL이 −${Number(config.auto_loss_stop_amount).toLocaleString()}P 이하이면 전체 배팅 종료 · ×${config.auto_actual_bet_scale ?? 1} 적용 시 −${Math.max(0.1, Number((Number(config.auto_loss_stop_amount) * Number(config.auto_actual_bet_scale ?? 1)).toFixed(1))).toLocaleString()}P 이하에서 종료 (마틴 회수 없이 즉시 정지)`
+                : "(사용안함)"}
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
               슬롯 GH 손실조건
             </Typography>
             <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>현재손실</Typography>

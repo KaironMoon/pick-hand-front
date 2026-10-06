@@ -59,6 +59,32 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
               </Box>
             </Box>
             <Box>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>글로벌히트 생성픽 근거</Typography>
+              {!detail.globalhit_generated_picks?.length ? (
+                <Typography color="text.secondary">이 회차에 저장된 생성픽 근거가 없습니다.</Typography>
+              ) : (
+                <Box sx={{ overflowX: "auto" }}>
+                  <Box component="table" sx={{
+                    width: "100%", borderCollapse: "collapse", fontSize: 13,
+                    "& th, & td": { borderBottom: "1px solid", borderColor: "divider", p: 0.75, textAlign: "left" },
+                  }}>
+                    <thead><tr><th scope="col">전략</th><th scope="col">번호</th><th scope="col">약칭</th><th scope="col">패턴</th><th scope="col">픽</th></tr></thead>
+                    <tbody>{detail.globalhit_generated_picks.map((row) => (
+                      <tr key={row.key}>
+                        <th scope="row">{row.key} · {row.label}</th>
+                        <td>{row.number ?? "—"}</td><td>{row.nickname ?? "—"}</td>
+                        <td style={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>
+                          {row.pattern}
+                          {row.condition && <Typography variant="caption" color="text.secondary" display="block">{row.condition}</Typography>}
+                        </td>
+                        <td>{row.pick ?? "—"}</td>
+                      </tr>
+                    ))}</tbody>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+            <Box>
               <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>패턴 발동 근거</Typography>
               {detail.snapshot_source !== "game_start" && (
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>

@@ -7,6 +7,7 @@ import {
   ghProfitStopStatusLabel,
   ghRoundPnlStopStatusLabel,
   ghSlotLossStatusLabel,
+  overallLossStopStatusLabel,
   martinBetStopReasonLabel,
   martinCBetAdjustmentStatusLabel,
   martinDrawdownStatusLabel,
@@ -15,6 +16,14 @@ import {
   martinProfitStopStatusLabel,
   martinSlotLossStatusLabel,
 } from "../src/pages/ghgame/slot-operating-options.js";
+
+test("overall loss condition uses the server-scaled threshold and stop reason", () => {
+  assert.equal(overallLossStopStatusLabel({}), "사용안함");
+  const status = { configured_loss_limit: 1000, loss_threshold: -100, pnl: -100,
+    reason: "overall_loss_limit_reached" };
+  assert.equal(overallLossStopStatusLabel(status), "전체 PNL -100P 이하에서 전체 배팅 종료 · 중지");
+  assert.match(ghBetStopReasonLabel({ overall_stop: status }), /-100P 이하에 도달/);
+});
 
 test("Martin combined goal status distinguishes disabled, active, and stopped", () => {
   assert.equal(martinGoalStatusLabel({}), "사용안함");

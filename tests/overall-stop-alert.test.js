@@ -3,6 +3,17 @@ import test from "node:test";
 
 import { claimOverallStopAlert } from "../src/pages/ghgame/overall-stop-alert.js";
 
+test("hard overall loss alert reports scaled limit without recovery", () => {
+  const alert = claimOverallStopAlert(new Set(), 39866, "overall_loss_limit_reached", "auto", {
+    loss_threshold: -100,
+    martin_recovery: { completed: true, targets: { martin_z: { required: true } } },
+  });
+  assert.equal(alert.title, "전체 손실종료 한도 도달");
+  assert.match(alert.detail, /-100P 이하/);
+  assert.match(alert.detail, /모든 마틴 배팅이 즉시 정지/);
+  assert.doesNotMatch(alert.detail, /회수까지 완료/);
+});
+
 test("overall goal alert is shown only once for an auto game", () => {
   const alerted = new Set();
 

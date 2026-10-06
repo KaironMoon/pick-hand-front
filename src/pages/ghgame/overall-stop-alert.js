@@ -1,4 +1,8 @@
 const STOP_ALERTS = {
+  overall_loss_limit_reached: {
+    title: "전체 손실종료 한도 도달",
+    detail: "전체 합산 PNL이 손실 한도에 도달하여 모든 배팅이 즉시 정지되었습니다.",
+  },
   goal_reached: {
     title: "목표금액 달성",
     detail: "목표금액을 달성하여 배팅이 정지되었습니다.",
@@ -33,6 +37,7 @@ const stopAlertDetail = (alert, reason, mode, stopDetail) => {
   const recoveredMartins = Object.values(stopDetail?.martin_recovery?.targets || {})
     .some((target) => target?.required);
   const recoveryCompleted = stopDetail?.martin_recovery?.completed && recoveredMartins;
+  if (reason === "overall_loss_limit_reached") return `전체 합산 PNL이 ${formatBetAmount(stopDetail?.loss_threshold ?? 0)}P 이하에 도달하여 글로벌히트와 모든 마틴 배팅이 즉시 정지되었습니다.`;
   if (reason === "goal_reached") return recoveryCompleted
     ? "전체 목표금액 달성 후 진행 중이던 마틴 회수까지 완료되어 최종 배팅이 정지되었습니다."
     : "전체 목표금액을 달성하여 배팅이 정지되었습니다.";
