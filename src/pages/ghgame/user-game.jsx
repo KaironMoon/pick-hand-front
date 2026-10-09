@@ -2788,12 +2788,12 @@ export default function GhUserGamePage() {
           </Box>
           {/* /1|2 row */}
 
-          {isAdmin && (
-            <Box sx={{
-              display: "flex", alignItems: "center", gap: 1, mb: 1.5, px: 1, py: 0.7,
-              border: "1px solid rgba(255,193,7,0.45)", borderRadius: 1,
-              backgroundColor: "rgba(255,193,7,0.06)", flexWrap: "wrap",
-            }}>
+          <Box sx={{
+            display: "flex", alignItems: "center", gap: 1, mb: 1.5, px: 1, py: 0.7,
+            border: "1px solid rgba(255,193,7,0.45)", borderRadius: 1,
+            backgroundColor: "rgba(255,193,7,0.06)", flexWrap: "wrap",
+          }}>
+            {isAdmin && <>
               <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: "bold" }}>어드민 도구</Typography>
               <Button
                 size="small"
@@ -2813,6 +2813,7 @@ export default function GhUserGamePage() {
                   {` ${shoeCopyProgress.completed}/${shoeCopyProgress.total}`}
                 </Typography>
               )}
+            </>}
               <Button
                 size="small"
                 variant="outlined"
@@ -2821,9 +2822,9 @@ export default function GhUserGamePage() {
               >
                 리플레이
               </Button>
-              <Button size="small" variant="outlined" color="secondary" onClick={openMaxMissPopup} disabled={!roundStateLower}>
+              {isAdmin && <Button size="small" variant="outlined" color="secondary" onClick={openMaxMissPopup} disabled={!roundStateLower}>
                 고연패 현황
-              </Button>
+              </Button>}
               {(replay.active || replayControlsOpen) && (
                 <>
                   <Button size="small" onClick={() => moveReplay(-10)} disabled={replayLoading || (replay.active ? replay.roundNum : strategyResults.length) <= 1}>-10</Button>
@@ -2849,8 +2850,7 @@ export default function GhUserGamePage() {
                   )}
                 </>
               )}
-            </Box>
-          )}
+          </Box>
 
           {isAdmin && <GhLossStopStatus roundState={roundState} autoStatus={autoStatus} />}
 

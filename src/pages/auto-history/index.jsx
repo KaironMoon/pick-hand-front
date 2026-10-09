@@ -5,9 +5,11 @@ import {
   TableRow, TextField, Typography,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
+import { useAtomValue } from "jotai";
+import { userAtom } from "@/store/auth-store";
 import autoService from "@/services/auto-service";
 
-const GAME_LABELS = { gh: "글로벌히트", nc2: "나이스초이스" };
+const GAME_LABELS = { gh: "글로벌히트", nc2: "트리플나인" };
 const STATUS_LABELS = { normal: "정상", error: "오류", stopped: "중지", running: "진행 중" };
 const STATUS_COLORS = { normal: "success", error: "error", stopped: "default", running: "info" };
 const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
@@ -17,6 +19,9 @@ const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
 const formatTime = (value) => value ? dateFormatter.format(new Date(value)) : "—";
 
 export default function AutoHistoryPage() {
+  const user = useAtomValue(userAtom);
+  const isAdmin = user?.role === "admin";
+  const [username, setUsername] = useState("");
   const [gameType, setGameType] = useState("");
   const [status, setStatus] = useState("");
   const [gameNumber, setGameNumber] = useState("");
@@ -39,7 +44,11 @@ export default function AutoHistoryPage() {
     setError("");
     autoService.getAutoHistory({ ...query, page: page + 1, page_size: pageSize })
       .then((result) => { if (active) setData(result); })
-      .catch(() => { if (active) setError("오토플레이 기록을 불러오지 못했습니다. 다시 시도해 주세요."); })
+      .catch((error) => {
+        if (active) setError(typeof error.response?.data?.detail === "string"
+          ? error.response.data.detail
+          : "오토플레이 기록을 불러오지 못했습니다. 다시 시도해 주세요.");
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [query, page, pageSize, revision]);
@@ -70,6 +79,7 @@ export default function AutoHistoryPage() {
     }
     setPage(0);
     setQuery({
+      ...(isAdmin && username.trim() ? { username: username.trim() } : {}),
       ...(gameType ? { game_type: gameType } : {}),
       ...(status ? { result_status: status } : {}),
       ...(value ? { game_id: Number(value) } : {}),
@@ -83,6 +93,8 @@ export default function AutoHistoryPage() {
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       <Typography variant="h5" sx={{ mb: 2 }}>오토플레이 기록</Typography>
       <Box component="form" onSubmit={search} sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2, alignItems: "flex-start" }}>
+        {isAdmin && <TextField label="로그인 아이디" size="small" value={username}
+          onChange={(e) => setUsername(e.target.value)} helperText="정확한 아이디로 검색 · 비워두면 본인 기록" />}
         <TextField select label="게임 종류" size="small" value={gameType} onChange={(e) => setGameType(e.target.value)} sx={{ minWidth: 150 }}>
           <MenuItem value="">전체</MenuItem>
           {Object.entries(GAME_LABELS).map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
