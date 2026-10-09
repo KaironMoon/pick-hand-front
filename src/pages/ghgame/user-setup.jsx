@@ -720,7 +720,7 @@ function KpkpSection({ name, label, martin, onChange }) {
       <MartinSection name={name} label={label} martin={martin} onChange={onChange} labelColor={isK ? "#c62828" : isP ? "#1565c0" : "#8e24aa"} />
       <tr>
         <td style={labelCellStyle}>발동조건</td>
-        <td colSpan={2} style={normalCell}>순수 글로벌히트 BET</td>
+        <td colSpan={2} style={normalCell}>{isP ? "GH+Z+C+K+KP 상계액" : "순수 글로벌히트 BET"}</td>
         {isP ? <EditableCell value={martin.trigger_bet_amount || 0}
           onChange={(value) => update({ trigger_bet_amount: Math.max(0, value) })}
           suffix="P" style={greenCell} decimal />
