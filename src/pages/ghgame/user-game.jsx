@@ -22,6 +22,8 @@ import { findGhSlotByNumber, findGhSlotReplacement } from "./slot-sync.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
 import { buildGoalStatusItems, formatGoalIndicator, formatGoalTarget } from "./goal-status.js";
 import { resolvePickMartinSummary } from "./pick-martin-summary.js";
+import { resolveBetBoardDirection } from "./bet-board-direction.js";
+import { createGameResponseGuard } from "../nc2game/game-response-guard.js";
 import {
   ghBetStopReasonLabel,
   ghDrawdownStatusLabel,
@@ -470,7 +472,7 @@ function GhRoundAmountTable({
     };
   });
   const fmt = (v) => v === "N/A" ? "-" : Number(v || 0).toFixed(1);
-  const finalSide = table.total_side;
+  const finalSide = resolveBetBoardDirection(roundState);
   const currentRoundIdx = Math.max(0, Number(roundState?.round_num || 0));
   const totalAmount = amountMode === "actual"
     ? Number(actualTable.server_current_bet_p
@@ -1027,6 +1029,7 @@ export default function GhUserGamePage() {
   const [trackStreakHidden, setTrackStreakHidden] = useState({}); // {sckey: true} — 트랙 연승/연패 셀 숨김 토글
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
+  const gameResponseGuardRef = useRef(createGameResponseGuard());
   const [config, setConfig] = useState(null);
   const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
   const [showNewConfirm, setShowNewConfirm] = useState(false);
@@ -1153,7 +1156,7 @@ export default function GhUserGamePage() {
     );
   }, [gameId, roundState?.round_num, roundState?.overall_stop, showOverallStopAlert]);
 
-  const { direction: displayPick } = resolvePickMartinSummary(roundState, autoStatus);
+  const displayPick = resolveBetBoardDirection(roundState);
   const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
   const applySavedRoundState = useCallback((data) => {
@@ -1176,7 +1179,12 @@ export default function GhUserGamePage() {
 
   const applyGameData = useCallback((data, { preserveGameId = false } = {}) => {
     setLegacyRestoreBlocked(false);
-    if (!preserveGameId) setGameId(data.game_id);
+    if (!preserveGameId) {
+      if (!gameResponseGuardRef.current.isActive(data.game_id)) {
+        gameResponseGuardRef.current.activate(data.game_id);
+      }
+      setGameId(data.game_id);
+    }
     setConfig(data.config);
     setCumPnL(data.cum_pnl || { gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
     applySavedRoundState(data);
@@ -1280,14 +1288,14 @@ export default function GhUserGamePage() {
               gameId: replacement.game_id,
               slot: replacement.slot_no,
             }, { replace: true });
-            await restoreGame(replacement.game_id);
+            await restoreGame(replacement.game_id, { activate: true });
             return;
           }
           setSelectedSlotNo(slot?.slot_no ?? null);
           if (skipRestoreGameIdRef.current === gid) {
             skipRestoreGameIdRef.current = null;
           } else {
-            await restoreGame(gid);
+            await restoreGame(gid, { activate: true });
           }
           return;
         }
@@ -1297,7 +1305,7 @@ export default function GhUserGamePage() {
           if (selected?.occupied) {
             skipRestoreGameIdRef.current = selected.game_id;
             setSearchParams({ gameId: selected.game_id, slot: selected.slot_no }, { replace: true });
-            await restoreGame(selected.game_id);
+            await restoreGame(selected.game_id, { activate: true });
           } else {
             clearCurrentGameView();
           }
@@ -1307,7 +1315,7 @@ export default function GhUserGamePage() {
         if (firstOccupied) {
           setSelectedSlotNo(firstOccupied.slot_no);
           setSearchParams({ gameId: firstOccupied.game_id, slot: firstOccupied.slot_no }, { replace: true });
-          await restoreGame(firstOccupied.game_id);
+          await restoreGame(firstOccupied.game_id, { activate: true });
         }
       } catch (err) {
         if (!cancelled) console.error("Failed to initialize game slots:", err);
@@ -1317,11 +1325,15 @@ export default function GhUserGamePage() {
     return () => { cancelled = true; };
   }, [searchParams.get("new"), searchParams.get("gameId"), searchParams.get("slot"), historyReplayGameId]);
 
-  const restoreGame = useCallback(async (gid) => {
+  const restoreGame = useCallback(async (gid, { activate = false } = {}) => {
+    if (activate) gameResponseGuardRef.current.activate(gid);
+    const ticket = gameResponseGuardRef.current.begin(gid);
     try {
       const res = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user");
+      if (!gameResponseGuardRef.current.canApply(ticket)) return;
       applyGameData(res.data);
     } catch (err) {
+      if (!gameResponseGuardRef.current.canApply(ticket)) return;
       if (err.response?.status === 409) {
         setGameId(gid);
         setLegacyRestoreBlocked(true);
@@ -1349,7 +1361,7 @@ export default function GhUserGamePage() {
       gameId: replacement.game_id,
       slot: replacement.slot_no,
     }, { replace: true });
-    await restoreGame(replacement.game_id);
+    await restoreGame(replacement.game_id, { activate: true });
     setRejectMsg("");
     return true;
   }, [restoreGame, setSearchParams]);
@@ -1546,7 +1558,7 @@ export default function GhUserGamePage() {
           } else if (t === "game_switched") {
             setGameId(data.new_game_id);
             setSearchParams({ gameId: data.new_game_id }, { replace: true });
-            restoreGame(data.new_game_id);
+            restoreGame(data.new_game_id, { activate: true });
           } else if (t === "auto_restarted") {
             // 새 슈에서 Auto 자동 재시작 — 새 session_id로 갱신, running 유지
             setAutoStatus((prev) => ({
@@ -1664,7 +1676,7 @@ export default function GhUserGamePage() {
     setProcessing(true);
 
     if (wasCurrentReplay) {
-      await restoreGame(gameId);
+      await restoreGame(gameId, { activate: true });
       setReplay({ active: false, external: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
     }
 
@@ -1673,8 +1685,10 @@ export default function GhUserGamePage() {
     setResults((prev) => [...prev, { value: inputValue, status: "wait", statusAr: "wait", aPick: effectivePick && effectivePick !== "wait" ? effectivePick : null, decalShadow: decalPick !== null || shadowPick !== null }]);
     setBetData(null);
 
+    const ticket = gameResponseGuardRef.current.begin(gameId);
     try {
       const res = await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
+      if (!gameResponseGuardRef.current.canApply(ticket)) return;
       const data = res.data;
       const nextStrategyRound = results.filter((result) => result.value === "P" || result.value === "B").length + 1;
       if (!wasCurrentReplay && inputValue !== "T" && data.round_num !== undefined && data.round_num !== nextStrategyRound) {
@@ -1712,6 +1726,7 @@ export default function GhUserGamePage() {
       );
 
     } catch (err) {
+      if (!gameResponseGuardRef.current.canApply(ticket)) return;
       console.error("Failed to record round:", err);
       setResults((prev) => prev.slice(0, -1));
       if (err.response?.status === 409) {
@@ -1734,8 +1749,10 @@ export default function GhUserGamePage() {
     if (results.length === 0 || !gameId || processingRef.current) return;
     processingRef.current = true;
     setProcessing(true);
+    const ticket = gameResponseGuardRef.current.begin(gameId);
     try {
       const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
+      if (!gameResponseGuardRef.current.canApply(ticket)) return;
       const data = res.data;
       if (data.tie_deleted) {
         setResults((prev) => prev.slice(0, -1));
@@ -1775,6 +1792,7 @@ export default function GhUserGamePage() {
   }, [gameId, results]);
 
   const clearCurrentGameView = () => {
+    gameResponseGuardRef.current.clear();
     setGameId(null);
     setResults([]);
     setCumPnL({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
@@ -1821,7 +1839,7 @@ export default function GhUserGamePage() {
         syncAutoStatusFromSlot(slot);
         skipRestoreGameIdRef.current = slot.game_id;
         setSearchParams({ gameId: slot.game_id, slot: slot.slot_no }, { replace: true });
-        await restoreGame(slot.game_id);
+        await restoreGame(slot.game_id, { activate: true });
       } else {
         clearCurrentGameView();
         await startGame({ slotNo });
@@ -1836,7 +1854,7 @@ export default function GhUserGamePage() {
         syncAutoStatusFromSlot(occupied);
         skipRestoreGameIdRef.current = occupied.game_id;
         setSearchParams({ gameId: occupied.game_id, slot: occupied.slot_no }, { replace: true });
-        await restoreGame(occupied.game_id);
+        await restoreGame(occupied.game_id, { activate: true });
         setRejectMsg("");
       } else {
         setRejectMsg("게임 슬롯을 전환하지 못했습니다.");
@@ -1872,6 +1890,7 @@ export default function GhUserGamePage() {
   };
 
   const applyReplayState = useCallback((data, external) => {
+    gameResponseGuardRef.current.clear();
     applyGameData(data, { preserveGameId: true });
     setReplay({
       active: true,
@@ -1971,7 +1990,7 @@ export default function GhUserGamePage() {
     }
     setReplayLoading(true);
     try {
-      await restoreGame(gameId);
+      await restoreGame(gameId, { activate: true });
       setReplay({ active: false, external: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
     } finally {
       setReplayLoading(false);
@@ -2149,7 +2168,7 @@ export default function GhUserGamePage() {
         syncAutoStatusFromSlot(nextSlot);
         skipRestoreGameIdRef.current = nextSlot.game_id;
         setSearchParams({ gameId: nextSlot.game_id, slot: nextSlot.slot_no }, { replace: true });
-        await restoreGame(nextSlot.game_id);
+        await restoreGame(nextSlot.game_id, { activate: true });
       }
     } catch (err) {
       const code = err.response?.data?.detail?.error;
@@ -2717,7 +2736,7 @@ export default function GhUserGamePage() {
                     component="img"
                     src={pickImage}
                     alt={displayPick === "P" ? "다음 픽 P" : displayPick === "B" ? "다음 픽 B" : "다음 픽 대기"}
-                    sx={{ width: 48, height: 48, objectFit: "contain", flexShrink: 0 }}
+                    sx={{ width: 48, height: 48, objectFit: "contain", flexShrink: 0, border: "2px solid #fff", borderRadius: "50%", boxSizing: "border-box" }}
                   />
                 </Box>
 
@@ -2863,7 +2882,7 @@ export default function GhUserGamePage() {
 
       {/* 새 게임 확인 대화상자 */}
       {/* 이전 게임 복원 확인 */}
-      <Dialog open={!!resumeGame} onClose={() => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) restoreGame(gid); }}>
+      <Dialog open={!!resumeGame} onClose={() => { const gid = resumeGame?.game_id; setResumeGame(null); if (gid) restoreGame(gid, { activate: true }); }}>
         <DialogTitle sx={{ fontWeight: "bold" }}>이전 게임 복원</DialogTitle>
         <DialogContent>
           <Typography>진행 중인 게임이 있습니다. (#{resumeGame?.game_id}, {resumeGame?.round_count}회차)</Typography>
@@ -2871,7 +2890,7 @@ export default function GhUserGamePage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={async () => { const gid = resumeGame.game_id; setResumeGame(null); try { await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gid } }); } catch {} startGame(); }}>새 게임</Button>
-          <Button onClick={() => { const gid = resumeGame.game_id; setResumeGame(null); restoreGame(gid); }} variant="contained">이어하기</Button>
+          <Button onClick={() => { const gid = resumeGame.game_id; setResumeGame(null); restoreGame(gid, { activate: true }); }} variant="contained">이어하기</Button>
         </DialogActions>
       </Dialog>
 
