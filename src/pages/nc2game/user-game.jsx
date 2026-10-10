@@ -1338,8 +1338,12 @@ export default function Nc2UserGamePage() {
         />
         <Button size="small" variant="outlined" color="warning" onClick={() => setNewOpen(true)} disabled={!sourceGameId || loading || autoStatus.running || replay.active}>이 조합으로 새 게임</Button>
         <Button size="small" variant="outlined" color="warning" onClick={() => { setShoeSourceId(""); setShoePreview(null); setShoeCopyError(""); setShoeCopyOpen(true); }} disabled={loading || autoStatus.running || replay.active || !game?.game_id}>기존 슈 불러오기</Button>
-        <Button size="small" variant="outlined" onClick={() => setReplayControlsOpen((open) => !open)} disabled={loading || replayLoading || !game?.game_id}>리플레이</Button>
         {autoStatus.running && <Typography variant="caption" sx={{ color: "text.secondary" }}>오토 실행 중에는 NC 조합을 변경할 수 없습니다.</Typography>}
+      </Box>
+      </>}
+
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: .7, px: 1, py: .7, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.06)" }}>
+        <Button size="small" variant="outlined" onClick={() => setReplayControlsOpen((open) => !open)} disabled={loading || replayLoading || !game?.game_id}>리플레이</Button>
         {(replay.active || replayControlsOpen) && <>
           <Button size="small" onClick={() => moveReplay(currentRound - 10)} disabled={replayLoading || currentRound <= 1}>-10</Button>
           <Button size="small" onClick={() => moveReplay(currentRound - 1)} disabled={replayLoading || currentRound <= 1}>이전</Button>
@@ -1351,6 +1355,7 @@ export default function Nc2UserGamePage() {
           {replay.active && <Button size="small" color="warning" onClick={exitReplay} disabled={replayLoading}>리플레이 종료</Button>}
         </>}
       </Box>
+      {isAdmin && <>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 1.5, px: 1, py: .7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
         <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>현재 게임 배팅조건</Typography>
         <Typography variant="caption" sx={{ px: 1, py: .35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: "#ffe082", fontWeight: 800 }}>
