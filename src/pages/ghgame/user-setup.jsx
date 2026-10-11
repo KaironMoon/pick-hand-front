@@ -721,7 +721,7 @@ function KpkpSection({ name, label, martin, onChange }) {
       <MartinSection name={name} label={label} martin={martin} onChange={onChange} labelColor={isK ? "#c62828" : isP ? "#1565c0" : "#8e24aa"} />
       <tr>
         <td style={labelCellStyle}>발동조건</td>
-        <td colSpan={2} style={normalCell}>{isP ? "GH+Z+C+K+KP 상계액" : "순수 글로벌히트 BET"}</td>
+        <td colSpan={2} style={normalCell}>{isP ? "GH+Z+C+K+KP 상계액" : isK ? "GH + 마틴Z 합계" : "순수 글로벌히트 BET"}</td>
         {isP ? <EditableCell value={martin.trigger_bet_amount || 0}
           onChange={(value) => update({ trigger_bet_amount: Math.max(0, value) })}
           suffix="P" style={greenCell} decimal />
@@ -740,6 +740,11 @@ function KpkpSection({ name, label, martin, onChange }) {
       </tr>
       {patternMode && <>
         <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#c62828" rowCount={100} recommendSingleStep={false} />
+        <tr><td colSpan={6} style={{ ...normalCell, textAlign: "left", padding: 8 }}>
+          진행 중 일치하는 패턴이 없는 회차에는 마틴K 배팅을 하지 않습니다. 미션은 종료하지 않고 현재 단계를 그대로 보류했다가, 다시 패턴이 일치하는 회차에 그 단계의 금액으로 배팅을 재개합니다.
+        </td></tr>
+      </>}
+      {name === "martin_kp" && <>
         <tr>
           <td style={labelCellStyle}>어시스트(연패처리)</td>
           <td colSpan={5} style={{ ...normalCell, textAlign: "left" }}>
@@ -747,7 +752,7 @@ function KpkpSection({ name, label, martin, onChange }) {
               {Array.from({ length: 8 }, (_, index) => index + 4).map((level) => (
                 <label key={level} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                   {level}패시
-                  <select aria-label={`마틴K ${level}패시 어시스트`}
+                  <select aria-label={`마틴KP ${level}패시 어시스트`}
                     value={martin.pattern_assists?.[level] ?? "해당진행"}
                     onChange={(event) => update({ pattern_assists: { ...martin.pattern_assists, [level]: event.target.value } })}
                     style={{ fontSize: 13, padding: "4px 6px" }}>
@@ -756,12 +761,9 @@ function KpkpSection({ name, label, martin, onChange }) {
                 </label>
               ))}
             </Box>
-            <Box sx={{ mt: 1, color: "#aaa", fontSize: 12 }}>배팅판 기준 연패를 사용합니다. 패턴이 없어 마틴K가 쉬는 동안에도 연승·연패 판단은 계속됩니다.</Box>
+            <Box sx={{ mt: 1, color: "#aaa", fontSize: 12 }}>연패는 GH + 마틴Z 상계액의 승패로 집계합니다. 해당진행·해당반대는 GH + 마틴Z 상계 방향을 기준으로 KP에 적용됩니다.</Box>
           </td>
         </tr>
-        <tr><td colSpan={6} style={{ ...normalCell, textAlign: "left", padding: 8 }}>
-          진행 중 일치하는 패턴이 없는 회차에는 마틴K 배팅을 하지 않습니다. 미션은 종료하지 않고 현재 단계를 그대로 보류했다가, 다시 패턴이 일치하는 회차에 그 단계의 금액으로 배팅을 재개합니다.
-        </td></tr>
       </>}
       {!patternMode && <>
         <KpkpChoiceRow label="어시스트" value={martin.assist_wait_losses || 0}
@@ -2181,13 +2183,13 @@ const DEFAULT_MARTIN_C = {
 };
 const DEFAULT_MARTIN_K = { ...DEFAULT_MARTIN, assist_wait_losses: 0, assist_wait_wins: 0,
   start_mode: "next_round", pattern_only: [],
-  pattern_assists: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [String(index + 4), "해당진행"])),
   additional_mission_limit: 0, additional_miss_limit: 0, distribution_limit: 0,
   bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
 const DEFAULT_MARTIN_P = { ...DEFAULT_MARTIN, trigger_bet_amount: 0,
   assist_wait_losses: 0, assist_wait_wins: 0, assist2_k_losses: 0, assist2_wait_rounds: 0,
   bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
 const DEFAULT_MARTIN_KP = { ...DEFAULT_MARTIN, assist_wait_losses: 0, assist_wait_wins: 0, bet_start_round: 1,
+  pattern_assists: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [String(index + 4), "해당진행"])),
   stop_bet_round: 0, finish_round: 0, assist2_k_losses: 0, assist2_wait_rounds: 0 };
 const DEFAULT_FAIL = {
   ...DEFAULT_MARTIN,
