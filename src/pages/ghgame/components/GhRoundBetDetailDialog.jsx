@@ -28,15 +28,15 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
               <Box>
                 <Typography variant="subtitle1" fontWeight={700}>KP 어시스트 적용 내역</Typography>
                 <Typography>
-                  배팅 전 {detail.kp_assist.loss_streak}패 · 적용 옵션: {detail.kp_assist.option}
+                  {detail.kp_assist.step > 0 ? `어시스트 ${detail.kp_assist.step}단계` : "어시스트 집계 대기 / 종료"} · 적용 옵션: {detail.kp_assist.option}
                 </Typography>
                 <Typography>
-                  GH+마틴Z 기준 방향: {detail.kp_assist.base_direction || "없음"}
-                  {" → "}KP 배팅: {detail.kp_assist.direction ? `${detail.kp_assist.direction} · ${formatP(detail.kp_assist.amount)}` : "배팅 없음"}
+                  GH+마틴Z+KP 상계 방향: {detail.kp_assist.base_direction || "없음"}
+                  {" → "}방향 적용 후 배팅: {detail.kp_assist.direction ? `${detail.kp_assist.direction} · ${formatP(detail.kp_assist.amount)}` : "배팅 없음"}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  연패 집계 기준 GH+마틴Z+KP 상계: {sideText(detail.kp_assist.source_direction)} · {formatP(detail.kp_assist.source_amount)}
-                  {" · "}결과: {detail.kp_assist.source_status === "hit" ? "승" : detail.kp_assist.source_status === "miss" ? "패" : detail.actual === "T" ? "타이 · 연패 유지" : detail.actual ? "집계 제외 · 연패 유지" : "미입력"}
+                  어시스트 단계 판정: {sideText(detail.kp_assist.source_direction)} · {formatP(detail.kp_assist.source_amount)}
+                  {" · "}결과: {detail.kp_assist.source_status === "hit" ? "승" : detail.kp_assist.source_status === "miss" ? "패" : detail.actual === "T" ? "타이 · 단계 유지" : detail.actual ? "집계 제외 · 단계 유지" : "미입력"}
                 </Typography>
               </Box>
             )}

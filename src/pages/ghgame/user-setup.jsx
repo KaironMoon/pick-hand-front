@@ -746,22 +746,22 @@ function KpkpSection({ name, label, martin, onChange }) {
       </>}
       {name === "martin_kp" && <>
         <tr>
-          <td style={labelCellStyle}>어시스트(연패처리)</td>
+          <td style={labelCellStyle}>어시스트(단계별 방향)</td>
           <td colSpan={5} style={{ ...normalCell, textAlign: "left" }}>
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-              {Array.from({ length: 8 }, (_, index) => index + 4).map((level) => (
+              {Array.from({ length: 8 }, (_, index) => index + 1).map((level) => (
                 <label key={level} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  {level}패시
-                  <select aria-label={`마틴KP ${level}패시 어시스트`}
-                    value={martin.pattern_assists?.[level] ?? "해당진행"}
-                    onChange={(event) => update({ pattern_assists: { ...martin.pattern_assists, [level]: event.target.value } })}
+                  {level}단계
+                  <select aria-label={`마틴KP 어시스트 ${level}단계`}
+                    value={martin.stage_assists?.[level] ?? "해당진행"}
+                    onChange={(event) => update({ stage_assists: { ...martin.stage_assists, [level]: event.target.value } })}
                     style={{ fontSize: 13, padding: "4px 6px" }}>
                     {["해당진행", "해당반대", "이전결과", "P", "B"].map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
                 </label>
               ))}
             </Box>
-            <Box sx={{ mt: 1, color: "#aaa", fontSize: 12 }}>연패는 GH + 마틴Z + KP 상계액의 승패로 집계합니다. 해당진행·해당반대는 GH + 마틴Z 상계 방향을 기준으로 KP에 적용됩니다.</Box>
+            <Box sx={{ mt: 1, color: "#aaa", fontSize: 12 }}>GH+마틴Z 0.0 구간 종료 후 첫 KP 배팅부터 어시스트 1단계로 시작합니다. GH+마틴Z+KP를 상계한 금액의 방향만 변경하며, 변경 후 패배하면 단계가 올라가고 승리하면 집계를 종료합니다.</Box>
           </td>
         </tr>
       </>}
@@ -2189,7 +2189,7 @@ const DEFAULT_MARTIN_P = { ...DEFAULT_MARTIN, trigger_bet_amount: 0,
   assist_wait_losses: 0, assist_wait_wins: 0, assist2_k_losses: 0, assist2_wait_rounds: 0,
   bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
 const DEFAULT_MARTIN_KP = { ...DEFAULT_MARTIN, assist_wait_losses: 0, assist_wait_wins: 0, bet_start_round: 1,
-  pattern_assists: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [String(index + 4), "해당진행"])),
+  stage_assists: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [String(index + 1), "해당진행"])),
   stop_bet_round: 0, finish_round: 0, assist2_k_losses: 0, assist2_wait_rounds: 0 };
 const DEFAULT_FAIL = {
   ...DEFAULT_MARTIN,
