@@ -24,6 +24,22 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
                 <Typography color="text.secondary" variant="body2">배팅 보류 상태가 적용된 회차입니다.</Typography>
               )}
             </Box>
+            {detail.kp_assist && (
+              <Box>
+                <Typography variant="subtitle1" fontWeight={700}>KP 어시스트 적용 내역</Typography>
+                <Typography>
+                  배팅 전 {detail.kp_assist.loss_streak}패 · 적용 옵션: {detail.kp_assist.option}
+                </Typography>
+                <Typography>
+                  GH+마틴Z 기준 방향: {detail.kp_assist.base_direction || "없음"}
+                  {" → "}KP 배팅: {detail.kp_assist.direction ? `${detail.kp_assist.direction} · ${formatP(detail.kp_assist.amount)}` : "배팅 없음"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  연패 집계 기준 GH+마틴Z+KP 상계: {sideText(detail.kp_assist.source_direction)} · {formatP(detail.kp_assist.source_amount)}
+                  {" · "}결과: {detail.kp_assist.source_status === "hit" ? "승" : detail.kp_assist.source_status === "miss" ? "패" : detail.actual === "T" ? "타이 · 연패 유지" : detail.actual ? "집계 제외 · 연패 유지" : "미입력"}
+                </Typography>
+              </Box>
+            )}
             {amountMode === "actual" && (
               <Box>
                 <Typography variant="subtitle1" fontWeight={700}>실제 배팅 기록</Typography>

@@ -761,7 +761,7 @@ function KpkpSection({ name, label, martin, onChange }) {
                 </label>
               ))}
             </Box>
-            <Box sx={{ mt: 1, color: "#aaa", fontSize: 12 }}>연패는 GH + 마틴Z 상계액의 승패로 집계합니다. 해당진행·해당반대는 GH + 마틴Z 상계 방향을 기준으로 KP에 적용됩니다.</Box>
+            <Box sx={{ mt: 1, color: "#aaa", fontSize: 12 }}>연패는 GH + 마틴Z + KP 상계액의 승패로 집계합니다. 해당진행·해당반대는 GH + 마틴Z 상계 방향을 기준으로 KP에 적용됩니다.</Box>
           </td>
         </tr>
       </>}
