@@ -447,7 +447,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false, highlightDuplicates = false }) {
+function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false, highlightDuplicates = false, recommendSingleStep = true }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -473,7 +473,7 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
   const toggleEnabled = (index, rule, direction) => {
     if (!rule.enabled) {
       const warnings = [];
-      if (Number(martin.step_max || 20) !== 1) {
+      if (recommendSingleStep && Number(martin.step_max || 20) !== 1) {
         warnings.push("패턴일 때만 배팅하기는 최고 1단계 사용을 권장합니다. 현재 최고 단계 설정으로 계속 진행합니다.");
       }
       if (!direction) {
@@ -714,6 +714,7 @@ function KpkpChoiceRow({ label, value, choices, onSelect, children }) {
 function KpkpSection({ name, label, martin, onChange }) {
   const isK = name === "martin_k";
   const isP = name.startsWith("martin_p") && name !== "martin_kp";
+  const patternMode = isK && martin.start_mode === "pattern";
   const update = (patch) => onChange({ ...martin, ...patch });
   return (
     <>
@@ -725,14 +726,51 @@ function KpkpSection({ name, label, martin, onChange }) {
           onChange={(value) => update({ trigger_bet_amount: Math.max(0, value) })}
           suffix="P" style={greenCell} decimal />
           : <td style={greenCell}>{isK ? "0.0P" : "항상"}</td>}
-        <td colSpan={2} style={normalCell}>{isK ? "다음 회차부터 진행" : isP ? "해당 포인트에서만 진행" : "방향이 있을 때 진행"}</td>
+        <td colSpan={2} style={normalCell}>{isK ? (
+          <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center", flexWrap: "wrap" }}>
+            {[["pattern", "해당회차 진행(패턴방향)"], ["next_round", "다음 회차부터 진행"]].map(([value, text]) => (
+              <button key={value} type="button" aria-pressed={(patternMode ? "pattern" : "next_round") === value}
+                onClick={() => update({ start_mode: value })}
+                style={{ background: (patternMode ? "pattern" : "next_round") === value ? "#388e3c" : "#252525", color: "#fff", border: "1px solid #555", borderRadius: 3, padding: "4px 8px", cursor: "pointer" }}>
+                {text}
+              </button>
+            ))}
+          </Box>
+        ) : isP ? "해당 포인트에서만 진행" : "방향이 있을 때 진행"}</td>
       </tr>
-      <KpkpChoiceRow label="어시스트" value={martin.assist_wait_losses || 0}
-        choices={[[0, "해당진행"], [1, "1패후진행"], [2, "2패후진행"], [3, "3패후진행"]]}
-        onSelect={(value) => update({ assist_wait_losses: value, ...(value ? { assist_wait_wins: 0 } : {}) })} />
-      <KpkpChoiceRow label="어시스트3" value={martin.assist_wait_wins || 0}
-        choices={[[0, "해당진행"], [1, "1승후진행"], [2, "2승후진행"], [3, "3승후진행"]]}
-        onSelect={(value) => update({ assist_wait_wins: value, ...(value ? { assist_wait_losses: 0 } : {}) })} />
+      {patternMode && <>
+        <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#c62828" rowCount={100} recommendSingleStep={false} />
+        <tr>
+          <td style={labelCellStyle}>어시스트(연패처리)</td>
+          <td colSpan={5} style={{ ...normalCell, textAlign: "left" }}>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+              {Array.from({ length: 8 }, (_, index) => index + 4).map((level) => (
+                <label key={level} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {level}패시
+                  <select aria-label={`마틴K ${level}패시 어시스트`}
+                    value={martin.pattern_assists?.[level] ?? "해당진행"}
+                    onChange={(event) => update({ pattern_assists: { ...martin.pattern_assists, [level]: event.target.value } })}
+                    style={{ fontSize: 13, padding: "4px 6px" }}>
+                    {["해당진행", "해당반대", "이전결과", "P", "B"].map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+              ))}
+            </Box>
+            <Box sx={{ mt: 1, color: "#aaa", fontSize: 12 }}>배팅판 기준 연패를 사용합니다. 패턴이 없어 마틴K가 쉬는 동안에도 연승·연패 판단은 계속됩니다.</Box>
+          </td>
+        </tr>
+        <tr><td colSpan={6} style={{ ...normalCell, textAlign: "left", padding: 8 }}>
+          진행 중 일치하는 패턴이 없는 회차에는 마틴K 배팅을 하지 않습니다. 미션은 종료하지 않고 현재 단계를 그대로 보류했다가, 다시 패턴이 일치하는 회차에 그 단계의 금액으로 배팅을 재개합니다.
+        </td></tr>
+      </>}
+      {!patternMode && <>
+        <KpkpChoiceRow label="어시스트" value={martin.assist_wait_losses || 0}
+          choices={[[0, "해당진행"], [1, "1패후진행"], [2, "2패후진행"], [3, "3패후진행"]]}
+          onSelect={(value) => update({ assist_wait_losses: value, ...(value ? { assist_wait_wins: 0 } : {}) })} />
+        <KpkpChoiceRow label="어시스트3" value={martin.assist_wait_wins || 0}
+          choices={[[0, "해당진행"], [1, "1승후진행"], [2, "2승후진행"], [3, "3승후진행"]]}
+          onSelect={(value) => update({ assist_wait_wins: value, ...(value ? { assist_wait_losses: 0 } : {}) })} />
+      </>}
       {(isP || name === "martin_kp") && (
         <KpkpChoiceRow label="어시스트2" value={martin.assist2_k_losses || 0}
           choices={[[0, "해당진행"], [2, "2패시K"], [3, "3패시K"], [4, "4패시K"]]}
@@ -2142,6 +2180,8 @@ const DEFAULT_MARTIN_C = {
   pattern_only: { ...EMPTY_MARTIN_PATTERN_RULE },
 };
 const DEFAULT_MARTIN_K = { ...DEFAULT_MARTIN, assist_wait_losses: 0, assist_wait_wins: 0,
+  start_mode: "next_round", pattern_only: [],
+  pattern_assists: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [String(index + 4), "해당진행"])),
   additional_mission_limit: 0, additional_miss_limit: 0, distribution_limit: 0,
   bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
 const DEFAULT_MARTIN_P = { ...DEFAULT_MARTIN, trigger_bet_amount: 0,
