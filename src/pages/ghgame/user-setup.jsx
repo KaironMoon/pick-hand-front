@@ -761,7 +761,7 @@ function KpkpSection({ name, label, martin, onChange }) {
                 </label>
               ))}
             </Box>
-            <Box sx={{ mt: 1, color: "#aaa", fontSize: 12 }}>GH+마틴Z 0.0 구간 종료 후 첫 KP 배팅부터 어시스트 1단계로 시작합니다. GH+마틴Z+KP를 상계한 금액의 방향만 변경하며, 변경 후 패배하면 단계가 올라가고 승리하면 집계를 종료합니다.</Box>
+            <Box sx={{ mt: 1, color: "#aaa", fontSize: 12 }}>1~4회차의 0.0은 제외하고, 5회차 이후 GH+마틴Z 0.0 구간 종료 후 첫 KP 배팅부터 어시스트 1단계로 시작합니다. GH+마틴Z+KP를 상계한 금액의 방향만 변경하며, 변경 후 패배하면 단계가 올라가고 승리하면 집계를 종료합니다.</Box>
           </td>
         </tr>
       </>}
