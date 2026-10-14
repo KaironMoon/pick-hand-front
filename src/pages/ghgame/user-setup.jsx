@@ -447,7 +447,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false, highlightDuplicates = false, recommendSingleStep = true }) {
+function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false, showExactLossCondition = false, highlightDuplicates = false, recommendSingleStep = true }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -503,6 +503,28 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
           >
             입력된 패턴 전체초기화하기
           </button>
+          {showExactLossCondition && (
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 12 }}>
+              <input
+                type="checkbox"
+                checked={Boolean(martin.exact_loss_enabled)}
+                onChange={(event) => onChange({ ...martin, exact_loss_enabled: event.target.checked })}
+              />
+              <input
+                type="number"
+                aria-label="작동 조건 연패 횟수"
+                min={1}
+                step={1}
+                value={martin.exact_loss_count ?? 3}
+                onChange={(event) => onChange({
+                  ...martin,
+                  exact_loss_count: Math.max(1, Math.trunc(Number(event.target.value) || 1)),
+                })}
+                style={{ width: 48 }}
+              />
+              패 시에만 작동
+            </label>
+          )}
         </Box>
         {rules.map((rule, rowIndex) => {
           const cells = patternCells(rule, PATTERN_ONLY_CELL_COUNT);
@@ -684,6 +706,7 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
             onChange={onChange}
             color={color}
             highlightDuplicates
+            showExactLossCondition
           />
         </>
       )}
@@ -2174,6 +2197,8 @@ const DEFAULT_MARTIN_B = {
 };
 const DEFAULT_MARTIN_C = {
   ...DEFAULT_MARTIN,
+  exact_loss_enabled: false,
+  exact_loss_count: 3,
   trigger_mode: "M",
   trigger_miss_streak: 0,
   trigger_hit_streak: 0,
