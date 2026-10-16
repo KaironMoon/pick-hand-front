@@ -3202,9 +3202,17 @@ export default function GhUserSetupPage() {
                 (사용안함)
               </Typography>
             )}
-            <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              설정 회차까지 배팅하고 다음 회차부터 모든 배팅 중지
-            </Typography>
+            <Box sx={{ minWidth: 240 }}>
+              <Typography variant="caption" display="block" sx={{ fontSize: 11, color: "#aaa" }}>
+                설정 회차까지 배팅하고 다음 회차부터 GH·K·P·KP를 중지합니다. (예: 60 설정 → 61회차부터)
+              </Typography>
+              <Typography variant="caption" display="block" sx={{ fontSize: 11, color: "#aaa" }}>
+                마감 시 이미 진행 중인 Z·B·C1~C5만 각각 첫 적중까지 회수한 뒤 중지하며, 신규 마틴은 시작하지 않습니다.
+              </Typography>
+              <Typography variant="caption" display="block" sx={{ fontSize: 11, color: "#aaa" }}>
+                회수할 마틴이 없으면 즉시 배팅을 중지하고 관찰 상태로 전환합니다. 0은 사용안함입니다.
+              </Typography>
+            </Box>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
