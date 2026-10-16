@@ -74,6 +74,8 @@ const GH_GAMES_API = {
 };
 
 const USER_BET_SETTINGS_API = {
+  MANUAL_SIGNALS: "/api/v1/gh/manual-pick-signals",
+  ADMIN_MANUAL_SIGNALS: (userId) => `/api/v1/gh/manual-pick-signals/users/${userId}`,
   GET: (gameType) => `/api/v1/user-settings/${gameType}`,
   SAVE: (gameType) => `/api/v1/user-settings/${gameType}`,
   ADMIN_GET_GH: (userId) => `/api/v1/user-settings/admin/${userId}/gh`,

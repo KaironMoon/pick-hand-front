@@ -5,6 +5,19 @@ const validGhSlotNo = (value) => {
 
 export const ghSelectedSlotNo = (value) => validGhSlotNo(value) || 1;
 
+// A game ID is usable only when it is mapped to one of the current user slots.
+export const ghEntrySlot = (slots, { gameId, slotNo } = {}) => {
+  const items = Array.isArray(slots) ? slots : [];
+  const id = Number(gameId);
+  const mapped = Number.isSafeInteger(id) && id > 0
+    ? items.find((slot) => slot.occupied && Number(slot.game_id) === id)
+    : null;
+  if (mapped) return mapped;
+  const selected = ghSelectedSlotNo(slotNo);
+  return items.find((slot) => Number(slot.slot_no) === selected)
+    || { slot_no: selected, occupied: false };
+};
+
 export const ghSetupsArray = (raw) => Array.from({ length: 6 }, (_, index) => {
   const saved = Array.isArray(raw?.gh_setups) ? raw.gh_setups[index] : null;
   return saved || raw || null;

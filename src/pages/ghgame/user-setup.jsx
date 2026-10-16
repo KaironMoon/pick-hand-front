@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
 import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
@@ -6,6 +6,7 @@ import apiCaller from "@/services/api-caller";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 import { ghSelectedSlotNo, updateGhGameSearchParams } from "./slot-navigation.js";
 import { userAtom } from "@/store/auth-store";
+import ManualPickSignalOptions from "./components/ManualPickSignalOptions";
 import { updatePbjStrategy } from "./pbj-goal.js";
 import { extendMartinAmounts, GH_FIXED_PASI_LEVELS, GH_STRATEGY_MAX_STEP } from "./strategy-step-capacity.js";
 import {
@@ -2225,6 +2226,7 @@ const DEFAULT_FAIL = {
 export default function GhUserSetupPage() {
   const gameType = "gh";
   const currentUser = useAtomValue(userAtom);
+  const isAdmin = currentUser?.role === "admin";
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedSlotNo = ghSelectedSlotNo(searchParams.get("slot"));
@@ -2238,6 +2240,9 @@ export default function GhUserSetupPage() {
   const [config, setConfig] = useState(null);
   const [jmhPickSets, setJmhPickSets] = useState([]);
   const [dirty, setDirty] = useState(false);
+  const [signalDirty, setSignalDirty] = useState(false);
+  const [signalReady, setSignalReady] = useState(false);
+  const signalRef = useRef(null);
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
   const [copyInputOpen, setCopyInputOpen] = useState(false);
@@ -2257,16 +2262,17 @@ export default function GhUserSetupPage() {
   const [bettingExcelText, setBettingExcelText] = useState("");
   const [bettingExcelResult, setBettingExcelResult] = useState(null);
 
-  const blocker = useBlocker(dirty);
+  const blocker = useBlocker(dirty || signalDirty);
 
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty && !signalDirty) return;
     const handler = (e) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty]);
+  }, [dirty, signalDirty]);
 
   useEffect(() => {
+    if (!isAdmin) return;
     let active = true;
     const url = editingTargetUser
       ? USER_BET_SETTINGS_API.ADMIN_GH_SLOT(targetUserId, selectedSlotNo)
@@ -2281,13 +2287,14 @@ export default function GhUserSetupPage() {
       setSnack({ open: true, message: err?.response?.data?.detail || "설정을 불러오지 못했습니다.", severity: "error" });
     });
     return () => { active = false; };
-  }, [editingTargetUser, selectedSlotNo, targetUserId]);
+  }, [editingTargetUser, isAdmin, selectedSlotNo, targetUserId]);
 
   useEffect(() => {
+    if (!isAdmin) return;
     apiCaller.get(USER_BET_SETTINGS_API.GH_PICK_SETS).then((res) => {
       setJmhPickSets(Array.isArray(res.data) ? res.data : []);
     });
-  }, []);
+  }, [isAdmin]);
 
   const updateJmhPickSet = (key, rawValue) => {
     const setId = rawValue ? Number(rawValue) : null;
@@ -2302,15 +2309,28 @@ export default function GhUserSetupPage() {
   };
 
   const handleSave = async () => {
-    if (!dirty) return;
+    if ((!dirty && !signalDirty) || saving || (signalDirty && !signalReady)) return;
     setSaving(true);
     try {
-      const url = editingTargetUser
-        ? USER_BET_SETTINGS_API.ADMIN_GH_SLOT(targetUserId, selectedSlotNo)
-        : USER_BET_SETTINGS_API.GH_SLOT(selectedSlotNo);
-      const res = await apiCaller.put(url, { config: normalizeUnknownAssistOptions(config) });
-      setConfig(res.data.config);
+      const signalRules = signalDirty ? signalRef.current.rules : undefined;
+      if (isAdmin) {
+        const url = editingTargetUser
+          ? USER_BET_SETTINGS_API.ADMIN_GH_SLOT(targetUserId, selectedSlotNo)
+          : USER_BET_SETTINGS_API.GH_SLOT(selectedSlotNo);
+        const res = await apiCaller.put(url, {
+          config: normalizeUnknownAssistOptions(config),
+          ...(signalDirty ? { manual_pick_signals: signalRules } : {}),
+        });
+        if (signalDirty && !res.data.manual_pick_signals) {
+          throw new Error("서버에서 수동픽 신호 저장을 확인하지 못했습니다. 최신 백엔드를 적용한 뒤 다시 저장해주세요.");
+        }
+        setConfig(res.data.config);
+      } else {
+        await apiCaller.put(USER_BET_SETTINGS_API.MANUAL_SIGNALS, { rules: signalRules });
+      }
       setDirty(false);
+      signalRef.current?.markSaved();
+      setSignalDirty(false);
       setSnack({
         open: true,
         message: editingTargetUser
@@ -2319,7 +2339,7 @@ export default function GhUserSetupPage() {
         severity: "success",
       });
     } catch (err) {
-      setSnack({ open: true, message: err?.response?.data?.detail || "저장 실패", severity: "error" });
+      setSnack({ open: true, message: err?.response?.data?.detail || err.message || "저장 실패", severity: "error" });
     } finally { setSaving(false); }
   };
 
@@ -2490,7 +2510,7 @@ export default function GhUserSetupPage() {
   };
 
   const selectSlot = (slotNo) => {
-    if (dirty) {
+    if (dirty || signalDirty) {
       setSnack({ open: true, message: "현재 슬롯 설정을 저장한 뒤 다른 슬롯을 선택해주세요.", severity: "warning" });
       return;
     }
@@ -2515,6 +2535,36 @@ export default function GhUserSetupPage() {
     });
     setDirty(true);
   };
+
+  const leaveDialog = (
+    <Dialog open={blocker.state === "blocked"}
+      PaperProps={{ sx: { backgroundColor: "#1a1a1a", border: "1px solid #333" } }}>
+      <DialogTitle sx={{ color: "#fff" }}>저장하지 않은 변경사항</DialogTitle>
+      <DialogContent>
+        <Typography sx={{ color: "#ccc" }}>저장하지 않은 변경사항이 있습니다. 페이지를 나가시겠습니까?</Typography>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={() => blocker.reset()} sx={{ color: "#888" }}>취소</Button>
+        <Button onClick={() => blocker.proceed()} variant="contained"
+          sx={{ backgroundColor: "#d32f2f", "&:hover": { backgroundColor: "#b71c1c" } }}>나가기</Button>
+      </DialogActions>
+    </Dialog>
+  );
+
+  if (!isAdmin) return <Box sx={{ p: 2 }}>
+    <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+      <Button onClick={handleBack}>뒤로가기</Button>
+      <Button variant="contained" onClick={handleSave} disabled={!signalDirty || !signalReady || saving}>
+        {saving ? "저장 중..." : "설정 저장"}
+      </Button>
+    </Box>
+    <ManualPickSignalOptions ref={signalRef} onDirtyChange={setSignalDirty} onReadyChange={setSignalReady} saving={saving} />
+    {leaveDialog}
+    <Snackbar open={snack.open} autoHideDuration={snack.severity === "error" ? null : 3000}
+      onClose={() => setSnack((prev) => ({ ...prev, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+      <Alert severity={snack.severity} onClose={() => setSnack((prev) => ({ ...prev, open: false }))}>{snack.message}</Alert>
+    </Snackbar>
+  </Box>;
 
   if (!config) return <Box sx={{ p: 2, color: "#888" }}>불러오는 중...</Box>;
 
@@ -2638,35 +2688,6 @@ export default function GhUserSetupPage() {
 
   return (
     <Box sx={{ p: 2 }}>
-      {/* 슬롯 선택 */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, p: 1, border: "1px solid rgba(0,168,90,.55)", borderRadius: 1, backgroundColor: "rgba(0,168,90,.06)", flexWrap: "wrap" }}>
-        <Typography variant="caption" sx={{ fontSize: 12, color: "#00e676", minWidth: 90, fontWeight: "bold" }}>슬롯별 설정</Typography>
-        <Box sx={{ display: "flex", gap: .7, flexWrap: "wrap" }}>
-          {Array.from({ length: 6 }, (_, index) => index + 1).map((slotNo) => {
-            const selected = selectedSlotNo === slotNo;
-            return <Box
-              key={slotNo}
-              role="button"
-              tabIndex={saving ? undefined : 0}
-              onClick={saving ? undefined : () => selectSlot(slotNo)}
-              onKeyDown={saving ? undefined : (event) => {
-                if (event.key === "Enter" || event.key === " ") selectSlot(slotNo);
-              }}
-              sx={{
-                minWidth: 44, px: 1, py: .45, borderRadius: 1,
-                border: `1px solid ${selected ? "#00a85a" : "#555"}`,
-                backgroundColor: selected ? "#17482f" : "#171a1f",
-                color: selected ? "#00e676" : "#aaa",
-                textAlign: "center", fontSize: 12, fontWeight: "bold",
-                cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .5 : 1, userSelect: "none",
-              }}
-            >S{slotNo}</Box>;
-          })}
-        </Box>
-        <Button size="small" variant="outlined" disabled={saving || copying || slotCopying}
-          onClick={() => { setSlotCopySource(""); setSlotCopyOpen(true); }}>슬롯복사</Button>
-        <Typography variant="caption" sx={{ fontSize: 10, color: "#999" }}>아래 모든 설정은 선택한 슬롯에만 적용됩니다</Typography>
-      </Box>
       {/* 상단 바 */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
         <Box onClick={handleBack}
@@ -2674,7 +2695,7 @@ export default function GhUserSetupPage() {
           <Typography variant="caption" sx={{ fontSize: 12 }}>&larr; 뒤로가기</Typography>
         </Box>
         <Box onClick={handleSave}
-          sx={{ display: "inline-flex", alignItems: "center", border: `1px solid ${dirty ? GREEN : "rgba(255,255,255,0.2)"}`, borderRadius: 1, px: 1.5, py: 0.5, cursor: dirty ? "pointer" : "default", backgroundColor: dirty ? GREEN : "transparent", color: dirty ? "#fff" : "#666", opacity: saving ? 0.5 : 1, "&:hover": dirty ? { backgroundColor: "#388e3c" } : {} }}>
+          sx={{ display: "inline-flex", alignItems: "center", border: `1px solid ${dirty || signalDirty ? GREEN : "rgba(255,255,255,0.2)"}`, borderRadius: 1, px: 1.5, py: 0.5, cursor: dirty || signalDirty ? "pointer" : "default", backgroundColor: dirty || signalDirty ? GREEN : "transparent", color: dirty || signalDirty ? "#fff" : "#666", opacity: saving ? 0.5 : 1, "&:hover": dirty || signalDirty ? { backgroundColor: "#388e3c" } : {} }}>
           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold" }}>{saving ? "저장 중..." : "저장"}</Typography>
         </Box>
         {editingTargetUser && (
@@ -2704,6 +2725,40 @@ export default function GhUserSetupPage() {
           sx={{ display: "inline-flex", alignItems: "center", border: "1px solid #7b1fa2", borderRadius: 1, px: 1.5, py: 0.5, cursor: "pointer", backgroundColor: "rgba(123,31,162,0.16)", "&:hover": { backgroundColor: "rgba(123,31,162,0.3)" } }}>
           <Typography variant="caption" sx={{ fontSize: 12 }}>배팅 설정 엑셀 입력</Typography>
         </Box>
+      </Box>
+
+      <Box sx={{ mb: 2 }}>
+        <ManualPickSignalOptions ref={signalRef} targetUserId={editingTargetUser ? targetUserId : undefined}
+          onDirtyChange={setSignalDirty} onReadyChange={setSignalReady} saving={saving} />
+      </Box>
+      {/* 슬롯 선택 */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, p: 1, border: "1px solid rgba(0,168,90,.55)", borderRadius: 1, backgroundColor: "rgba(0,168,90,.06)", flexWrap: "wrap" }}>
+        <Typography variant="caption" sx={{ fontSize: 12, color: "#00e676", minWidth: 90, fontWeight: "bold" }}>슬롯별 설정</Typography>
+        <Box sx={{ display: "flex", gap: .7, flexWrap: "wrap" }}>
+          {Array.from({ length: 6 }, (_, index) => index + 1).map((slotNo) => {
+            const selected = selectedSlotNo === slotNo;
+            return <Box
+              key={slotNo}
+              role="button"
+              tabIndex={saving ? undefined : 0}
+              onClick={saving ? undefined : () => selectSlot(slotNo)}
+              onKeyDown={saving ? undefined : (event) => {
+                if (event.key === "Enter" || event.key === " ") selectSlot(slotNo);
+              }}
+              sx={{
+                minWidth: 44, px: 1, py: .45, borderRadius: 1,
+                border: `1px solid ${selected ? "#00a85a" : "#555"}`,
+                backgroundColor: selected ? "#17482f" : "#171a1f",
+                color: selected ? "#00e676" : "#aaa",
+                textAlign: "center", fontSize: 12, fontWeight: "bold",
+                cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .5 : 1, userSelect: "none",
+              }}
+            >S{slotNo}</Box>;
+          })}
+        </Box>
+        <Button size="small" variant="outlined" disabled={saving || copying || slotCopying}
+          onClick={() => { setSlotCopySource(""); setSlotCopyOpen(true); }}>슬롯복사</Button>
+        <Typography variant="caption" sx={{ fontSize: 10, color: "#999" }}>아래 모든 설정은 선택한 슬롯에만 적용됩니다</Typography>
       </Box>
 
       {gameType === "gh" && (
@@ -3736,19 +3791,7 @@ export default function GhUserSetupPage() {
         </DialogActions>
       </Dialog>
 
-      {/* 이탈 경고 */}
-      <Dialog open={blocker.state === "blocked"}
-        PaperProps={{ sx: { backgroundColor: "#1a1a1a", border: "1px solid #333" } }}>
-        <DialogTitle sx={{ color: "#fff" }}>저장하지 않은 변경사항</DialogTitle>
-        <DialogContent>
-          <Typography sx={{ color: "#ccc" }}>저장하지 않은 변경사항이 있습니다. 페이지를 나가시겠습니까?</Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => blocker.reset()} sx={{ color: "#888" }}>취소</Button>
-          <Button onClick={() => blocker.proceed()} variant="contained"
-            sx={{ backgroundColor: "#d32f2f", "&:hover": { backgroundColor: "#b71c1c" } }}>나가기</Button>
-        </DialogActions>
-      </Dialog>
+      {leaveDialog}
 
       <Snackbar open={snack.open} autoHideDuration={snack.severity === "error" ? null : 3000}
         onClose={() => {

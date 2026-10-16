@@ -9,6 +9,8 @@ import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
 import GhBigRoad2 from "./components/GhBigRoad2";
 import GhRoundBetDetailDialog from "./components/GhRoundBetDetailDialog";
+import { ghEntrySlot, updateGhGameSearchParams } from "./slot-navigation.js";
+import { manualPickSignalStyle } from "./manual-pick-signals.js";
 import {
   autoStatusLookupError,
   createEmptyAutoStatus,
@@ -424,7 +426,7 @@ function GhRoundAmountTable({
       accent: "#ff9800",
       onClick: onSetup,
       disabled: setupDisabled,
-      title: setupDisabled ? "관리자 전용 설정" : "배팅 설정",
+      title: setupDisabled ? "설정을 사용할 수 없습니다." : "배팅 설정",
     },
     { label: "NW", accent: "#2f9bff", onClick: onNew, disabled: newDisabled },
     {
@@ -514,6 +516,7 @@ function GhRoundAmountTable({
       width: 84,
       height: 31,
       border: "1px solid #3f4650",
+      ...manualPickSignalStyle(roundState?.manual_pick_signals?.[idx + 1]),
       // 실제 배팅 여부와 픽 판정은 별개다. 실 모드에서 금액이 0이어도
       // 배팅금액판 픽의 hit/miss 결과 색상은 그대로 보여준다.
       backgroundColor: hasResult && hasJudgement
@@ -1039,7 +1042,8 @@ export default function GhUserGamePage() {
   const [labSeqOpen, setLabSeqOpen] = useState(false);
   const [labHmPressed, setLabHmPressed] = useState(null); // "H" | "M" | null
   const [gameSlots, setGameSlots] = useState([]);
-  const [selectedSlotNo, setSelectedSlotNo] = useState(null);
+  const [selectedSlotNo, setSelectedSlotNo] = useState(1);
+  const [manualSignalEnabled, setManualSignalEnabled] = useState(false);
   const [slotBusy, setSlotBusy] = useState(false);
   const slotBusyRef = useRef(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -1195,6 +1199,15 @@ export default function GhUserGamePage() {
     setUserMartinDashboard(data.user_martin_dashboard || null);
   }, [applySavedRoundState]);
 
+  useEffect(() => {
+    if (isAdmin) return;
+    let active = true;
+    apiCaller.get(USER_BET_SETTINGS_API.MANUAL_SIGNALS).then(({ data }) => {
+      if (active) setManualSignalEnabled(data.enabled === true);
+    }).catch(() => { if (active) setManualSignalEnabled(false); });
+    return () => { active = false; };
+  }, [isAdmin, user?.username]);
+
   const refreshGameSlots = useCallback(async () => {
     const res = await apiCaller.get(
       GH_GAMES_API.SLOTS,
@@ -1241,7 +1254,7 @@ export default function GhUserGamePage() {
     let cancelled = false;
     const isNew = searchParams.get("new");
     const urlGameId = searchParams.get("gameId");
-    const urlSlotNo = Number(searchParams.get("slot"));
+    const urlSlotNo = searchParams.get("slot");
     const initialize = async () => {
       try {
         const slots = await refreshGameSlots();
@@ -1272,50 +1285,27 @@ export default function GhUserGamePage() {
           if (empty) await startGame({ slotNo: empty.slot_no });
           return;
         }
-        if (urlGameId) {
-          const gid = parseInt(urlGameId);
-          const slot = slots.find((item) => item.game_id === gid);
-          const replacement = !slot && (
-            slots.find((item) => item.occupied && Number(item.previous_game_id) === gid)
-            || (Number.isInteger(urlSlotNo) && urlSlotNo >= 1 && urlSlotNo <= 6
-              ? slots.find((item) => item.occupied && item.slot_no === urlSlotNo)
-              : null)
-          );
-          if (replacement) {
-            setSelectedSlotNo(replacement.slot_no);
-            skipRestoreGameIdRef.current = replacement.game_id;
-            setSearchParams({
-              gameId: replacement.game_id,
-              slot: replacement.slot_no,
-            }, { replace: true });
-            await restoreGame(replacement.game_id, { activate: true });
-            return;
-          }
-          setSelectedSlotNo(slot?.slot_no ?? null);
+        const selected = ghEntrySlot(slots, { gameId: urlGameId, slotNo: urlSlotNo });
+        setSelectedSlotNo(Number(selected.slot_no));
+        const nextParams = updateGhGameSearchParams(searchParams, {
+          slotNo: selected.slot_no,
+          gameId: selected.occupied ? selected.game_id : null,
+        });
+        if (!selected.occupied) {
+          skipRestoreGameIdRef.current = null;
+          clearCurrentGameView();
+        }
+        if (nextParams.toString() !== searchParams.toString()) {
+          setSearchParams(nextParams, { replace: true });
+          return;
+        }
+        if (selected.occupied) {
+          const gid = Number(selected.game_id);
           if (skipRestoreGameIdRef.current === gid) {
             skipRestoreGameIdRef.current = null;
           } else {
             await restoreGame(gid, { activate: true });
           }
-          return;
-        }
-        if (Number.isInteger(urlSlotNo) && urlSlotNo >= 1 && urlSlotNo <= 6) {
-          setSelectedSlotNo(urlSlotNo);
-          const selected = findGhSlotByNumber(slots, urlSlotNo);
-          if (selected?.occupied) {
-            skipRestoreGameIdRef.current = selected.game_id;
-            setSearchParams({ gameId: selected.game_id, slot: selected.slot_no }, { replace: true });
-            await restoreGame(selected.game_id, { activate: true });
-          } else {
-            clearCurrentGameView();
-          }
-          return;
-        }
-        const firstOccupied = slots.find((slot) => slot.occupied);
-        if (firstOccupied) {
-          setSelectedSlotNo(firstOccupied.slot_no);
-          setSearchParams({ gameId: firstOccupied.game_id, slot: firstOccupied.slot_no }, { replace: true });
-          await restoreGame(firstOccupied.game_id, { activate: true });
         }
       } catch (err) {
         if (!cancelled) console.error("Failed to initialize game slots:", err);
@@ -2766,7 +2756,7 @@ export default function GhUserGamePage() {
               const q = qs.toString();
               navigate(`/ghgame/user-setup${q ? `?${q}` : ""}`);
             }}
-            setupDisabled={!isAdmin || replay.active}
+            setupDisabled={(!isAdmin && !manualSignalEnabled) || replay.active}
             onNew={() => setShowNewConfirm(true)}
             newDisabled={processing || slotBusy || autoStatus.running || !gameId || !selectedSlotNo || (replay.active && !replay.external)}
             labouchere={labouchere}

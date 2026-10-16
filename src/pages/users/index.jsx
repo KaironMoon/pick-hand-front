@@ -69,7 +69,6 @@ function UsersPage() {
   const [copyError, setCopyError] = useState("");
   const [copying, setCopying] = useState(false);
   const [emergencyStoppingId, setEmergencyStoppingId] = useState(null);
-  const [rouletteStoppingId, setRouletteStoppingId] = useState(null);
   const [impersonatingId, setImpersonatingId] = useState(null);
   const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
 
@@ -130,7 +129,7 @@ function UsersPage() {
 
   const handleEditOpen = (user) => {
     setEditUser(user);
-    setEditForm({ nickname: user.nickname || "", password: "", is_active: user.is_active, role: user.role || "user" });
+    setEditForm({ nickname: user.nickname || "", password: "", is_active: user.is_active, role: user.role || "user", manual_pick_signal_enabled: !!user.manual_pick_signal_enabled });
     setEditError("");
     setEditOpen(true);
   };
@@ -138,6 +137,9 @@ function UsersPage() {
   const handleEditSubmit = async () => {
     setEditError("");
     const payload = { nickname: editForm.nickname, is_active: editForm.is_active, role: editForm.role };
+    if (editForm.role !== "admin") {
+      payload.manual_pick_signal_enabled = !!editForm.manual_pick_signal_enabled;
+    }
     if (editForm.password.trim()) {
       payload.password = editForm.password;
     }
@@ -230,45 +232,6 @@ function UsersPage() {
     }
   };
 
-  const handleRouletteKeeperStop = async (target) => {
-    const warning = target.has_running_auto
-      ? "Auto 실행 중 룰렛 유지 베팅을 정지하면 오작동 가능성이 있습니다. Auto를 먼저 중지한 뒤 진행하세요.\n\n그래도 룰렛 유지 베팅을 정지할까요?"
-      : `${target.nickname || target.username} 계정의 룰렛 유지 베팅만 정지할까요?`;
-    if (!window.confirm(warning)) return;
-    setRouletteStoppingId(target.id);
-    try {
-      const response = await apiCaller.post(USERS_API.ROULETTE_KEEPER_STOP(target.id));
-      setUsers((current) => current.map((user) => (
-        user.id === target.id
-          ? { ...user, roulette_keeper_enabled: false, roulette_keeper_state: "stopped" }
-          : user
-      )));
-      setSnack({
-        open: true,
-        message: response.data.runtime_delivered
-          ? `${target.username}: 룰렛 유지 베팅을 정지했습니다.`
-          : `${target.username}: 정지 상태를 저장했습니다. 실행 서버 전달 상태를 확인하세요.`,
-        severity: response.data.runtime_delivered ? "success" : "warning",
-      });
-    } catch (err) {
-      setSnack({
-        open: true,
-        message: err.response?.data?.detail || `${target.username} 계정의 룰렛 유지 베팅 정지에 실패했습니다.`,
-        severity: "error",
-      });
-    } finally {
-      setRouletteStoppingId(null);
-    }
-  };
-
-  const rouletteStateLabel = (state) => ({
-    running: "Auto 실행 중",
-    active: "유지 베팅 중",
-    expired: "1시간 종료",
-    stopped: "베팅 정지",
-    none: "대기",
-  }[state] || state || "대기");
-
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const d = new Date(dateStr);
@@ -333,7 +296,6 @@ function UsersPage() {
               <TableCell sx={headerCellSx}>권한</TableCell>
               <TableCell sx={headerCellSx}>상태</TableCell>
               <TableCell sx={headerCellSx}>JSESSION</TableCell>
-              <TableCell sx={headerCellSx}>룰렛 유지</TableCell>
               <TableCell sx={headerCellSx}>생성일</TableCell>
               <TableCell sx={headerCellSx} align="center">관리</TableCell>
             </TableRow>
@@ -341,13 +303,13 @@ function UsersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} sx={{ ...cellSx, textAlign: "center", py: 4 }}>
+                <TableCell colSpan={7} sx={{ ...cellSx, textAlign: "center", py: 4 }}>
                   불러오는 중...
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} sx={{ ...cellSx, textAlign: "center", py: 4 }}>
+                <TableCell colSpan={7} sx={{ ...cellSx, textAlign: "center", py: 4 }}>
                   등록된 사용자가 없습니다.
                 </TableCell>
               </TableRow>
@@ -388,28 +350,6 @@ function UsersPage() {
                         variant="outlined"
                       />
                     </Tooltip>
-                  </TableCell>
-                  <TableCell sx={cellSx}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <Chip
-                        label={rouletteStateLabel(user.roulette_keeper_state)}
-                        size="small"
-                        color={["running", "active"].includes(user.roulette_keeper_state) ? "success" : "default"}
-                        variant="outlined"
-                      />
-                      <Tooltip title="룰렛 유지 베팅만 정지">
-                        <span>
-                          <IconButton
-                            size="small"
-                            disabled={!user.roulette_keeper_enabled || !user.has_jsession || rouletteStoppingId === user.id}
-                            onClick={() => handleRouletteKeeperStop(user)}
-                            sx={{ color: "#ff9800" }}
-                          >
-                            <StopCircleIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </Box>
                   </TableCell>
                   <TableCell sx={cellSx}>{formatDate(user.created_at)}</TableCell>
                   <TableCell sx={{ ...cellSx, textAlign: "center" }}>
@@ -590,6 +530,13 @@ function UsersPage() {
             }
             label="활성 상태" sx={{ mt: 1, color: "text.secondary" }}
           />
+          {editForm.role !== "admin" && (
+            <FormControlLabel
+              control={<Switch checked={!!editForm.manual_pick_signal_enabled}
+                onChange={(e) => setEditForm((f) => ({ ...f, manual_pick_signal_enabled: e.target.checked }))} />}
+              label="수동픽 신호 사용" sx={{ display: "block", color: "text.secondary" }}
+            />
+          )}
           {editError && (
             <Typography variant="body2" sx={{ color: "#f44336", mt: 1 }}>{editError}</Typography>
           )}
