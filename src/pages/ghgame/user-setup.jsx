@@ -2313,20 +2313,24 @@ export default function GhUserSetupPage() {
     setSaving(true);
     try {
       const signalRules = signalDirty ? signalRef.current.rules : undefined;
+      const signalFilters = signalDirty ? signalRef.current.filters : undefined;
       if (isAdmin) {
         const url = editingTargetUser
           ? USER_BET_SETTINGS_API.ADMIN_GH_SLOT(targetUserId, selectedSlotNo)
           : USER_BET_SETTINGS_API.GH_SLOT(selectedSlotNo);
         const res = await apiCaller.put(url, {
           config: normalizeUnknownAssistOptions(config),
-          ...(signalDirty ? { manual_pick_signals: signalRules } : {}),
+          ...(signalDirty ? { manual_pick_signals: signalRules, manual_pick_signal_filters: signalFilters } : {}),
         });
-        if (signalDirty && !res.data.manual_pick_signals) {
+        if (signalDirty && (!res.data.manual_pick_signals || !res.data.manual_pick_signal_filters)) {
           throw new Error("서버에서 수동픽 신호 저장을 확인하지 못했습니다. 최신 백엔드를 적용한 뒤 다시 저장해주세요.");
         }
         setConfig(res.data.config);
       } else {
-        await apiCaller.put(USER_BET_SETTINGS_API.MANUAL_SIGNALS, { rules: signalRules });
+        const res = await apiCaller.put(USER_BET_SETTINGS_API.MANUAL_SIGNALS, { rules: signalRules, filters: signalFilters });
+        if (!res.data.filters) {
+          throw new Error("서버에서 수동픽 신호 제한 설정 저장을 확인하지 못했습니다. 최신 백엔드를 적용한 뒤 다시 저장해주세요.");
+        }
       }
       setDirty(false);
       signalRef.current?.markSaved();

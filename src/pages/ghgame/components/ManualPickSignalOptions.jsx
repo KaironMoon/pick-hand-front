@@ -4,6 +4,7 @@ import apiCaller from "@/services/api-caller";
 import { USER_BET_SETTINGS_API } from "@/constants/api-url";
 
 const GRADES = [[1, "1등급", "#ef5350"], [2, "2등급", "#42a5f5"], [3, "3등급", "#ba68c8"], [0, "신호없음", "inherit"]];
+const DEFAULT_FILTERS = { win_rate_threshold: 0, loss_streak_threshold: 0 };
 const STAGE_ROWS = ["#64b5f6", "#81c784", "#ffb74d", "#ce93d8", "#4dd0e1"]
   .map((color, index) => ({ color, start: 15 + index * 10, end: 24 + index * 10 }));
 const conditionLabel = (option, target) => {
@@ -18,6 +19,7 @@ const ManualPickSignalOptions = forwardRef(function ManualPickSignalOptions({ ta
   const [enabled, setEnabled] = useState(false);
   const [target, setTarget] = useState(15);
   const [rules, setRules] = useState({});
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [options, setOptions] = useState([]);
   const [memoTitle, setMemoTitle] = useState("");
   const [loading, setLoading] = useState(true);
@@ -28,7 +30,7 @@ const ManualPickSignalOptions = forwardRef(function ManualPickSignalOptions({ ta
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
   const ready = !settingsLoading && !loading && !error;
   useEffect(() => { onReadyChange?.(ready); }, [ready, onReadyChange]);
-  useImperativeHandle(ref, () => ({ rules, markSaved: () => setDirty(false) }), [rules]);
+  useImperativeHandle(ref, () => ({ rules, filters, markSaved: () => setDirty(false) }), [rules, filters]);
 
   useEffect(() => {
     let active = true;
@@ -37,6 +39,7 @@ const ManualPickSignalOptions = forwardRef(function ManualPickSignalOptions({ ta
       if (!active) return;
       setEnabled(data.enabled);
       setRules(data.rules);
+      setFilters({ ...DEFAULT_FILTERS, ...data.filters });
       setDirty(false);
     }).catch((err) => {
       if (active) {
@@ -82,6 +85,10 @@ const ManualPickSignalOptions = forwardRef(function ManualPickSignalOptions({ ta
     });
     setDirty(true);
   };
+  const selectFilter = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: Number(value) }));
+    setDirty(true);
+  };
 
   return <Box component="section" aria-label="수동픽 신호 설정" sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>수동픽 신호 설정</Typography>
@@ -103,6 +110,31 @@ const ManualPickSignalOptions = forwardRef(function ManualPickSignalOptions({ ta
                 }}>{step}</Button>)}
             </Box>)}
           </Box>
+        </Box>
+        <Box sx={{ border: "1px solid #ef5350", borderRadius: 1, p: 1.5, mb: 2 }}>
+          <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 2 }}>
+            <Box component="label" sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+              <Box component="select" aria-label="수동픽 신호 승률 기준" value={filters.win_rate_threshold}
+                disabled={saving || settingsLoading} onChange={(e) => selectFilter("win_rate_threshold", e.target.value)}
+                sx={{ backgroundColor: "#161b22", color: "#fff", border: "1px solid #888", borderRadius: 1, p: 0.75 }}>
+                <option value={0}>사용안함</option>
+                {Array.from({ length: 100 }, (_, index) => index + 1).map((rate) => <option key={rate} value={rate}>{rate}%</option>)}
+              </Box>
+              <Typography component="span">글로벌히트 빅로드 승률이 기준 이하이면 신호 숨김 · 회복 시 다시 표시</Typography>
+            </Box>
+            <Box component="label" sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+              <Box component="select" aria-label="수동픽 신호 연패 기준" value={filters.loss_streak_threshold}
+                disabled={saving || settingsLoading} onChange={(e) => selectFilter("loss_streak_threshold", e.target.value)}
+                sx={{ backgroundColor: "#161b22", color: "#fff", border: "1px solid #888", borderRadius: 1, p: 0.75 }}>
+                <option value={0}>사용안함</option>
+                {Array.from({ length: 80 }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{count}연패</option>)}
+              </Box>
+              <Typography component="span">지정 연패 이상 발생하면 해당 게임의 신호 중지</Typography>
+            </Box>
+          </Box>
+          <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
+            모든 단계에 공통 적용합니다. 1~4회차와 배팅이 없는 회차는 집계에서 제외하며, 연패로 중지된 게임은 승률이 회복되어도 신호를 다시 표시하지 않습니다.
+          </Typography>
         </Box>
         {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
         {loading || settingsLoading ? <Typography>불러오는 중...</Typography> : <>
