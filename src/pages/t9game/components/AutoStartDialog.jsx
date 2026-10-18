@@ -213,6 +213,8 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId
         message = "이 테이블의 자동 베팅이 이미 실행 중입니다";
       } else if (detail?.error === "caller_user_mismatch") {
         message = "로그인 계정과 Pick Hand ID가 일치하지 않습니다";
+      } else if (["auto_start_blocked", "auto_start_gate_unavailable"].includes(detail?.error)) {
+        message = detail.message;
       } else if (e?.response?.status === 503) {
         setFeatureDisabled(true);
         message = "자동 베팅 기능이 비활성화되어 있습니다";
