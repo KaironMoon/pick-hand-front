@@ -1042,6 +1042,7 @@ export default function GhUserGamePage() {
   const [labSeqOpen, setLabSeqOpen] = useState(false);
   const [labHmPressed, setLabHmPressed] = useState(null); // "H" | "M" | null
   const [gameSlots, setGameSlots] = useState([]);
+  const [autoPnlTotal, setAutoPnlTotal] = useState(0);
   const [selectedSlotNo, setSelectedSlotNo] = useState(1);
   const [manualSignalEnabled, setManualSignalEnabled] = useState(false);
   const [slotBusy, setSlotBusy] = useState(false);
@@ -1216,6 +1217,7 @@ export default function GhUserGamePage() {
     );
     const slots = Array.isArray(res.data?.slots) ? res.data.slots : [];
     setGameSlots(slots);
+    setAutoPnlTotal(Number(res.data?.auto_pnl_total_p ?? 0));
     return slots;
   }, []);
 
@@ -2368,25 +2370,16 @@ export default function GhUserGamePage() {
 
             return (
               <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1, px: 0, py: 0.5 }}>
-                {/* 행1: 마틴A + (마틴Z 또는 크루즈) */}
+                {/* 행1: 오토 슬롯 PNL 합계 + (마틴Z 또는 크루즈) */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                  {/* 마틴A */}
-                  {(() => {
-                    const td = betData?.user_martin?.martin_a;
-                    const amt = td?.amount || 0;
-                    return (
-                      <React.Fragment>
-                        <Box sx={tagSx("#1565c0")}>
-                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>A</Typography>
-                        </Box>
-                        <Box sx={{ ...fieldSx, minWidth: 55 }}>
-                          <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>
-                            {amt > 0 ? amt.toLocaleString() : "0"}
-                          </Typography>
-                        </Box>
-                      </React.Fragment>
-                    );
-                  })()}
+                  <Box sx={tagSx("#1565c0")} title="오토가 켜진 슬롯의 실제 누적 PNL 합계">
+                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>오토 합계</Typography>
+                  </Box>
+                  <Box sx={{ ...fieldSx, minWidth: 55 }} aria-label="오토 슬롯 PNL 합계">
+                    <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: autoPnlTotal > 0 ? "#00e676" : autoPnlTotal < 0 ? "#ef5350" : "#666" }}>
+                      {autoPnlTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}P
+                    </Typography>
+                  </Box>
                   {/* 라보쉐르 활성이면 크루즈/마틴Z 대신 라보쉐르 표시 */}
                   {betData?.user_martin?.labouchere?.enabled ? (() => {
                     const lb = betData.user_martin.labouchere;
