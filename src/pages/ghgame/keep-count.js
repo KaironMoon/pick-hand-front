@@ -1,6 +1,6 @@
 export const GH_KEEP_COUNT_MIN = 2;
-export const GH_KEEP_COUNT_MAX = 100;
-export const GH_KEEP_COUNT_DEFAULT = 20;
+export const GH_KEEP_COUNT_MAX = 5;
+export const GH_KEEP_COUNT_DEFAULT = 5;
 
 export function parseGhKeepCount(value) {
   const parsed = Number(value);
