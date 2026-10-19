@@ -3,6 +3,21 @@ import test from "node:test";
 
 import { claimOverallStopAlert } from "../src/pages/ghgame/overall-stop-alert.js";
 
+test("common auto total goal reports that every GH slot stopped", () => {
+  const alerted = new Set();
+  const alert = claimOverallStopAlert(alerted, 100, "auto_total_goal_reached", "auto");
+  assert.equal(alert.title, "오토 합계 목표금액 달성");
+  assert.match(alert.detail, /모든 GH 슬롯 오토/);
+  assert.equal(claimOverallStopAlert(alerted, 100, "auto_total_goal_reached", "auto"), null);
+});
+
+test("common goal alert is independent of game alerts and resets for a new auto session", () => {
+  const alerted = new Set(["100"]);
+  assert.ok(claimOverallStopAlert(alerted, 100, "auto_total_goal_reached", "auto", { auto_session_id: "first" }));
+  assert.equal(claimOverallStopAlert(alerted, 100, "auto_total_goal_reached", "auto", { auto_session_id: "first" }), null);
+  assert.ok(claimOverallStopAlert(alerted, 100, "auto_total_goal_reached", "auto", { auto_session_id: "second" }));
+});
+
 test("hard overall loss alert reports scaled limit without recovery", () => {
   const alert = claimOverallStopAlert(new Set(), 39866, "overall_loss_limit_reached", "auto", {
     loss_threshold: -100,

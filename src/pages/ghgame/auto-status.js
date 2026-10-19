@@ -3,6 +3,7 @@ export const createEmptyAutoStatus = () => ({
   autoSessionId: null,
   phase: null,
   stop_reason: null,
+  sync_notice: null,
   active_pot_count: null,
   pot_stop_count: 0,
   goal_amount: 0,
@@ -52,6 +53,7 @@ export const mergePolledAutoStatus = (previous, status) => {
     betsSucceeded: status?.bets_succeeded,
     betsFailed: status?.bets_failed,
     phase: hasSession ? status?.phase ?? null : null,
+    sync_notice: hasSession ? status?.sync_notice ?? null : null,
     actual_bet_scale:
       status?.actual_bet_scale ?? previous?.actual_bet_scale ?? 1,
     pnl_total: status?.pnl_total ?? previous?.pnl_total,

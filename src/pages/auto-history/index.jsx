@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Link, MenuItem, Paper,
   Table, TableBody, TableCell, TableContainer, TableHead, TablePagination,
-  TableRow, TextField, Typography,
+  TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import { useAtomValue } from "jotai";
@@ -139,7 +139,11 @@ export default function AutoHistoryPage() {
                     <TableCell>{row.round_count}회차</TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>{formatTime(row.started_at)}</TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>{formatTime(row.stopped_at)}</TableCell>
-                    <TableCell><Chip size="small" label={STATUS_LABELS[row.status]} color={STATUS_COLORS[row.status]} /></TableCell>
+                    <TableCell>
+                      <Tooltip title={row.status === "error" ? row.error_detail || row.error_code || "" : ""} enterTouchDelay={0} arrow>
+                        <Chip size="small" label={STATUS_LABELS[row.status]} color={STATUS_COLORS[row.status]} />
+                      </Tooltip>
+                    </TableCell>
                   </TableRow>
                 ))}
             </TableBody>

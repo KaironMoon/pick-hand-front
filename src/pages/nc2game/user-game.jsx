@@ -819,6 +819,7 @@ export default function Nc2UserGamePage() {
             setAutoStatus((previous) => ({
               ...previous,
               phase: data.phase ?? previous.phase,
+              sync_notice: data.sync_notice ?? previous.sync_notice,
               round_count: data.round_count ?? previous.round_count,
               pnl_total: data.pnl_total ?? previous.pnl_total,
               pnl_actual: data.pnl_actual ?? previous.pnl_actual,
@@ -828,6 +829,8 @@ export default function Nc2UserGamePage() {
             }));
             if (data.game_id && Number(data.game_id) !== Number(game.game_id)) {
               refreshEventGame(data.game_id, true);
+            } else if (data.reason === "waiting_for_new_shoe") {
+              refreshEventGame(data.game_id || game.game_id);
             }
           } else if (type === "game_switched" && data.new_game_id) {
             refreshEventGame(data.new_game_id, true);
@@ -837,6 +840,7 @@ export default function Nc2UserGamePage() {
               running: true,
               auto_session_id: data.auto_session_id,
               phase: data.phase || "betting",
+              sync_notice: data.sync_notice ?? null,
               round_count: 0,
               pnl_total: 0,
               pnl_actual: 0,
@@ -1387,6 +1391,9 @@ export default function Nc2UserGamePage() {
       </>}
 
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
+      {autoStatus.running && autoStatus.phase === "waiting_new_shoe" && autoStatus.sync_notice && (
+        <Alert severity="info" sx={{ mb: 1 }}>{autoStatus.sync_notice}</Alert>
+      )}
       {isAdmin && (state?.martin_zzzs || []).filter((zzz) => zzz?.enabled).map((zzz) => <MartinZzzBoard
         key={zzz.index}
         zzz={zzz}

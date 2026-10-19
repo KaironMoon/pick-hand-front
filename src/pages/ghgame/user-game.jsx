@@ -1043,6 +1043,8 @@ export default function GhUserGamePage() {
   const [labHmPressed, setLabHmPressed] = useState(null); // "H" | "M" | null
   const [gameSlots, setGameSlots] = useState([]);
   const [autoPnlTotal, setAutoPnlTotal] = useState(0);
+  const [autoTotalResetting, setAutoTotalResetting] = useState(false);
+  const autoTotalVersionRef = useRef(0);
   const [selectedSlotNo, setSelectedSlotNo] = useState(1);
   const [manualSignalEnabled, setManualSignalEnabled] = useState(false);
   const [slotBusy, setSlotBusy] = useState(false);
@@ -1210,6 +1212,7 @@ export default function GhUserGamePage() {
   }, [isAdmin, user?.username]);
 
   const refreshGameSlots = useCallback(async () => {
+    const totalVersion = autoTotalVersionRef.current;
     const res = await apiCaller.get(
       GH_GAMES_API.SLOTS,
       { _ts: Date.now() },
@@ -1217,9 +1220,27 @@ export default function GhUserGamePage() {
     );
     const slots = Array.isArray(res.data?.slots) ? res.data.slots : [];
     setGameSlots(slots);
-    setAutoPnlTotal(Number(res.data?.auto_pnl_total_p ?? 0));
+    if (totalVersion === autoTotalVersionRef.current) {
+      setAutoPnlTotal(Number(res.data?.auto_pnl_total_p ?? 0));
+    }
     return slots;
   }, []);
+
+  const resetAutoTotal = async () => {
+    if (autoTotalResetting || !window.confirm("오토 합계를 0으로 리셋합니다. 확인?")) return;
+    autoTotalVersionRef.current += 1;
+    setAutoTotalResetting(true);
+    try {
+      const { data } = await apiCaller.post(GH_GAMES_API.AUTO_TOTAL_RESET);
+      autoTotalVersionRef.current += 1;
+      setAutoPnlTotal(Number(data.auto_pnl_total_p));
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setRejectMsg(typeof detail === "string" ? detail : "오토 합계를 초기화하지 못했습니다.");
+    } finally {
+      setAutoTotalResetting(false);
+    }
+  };
 
   const startGame = useCallback(async ({ slotNo = null, replaceGameId = null } = {}) => {
     try {
@@ -1432,6 +1453,9 @@ export default function GhUserGamePage() {
             detail: st.error_detail || "자동게임 처리 중 오류가 발생했습니다.",
           } : null);
           setAutoStatus((prev) => mergePolledAutoStatus(prev, st));
+          if (st.stop_reason === "auto_total_goal_reached") {
+            showOverallStopAlert(gameId, st.stop_reason, "auto", st);
+          }
         }
       } catch (e) {
         if (e?.response?.status === 503) {
@@ -1444,7 +1468,7 @@ export default function GhUserGamePage() {
     tick();
     const id = setInterval(tick, 5000);  // auto-status 폴링 1s → 5s로 완화 (호출량 감소 260603)
     return () => { cancelled = true; clearInterval(id); };
-  }, [gameId, autoFeatureAvailable, autoStatus.running, historyReplayGameId, replay.active]);
+  }, [gameId, autoFeatureAvailable, autoStatus.running, historyReplayGameId, replay.active, showOverallStopAlert]);
 
   // ── Auto WebSocket 구독 (실시간 이벤트 푸시) ───────────
   useEffect(() => {
@@ -1477,6 +1501,14 @@ export default function GhUserGamePage() {
           const msg = JSON.parse(evt.data);
           const t = msg.type;
           const data = msg.data || {};
+          if (t === "auto_total_goal_reached") {
+            setAutoPnlTotal(Number(data.auto_pnl_total_p));
+            setAutoStatus((prev) => ({ ...prev, running: false, phase: "completed", stop_reason: data.reason }));
+            showOverallStopAlert(gameId, data.reason, "auto", data);
+            refreshGameSlots().catch(() => {});
+            if (gameId) restoreGame(gameId);
+            return;
+          }
           if (t !== "pong") {
             const currentGameId = Number(gameId);
             const eventGameId = Number(data.game_id);
@@ -1525,6 +1557,7 @@ export default function GhUserGamePage() {
             setAutoStatus((prev) => ({
               ...prev,
               phase: data.phase,
+              sync_notice: data.sync_notice ?? prev.sync_notice,
               pnl_total: data.pnl_total ?? prev.pnl_total,
               pnl_actual: data.pnl_actual ?? prev.pnl_actual,
               pnl_total_p: data.pnl_total_p ?? prev.pnl_total_p,
@@ -1547,6 +1580,9 @@ export default function GhUserGamePage() {
               setGameId(data.game_id);
               setSearchParams({ gameId: data.game_id }, { replace: true });
             }
+            if (data.game_id && data.reason === "waiting_for_new_shoe") {
+              restoreGame(data.game_id);
+            }
           } else if (t === "game_switched") {
             setGameId(data.new_game_id);
             setSearchParams({ gameId: data.new_game_id }, { replace: true });
@@ -1558,6 +1594,7 @@ export default function GhUserGamePage() {
               running: true,
               autoSessionId: data.auto_session_id,
               phase: data.phase || "betting",
+              sync_notice: data.sync_notice ?? null,
               round_count: 0,
               pnl_total: 0,
               pnl_actual: 0,
@@ -2254,6 +2291,9 @@ export default function GhUserGamePage() {
         )}
       </Box>
       <GoalStatusBar roundState={roundState} autoStatus={autoStatus} />
+      {autoStatus.running && autoStatus.phase === "waiting_new_shoe" && autoStatus.sync_notice && (
+        <Alert severity="info" sx={{ mb: 1 }}>{autoStatus.sync_notice}</Alert>
+      )}
       {/* ===== 상단: 6x40 빅로드 격자 ===== */}
       <Box
         sx={{
@@ -2372,10 +2412,12 @@ export default function GhUserGamePage() {
               <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1, px: 0, py: 0.5 }}>
                 {/* 행1: 오토 슬롯 PNL 합계 + (마틴Z 또는 크루즈) */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                  <Box sx={tagSx("#1565c0")} title="오토가 켜진 슬롯의 실제 누적 PNL 합계">
+                  <Box sx={{ ...tagSx("#1565c0"), cursor: "pointer" }} onClick={resetAutoTotal} title="클릭하여 오토 합계를 0으로 초기화">
                     <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>오토 합계</Typography>
                   </Box>
-                  <Box sx={{ ...fieldSx, minWidth: 55 }} aria-label="오토 슬롯 PNL 합계">
+                  <Box component="button" type="button" disabled={autoTotalResetting} onClick={resetAutoTotal}
+                    sx={{ ...fieldSx, minWidth: 55, backgroundColor: "transparent", cursor: "pointer" }}
+                    aria-label="오토 합계 초기화" title="게임 변경 후에도 유지되는 누적 손익 · 클릭하여 초기화">
                     <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: autoPnlTotal > 0 ? "#00e676" : autoPnlTotal < 0 ? "#ef5350" : "#666" }}>
                       {autoPnlTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}P
                     </Typography>

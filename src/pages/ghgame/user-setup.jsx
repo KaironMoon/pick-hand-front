@@ -2762,12 +2762,29 @@ export default function GhUserSetupPage() {
         </Box>
         <Button size="small" variant="outlined" disabled={saving || copying || slotCopying}
           onClick={() => { setSlotCopySource(""); setSlotCopyOpen(true); }}>슬롯복사</Button>
-        <Typography variant="caption" sx={{ fontSize: 10, color: "#999" }}>아래 모든 설정은 선택한 슬롯에만 적용됩니다</Typography>
+        <Typography variant="caption" sx={{ fontSize: 10, color: "#999" }}>공통 설정을 제외한 아래 설정은 선택한 슬롯에만 적용됩니다</Typography>
       </Box>
 
       {gameType === "gh" && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2, p: 1, border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1 }}>
           <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>오토 운영 옵션</Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
+              오토 합계 목표금액 (P) · 공통
+            </Typography>
+            <input type="number" min="0" step="0.1" aria-label="오토 합계 목표금액"
+              value={config.auto_total_goal_amount ?? 0}
+              onChange={(event) => {
+                setConfig((prev) => ({ ...prev, auto_total_goal_amount: Math.max(0, parseFloat(event.target.value || "0") || 0) }));
+                setDirty(true);
+              }}
+              style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
+            />
+            <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>
+              {Number(config.auto_total_goal_amount || 0) === 0 ? "(사용안함) " : ""}
+              모든 슬롯의 오토 합계가 목표 이상이면 모든 GH 슬롯 오토 정지 · 배율 미적용
+            </Typography>
+          </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>실배팅 배율</Typography>
             {[1, 0.1].map((scale) => {

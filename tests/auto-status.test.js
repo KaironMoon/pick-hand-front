@@ -16,6 +16,7 @@ test("new game status starts without the previous auto error", () => {
     autoSessionId: null,
     phase: null,
     stop_reason: null,
+    sync_notice: null,
     active_pot_count: null,
     pot_stop_count: 0,
     goal_amount: 0,
@@ -31,6 +32,19 @@ test("new game status starts without the previous auto error", () => {
     keep_shoes_remaining: null,
     martin_recovery: null,
   });
+});
+
+test("sync notice survives polling and clears for the next game", () => {
+  const message = "초기 결과를 불러오는 동안 슈가 변경되었습니다.";
+  const waiting = mergePolledAutoStatus(createEmptyAutoStatus(), {
+    running: true, auto_session_id: "waiting", phase: "waiting_new_shoe", sync_notice: message,
+  });
+  assert.equal(waiting.sync_notice, message);
+  const next = mergePolledAutoStatus(waiting, {
+    running: true, auto_session_id: "next", phase: "betting", sync_notice: null,
+  });
+  assert.equal(next.sync_notice, null);
+  assert.equal(mergePolledAutoStatus(waiting, { running: false }).sync_notice, null);
 });
 
 test("polling preserves GH drawdown status values", () => {
