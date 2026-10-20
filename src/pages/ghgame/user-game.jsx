@@ -1005,6 +1005,7 @@ export default function GhUserGamePage() {
   const navigate = useNavigate();
   const user = useAtomValue(userAtom);
   const isAdmin = user?.role === "admin";
+  const isAutoOnly = !isAdmin && !!user?.auto_only;
   const [searchParams, setSearchParams] = useSearchParams();
   const historyReplayGameId = searchParams.get("replayGameId");
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
@@ -1107,7 +1108,7 @@ export default function GhUserGamePage() {
     setReplayRoundInput(displayedRound > 0 ? String(displayedRound) : "");
   }, [replay.active, replay.roundNum, strategyResults.length]);
   const currentTurn = strategyResults.length + 1;
-  const inputLocked = processing || legacyRestoreBlocked || (replay.active && replay.external);
+  const inputLocked = isAutoOnly || processing || legacyRestoreBlocked || (replay.active && replay.external);
   // LEGACY COMPAT ONLY: displaySnapshot 별칭은 남은 레거시 보조표용이다.
   // 새 화면/상태 판단/픽 표시/닷 표시에는 사용 금지. 필요한 데이터는 서버에서 roundState에 추가한다.
   const displaySnapshot = picksSnapshot;
@@ -1707,7 +1708,7 @@ export default function GhUserGamePage() {
   };
 
   const handleInput = async (inputValue) => {
-    if (!gameId || processingRef.current) return;
+    if (isAutoOnly || !gameId || processingRef.current) return;
     if (replay.active && replay.external) return;
     const wasCurrentReplay = replay.active;
     processingRef.current = true;
@@ -2303,8 +2304,25 @@ export default function GhUserGamePage() {
       {autoStatus.running && autoStatus.phase === "waiting_new_shoe" && autoStatus.sync_notice && (
         <Alert severity="info" sx={{ mb: 1 }}>{autoStatus.sync_notice}</Alert>
       )}
-      {/* ===== 상단: 6x40 빅로드 격자 ===== */}
+      {/* 빅로드 표시만 교체한다. 결과 수신·베팅·정산 상태는 계속 갱신한다. */}
+      {isAutoOnly ? (
+        <Box role="status" aria-live="polite" sx={{
+          minHeight: isMobile ? 102 : 162, mb: 2, px: 2, py: 1,
+          border: "1px solid #87ceeb", boxSizing: "border-box",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+          textAlign: "center", backgroundColor: "background.paper",
+        }}>
+          <Typography sx={{ fontSize: isMobile ? 20 : 32, fontWeight: "bold" }}>
+            {autoStatus.running ? "시스템 작동중 입니다" : "시스템 정지중 입니다"}
+          </Typography>
+          <Typography sx={{ fontSize: isMobile ? 18 : 28 }}>
+            {autoStatus.running ? "중단하려면 정지 버튼을 누르세요" : "시작하려면 시스템을 설정 하세요"}
+          </Typography>
+        </Box>
+      ) : (
       <Box
+        role="img"
+        aria-label="글로벌히트 빅로드"
         sx={{
           display: "grid",
           gridTemplateColumns: `repeat(${GRID_COLS}, ${isMobile ? 16 : 26}px)`,
@@ -2356,6 +2374,8 @@ export default function GhUserGamePage() {
           })
         )}
       </Box>
+
+      )}
 
       {/* ===== 새 레이아웃 (자리만, 정적 HTML — 기능 미연결) =====
            [ 1 ][ 2 ]
@@ -2736,11 +2756,11 @@ export default function GhUserGamePage() {
                     const blinkSx = { animation: "pbBlink 0.8s infinite", "@keyframes pbBlink": { "0%, 100%": { opacity: 1 }, "50%": { opacity: 0.3 } } };
                     return (
                       <>
-                        <Box sx={pbBtnSx("#1565c0")} onClick={() => handleInput("P")}>P</Box>
+                        <Box component="button" type="button" disabled={inputLocked} aria-label="P 결과 입력" sx={{ ...pbBtnSx("#1565c0"), border: 0, p: 0 }} onClick={() => handleInput("P")}>P</Box>
                         <Box sx={{ ...turnBoxSx, width: 38, height: 38, ...(pBlink ? blinkSx : {}) }}>
                           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{pCount}</Typography>
                         </Box>
-                        <Box sx={pbBtnSx("#f44336")} onClick={() => handleInput("B")}>B</Box>
+                        <Box component="button" type="button" disabled={inputLocked} aria-label="B 결과 입력" sx={{ ...pbBtnSx("#f44336"), border: 0, p: 0 }} onClick={() => handleInput("B")}>B</Box>
                         <Box sx={{ ...turnBoxSx, width: 38, height: 38, ...(bBlink ? blinkSx : {}) }}>
                           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{bCount}</Typography>
                         </Box>

@@ -51,12 +51,12 @@ function UsersPage() {
   const [loading, setLoading] = useState(true);
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ username: "", password: "", nickname: "", role: "user" });
+  const [addForm, setAddForm] = useState({ username: "", password: "", nickname: "", role: "user", auto_only: false });
   const [addError, setAddError] = useState("");
 
   const [editOpen, setEditOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
-  const [editForm, setEditForm] = useState({ nickname: "", password: "", is_active: true, role: "user" });
+  const [editForm, setEditForm] = useState({ nickname: "", password: "", is_active: true, role: "user", auto_only: false });
   const [editError, setEditError] = useState("");
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -118,9 +118,9 @@ function UsersPage() {
       return;
     }
     try {
-      await apiCaller.post(USERS_API.BASE, addForm);
+      await apiCaller.post(USERS_API.BASE, { ...addForm, auto_only: addForm.role !== "admin" && addForm.auto_only });
       setAddOpen(false);
-      setAddForm({ username: "", password: "", nickname: "", role: "user" });
+      setAddForm({ username: "", password: "", nickname: "", role: "user", auto_only: false });
       fetchUsers();
     } catch (err) {
       setAddError(err.response?.data?.detail || "사용자 추가에 실패했습니다.");
@@ -129,7 +129,7 @@ function UsersPage() {
 
   const handleEditOpen = (user) => {
     setEditUser(user);
-    setEditForm({ nickname: user.nickname || "", password: "", is_active: user.is_active, role: user.role || "user", manual_pick_signal_enabled: !!user.manual_pick_signal_enabled });
+    setEditForm({ nickname: user.nickname || "", password: "", is_active: user.is_active, role: user.role || "user", manual_pick_signal_enabled: !!user.manual_pick_signal_enabled, auto_only: !!user.auto_only });
     setEditError("");
     setEditOpen(true);
   };
@@ -139,6 +139,7 @@ function UsersPage() {
     const payload = { nickname: editForm.nickname, is_active: editForm.is_active, role: editForm.role };
     if (editForm.role !== "admin") {
       payload.manual_pick_signal_enabled = !!editForm.manual_pick_signal_enabled;
+      payload.auto_only = !!editForm.auto_only;
     }
     if (editForm.password.trim()) {
       payload.password = editForm.password;
@@ -271,7 +272,7 @@ function UsersPage() {
           variant="contained"
           startIcon={<PersonAddIcon />}
           onClick={() => {
-            setAddForm({ username: "", password: "", nickname: "", role: "user" });
+            setAddForm({ username: "", password: "", nickname: "", role: "user", auto_only: false });
             setAddError("");
             setAddOpen(true);
           }}
@@ -320,7 +321,7 @@ function UsersPage() {
                   <TableCell sx={cellSx}>{user.nickname || "-"}</TableCell>
                   <TableCell sx={cellSx}>
                     <Chip
-                      label={user.role}
+                      label={user.role !== "admin" && user.auto_only ? "user (오토 전용)" : user.role}
                       size="small"
                       sx={{
                         backgroundColor: user.role === "admin" ? "#2e7d32" : "#777",
@@ -446,6 +447,12 @@ function UsersPage() {
               <MenuItem value="admin">admin (관리자)</MenuItem>
             </Select>
           </FormControl>
+          {addForm.role !== "admin" && (
+            <FormControlLabel
+              control={<Switch checked={addForm.auto_only} onChange={(e) => setAddForm((f) => ({ ...f, auto_only: e.target.checked }))} />}
+              label="글로벌히트 오토 전용" sx={{ display: "block", color: "text.secondary" }}
+            />
+          )}
           {addError && (
             <Typography variant="body2" sx={{ color: "#f44336", mt: 1 }}>{addError}</Typography>
           )}
@@ -535,6 +542,12 @@ function UsersPage() {
               control={<Switch checked={!!editForm.manual_pick_signal_enabled}
                 onChange={(e) => setEditForm((f) => ({ ...f, manual_pick_signal_enabled: e.target.checked }))} />}
               label="수동픽 신호 사용" sx={{ display: "block", color: "text.secondary" }}
+            />
+          )}
+          {editForm.role !== "admin" && (
+            <FormControlLabel
+              control={<Switch checked={editForm.auto_only} onChange={(e) => setEditForm((f) => ({ ...f, auto_only: e.target.checked }))} />}
+              label="글로벌히트 오토 전용" sx={{ display: "block", color: "text.secondary" }}
             />
           )}
           {editError && (
