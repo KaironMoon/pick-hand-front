@@ -90,14 +90,14 @@ export default async function verifyGhAutoOnly(page) {
   };
   try {
     await open();
-    await page.getByText('시스템 정지중 입니다', { exact: true }).waitFor();
+    await page.getByText('오토 플레이가 정지되어 있습니다', { exact: true }).waitFor();
     await checkBlocked();
-    check(await page.getByText('시작하려면 시스템을 설정 하세요', { exact: true }).isVisible(), 'Stopped guidance');
+    check(await page.getByText('시작하려면 play 버튼을 눌러주세요.', { exact: true }).isVisible(), 'Stopped guidance');
 
     mock.running = true;
-    await page.getByText('시스템 작동중 입니다', { exact: true }).waitFor();
+    await page.getByText('오토 플레이 중입니다', { exact: true }).waitFor();
     await checkBlocked();
-    check(await page.getByText('중단하려면 정지 버튼을 누르세요', { exact: true }).isVisible(), 'Running guidance');
+    check(await page.getByText('중단하려면 stop 버튼을 눌러주세요.', { exact: true }).isVisible(), 'Running guidance');
 
     // A placed bet still updates the actual amount board while BigRoad is absent.
     await emit('bet_attempt', { placed: true, direction: 'P', amount_p: 12.3, amount_won: 123000, ext_game_id: 'round-3' });
@@ -127,11 +127,11 @@ export default async function verifyGhAutoOnly(page) {
     await page.waitForFunction(() => document.querySelector('[aria-label="P 결과 입력"]')?.nextElementSibling?.textContent === '0');
     await emit('auto_restarted', { phase: 'betting', auto_session_id: 'mock-auto-2', source_auto_session_id: mock.session });
     mock.session = 'mock-auto-2';
-    await page.getByText('시스템 작동중 입니다', { exact: true }).waitFor();
+    await page.getByText('오토 플레이 중입니다', { exact: true }).waitFor();
     await checkBlocked();
 
     await page.getByRole('button', { name: 'stop', exact: true }).click();
-    await page.getByText('시스템 정지중 입니다', { exact: true }).waitFor();
+    await page.getByText('오토 플레이가 정지되어 있습니다', { exact: true }).waitFor();
     check(mock.calls.some(call => call.path.endsWith('/auto/stop') && call.body?.auto_session_id === 'mock-auto-2'), 'Stop must use the restarted session');
     await checkBlocked();
 
@@ -144,7 +144,7 @@ export default async function verifyGhAutoOnly(page) {
       await open();
       await road().waitFor();
       check(await p().isEnabled() && await b().isEnabled(), `${user.role} manual controls must remain enabled`);
-      check(await page.getByText('시스템 정지중 입니다', { exact: true }).count() === 0, 'Non-auto user should not see notice');
+      check(await page.getByText('오토 플레이가 정지되어 있습니다', { exact: true }).count() === 0, 'Non-auto user should not see notice');
       const before = mock.calls.filter(call => call.path.endsWith('/gh/games/round')).length;
       await p().click();
       await page.waitForTimeout(150);

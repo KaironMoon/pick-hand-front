@@ -2313,10 +2313,10 @@ export default function GhUserGamePage() {
           textAlign: "center", backgroundColor: "background.paper",
         }}>
           <Typography sx={{ fontSize: isMobile ? 20 : 32, fontWeight: "bold" }}>
-            {autoStatus.running ? "시스템 작동중 입니다" : "시스템 정지중 입니다"}
+            {autoStatus.running ? "오토 플레이 중입니다" : "오토 플레이가 정지되어 있습니다"}
           </Typography>
           <Typography sx={{ fontSize: isMobile ? 18 : 28 }}>
-            {autoStatus.running ? "중단하려면 정지 버튼을 누르세요" : "시작하려면 시스템을 설정 하세요"}
+            {autoStatus.running ? "중단하려면 stop 버튼을 눌러주세요." : "시작하려면 play 버튼을 눌러주세요."}
           </Typography>
         </Box>
       ) : (
