@@ -9,6 +9,7 @@ import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
 import GhBigRoad2 from "./components/GhBigRoad2";
 import GhRoundBetDetailDialog from "./components/GhRoundBetDetailDialog";
+import GhAutoTotalControl from "./components/GhAutoTotalControl";
 import { ghEntrySlot, updateGhGameSearchParams } from "./slot-navigation.js";
 import { manualPickSignalStyle } from "./manual-pick-signals.js";
 import {
@@ -1043,7 +1044,7 @@ export default function GhUserGamePage() {
   const [labHmPressed, setLabHmPressed] = useState(null); // "H" | "M" | null
   const [gameSlots, setGameSlots] = useState([]);
   const [autoPnlTotal, setAutoPnlTotal] = useState(0);
-  const [autoTotalResetting, setAutoTotalResetting] = useState(false);
+  const [autoTotalGoal, setAutoTotalGoal] = useState(0);
   const autoTotalVersionRef = useRef(0);
   const [selectedSlotNo, setSelectedSlotNo] = useState(1);
   const [manualSignalEnabled, setManualSignalEnabled] = useState(false);
@@ -1222,23 +1223,31 @@ export default function GhUserGamePage() {
     setGameSlots(slots);
     if (totalVersion === autoTotalVersionRef.current) {
       setAutoPnlTotal(Number(res.data?.auto_pnl_total_p ?? 0));
+      setAutoTotalGoal(Number(res.data?.auto_total_goal_amount ?? 0));
     }
     return slots;
   }, []);
 
   const resetAutoTotal = async () => {
-    if (autoTotalResetting || !window.confirm("오토 합계를 0으로 리셋합니다. 확인?")) return;
     autoTotalVersionRef.current += 1;
-    setAutoTotalResetting(true);
     try {
       const { data } = await apiCaller.post(GH_GAMES_API.AUTO_TOTAL_RESET);
-      autoTotalVersionRef.current += 1;
       setAutoPnlTotal(Number(data.auto_pnl_total_p));
-    } catch (err) {
-      const detail = err?.response?.data?.detail;
-      setRejectMsg(typeof detail === "string" ? detail : "오토 합계를 초기화하지 못했습니다.");
+      setAutoTotalGoal(Number(data.auto_total_goal_amount));
     } finally {
-      setAutoTotalResetting(false);
+      autoTotalVersionRef.current += 1;
+    }
+  };
+
+  const saveAutoTotalGoal = async (amount) => {
+    autoTotalVersionRef.current += 1;
+    try {
+      const { data } = await apiCaller.put(USER_BET_SETTINGS_API.SAVE("gh"), {
+        config: { auto_total_goal_amount: amount },
+      });
+      setAutoTotalGoal(Number(data.config.auto_total_goal_amount));
+    } finally {
+      autoTotalVersionRef.current += 1;
     }
   };
 
@@ -2412,16 +2421,8 @@ export default function GhUserGamePage() {
               <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1, px: 0, py: 0.5 }}>
                 {/* 행1: 오토 슬롯 PNL 합계 + (마틴Z 또는 크루즈) */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                  <Box sx={{ ...tagSx("#1565c0"), cursor: "pointer" }} onClick={resetAutoTotal} title="클릭하여 오토 합계를 0으로 초기화">
-                    <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>오토 합계</Typography>
-                  </Box>
-                  <Box component="button" type="button" disabled={autoTotalResetting} onClick={resetAutoTotal}
-                    sx={{ ...fieldSx, minWidth: 55, backgroundColor: "transparent", cursor: "pointer" }}
-                    aria-label="오토 합계 초기화" title="게임 변경 후에도 유지되는 누적 손익 · 클릭하여 초기화">
-                    <Typography variant="caption" sx={{ fontSize: 12, fontWeight: "bold", color: autoPnlTotal > 0 ? "#00e676" : autoPnlTotal < 0 ? "#ef5350" : "#666" }}>
-                      {autoPnlTotal.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}P
-                    </Typography>
-                  </Box>
+                  <GhAutoTotalControl total={autoPnlTotal} goal={autoTotalGoal}
+                    onSaveGoal={saveAutoTotalGoal} onReset={resetAutoTotal} />
                   {/* 라보쉐르 활성이면 크루즈/마틴Z 대신 라보쉐르 표시 */}
                   {betData?.user_martin?.labouchere?.enabled ? (() => {
                     const lb = betData.user_martin.labouchere;
