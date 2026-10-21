@@ -111,10 +111,24 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
                 <Typography color="text.secondary">패턴 발동 기록 없음</Typography>
               ) : detail.patterns.map((strategy) => (
                 <Box key={strategy.key} sx={{ mb: 1.5, p: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
-                  <Typography fontWeight={700}>{strategy.label} · 최초 {strategy.activation_round}회차 발동</Typography>
+                  <Typography fontWeight={700}>
+                    {strategy.label} · {strategy.activation_round}회차 적용 · {strategy.rule_numbers.join("번, ")}번 패턴
+                  </Typography>
+                  {strategy.p_amount != null && strategy.b_amount != null && (
+                    <Typography>
+                      패턴 금액: P {formatP(strategy.p_amount)} − B {formatP(strategy.b_amount)}
+                      {" → "}{strategy.offset ? "상계" : strategy.direction} {formatP(strategy.net_amount)}
+                    </Typography>
+                  )}
+                  {strategy.offset && <Typography color="warning.main">반대 방향 패턴이 서로 상계되었습니다.</Typography>}
+                  {strategy.applied_p_amount != null && (
+                    <Typography variant="body2" color="text.secondary">
+                      실제 계산 반영: P {formatP(strategy.applied_p_amount)} · B {formatP(strategy.applied_b_amount)}
+                    </Typography>
+                  )}
                   {strategy.matches.map((match, index) => (
                     <Box key={`${match.rule_no}-${index}`} sx={{ mt: 1.25 }}>
-                      <Typography>{match.rule_no}번 패턴 · 배팅 방향 {match.direction}</Typography>
+                      <Typography>{match.rule_no}번 패턴 · 배팅 방향 {match.direction}{match.amount != null ? ` · ${formatP(match.amount)}` : ""}</Typography>
                       <Typography sx={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>설정 패턴: {sequenceText(match.pattern)}</Typography>
                       <Typography variant="body2" color="text.secondary">
                         설정 방향 {match.configured_direction} · {match.match_kind === "inverse" ? "반대 패턴 일치" : "정방향 일치"} · 반대 패턴 포함 {match.include_inverse ? "켜짐" : "꺼짐"}

@@ -1,3 +1,4 @@
+import { duplicatePatternRows } from "./pattern-duplicates.js";
 import { Fragment, useState, useEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
@@ -448,7 +449,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false, showExactLossCondition = false, highlightDuplicates = false, recommendSingleStep = true }) {
+function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -461,10 +462,7 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
   const patternKeys = highlightDuplicates
     ? rules.map((rule) => patternCells(rule, PATTERN_ONLY_CELL_COUNT).join(""))
     : [];
-  const patternCounts = new Map();
-  for (const key of patternKeys) {
-    if (key) patternCounts.set(key, (patternCounts.get(key) || 0) + 1);
-  }
+  const duplicateRows = duplicatePatternRows(patternKeys);
   const updateRule = (index, patch) => {
     const next = rules.map((rule, ruleIndex) => (
       ruleIndex === index ? { ...rule, ...patch } : rule
@@ -529,7 +527,7 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
         </Box>
         {rules.map((rule, rowIndex) => {
           const cells = patternCells(rule, PATTERN_ONLY_CELL_COUNT);
-          const isDuplicate = (patternCounts.get(patternKeys[rowIndex]) || 0) > 1;
+          const isDuplicate = duplicateRows[rowIndex];
           const direction = rule.direction === "P" || rule.direction === "B" ? rule.direction : "";
           const nextDirection = direction === "" ? "B" : direction === "B" ? "P" : "";
           return (
@@ -545,10 +543,13 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
                 whiteSpace: "nowrap",
               }}
             >
+              <Typography component="span" sx={{ minWidth: 42, textAlign: "right", fontSize: 13 }}>
+                {rowIndex + 1}번
+              </Typography>
               <Box
                 role="group"
                 aria-label={`패턴 ${rowIndex + 1}${isDuplicate ? " (중복)" : ""}`}
-                title={isDuplicate ? "동일한 패턴이 중복 입력되어 있습니다." : undefined}
+                title={isDuplicate ? "동일하거나 BP가 반전된 패턴이 중복 입력되어 있습니다." : undefined}
                 sx={{
                   display: "flex",
                   gap: 0.75,
