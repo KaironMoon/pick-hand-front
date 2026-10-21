@@ -353,7 +353,7 @@ const EMPTY_MARTIN_PATTERN_RULE = {
 };
 
 const PATTERN_BLOCK_CELL_COUNT = 10;
-const PATTERN_ONLY_CELL_COUNT = 15;
+const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
 const MARTIN_Z_PATTERN_ONLY_ROW_COUNT = 400;
 
@@ -485,7 +485,7 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
 
   return (
     <tr>
-      <td colSpan={6} style={{ ...normalCell, padding: 0, textAlign: "left" }}>
+      <td colSpan={6} style={{ ...normalCell, border: "none", padding: 0, textAlign: "left" }}>
         <Box sx={{ px: 1, py: 0.75, color, fontWeight: "bold", backgroundColor: "rgba(255,255,255,0.04)" }}>
           패턴일 때만 배팅하기
           <button
@@ -535,15 +535,20 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
               key={`pattern-only-row-${rowIndex}`}
               sx={{
                 display: "flex",
+                width: "100%",
+                boxSizing: "border-box",
                 alignItems: "center",
-                gap: 0.75,
-                px: 0.75,
+                gap: 0.5,
+                px: 0.25,
                 py: 0.5,
                 borderTop: CELL_BORDER,
+                borderLeft: CELL_BORDER,
+                borderRight: CELL_BORDER,
+                "&:last-child": { borderBottom: CELL_BORDER },
                 whiteSpace: "nowrap",
               }}
             >
-              <Typography component="span" sx={{ minWidth: 42, textAlign: "right", fontSize: 13 }}>
+              <Typography component="span" sx={{ minWidth: 34, textAlign: "left", fontSize: 13 }}>
                 {rowIndex + 1}번
               </Typography>
               <Box
@@ -601,8 +606,8 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
               <Box
                 onClick={() => toggleEnabled(rowIndex, rule, direction)}
                 sx={{
-                  ml: 0.5,
-                  px: 1.25,
+                  ml: 0,
+                  px: 0.5,
                   py: 0.5,
                   borderRadius: 1,
                   backgroundColor: rule.enabled ? GREEN : "#333",
@@ -765,14 +770,14 @@ function KpkpSection({ name, label, martin, onChange }) {
       </tr>
       {patternMode && <>
         <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#c62828" rowCount={100} recommendSingleStep={false} />
-        <tr><td colSpan={6} style={{ ...normalCell, textAlign: "left", padding: 8 }}>
+        <tr><td colSpan={6} style={{ ...normalCell, textAlign: "left", padding: 8, whiteSpace: "normal" }}>
           진행 중 일치하는 패턴이 없는 회차에는 마틴K 배팅을 하지 않습니다. 미션은 종료하지 않고 현재 단계를 그대로 보류했다가, 다시 패턴이 일치하는 회차에 그 단계의 금액으로 배팅을 재개합니다.
         </td></tr>
       </>}
       {name === "martin_kp" && <>
         <tr>
           <td style={labelCellStyle}>어시스트(단계별 방향)</td>
-          <td colSpan={5} style={{ ...normalCell, textAlign: "left" }}>
+          <td colSpan={5} style={{ ...normalCell, textAlign: "left", whiteSpace: "normal" }}>
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
               {Array.from({ length: 8 }, (_, index) => index + 1).map((level) => (
                 <label key={level} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -2244,6 +2249,13 @@ export default function GhUserSetupPage() {
   const [signalDirty, setSignalDirty] = useState(false);
   const [signalReady, setSignalReady] = useState(false);
   const signalRef = useRef(null);
+  const martinZTableRef = useRef(null);
+  const [martinTableWidth, setMartinTableWidth] = useState(undefined);
+  const martinTableStyle = {
+    borderCollapse: "collapse",
+    width: martinTableWidth,
+    tableLayout: "fixed",
+  };
   const [saving, setSaving] = useState(false);
   const [snack, setSnack] = useState({ open: false, message: "", severity: "success" });
   const [copyInputOpen, setCopyInputOpen] = useState(false);
@@ -2264,6 +2276,16 @@ export default function GhUserSetupPage() {
   const [bettingExcelResult, setBettingExcelResult] = useState(null);
 
   const blocker = useBlocker(dirty || signalDirty);
+
+  useEffect(() => {
+    const table = martinZTableRef.current;
+    if (!table) return;
+    const updateWidth = () => setMartinTableWidth(table.getBoundingClientRect().width);
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(table);
+    return () => observer.disconnect();
+  }, [config]);
 
   useEffect(() => {
     if (!dirty && !signalDirty) return;
@@ -3431,7 +3453,7 @@ export default function GhUserSetupPage() {
       )}
 
       <Box sx={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", width: "fit-content" }}>
+        <table ref={martinZTableRef} style={{ borderCollapse: "collapse", width: "fit-content" }}>
           <tbody>
             <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={(m) => updateMartin("martin_a", m)} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
@@ -3457,6 +3479,10 @@ export default function GhUserSetupPage() {
               onChange={(m) => updateMartin("martin_z", m)}
               color="#1565c0"
             />
+          </tbody>
+        </table>
+        <table style={martinTableStyle}>
+          <tbody>
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             <ConditionalMartinSection kind="B" martin={martinB} onChange={(m) => updateMartin("martin_b", m)} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
@@ -3603,7 +3629,7 @@ export default function GhUserSetupPage() {
       )}
 
       <Box sx={{ overflowX: "auto", mt: 2 }}>
-        <table style={{ borderCollapse: "collapse", width: "fit-content" }}>
+        <table style={martinTableStyle}>
           <tbody>
             {gameType === "gh" && (
               <>
