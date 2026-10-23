@@ -1,5 +1,7 @@
+import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
+import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
 import { duplicatePatternRows } from "./pattern-duplicates.js";
-import { Fragment, useState, useEffect, useRef } from "react";
+import { Fragment, memo, useMemo, useState, useEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
 import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
@@ -355,7 +357,7 @@ const EMPTY_MARTIN_PATTERN_RULE = {
 const PATTERN_BLOCK_CELL_COUNT = 10;
 const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
-const MARTIN_Z_PATTERN_ONLY_ROW_COUNT = 400;
+const MARTIN_Z_PATTERN_ONLY_ROW_COUNT = 600;
 
 function PatternCell({ value, onClick, cellKey }) {
   return (
@@ -449,7 +451,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true }) {
+const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -525,7 +527,9 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
             </label>
           )}
         </Box>
-        {rules.map((rule, rowIndex) => {
+        {/* All rules stay in state; only the visible inputs are mounted. */}
+        <WindowedPatternRows rowCount={rowCount} renderRow={(rowIndex) => {
+          const rule = rules[rowIndex];
           const cells = patternCells(rule, PATTERN_ONLY_CELL_COUNT);
           const isDuplicate = duplicateRows[rowIndex];
           const direction = rule.direction === "P" || rule.direction === "B" ? rule.direction : "";
@@ -533,7 +537,9 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
           return (
             <Box
               key={`pattern-only-row-${rowIndex}`}
+              data-pattern-row={rowIndex}
               sx={{
+                height: PATTERN_ROW_HEIGHT,
                 display: "flex",
                 width: "100%",
                 boxSizing: "border-box",
@@ -544,7 +550,7 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
                 borderTop: CELL_BORDER,
                 borderLeft: CELL_BORDER,
                 borderRight: CELL_BORDER,
-                "&:last-child": { borderBottom: CELL_BORDER },
+                borderBottom: rowIndex === rowCount - 1 ? CELL_BORDER : undefined,
                 whiteSpace: "nowrap",
               }}
             >
@@ -621,11 +627,11 @@ function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONL
               </Box>
             </Box>
           );
-        })}
+        }} />
       </td>
     </tr>
   );
-}
+});
 
 function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
   const isB = kind === "B";
@@ -2548,6 +2554,13 @@ export default function GhUserSetupPage() {
     setConfig((prev) => updatePbjStrategy(prev, key, martin));
     setDirty(true);
   };
+  const martinChanges = useMemo(() => Object.fromEntries([
+    "martin_a", "martin_z", "martin_b", "martin_c", "martin_c2", "martin_c3",
+    "martin_c4", "martin_c5", "martin_k", "martin_p1", "martin_p2", "martin_p3", "martin_kp",
+  ].map((key) => [key, (martin) => {
+    setConfig((prev) => updatePbjStrategy(prev, key, martin));
+    setDirty(true);
+  }])), []);
 
   // Point 복원: IN/OUT→IN, 회차적중→1, 회차미적→0. 3연적중(force_trigger/force_pick)은 유지.
   const restoreGhPoint = () => {
@@ -3455,19 +3468,19 @@ export default function GhUserSetupPage() {
       <Box sx={{ overflowX: "auto" }}>
         <table ref={martinZTableRef} style={{ borderCollapse: "collapse", width: "fit-content" }}>
           <tbody>
-            <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={(m) => updateMartin("martin_a", m)} />
+            <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={martinChanges.martin_a} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-            <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={(m) => updateMartin("martin_z", m)} />
+            <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={martinChanges.martin_z} />
             <MartinPatternRow
               martin={martinZ}
-              onChange={(m) => updateMartin("martin_z", m)}
+              onChange={martinChanges.martin_z}
               ruleKey="pattern_block"
               label="패턴일 때 배팅 안 하기"
               color="#1565c0"
             />
             <MartinPatternOnlyRows
               martin={martinZ}
-              onChange={(m) => updateMartin("martin_z", m)}
+              onChange={martinChanges.martin_z}
               color="#1565c0"
               rowCount={MARTIN_Z_PATTERN_ONLY_ROW_COUNT}
               showMissCondition
@@ -3476,7 +3489,7 @@ export default function GhUserSetupPage() {
             <MartinStopBetRoundRow
               martin={martinZ}
               showStepRecovery
-              onChange={(m) => updateMartin("martin_z", m)}
+              onChange={martinChanges.martin_z}
               color="#1565c0"
             />
           </tbody>
@@ -3484,7 +3497,7 @@ export default function GhUserSetupPage() {
         <table style={martinTableStyle}>
           <tbody>
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-            <ConditionalMartinSection kind="B" martin={martinB} onChange={(m) => updateMartin("martin_b", m)} />
+            <ConditionalMartinSection kind="B" martin={martinB} onChange={martinChanges.martin_b} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             {martinCs.map(([key, label, martin], index) => (
               <Fragment key={key}>
@@ -3494,18 +3507,18 @@ export default function GhUserSetupPage() {
                   name={key}
                   label={label}
                   martin={martin}
-                  onChange={(value) => updateMartin(key, value)}
+                  onChange={martinChanges[key]}
                 />
               </Fragment>
             ))}
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-            <KpkpSection name="martin_k" label="마틴K" martin={martinK} onChange={(value) => updateMartin("martin_k", value)} />
+            <KpkpSection name="martin_k" label="마틴K" martin={martinK} onChange={martinChanges.martin_k} />
             {martinPs.map(([key, label, martin]) => <Fragment key={key}>
               <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-              <KpkpSection name={key} label={label} martin={martin} onChange={(value) => updateMartin(key, value)} />
+              <KpkpSection name={key} label={label} martin={martin} onChange={martinChanges[key]} />
             </Fragment>)}
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-            <KpkpSection name="martin_kp" label="마틴KP" martin={martinKp} onChange={(value) => updateMartin("martin_kp", value)} />
+            <KpkpSection name="martin_kp" label="마틴KP" martin={martinKp} onChange={martinChanges.martin_kp} />
           </tbody>
         </table>
       </Box>
