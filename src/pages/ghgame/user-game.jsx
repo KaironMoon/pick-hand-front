@@ -9,7 +9,7 @@ import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
 import GhBigRoad2 from "./components/GhBigRoad2";
 import GhRoundBetDetailDialog from "./components/GhRoundBetDetailDialog";
-import { finalBetCapSummary, martinZRateSummary } from "./components/AutoRiskSettings";
+import { finalBetCapSummary, martinZRateSummary, martinZPatternPrioritySummary } from "./components/AutoRiskSettings";
 import GhAutoTotalControl from "./components/GhAutoTotalControl";
 import { ghEntrySlot, updateGhGameSearchParams } from "./slot-navigation.js";
 import { manualPickSignalStyle } from "./manual-pick-signals.js";
@@ -283,6 +283,11 @@ function GhLossStopStatus({ roundState, autoStatus }) {
     <>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: betStopReason ? 0.5 : 1.5, px: 1, py: 0.7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
         <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>현재 게임 배팅조건</Typography>
+        <Tooltip title={martinZPatternPrioritySummary(roundState?.martin_z_pattern_match_priority)}>
+          <Typography variant="caption" sx={{ color: "#ffe082" }}>
+            마틴Z 끝일치: {{ all: "전부", longest: "긴 것 우선", shortest: "짧은 것 우선" }[roundState?.martin_z_pattern_match_priority || "all"]} ⓘ
+          </Typography>
+        </Tooltip>
         <Tooltip title={finalBetCapSummary(roundState?.auto_final_bet_cap_amount)}>
           <Typography variant="caption" sx={{ color: "#ffe082" }}>최종 배팅 상한: {roundState?.auto_final_bet_cap_amount || "사용안함"} {roundState?.auto_final_bet_cap_amount > 0 ? "P" : ""} ⓘ</Typography>
         </Tooltip>
@@ -2573,7 +2578,7 @@ export default function GhUserGamePage() {
                     const step = td?.step || 1;
                     return (
                       <React.Fragment>
-                        <Tooltip title={martinZRateSummary({}, roundState?.pick_martin)}>
+                        <Tooltip title={<Box sx={{ whiteSpace: "pre-line" }}>{`${martinZPatternPrioritySummary(roundState?.martin_z_pattern_match_priority)}\n${martinZRateSummary({}, roundState?.pick_martin)}`}</Box>}>
                           <Box sx={tagSx("#c62828")}>
                             <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>Z</Typography>
                           </Box>

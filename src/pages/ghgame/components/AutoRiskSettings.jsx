@@ -22,6 +22,15 @@ export function finalBetCapSummary(value) {
     : "회차별 최종 배팅 상한: 사용안함";
 }
 
+export function martinZPatternPrioritySummary(value = "all") {
+  const descriptions = {
+    all: "전부 · 현행대로 일치 패턴을 모두 반영",
+    longest: "긴 것 우선 · 일치한 패턴 중 가장 긴 패턴 하나만 반영",
+    shortest: "짧은 것 우선 · 일치한 패턴 중 가장 짧은 패턴 하나만 반영",
+  };
+  return `마틴Z 끝일치 패턴 선택: ${descriptions[value] || descriptions.all} · 정방향·B↔P 반전 포함`;
+}
+
 export function martinZRateSummary(config = {}, status = {}) {
   const threshold = Number(status.win_rate_threshold ?? config.win_rate_threshold ?? 0);
   if (threshold <= 0) return "마틴Z 승률 조건: 사용안함";

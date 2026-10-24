@@ -1,4 +1,4 @@
-import AutoRiskSettings, { martinZRateSummary } from "./components/AutoRiskSettings";
+import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } from "./components/AutoRiskSettings";
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
 import { duplicatePatternRows } from "./pattern-duplicates.js";
@@ -3476,6 +3476,21 @@ export default function GhUserSetupPage() {
             <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={martinChanges.martin_a} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={martinChanges.martin_z} />
+            <tr><td colSpan={6} style={{ padding: 8 }}>
+              <Tooltip title={martinZPatternPrioritySummary(martinZ.pattern_match_priority)}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography component="label" htmlFor="martin-z-pattern-priority" variant="caption">끝일치 패턴 선택 ⓘ</Typography>
+                  <select id="martin-z-pattern-priority" value={martinZ.pattern_match_priority ?? "all"}
+                    onChange={(event) => martinChanges.martin_z({ ...martinZ, pattern_match_priority: event.target.value })}
+                    style={{ padding: "4px 8px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4 }}>
+                    <option value="all">전부</option>
+                    <option value="longest">긴 것 우선</option>
+                    <option value="shortest">짧은 것 우선</option>
+                  </select>
+                  <Typography variant="caption">동시에 끝일치한 패턴에 적용 · 새 게임부터 적용</Typography>
+                </Box>
+              </Tooltip>
+            </td></tr>
             <tr><td colSpan={6} style={{ padding: 8 }}>
               <Tooltip title={martinZRateSummary(martinZ)}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
