@@ -357,7 +357,7 @@ const EMPTY_MARTIN_PATTERN_RULE = {
 const PATTERN_BLOCK_CELL_COUNT = 10;
 const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
-const MARTIN_Z_PATTERN_ONLY_ROW_COUNT = 600;
+const MARTIN_Z_PATTERN_ONLY_ROW_COUNT = 1000;
 
 function PatternCell({ value, onClick, cellKey }) {
   return (
