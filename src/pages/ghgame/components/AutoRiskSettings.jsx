@@ -1,4 +1,4 @@
-import { Box, TextField, Tooltip, Typography } from "@mui/material";
+import { Box, Tooltip, Typography } from "@mui/material";
 
 export function autoRiskSummary(config = {}) {
   const start = Number(config.auto_total_drawdown_start_amount || 0);
@@ -18,7 +18,7 @@ export function autoRiskSummary(config = {}) {
 export function finalBetCapSummary(value) {
   const cap = Number(value || 0);
   return cap > 0
-    ? `GH·모든 마틴을 합친 최종 실배팅액이 ${cap}P를 초과하면 ${cap}P로 배팅 · 실배팅 배율 적용 후 판정`
+    ? `GH·모든 마틴을 합친 최종 실배팅액이 설정 상한 × 실배팅 배율을 초과하면 상한 적용 · ×1 기준 ${cap}P`
     : "회차별 최종 배팅 상한: 사용안함";
 }
 
@@ -41,32 +41,40 @@ export function martinZRateSummary(config = {}, status = {}) {
 }
 
 export default function AutoRiskSettings({ config, onChange }) {
-  const input = (key, label, max) => (
-    <TextField size="small" type="number" label={label} value={config[key] ?? 0}
-      inputProps={{ min: 0, max, step: key.includes("count") ? 1 : 0.1 }}
-      onChange={(event) => onChange(key, Number(event.target.value))}
-      sx={{ width: 150 }} />
+  const input = (key, label, max, width = 90) => (
+    <input type="number" aria-label={label} min="0" max={max}
+      step={key.includes("count") ? "1" : "0.1"} value={config[key] ?? 0}
+      onChange={(event) => onChange(key, event.target.value)}
+      style={{ width, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
   );
   return <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, py: 1 }}>
     <Tooltip title={<Box sx={{ whiteSpace: "pre-line" }}>{autoRiskSummary(config)}</Box>}>
       <Typography variant="caption" sx={{ width: "fit-content", fontWeight: "bold" }}>전체 오토 종료 조건 · 공통 ⓘ</Typography>
     </Tooltip>
-    <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-      {input("auto_total_drawdown_start_amount", "감시 시작 (P)")}
-      {input("auto_total_drawdown_percent", "최고 PNL 손실률 (%)", 100)}
-      <Typography variant="caption">달성 후 최고 PNL 대비 설정 손실률 이상이면 전체 GH 오토 정지</Typography>
+    <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
+      {input("auto_total_drawdown_start_amount", "전체 오토 감시 시작 (P)")}
+      <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 달성 시 최고 PNL에서</Typography>
+      {input("auto_total_drawdown_percent", "전체 오토 최고 PNL 손실률 (%)", 100, 70)}
+      <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>% 이상 손실 나면 전체 GH 오토 정지</Typography>
+      {(!Number(config.auto_total_drawdown_start_amount) || !Number(config.auto_total_drawdown_percent))
+        && <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>}
     </Box>
-    <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-      {input("auto_total_stopped_slot_count", "종료 슬롯 수 (개)", 6)}
+    <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
+      <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>종료슬롯 수 & PNL</Typography>
+      <Typography variant="caption">슬롯이</Typography>
+      {input("auto_total_stopped_slot_count", "종료 슬롯 수 (개)", 6, 60)}
+      <Typography variant="caption">개 종료하고 오토합계</Typography>
       {input("auto_total_stopped_slot_pnl", "오토 합계 PNL (P)")}
-      <Typography variant="caption">두 조건을 모두 달성하면 전체 GH 오토 정지 · 0은 사용안함</Typography>
+      <Typography variant="caption">P 달성하면 전체 GH 오토 정지</Typography>
     </Box>
-    <Typography variant="caption" color="text.secondary">종료 슬롯은 현재 연결된 슬롯의 마지막 오토가 종료된 슬롯입니다. 합계 초기화 시 최고 PNL도 초기화됩니다. 공통 조건은 배율을 적용하지 않습니다.</Typography>
+    <Typography variant="caption" color="text.secondary">종료 슬롯은 현재 연결된 슬롯의 마지막 오토가 종료된 슬롯입니다. 두 조건 모두 충족 시 정지하며 0은 사용안함입니다. 합계 초기화 시 최고 PNL도 초기화됩니다.</Typography>
     <Tooltip title={finalBetCapSummary(config.auto_final_bet_cap_amount)}>
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-        {input("auto_final_bet_cap_amount", "회차별 최종 배팅 상한 (P)")}
-        <Typography variant="caption">선택 슬롯의 최종 실배팅액이 설정값보다 클 때만 지정 금액으로 배팅 · 0은 사용안함</Typography>
+      <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
+        <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>회차별 최종 배팅 상한 (P) · 공통</Typography>
+        {input("auto_final_bet_cap_amount", "회차별 최종 배팅 상한 (P)", undefined, 140)}
+        <Typography variant="caption">GH·모든 마틴을 합친 최종 실배팅액에 상한 적용 · 0은 사용안함</Typography>
       </Box>
     </Tooltip>
+    <Typography variant="caption" color="text.secondary">모든 금액은 ×1 기준으로 설정하며 실제 적용 금액은 공통 실배팅 배율에 따라 조정됩니다. 슬롯 수와 손실률(%)에는 배율을 적용하지 않습니다.</Typography>
   </Box>;
 }

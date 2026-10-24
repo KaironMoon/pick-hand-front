@@ -289,7 +289,7 @@ function GhLossStopStatus({ roundState, autoStatus }) {
           </Typography>
         </Tooltip>
         <Tooltip title={finalBetCapSummary(roundState?.auto_final_bet_cap_amount)}>
-          <Typography variant="caption" sx={{ color: "#ffe082" }}>최종 배팅 상한: {roundState?.auto_final_bet_cap_amount || "사용안함"} {roundState?.auto_final_bet_cap_amount > 0 ? "P" : ""} ⓘ</Typography>
+          <Typography variant="caption" sx={{ color: "#ffe082" }}>최종 배팅 상한(×1): {roundState?.auto_final_bet_cap_amount || "사용안함"} {roundState?.auto_final_bet_cap_amount > 0 ? "P" : ""} ⓘ</Typography>
         </Tooltip>
         <Tooltip title={martinZRateSummary({}, roundState?.pick_martin)}>
           <Typography variant="caption" sx={{ color: roundState?.pick_martin?.win_rate_blocked ? "#ff8a80" : "#ffe082" }}>마틴Z 승률 조건: {roundState?.pick_martin?.win_rate_threshold || "사용안함"}{roundState?.pick_martin?.win_rate_threshold > 0 ? "%" : ""} ⓘ</Typography>
@@ -1061,7 +1061,6 @@ export default function GhUserGamePage() {
   const [autoTotalRisk, setAutoTotalRisk] = useState({});
   const autoTotalVersionRef = useRef(0);
   const [selectedSlotNo, setSelectedSlotNo] = useState(1);
-  const [manualSignalEnabled, setManualSignalEnabled] = useState(false);
   const [slotBusy, setSlotBusy] = useState(false);
   const slotBusyRef = useRef(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -1217,15 +1216,6 @@ export default function GhUserGamePage() {
     setUserMartinDashboard(data.user_martin_dashboard || null);
   }, [applySavedRoundState]);
 
-  useEffect(() => {
-    if (isAdmin) return;
-    let active = true;
-    apiCaller.get(USER_BET_SETTINGS_API.MANUAL_SIGNALS).then(({ data }) => {
-      if (active) setManualSignalEnabled(data.enabled === true);
-    }).catch(() => { if (active) setManualSignalEnabled(false); });
-    return () => { active = false; };
-  }, [isAdmin, user?.username]);
-
   const refreshGameSlots = useCallback(async () => {
     const totalVersion = autoTotalVersionRef.current;
     const res = await apiCaller.get(
@@ -1258,10 +1248,10 @@ export default function GhUserGamePage() {
   const saveAutoTotalGoal = async (amount) => {
     autoTotalVersionRef.current += 1;
     try {
-      const { data } = await apiCaller.put(USER_BET_SETTINGS_API.SAVE("gh"), {
+      await apiCaller.put(USER_BET_SETTINGS_API.SAVE("gh"), {
         config: { auto_total_goal_amount: amount },
       });
-      setAutoTotalGoal(Number(data.config.auto_total_goal_amount));
+      await refreshGameSlots();
     } finally {
       autoTotalVersionRef.current += 1;
     }
@@ -2471,7 +2461,7 @@ export default function GhUserGamePage() {
                 {/* 행1: 오토 슬롯 PNL 합계 + (마틴Z 또는 크루즈) */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                   <GhAutoTotalControl total={autoPnlTotal} goal={autoTotalGoal} risk={autoTotalRisk} betCap={roundState?.auto_final_bet_cap_amount}
-                    onSaveGoal={saveAutoTotalGoal} onReset={resetAutoTotal} />
+                    canEditGoal={isAdmin} onSaveGoal={saveAutoTotalGoal} onReset={resetAutoTotal} />
                   {/* 라보쉐르 활성이면 크루즈/마틴Z 대신 라보쉐르 표시 */}
                   {betData?.user_martin?.labouchere?.enabled ? (() => {
                     const lb = betData.user_martin.labouchere;
@@ -2843,7 +2833,7 @@ export default function GhUserGamePage() {
               const q = qs.toString();
               navigate(`/ghgame/user-setup${q ? `?${q}` : ""}`);
             }}
-            setupDisabled={(!isAdmin && !manualSignalEnabled) || replay.active}
+            setupDisabled={!isAdmin || replay.active}
             onNew={() => setShowNewConfirm(true)}
             newDisabled={processing || slotBusy || autoStatus.running || !gameId || !selectedSlotNo || (replay.active && !replay.external)}
             labouchere={labouchere}

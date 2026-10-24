@@ -600,9 +600,9 @@ export default function MhUserGamePage() {
         </Box>
         <Box sx={{ width: isMobile ? 8 : 12 }} />
         {/* 셋업 (유저 설정) */}
-        <Box onClick={() => navigate(`/mhgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ff9800" }}>
+        {isAdmin && <Box onClick={() => navigate(`/mhgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)} sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ff9800" }}>
           <Typography variant="caption" sx={{ fontSize: isMobile ? 9 : 11, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
-        </Box>
+        </Box>}
       </Box>
 
       {/* 상단 PnL 요약 바 (마틴A/Z) */}

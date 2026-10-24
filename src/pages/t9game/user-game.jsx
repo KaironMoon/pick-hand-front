@@ -725,12 +725,12 @@ export default function GamePage() {
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
         </Box>
-        <Box
+        {isAdmin && <Box
           onClick={() => navigate(`/t9game/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
           sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ff9800" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
-        </Box>
+        </Box>}
       </Box>
 
       {/* ===== 대시보드 (단일 12열 테이블) ===== */}

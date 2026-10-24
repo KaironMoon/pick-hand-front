@@ -117,24 +117,12 @@ const router = createBrowserRouter([
             element: <CurrentSetupPage />,
           },
           {
-            path: "/t9game/user-setup",
-            element: <T9UserSetupPage />,
-          },
-          {
             path: "/hbgame/user",
             element: <GameGuard gameType="hb"><HbUserGamePage /></GameGuard>,
           },
           {
-            path: "/hbgame/user-setup",
-            element: <HbUserSetupPage />,
-          },
-          {
             path: "/ghgame/user",
             element: <GameGuard gameType="gh"><GhUserGamePage /></GameGuard>,
-          },
-          {
-            path: "/ghgame/user-setup",
-            element: <GhUserSetupPage />,
           },
           {
             path: "/ncgame/user",
@@ -145,16 +133,8 @@ const router = createBrowserRouter([
             element: <NcCurrentSetupPage />,
           },
           {
-            path: "/ncgame/user-setup",
-            element: <NcUserSetupPage />,
-          },
-          {
             path: "/nc2game/user",
             element: <GameGuard gameType="nc2"><Nc2UserGamePage /></GameGuard>,
-          },
-          {
-            path: "/nc2game/user-setup",
-            element: <Nc2UserSetupPage />,
           },
           {
             path: "/whgame/user",
@@ -165,20 +145,12 @@ const router = createBrowserRouter([
             element: <WhCurrentSetupPage />,
           },
           {
-            path: "/whgame/user-setup",
-            element: <WhUserSetupPage />,
-          },
-          {
             path: "/mhgame/user",
             element: <GameGuard gameType="mh"><MhUserGamePage /></GameGuard>,
           },
           {
             path: "/mhgame/current-setup",
             element: <MhCurrentSetupPage />,
-          },
-          {
-            path: "/mhgame/user-setup",
-            element: <MhUserSetupPage />,
           },
           {
             path: "/dhgame/user",
@@ -189,12 +161,40 @@ const router = createBrowserRouter([
             element: <DhCurrentSetupPage />,
           },
           {
-            path: "/dhgame/user-setup",
-            element: <DhUserSetupPage />,
-          },
-          {
             element: <ProtectedRoute adminOnly />,
             children: [
+              {
+                path: "/t9game/user-setup",
+                element: <T9UserSetupPage />,
+              },
+              {
+                path: "/hbgame/user-setup",
+                element: <HbUserSetupPage />,
+              },
+              {
+                path: "/ghgame/user-setup",
+                element: <GhUserSetupPage />,
+              },
+              {
+                path: "/ncgame/user-setup",
+                element: <NcUserSetupPage />,
+              },
+              {
+                path: "/nc2game/user-setup",
+                element: <Nc2UserSetupPage />,
+              },
+              {
+                path: "/whgame/user-setup",
+                element: <WhUserSetupPage />,
+              },
+              {
+                path: "/mhgame/user-setup",
+                element: <MhUserSetupPage />,
+              },
+              {
+                path: "/dhgame/user-setup",
+                element: <DhUserSetupPage />,
+              },
               {
                 path: "/t9game",
                 element: <GamePage />,

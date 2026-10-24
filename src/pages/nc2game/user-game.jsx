@@ -1304,6 +1304,7 @@ export default function Nc2UserGamePage() {
           roundState={ghRoundState}
           amountMode={amountViewMode}
           onSetup={() => navigate(nc2SetupPath(selectedSlotNo))}
+          setupDisabled={!isAdmin}
           onNew={() => setNewOpen(true)}
           newDisabled={loading || slotBusy || autoStatus.running || replay.active || !selectedSlotNo}
           gameSlots={gameSlots}

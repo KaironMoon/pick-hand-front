@@ -13,7 +13,8 @@ function errorMessage(error, fallback) {
   return typeof detail === "string" ? detail : fallback;
 }
 
-export default function GhAutoTotalControl({ total, goal, risk, betCap, onSaveGoal, onReset }) {
+export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditGoal, onSaveGoal, onReset }) {
+  const configuredGoal = Number(risk?.configured_auto_total_goal_amount ?? 0);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -22,11 +23,11 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, onSaveGo
   const [notice, setNotice] = useState(null);
 
   useEffect(() => {
-    if (!dirty) setDraft(goal > 0 ? String(goal) : "");
-  }, [goal, dirty]);
+    if (!dirty) setDraft(configuredGoal > 0 ? String(configuredGoal) : "");
+  }, [configuredGoal, dirty]);
 
   const showDialog = () => {
-    setDraft(goal > 0 ? String(goal) : "");
+    setDraft(configuredGoal > 0 ? String(configuredGoal) : "");
     setDirty(false);
     setNotice(null);
     setOpen(true);
@@ -111,25 +112,25 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, onSaveGo
           </Typography>
           <Box component="form" onSubmit={(event) => {
             event.preventDefault();
-            saveGoal(Number(draft));
+            if (canEditGoal) saveGoal(Number(draft));
           }}>
-            <TextField fullWidth size="small" label="목표금액 (P)" type="number" value={draft}
-              disabled={busy} inputProps={{ min: 0, step: 0.1 }}
+            <TextField fullWidth size="small" label="목표금액 (P) · ×1 기준" type="number" value={draft}
+              disabled={busy || !canEditGoal} inputProps={{ min: 0, step: 0.1 }}
               onChange={(event) => {
                 setDraft(event.target.value);
                 setDirty(true);
                 setNotice(null);
               }}
-              helperText={goal > 0 ? `현재 목표 ${formatAmount(goal)}P · 0은 사용 안 함` : "목표액 미설정 · 0은 사용 안 함"}
+              helperText={goal > 0 ? `실제 목표 ${formatAmount(goal)}P · 0은 사용 안 함` : "목표액 미설정 · 0은 사용 안 함"}
             />
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-              모든 슬롯의 오토 합계가 목표 이상이면 모든 GH 슬롯 오토 정지 · 배율 미적용
+              모든 슬롯의 오토 합계가 목표 이상이면 모든 GH 슬롯 오토 정지 · 공통 실배팅 배율 적용
             </Typography>
             <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
-              <Button type="submit" variant="contained" disabled={busy || draft.trim() === ""}>
+              <Button type="submit" variant="contained" disabled={busy || !canEditGoal || draft.trim() === ""}>
                 목표액 저장
               </Button>
-              <Button color="error" disabled={busy || goal <= 0} onClick={() => saveGoal(0)}>
+              <Button color="error" disabled={busy || !canEditGoal || configuredGoal <= 0} onClick={() => saveGoal(0)}>
                 목표액 삭제
               </Button>
             </Box>

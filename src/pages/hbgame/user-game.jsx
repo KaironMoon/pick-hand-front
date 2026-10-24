@@ -535,12 +535,12 @@ export default function HbUserGamePage() {
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#2196f3" }}>new</Typography>
         </Box>
-        <Box
+        {isAdmin && <Box
           onClick={() => navigate(`/hbgame/user-setup${gameId ? `?gameId=${gameId}` : ""}`)}
           sx={{ ...controlBtnSx, cursor: "pointer", border: "2px solid #ff9800" }}
         >
           <Typography variant="caption" sx={{ fontSize: isMobile ? 10 : 12, color: "#ff9800", fontWeight: "bold" }}>셋업</Typography>
-        </Box>
+        </Box>}
       </Box>
 
       {/* 종료 다이얼로그 */}

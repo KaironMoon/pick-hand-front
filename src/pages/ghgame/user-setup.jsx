@@ -2356,11 +2356,6 @@ export default function GhUserSetupPage() {
           throw new Error("서버에서 수동픽 신호 저장을 확인하지 못했습니다. 최신 백엔드를 적용한 뒤 다시 저장해주세요.");
         }
         setConfig(res.data.config);
-      } else {
-        const res = await apiCaller.put(USER_BET_SETTINGS_API.MANUAL_SIGNALS, { rules: signalRules, filters: signalFilters });
-        if (!res.data.filters) {
-          throw new Error("서버에서 수동픽 신호 제한 설정 저장을 확인하지 못했습니다. 최신 백엔드를 적용한 뒤 다시 저장해주세요.");
-        }
       }
       setDirty(false);
       signalRef.current?.markSaved();
@@ -2592,21 +2587,6 @@ export default function GhUserSetupPage() {
     </Dialog>
   );
 
-  if (!isAdmin) return <Box sx={{ p: 2 }}>
-    <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
-      <Button onClick={handleBack}>뒤로가기</Button>
-      <Button variant="contained" onClick={handleSave} disabled={!signalDirty || !signalReady || saving}>
-        {saving ? "저장 중..." : "설정 저장"}
-      </Button>
-    </Box>
-    <ManualPickSignalOptions ref={signalRef} onDirtyChange={setSignalDirty} onReadyChange={setSignalReady} saving={saving} />
-    {leaveDialog}
-    <Snackbar open={snack.open} autoHideDuration={snack.severity === "error" ? null : 3000}
-      onClose={() => setSnack((prev) => ({ ...prev, open: false }))} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-      <Alert severity={snack.severity} onClose={() => setSnack((prev) => ({ ...prev, open: false }))}>{snack.message}</Alert>
-    </Snackbar>
-  </Box>;
-
   if (!config) return <Box sx={{ p: 2, color: "#888" }}>불러오는 중...</Box>;
 
   const martinA = config.martin_a || { ...DEFAULT_MARTIN, enabled: true };
@@ -2772,36 +2752,6 @@ export default function GhUserSetupPage() {
         <ManualPickSignalOptions ref={signalRef} targetUserId={editingTargetUser ? targetUserId : undefined}
           onDirtyChange={setSignalDirty} onReadyChange={setSignalReady} saving={saving} />
       </Box>
-      {/* 슬롯 선택 */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, p: 1, border: "1px solid rgba(0,168,90,.55)", borderRadius: 1, backgroundColor: "rgba(0,168,90,.06)", flexWrap: "wrap" }}>
-        <Typography variant="caption" sx={{ fontSize: 12, color: "#00e676", minWidth: 90, fontWeight: "bold" }}>슬롯별 설정</Typography>
-        <Box sx={{ display: "flex", gap: .7, flexWrap: "wrap" }}>
-          {Array.from({ length: 6 }, (_, index) => index + 1).map((slotNo) => {
-            const selected = selectedSlotNo === slotNo;
-            return <Box
-              key={slotNo}
-              role="button"
-              tabIndex={saving ? undefined : 0}
-              onClick={saving ? undefined : () => selectSlot(slotNo)}
-              onKeyDown={saving ? undefined : (event) => {
-                if (event.key === "Enter" || event.key === " ") selectSlot(slotNo);
-              }}
-              sx={{
-                minWidth: 44, px: 1, py: .45, borderRadius: 1,
-                border: `1px solid ${selected ? "#00a85a" : "#555"}`,
-                backgroundColor: selected ? "#17482f" : "#171a1f",
-                color: selected ? "#00e676" : "#aaa",
-                textAlign: "center", fontSize: 12, fontWeight: "bold",
-                cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .5 : 1, userSelect: "none",
-              }}
-            >S{slotNo}</Box>;
-          })}
-        </Box>
-        <Button size="small" variant="outlined" disabled={saving || copying || slotCopying}
-          onClick={() => { setSlotCopySource(""); setSlotCopyOpen(true); }}>슬롯복사</Button>
-        <Typography variant="caption" sx={{ fontSize: 10, color: "#999" }}>공통 설정을 제외한 아래 설정은 선택한 슬롯에만 적용됩니다</Typography>
-      </Box>
-
       {gameType === "gh" && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2, p: 1, border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1 }}>
           <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>오토 운영 옵션</Typography>
@@ -2816,18 +2766,18 @@ export default function GhUserSetupPage() {
             <input type="number" min="0" step="0.1" aria-label="오토 합계 목표금액"
               value={config.auto_total_goal_amount ?? 0}
               onChange={(event) => {
-                setConfig((prev) => ({ ...prev, auto_total_goal_amount: Math.max(0, parseFloat(event.target.value || "0") || 0) }));
+                setConfig((prev) => ({ ...prev, auto_total_goal_amount: event.target.value }));
                 setDirty(true);
               }}
               style={{ width: 140, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
             <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>
               {Number(config.auto_total_goal_amount || 0) === 0 ? "(사용안함) " : ""}
-              모든 슬롯의 오토 합계가 목표 이상이면 모든 GH 슬롯 오토 정지 · 배율 미적용
+              모든 슬롯의 오토 합계가 목표 이상이면 모든 GH 슬롯 오토 정지 · 실배팅 배율 적용
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>실배팅 배율</Typography>
+            <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>실배팅 배율 · 공통</Typography>
             {[1, 0.1].map((scale) => {
               const selected = Number(config.auto_actual_bet_scale ?? 1) === scale;
               return (
@@ -2868,6 +2818,41 @@ export default function GhUserSetupPage() {
               서버 PNL·종료조건과 실제 카지노 주문액에 동일 적용 (로컬 안전조정은 전송액만 적용)
             </Typography>
           </Box>
+        </Box>
+      )}
+
+      {/* 슬롯 선택 */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, p: 1, border: "1px solid rgba(0,168,90,.55)", borderRadius: 1, backgroundColor: "rgba(0,168,90,.06)", flexWrap: "wrap" }}>
+        <Typography variant="caption" sx={{ fontSize: 12, color: "#00e676", minWidth: 90, fontWeight: "bold" }}>슬롯별 설정</Typography>
+        <Box sx={{ display: "flex", gap: .7, flexWrap: "wrap" }}>
+          {Array.from({ length: 6 }, (_, index) => index + 1).map((slotNo) => {
+            const selected = selectedSlotNo === slotNo;
+            return <Box
+              key={slotNo}
+              role="button"
+              tabIndex={saving ? undefined : 0}
+              onClick={saving ? undefined : () => selectSlot(slotNo)}
+              onKeyDown={saving ? undefined : (event) => {
+                if (event.key === "Enter" || event.key === " ") selectSlot(slotNo);
+              }}
+              sx={{
+                minWidth: 44, px: 1, py: .45, borderRadius: 1,
+                border: `1px solid ${selected ? "#00a85a" : "#555"}`,
+                backgroundColor: selected ? "#17482f" : "#171a1f",
+                color: selected ? "#00e676" : "#aaa",
+                textAlign: "center", fontSize: 12, fontWeight: "bold",
+                cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .5 : 1, userSelect: "none",
+              }}
+            >S{slotNo}</Box>;
+          })}
+        </Box>
+        <Button size="small" variant="outlined" disabled={saving || copying || slotCopying}
+          onClick={() => { setSlotCopySource(""); setSlotCopyOpen(true); }}>슬롯복사</Button>
+        <Typography variant="caption" sx={{ fontSize: 10, color: "#999" }}>공통 설정을 제외한 아래 설정은 선택한 슬롯에만 적용됩니다</Typography>
+      </Box>
+
+      {gameType === "gh" && (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2, p: 1, border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
               전체 목표금액 (P)
