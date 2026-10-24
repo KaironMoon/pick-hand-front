@@ -1665,6 +1665,19 @@ export default function GhUserGamePage() {
 
   }, [autoFeatureAvailable, autoStatus.running, autoStatus.autoSessionId, gameId, showOverallStopAlert, historyReplayGameId, replay.active]);
 
+  const checkAutoStartSlot = async (startingGameId) => {
+    const slots = await refreshGameSlots();
+    const current = slots.find((slot) => slot.occupied && Number(slot.game_id) === Number(startingGameId));
+    if (current) return true;
+
+    const synced = await syncToReplacementSlot(slots, startingGameId, selectedSlotNo);
+    setAutoDialogOpen(false);
+    setRejectMsg(synced
+      ? "슬롯의 게임이 변경되어 최신 게임으로 갱신했습니다. 게임을 확인한 뒤 오토를 다시 시작해 주세요."
+      : "현재 게임이 슬롯에 연결되어 있지 않습니다. 해당 슬롯을 다시 선택한 뒤 오토를 시작해 주세요.");
+    return false;
+  };
+
   const handleAutoToggle = async () => {
     if (!autoFeatureAvailable) return;
     if (autoStatus.running && autoStatus.autoSessionId) {
@@ -3602,6 +3615,7 @@ export default function GhUserGamePage() {
       {/* Auto 베팅 시작 모달 — mvp-aboo-integration.md §5.1 */}
       <AutoStartDialog
         open={autoDialogOpen}
+        beforeStart={checkAutoStartSlot}
         onClose={() => setAutoDialogOpen(false)}
         onStarted={(resp) => {
           setAutoError(null);

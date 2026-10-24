@@ -79,7 +79,7 @@ const formatAge = (sec) => {
   return `${Math.floor(sec / 3600)}시간 전`;
 };
 
-const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId, gameType = "gh", playMode = "keep", keepCount = null }) => {
+const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameId, pickhandId, gameType = "gh", playMode = "keep", keepCount = null }) => {
   const [sessionInfo, setSessionInfo] = useState(null);
   const [tableId, setTableId] = useState("");
   const [server, setServer] = useState("");
@@ -186,6 +186,14 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId
     setError(null);
     setBusy(true);
     try {
+      if (beforeStart) {
+        try {
+          if (!(await beforeStart(gameId))) return;
+        } catch {
+          setError("게임 슬롯을 확인하지 못했습니다. 다시 시도해 주세요.");
+          return;
+        }
+      }
       const resp = await autoService.startAuto({
         gameId,
         pickhandId,
@@ -207,6 +215,8 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, gameId, pickhandId
         setSessionInfo((current) => ({ ...current, captured: true, status: "expired" }));
       } else if (detail?.error === "auto_session_limit_reached") {
         message = "자동게임은 게임 종류별로 최대 6개까지 실행할 수 있습니다";
+      } else if (detail?.error === "game_slot_limit_reached") {
+        message = "게임 슬롯 6개가 모두 사용 중이며, 현재 게임은 슬롯에 연결되어 있지 않습니다. 시작 창을 닫고 해당 슬롯을 다시 선택해 주세요.";
       } else if (detail?.error === "auto_game_already_running") {
         message = "이 게임의 자동 베팅이 이미 실행 중입니다";
       } else if (detail?.error === "auto_table_already_running") {
