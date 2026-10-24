@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Tooltip, Typography } from "@mui/material";
+
+import { autoRiskSummary, finalBetCapSummary } from "./AutoRiskSettings";
 
 const formatAmount = (value) => value.toLocaleString(undefined, {
   minimumFractionDigits: 1,
@@ -11,7 +13,7 @@ function errorMessage(error, fallback) {
   return typeof detail === "string" ? detail : fallback;
 }
 
-export default function GhAutoTotalControl({ total, goal, onSaveGoal, onReset }) {
+export default function GhAutoTotalControl({ total, goal, risk, betCap, onSaveGoal, onReset }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -59,9 +61,9 @@ export default function GhAutoTotalControl({ total, goal, onSaveGoal, onReset })
   return (
     <>
       <Box sx={{ position: "relative", flex: "0 0 auto" }}>
+        <Tooltip title={<Box sx={{ whiteSpace: "pre-line" }}>{`${autoRiskSummary(risk)}\n${finalBetCapSummary(betCap)}`}</Box>}>
         <Box component="button" type="button" onClick={showDialog}
           aria-label="오토 합계 설정" aria-haspopup="dialog" aria-expanded={open}
-          title="오토 합계 초기화 및 목표액 설정"
           sx={{
             display: "flex", alignItems: "center", gap: 0.5, p: 0, border: 0,
             backgroundColor: "transparent", cursor: "pointer", color: "inherit",
@@ -96,6 +98,7 @@ export default function GhAutoTotalControl({ total, goal, onSaveGoal, onReset })
             {formatAmount(total)}P
           </Box>
         </Box>
+        </Tooltip>
       </Box>
 
       <Dialog open={open} onClose={() => { if (!busyRef.current) setOpen(false); }} fullWidth maxWidth="xs"

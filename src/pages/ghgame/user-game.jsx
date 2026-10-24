@@ -9,6 +9,7 @@ import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
 import GhBigRoad2 from "./components/GhBigRoad2";
 import GhRoundBetDetailDialog from "./components/GhRoundBetDetailDialog";
+import { finalBetCapSummary, martinZRateSummary } from "./components/AutoRiskSettings";
 import GhAutoTotalControl from "./components/GhAutoTotalControl";
 import { ghEntrySlot, updateGhGameSearchParams } from "./slot-navigation.js";
 import { manualPickSignalStyle } from "./manual-pick-signals.js";
@@ -282,6 +283,12 @@ function GhLossStopStatus({ roundState, autoStatus }) {
     <>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: betStopReason ? 0.5 : 1.5, px: 1, py: 0.7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
         <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>현재 게임 배팅조건</Typography>
+        <Tooltip title={finalBetCapSummary(roundState?.auto_final_bet_cap_amount)}>
+          <Typography variant="caption" sx={{ color: "#ffe082" }}>최종 배팅 상한: {roundState?.auto_final_bet_cap_amount || "사용안함"} {roundState?.auto_final_bet_cap_amount > 0 ? "P" : ""} ⓘ</Typography>
+        </Tooltip>
+        <Tooltip title={martinZRateSummary({}, roundState?.pick_martin)}>
+          <Typography variant="caption" sx={{ color: roundState?.pick_martin?.win_rate_blocked ? "#ff8a80" : "#ffe082" }}>마틴Z 승률 조건: {roundState?.pick_martin?.win_rate_threshold || "사용안함"}{roundState?.pick_martin?.win_rate_threshold > 0 ? "%" : ""} ⓘ</Typography>
+        </Tooltip>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.overall_stop?.reason === "overall_loss_limit_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
           전체 손실종료조건: {overallLossStopStatusLabel(roundState?.overall_stop)}
         </Typography>
@@ -1046,6 +1053,7 @@ export default function GhUserGamePage() {
   const [gameSlots, setGameSlots] = useState([]);
   const [autoPnlTotal, setAutoPnlTotal] = useState(0);
   const [autoTotalGoal, setAutoTotalGoal] = useState(0);
+  const [autoTotalRisk, setAutoTotalRisk] = useState({});
   const autoTotalVersionRef = useRef(0);
   const [selectedSlotNo, setSelectedSlotNo] = useState(1);
   const [manualSignalEnabled, setManualSignalEnabled] = useState(false);
@@ -1225,6 +1233,7 @@ export default function GhUserGamePage() {
     if (totalVersion === autoTotalVersionRef.current) {
       setAutoPnlTotal(Number(res.data?.auto_pnl_total_p ?? 0));
       setAutoTotalGoal(Number(res.data?.auto_total_goal_amount ?? 0));
+      setAutoTotalRisk(res.data || {});
     }
     return slots;
   }, []);
@@ -1235,6 +1244,7 @@ export default function GhUserGamePage() {
       const { data } = await apiCaller.post(GH_GAMES_API.AUTO_TOTAL_RESET);
       setAutoPnlTotal(Number(data.auto_pnl_total_p));
       setAutoTotalGoal(Number(data.auto_total_goal_amount));
+      setAutoTotalRisk(data);
     } finally {
       autoTotalVersionRef.current += 1;
     }
@@ -1463,7 +1473,7 @@ export default function GhUserGamePage() {
             detail: st.error_detail || "자동게임 처리 중 오류가 발생했습니다.",
           } : null);
           setAutoStatus((prev) => mergePolledAutoStatus(prev, st));
-          if (st.stop_reason === "auto_total_goal_reached") {
+          if (["auto_total_goal_reached", "auto_total_drawdown_reached", "auto_total_stopped_slots_reached"].includes(st.stop_reason)) {
             showOverallStopAlert(gameId, st.stop_reason, "auto", st);
           }
         }
@@ -1513,6 +1523,7 @@ export default function GhUserGamePage() {
           const data = msg.data || {};
           if (t === "auto_total_goal_reached") {
             setAutoPnlTotal(Number(data.auto_pnl_total_p));
+            setAutoTotalRisk(data);
             setAutoStatus((prev) => ({ ...prev, running: false, phase: "completed", stop_reason: data.reason }));
             showOverallStopAlert(gameId, data.reason, "auto", data);
             refreshGameSlots().catch(() => {});
@@ -2454,7 +2465,7 @@ export default function GhUserGamePage() {
               <Box sx={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 1, px: 0, py: 0.5 }}>
                 {/* 행1: 오토 슬롯 PNL 합계 + (마틴Z 또는 크루즈) */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                  <GhAutoTotalControl total={autoPnlTotal} goal={autoTotalGoal}
+                  <GhAutoTotalControl total={autoPnlTotal} goal={autoTotalGoal} risk={autoTotalRisk} betCap={roundState?.auto_final_bet_cap_amount}
                     onSaveGoal={saveAutoTotalGoal} onReset={resetAutoTotal} />
                   {/* 라보쉐르 활성이면 크루즈/마틴Z 대신 라보쉐르 표시 */}
                   {betData?.user_martin?.labouchere?.enabled ? (() => {
@@ -2562,9 +2573,11 @@ export default function GhUserGamePage() {
                     const step = td?.step || 1;
                     return (
                       <React.Fragment>
-                        <Box sx={tagSx("#c62828")}>
-                          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>Z</Typography>
-                        </Box>
+                        <Tooltip title={martinZRateSummary({}, roundState?.pick_martin)}>
+                          <Box sx={tagSx("#c62828")}>
+                            <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>Z</Typography>
+                          </Box>
+                        </Tooltip>
                         <Box sx={{ ...fieldSx, minWidth: 80, px: 0.6 }}>
                           <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>{step}S</Typography>
                           <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: amt > 0 ? "#4caf50" : "#666" }}>

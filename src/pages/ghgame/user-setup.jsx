@@ -1,3 +1,4 @@
+import AutoRiskSettings, { martinZRateSummary } from "./components/AutoRiskSettings";
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
 import { duplicatePatternRows } from "./pattern-duplicates.js";
@@ -2804,6 +2805,10 @@ export default function GhUserSetupPage() {
       {gameType === "gh" && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2, p: 1, border: "1px solid rgba(255,255,255,0.2)", borderRadius: 1 }}>
           <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>오토 운영 옵션</Typography>
+          <AutoRiskSettings config={config} onChange={(key, value) => {
+            setConfig((prev) => ({ ...prev, [key]: value }));
+            setDirty(true);
+          }} />
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
             <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
               오토 합계 목표금액 (P) · 공통
@@ -3471,6 +3476,16 @@ export default function GhUserSetupPage() {
             <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={martinChanges.martin_a} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={martinChanges.martin_z} />
+            <tr><td colSpan={6} style={{ padding: 8 }}>
+              <Tooltip title={martinZRateSummary(martinZ)}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <TextField size="small" type="number" label="마틴Z 최소 승률 (%)"
+                    value={martinZ.win_rate_threshold ?? 0} inputProps={{ min: 0, max: 100, step: 0.1 }}
+                    onChange={(event) => martinChanges.martin_z({ ...martinZ, win_rate_threshold: Number(event.target.value) })} />
+                  <Typography variant="caption">미만이면 단계 유지·0.0P, 이상으로 회복하면 정상 배팅 · 0은 사용안함 ⓘ</Typography>
+                </Box>
+              </Tooltip>
+            </td></tr>
             <MartinPatternRow
               martin={martinZ}
               onChange={martinChanges.martin_z}

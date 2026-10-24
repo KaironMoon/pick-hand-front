@@ -1,4 +1,12 @@
 const STOP_ALERTS = {
+  auto_total_drawdown_reached: {
+    title: "오토 합계 최고 PNL 손실률 도달",
+    detail: "오토 합계가 최고 PNL 대비 설정 손실률에 도달하여 모든 GH 슬롯 오토가 정지되었습니다.",
+  },
+  auto_total_stopped_slots_reached: {
+    title: "종료 슬롯 수·오토 합계 조건 달성",
+    detail: "종료 슬롯 수와 전체 오토 합계 PNL 조건을 모두 달성하여 모든 GH 슬롯 오토가 정지되었습니다.",
+  },
   auto_total_goal_reached: {
     title: "오토 합계 목표금액 달성",
     detail: "오토 합계가 목표금액에 도달하여 모든 GH 슬롯 오토가 정지되었습니다.",
@@ -86,7 +94,7 @@ export const claimOverallStopAlert = (
 ) => {
   const alert = STOP_ALERTS[reason];
   if (!alert || gameId === null || gameId === undefined) return null;
-  const key = reason === "auto_total_goal_reached"
+  const key = reason.startsWith("auto_total_")
     ? `${reason}:${stopDetail?.auto_session_id || gameId}`
     : String(gameId);
   if (alertedGameIds.has(key)) return null;
