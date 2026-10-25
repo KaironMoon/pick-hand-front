@@ -219,6 +219,8 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
         message = "게임 슬롯 6개가 모두 사용 중이며, 현재 게임은 슬롯에 연결되어 있지 않습니다. 시작 창을 닫고 해당 슬롯을 다시 선택해 주세요.";
       } else if (detail?.error === "auto_game_already_running") {
         message = "이 게임의 자동 베팅이 이미 실행 중입니다";
+      } else if (detail?.error === "game_not_active") {
+        message = "종료된 게임에서는 오토를 시작할 수 없습니다. 새 게임을 시작해 주세요.";
       } else if (detail?.error === "auto_table_already_running") {
         message = "이 테이블의 자동 베팅이 이미 실행 중입니다";
       } else if (detail?.error === "caller_user_mismatch") {

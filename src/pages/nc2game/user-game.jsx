@@ -719,8 +719,18 @@ export default function Nc2UserGamePage() {
   useEffect(() => {
     if (!game?.game_id || historyReplayGameId || replay.active) return undefined;
     let cancelled = false;
-    const poll = () => autoService.getAutoStatus(game.game_id, "nc2").then((status) => {
+    const poll = () => autoService.getAutoStatus(game.game_id, "nc2").then(async (status) => {
       if (cancelled || !gameResponseGuardRef.current.isActive(game.game_id)) return;
+      if (!status.running) {
+        const slots = await refreshGameSlots();
+        if (cancelled || !gameResponseGuardRef.current.isActive(game.game_id)) return;
+        const replacement = slots.find((slot) => slot.slot_no === selectedSlotNo && slot.occupied);
+        if (replacement && replacement.game_id !== game.game_id) {
+          syncAutoStatusFromSlot(replacement);
+          await restore(replacement.game_id, { activate: true });
+          return;
+        }
+      }
       setAutoStatus(status);
       setAutoStatusError(null);
       if (status.running && (status.play_mode === "one" || status.play_mode === "keep")) {
@@ -745,7 +755,7 @@ export default function Nc2UserGamePage() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [game?.game_id, refreshGameSlots, restore, historyReplayGameId, replay.active]);
+  }, [game?.game_id, refreshGameSlots, restore, historyReplayGameId, replay.active, selectedSlotNo, syncAutoStatusFromSlot]);
 
   useEffect(() => {
     setAmountViewMode(autoStatus.running ? "actual" : "calculated");

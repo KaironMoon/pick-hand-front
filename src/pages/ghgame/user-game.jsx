@@ -1459,6 +1459,13 @@ export default function GhUserGamePage() {
     const tick = async () => {
       try {
         const st = await autoService.getAutoStatus(gameId);
+        if (cancelled) return;
+        if (!st.running) {
+          // KEEP may already have a running successor in the same server slot.
+          const slots = await refreshGameSlots();
+          if (cancelled) return;
+          if (await syncToReplacementSlot(slots, gameId, selectedSlotNo)) return;
+        }
         if (!cancelled) {
           if (st.running && (st.play_mode === "one" || st.play_mode === "keep")) {
             setAutoPlayMode(st.play_mode);
@@ -1483,7 +1490,7 @@ export default function GhUserGamePage() {
     tick();
     const id = setInterval(tick, 5000);  // auto-status 폴링 1s → 5s로 완화 (호출량 감소 260603)
     return () => { cancelled = true; clearInterval(id); };
-  }, [gameId, autoFeatureAvailable, autoStatus.running, historyReplayGameId, replay.active, showOverallStopAlert]);
+  }, [gameId, autoFeatureAvailable, autoStatus.running, historyReplayGameId, replay.active, showOverallStopAlert, refreshGameSlots, syncToReplacementSlot, selectedSlotNo]);
 
   // ── Auto WebSocket 구독 (실시간 이벤트 푸시) ───────────
   useEffect(() => {
@@ -1930,7 +1937,6 @@ export default function GhUserGamePage() {
     setProcessing(true);
     try {
       setReplay({ active: false, external: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
-      await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gameId } });
       await startGame({ slotNo: selectedSlotNo, replaceGameId: gameId });
       await refreshGameSlots();
     } catch (err) {
@@ -2957,7 +2963,15 @@ export default function GhUserGamePage() {
           <Typography>이어서 하시겠습니까?</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={async () => { const gid = resumeGame.game_id; setResumeGame(null); try { await apiCaller.post(GH_GAMES_API.END, null, { params: { game_id: gid } }); } catch {} startGame(); }}>새 게임</Button>
+          <Button onClick={async () => {
+            const gid = resumeGame.game_id;
+            setResumeGame(null);
+            try {
+              await startGame({ slotNo: selectedSlotNo, replaceGameId: gid });
+            } catch {
+              setRejectMsg("새 게임으로 교체하지 못했습니다.");
+            }
+          }}>새 게임</Button>
           <Button onClick={() => { const gid = resumeGame.game_id; setResumeGame(null); restoreGame(gid, { activate: true }); }} variant="contained">이어하기</Button>
         </DialogActions>
       </Dialog>
