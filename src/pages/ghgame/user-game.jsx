@@ -1250,7 +1250,7 @@ export default function GhUserGamePage() {
     try {
       await apiCaller.put(USER_BET_SETTINGS_API.SAVE("gh"), {
         config,
-      });
+      }, { timeout: 120000 });
       await refreshGameSlots();
     } finally {
       autoTotalVersionRef.current += 1;
