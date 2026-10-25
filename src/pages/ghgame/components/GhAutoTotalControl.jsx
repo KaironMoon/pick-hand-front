@@ -13,7 +13,7 @@ function errorMessage(error, fallback) {
   return typeof detail === "string" ? detail : fallback;
 }
 
-export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditGoal, onSaveGoal, onReset }) {
+export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditGoal, onSaveGoal, onSaveRisk, onReset }) {
   const configuredGoal = Number(risk?.configured_auto_total_goal_amount ?? 0);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -21,6 +21,7 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [notice, setNotice] = useState(null);
+  const [riskDraft, setRiskDraft] = useState({});
 
   useEffect(() => {
     if (!dirty) setDraft(configuredGoal > 0 ? String(configuredGoal) : "");
@@ -28,6 +29,12 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
 
   const showDialog = () => {
     setDraft(configuredGoal > 0 ? String(configuredGoal) : "");
+    setRiskDraft({
+      auto_total_drawdown_start_amount: risk?.configured_auto_total_drawdown_start_amount ?? 0,
+      auto_total_drawdown_percent: risk?.auto_total_drawdown_percent ?? 0,
+      auto_total_stopped_slot_count: risk?.auto_total_stopped_slot_count ?? 0,
+      auto_total_stopped_slot_pnl: risk?.configured_auto_total_stopped_slot_pnl ?? 0,
+    });
     setDirty(false);
     setNotice(null);
     setOpen(true);
@@ -134,6 +141,36 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
                 목표액 삭제
               </Button>
             </Box>
+          </Box>
+          <Box component="form" sx={{ mt: 3, pt: 2, borderTop: "1px solid", borderColor: "divider" }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              runAction(() => onSaveRisk(riskDraft), "전체 오토 종료 조건을 저장했습니다.", "전체 오토 종료 조건을 저장하지 못했습니다.");
+            }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>P 달성 후 최고 PNL 손실 시 정지</Typography>
+            {[
+              ["auto_total_drawdown_start_amount", "감시 시작 금액 (P) · ×1 기준"],
+              ["auto_total_drawdown_percent", "최고 PNL 대비 손실률 (%)", 100],
+              ["auto_total_stopped_slot_count", "종료 슬롯 수 (개)", 6],
+              ["auto_total_stopped_slot_pnl", "종료 슬롯 조건의 합계 PNL (P) · ×1 기준"],
+            ].map(([key, label, max], index) => (
+              <Box key={key}>
+                {index === 2 && <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>종료 슬롯 수 & 합계 PNL 달성 시 정지</Typography>}
+                <TextField fullWidth size="small" type="number" label={label}
+                  value={riskDraft[key] ?? 0} disabled={busy || !canEditGoal}
+                  inputProps={{ min: 0, max, step: key.includes("count") ? 1 : 0.1 }} sx={{ mb: 1.5 }}
+                  onChange={(event) => {
+                    setRiskDraft((prev) => ({ ...prev, [key]: event.target.value }));
+                    setNotice(null);
+                  }} />
+              </Box>
+            ))}
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+              각 조건의 두 값이 모두 충족되면 전체 GH 오토가 정지됩니다. 0은 사용 안 함입니다.
+              금액에는 공통 실배팅 배율을 적용하며 슬롯 수와 손실률에는 적용하지 않습니다.
+              종료 슬롯은 현재 연결된 슬롯의 마지막 오토가 종료된 슬롯입니다.
+            </Typography>
+            <Button type="submit" variant="contained" disabled={busy || !canEditGoal}>종료 조건 저장</Button>
           </Box>
           <Box sx={{ mt: 3, pt: 2, borderTop: "1px solid", borderColor: "divider" }}>
             <Button variant="outlined" disabled={busy} onClick={resetTotal}>합계 초기화</Button>

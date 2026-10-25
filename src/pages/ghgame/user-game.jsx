@@ -1245,11 +1245,11 @@ export default function GhUserGamePage() {
     }
   };
 
-  const saveAutoTotalGoal = async (amount) => {
+  const saveAutoTotalSettings = async (config) => {
     autoTotalVersionRef.current += 1;
     try {
       await apiCaller.put(USER_BET_SETTINGS_API.SAVE("gh"), {
-        config: { auto_total_goal_amount: amount },
+        config,
       });
       await refreshGameSlots();
     } finally {
@@ -2461,7 +2461,8 @@ export default function GhUserGamePage() {
                 {/* 행1: 오토 슬롯 PNL 합계 + (마틴Z 또는 크루즈) */}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                   <GhAutoTotalControl total={autoPnlTotal} goal={autoTotalGoal} risk={autoTotalRisk} betCap={roundState?.auto_final_bet_cap_amount}
-                    canEditGoal={isAdmin} onSaveGoal={saveAutoTotalGoal} onReset={resetAutoTotal} />
+                    canEditGoal onSaveGoal={(amount) => saveAutoTotalSettings({ auto_total_goal_amount: amount })}
+                    onSaveRisk={saveAutoTotalSettings} onReset={resetAutoTotal} />
                   {/* 라보쉐르 활성이면 크루즈/마틴Z 대신 라보쉐르 표시 */}
                   {betData?.user_martin?.labouchere?.enabled ? (() => {
                     const lb = betData.user_martin.labouchere;
