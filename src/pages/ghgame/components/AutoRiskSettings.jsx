@@ -9,7 +9,7 @@ export function autoRiskSummary(config = {}) {
     start > 0 && percent > 0
       ? `오토 합계 ${start}P 달성 후 최고 PNL에서 ${percent}% 이상 하락하면 전체 GH 오토 정지`
       : "오토 최고 PNL 손실 종료: 사용안함",
-    count > 0 && pnl > 0
+    count > 0 && pnl !== 0
       ? `종료 슬롯 ${count}개 이상이고 전체 오토 합계 PNL ${pnl}P 이상이면 전체 GH 오토 정지`
       : "종료 슬롯 수 + PNL 종료: 사용안함",
   ].join("\n");
@@ -42,7 +42,7 @@ export function martinZRateSummary(config = {}, status = {}) {
 
 export default function AutoRiskSettings({ config, onChange }) {
   const input = (key, label, max, width = 90) => (
-    <input type="number" aria-label={label} min="0" max={max}
+    <input type="number" aria-label={label} min={key === "auto_total_stopped_slot_pnl" ? undefined : 0} max={max}
       step={key.includes("count") ? "1" : "0.1"} value={config[key] ?? 0}
       onChange={(event) => onChange(key, event.target.value)}
       style={{ width, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }} />
@@ -65,7 +65,7 @@ export default function AutoRiskSettings({ config, onChange }) {
       {input("auto_total_stopped_slot_count", "종료 슬롯 수 (개)", 6, 60)}
       <Typography variant="caption">개 종료하고 오토합계</Typography>
       {input("auto_total_stopped_slot_pnl", "오토 합계 PNL (P)")}
-      <Typography variant="caption">P 달성하면 전체 GH 오토 정지</Typography>
+      <Typography variant="caption">P 이상이면 전체 GH 오토 정지 · 음수 입력 가능</Typography>
     </Box>
     <Typography variant="caption" color="text.secondary">종료 슬롯은 현재 연결된 슬롯의 마지막 오토가 종료된 슬롯입니다. 두 조건 모두 충족 시 정지하며 0은 사용안함입니다. 합계 초기화 시 최고 PNL도 초기화됩니다.</Typography>
     <Tooltip title={finalBetCapSummary(config.auto_final_bet_cap_amount)}>

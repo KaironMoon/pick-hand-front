@@ -158,7 +158,7 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
                 {index === 2 && <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>종료 슬롯 수 & 합계 PNL 달성 시 정지</Typography>}
                 <TextField fullWidth size="small" type="number" label={label}
                   value={riskDraft[key] ?? 0} disabled={busy || !canEditGoal}
-                  inputProps={{ min: 0, max, step: key.includes("count") ? 1 : 0.1 }} sx={{ mb: 1.5 }}
+                  inputProps={{ min: key === "auto_total_stopped_slot_pnl" ? undefined : 0, max, step: key.includes("count") ? 1 : 0.1 }} sx={{ mb: 1.5 }}
                   onChange={(event) => {
                     setRiskDraft((prev) => ({ ...prev, [key]: event.target.value }));
                     setNotice(null);
@@ -169,6 +169,7 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
               각 조건의 두 값이 모두 충족되면 전체 GH 오토가 정지됩니다. 0은 사용 안 함입니다.
               금액에는 공통 실배팅 배율을 적용하며 슬롯 수와 손실률에는 적용하지 않습니다.
               종료 슬롯은 현재 연결된 슬롯의 마지막 오토가 종료된 슬롯입니다.
+              종료 슬롯 조건의 합계 PNL은 음수도 입력할 수 있으며, 설정값 이상이면 조건을 충족합니다.
             </Typography>
             <Button type="submit" variant="contained" disabled={busy || !canEditGoal}>종료 조건 저장</Button>
           </Box>
