@@ -26,6 +26,7 @@ import { findGhSlotByNumber, findGhSlotReplacement } from "./slot-sync.js";
 import { claimOverallStopAlert } from "./overall-stop-alert";
 import { buildGoalStatusItems, formatGoalIndicator, formatGoalTarget } from "./goal-status.js";
 import { resolvePickMartinSummary } from "./pick-martin-summary.js";
+import { resolveSlotPnl } from "./slot-summary.js";
 import { resolveBetBoardDirection } from "./bet-board-direction.js";
 import { createGameResponseGuard } from "../nc2game/game-response-guard.js";
 import {
@@ -113,7 +114,7 @@ function GoalStatusBar({ roundState, autoStatus, gameSlots, gameId }) {
         const slot = gameSlots.find((item) => item.slot_no === slotNo);
         const occupied = Boolean(slot?.occupied);
         const current = occupied && Number(slot.game_id) === Number(gameId) && roundState;
-        const pnl = current ? (roundState.round_amount_table?.total_pnl ?? 0) : (slot?.total_pnl ?? 0);
+        const pnl = resolveSlotPnl(slot, gameId, roundState, autoStatus);
         const step = current ? (roundState.pick_martin?.step || 1) : (slot?.current_step ?? 1);
         return (
           <Box
