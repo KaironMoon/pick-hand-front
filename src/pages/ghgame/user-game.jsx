@@ -100,7 +100,7 @@ const getShoeResultCount = (data) => {
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
 
-function GoalStatusBar({ roundState, autoStatus, gameSlots, gameId }) {
+function GoalStatusBar({ roundState, autoStatus, gameSlots, gameId, onSlotSelect, slotSelectionBlocked }) {
   const items = buildGoalStatusItems(
     roundState?.strategy_goals,
     roundState?.overall_stop,
@@ -119,22 +119,35 @@ function GoalStatusBar({ roundState, autoStatus, gameSlots, gameId }) {
         return (
           <Box
             key={slotNo}
+            component="button"
+            type="button"
+            disabled={slotSelectionBlocked}
+            onClick={() => onSlotSelect(slotNo)}
             title={occupied ? `${slotNo}번 슬롯 / 전체 PNL / 현재 단계` : `${slotNo}번 빈 슬롯`}
             sx={{
-              display: "flex", alignItems: "center", gap: 1, px: 1, height: 28,
+              display: "grid", gridTemplateColumns: "16px 22px minmax(0, 1fr)",
+              alignItems: "center", gap: 0.25, px: 0.5, py: 0, height: 28,
+              width: 100, flexShrink: 0, boxSizing: "border-box",
+              fontFamily: "inherit", textAlign: "left",
+              cursor: slotSelectionBlocked ? "default" : "pointer",
+              "&:focus-visible": { outline: "2px solid #90caf9", outlineOffset: 2 },
+              fontVariantNumeric: "tabular-nums",
               border: "1px solid #59616d", borderRadius: 1,
               backgroundColor: !occupied || pnl === 0 ? "#11161d" : pnl > 0 ? "#0e5635" : "#63232b",
               color: occupied ? "#fff" : "#888", fontSize: 11, fontWeight: "bold", whiteSpace: "nowrap",
             }}
           >
             <span>{slotNo}번</span>
-            <span>PNL {occupied ? formatGoalTarget(pnl) : "—"}</span>
             <Box component="span" sx={occupied && step >= 5 ? {
               animation: "ghSlotStepBlink 0.8s steps(2, end) infinite",
               "@keyframes ghSlotStepBlink": { "0%, 100%": { opacity: 1 }, "50%": { opacity: 0.2 } },
             } : {}}>
               {occupied ? `${step}S` : "—"}
             </Box>
+            <span style={{ textAlign: "right" }}>{occupied ? Number(pnl).toLocaleString(undefined, {
+              minimumFractionDigits: 1,
+              maximumFractionDigits: 1,
+            }) : "—"}</span>
           </Box>
         );
       })}
@@ -2355,7 +2368,14 @@ export default function GhUserGamePage() {
           </span>
         )}
       </Box>
-      <GoalStatusBar roundState={roundState} autoStatus={autoStatus} gameSlots={gameSlots} gameId={gameId} />
+      <GoalStatusBar
+        roundState={roundState}
+        autoStatus={autoStatus}
+        gameSlots={gameSlots}
+        gameId={gameId}
+        onSlotSelect={handleSlotSelect}
+        slotSelectionBlocked={slotBusy || replay.active}
+      />
       {autoStatus.running && autoStatus.phase === "waiting_new_shoe" && autoStatus.sync_notice && (
         <Alert severity="info" sx={{ mb: 1 }}>{autoStatus.sync_notice}</Alert>
       )}
