@@ -99,15 +99,44 @@ const getShoeResultCount = (data) => {
 const GRID_ROWS = 6;
 const GRID_COLS = 40;
 
-function GoalStatusBar({ roundState, autoStatus }) {
+function GoalStatusBar({ roundState, autoStatus, gameSlots, gameId }) {
   const items = buildGoalStatusItems(
     roundState?.strategy_goals,
     roundState?.overall_stop,
     autoStatus,
-  );
+  ).filter((item) => item.key === "overall-pnl");
 
   return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 2 }}>
+    <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.5, mb: 2 }}>
+      {Array.from({ length: 6 }, (_, index) => {
+        const slotNo = index + 1;
+        const slot = gameSlots.find((item) => item.slot_no === slotNo);
+        const occupied = Boolean(slot?.occupied);
+        const current = occupied && Number(slot.game_id) === Number(gameId) && roundState;
+        const pnl = current ? (roundState.round_amount_table?.total_pnl ?? 0) : (slot?.total_pnl ?? 0);
+        const step = current ? (roundState.pick_martin?.step || 1) : (slot?.current_step ?? 1);
+        return (
+          <Box
+            key={slotNo}
+            title={occupied ? `${slotNo}번 슬롯 / 전체 PNL / 현재 단계` : `${slotNo}번 빈 슬롯`}
+            sx={{
+              display: "flex", alignItems: "center", gap: 1, px: 1, height: 28,
+              border: "1px solid #59616d", borderRadius: 1,
+              backgroundColor: !occupied || pnl === 0 ? "#11161d" : pnl > 0 ? "#0e5635" : "#63232b",
+              color: occupied ? "#fff" : "#888", fontSize: 11, fontWeight: "bold", whiteSpace: "nowrap",
+            }}
+          >
+            <span>{slotNo}번</span>
+            <span>PNL {occupied ? formatGoalTarget(pnl) : "—"}</span>
+            <Box component="span" sx={occupied && step >= 5 ? {
+              animation: "ghSlotStepBlink 0.8s steps(2, end) infinite",
+              "@keyframes ghSlotStepBlink": { "0%, 100%": { opacity: 1 }, "50%": { opacity: 0.2 } },
+            } : {}}>
+              {occupied ? `${step}S` : "—"}
+            </Box>
+          </Box>
+        );
+      })}
       {items.map((item) => {
         const text = formatGoalIndicator(item);
         const title = item.target > 0
@@ -2325,7 +2354,7 @@ export default function GhUserGamePage() {
           </span>
         )}
       </Box>
-      <GoalStatusBar roundState={roundState} autoStatus={autoStatus} />
+      <GoalStatusBar roundState={roundState} autoStatus={autoStatus} gameSlots={gameSlots} gameId={gameId} />
       {autoStatus.running && autoStatus.phase === "waiting_new_shoe" && autoStatus.sync_notice && (
         <Alert severity="info" sx={{ mb: 1 }}>{autoStatus.sync_notice}</Alert>
       )}
