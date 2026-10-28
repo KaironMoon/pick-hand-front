@@ -676,7 +676,7 @@ function MartinBSection({ martin, onChange }) {
           </tr>)}</tbody>
         </table>
       </Box>
-      <Box sx={{ p: 0.75, textAlign: "left" }}>성공마감은 누적 승수입니다. 어시회차 또는 어시단계 중 하나를 충족하면 어시가 작동합니다.</Box>
+      <Box sx={{ p: 0.75, textAlign: "left" }}>성공마감은 누적 승수입니다. 어시는 성공마감 여부와 관계없이 회차 또는 패배 조건을 충족하면 작동하며, 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동합니다.</Box>
     </td></tr>
     <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#6a1b9a"
       rowCount={MARTIN_B_PATTERN_ROW_COUNT} rowLabel={martinBPatternLabel} recommendSingleStep={false} />
