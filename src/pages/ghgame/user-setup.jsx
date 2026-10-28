@@ -2,6 +2,7 @@ import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } f
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
 import { duplicatePatternRows } from "./pattern-duplicates.js";
+import { MARTIN_B_PATTERN_ROW_COUNT, martinBPatternLabel, martinBPatternOptions } from "./martin-b-settings.js";
 import { Fragment, memo, useMemo, useState, useEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
@@ -452,7 +453,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true }) {
+const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -556,11 +557,11 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
               }}
             >
               <Typography component="span" sx={{ minWidth: 34, textAlign: "left", fontSize: 13 }}>
-                {rowIndex + 1}번
+                {rowLabel(rowIndex)}번
               </Typography>
               <Box
                 role="group"
-                aria-label={`패턴 ${rowIndex + 1}${isDuplicate ? " (중복)" : ""}`}
+                aria-label={`패턴 ${rowLabel(rowIndex)}${isDuplicate ? " (중복)" : ""}`}
                 title={isDuplicate ? "동일하거나 BP가 반전된 패턴이 중복 입력되어 있습니다." : undefined}
                 sx={{
                   display: "flex",
@@ -634,17 +635,65 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
   );
 });
 
-function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
-  const isB = kind === "B";
-  const color = isB ? "#6a1b9a" : "#ef6c00";
+function MartinBSection({ martin, onChange }) {
+  const options = martinBPatternOptions(martin.pattern_options);
+  const updateOption = (index, patch) => onChange({
+    ...martin,
+    pattern_options: options.map((option, i) => i === index ? { ...option, ...patch } : option),
+  });
+  const numberInput = (index, field, max, label) => (
+    <input type="number" min={0} max={max} step={1}
+      aria-label={`마틴B ${index + 1}번 ${label}`}
+      value={options[index][field]}
+      onChange={(event) => updateOption(index, { [field]: Number(event.target.value) })}
+      style={{ width: 58 }} />
+  );
+  return <>
+    <MartinSection name="martin_b" label="마틴B" martin={martin} onChange={onChange} labelColor="#6a1b9a" />
+    <tr><td colSpan={6} style={{ ...normalCell, padding: 0 }}>
+      <Box sx={{ maxHeight: 480, overflow: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }} aria-label="마틴B 패턴별 옵션">
+          <thead style={{ position: "sticky", top: 0, background: "#252525", zIndex: 1 }}><tr>
+            {["전체패턴번호", "성공마감", "어시회차", "어시단계", "전체/부분", "부분패턴번호 지정선택 (0: 미지정)"].map((label) => <th key={label} style={headerStyle}>{label}</th>)}
+          </tr></thead>
+          <tbody>{options.map((option, index) => <tr key={index}>
+            <td style={normalCell}>{index + 1}번{index === 0 ? " (1-1~1-10)" : ""}</td>
+            <td style={normalCell}>{numberInput(index, "success_limit", 80, "성공마감")} 승</td>
+            <td style={normalCell}>{numberInput(index, "assist_round", 80, "어시회차")} 회차</td>
+            <td style={normalCell}>{numberInput(index, "assist_losses", 80, "어시단계")} 패 시</td>
+            <td style={normalCell}><select aria-label={`마틴B ${index + 1}번 전체/부분`} value={option.assist_mode}
+              onChange={(event) => updateOption(index, { assist_mode: event.target.value })}>
+              <option value="all">전체</option><option value="partial">부분</option>
+            </select></td>
+            <td style={normalCell}>{option.partial_patterns.map((number, partialIndex) => <input
+              key={partialIndex} type="number" min={0} max={30} step={1}
+              aria-label={`마틴B ${index + 1}번 부분패턴 ${partialIndex + 1}`}
+              value={number}
+              onChange={(event) => updateOption(index, {
+                partial_patterns: option.partial_patterns.map((value, i) => i === partialIndex ? Number(event.target.value) : value),
+              })}
+              style={{ width: 52, margin: "0 3px" }} />)}</td>
+          </tr>)}</tbody>
+        </table>
+      </Box>
+      <Box sx={{ p: 0.75, textAlign: "left" }}>성공마감은 누적 승수입니다. 어시회차 또는 어시단계 중 하나를 충족하면 어시가 작동합니다.</Box>
+    </td></tr>
+    <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#6a1b9a"
+      rowCount={MARTIN_B_PATTERN_ROW_COUNT} rowLabel={martinBPatternLabel} recommendSingleStep={false} />
+    <MartinStopBetRoundRow martin={martin} onChange={onChange} color="#6a1b9a" />
+  </>;
+}
+
+function ConditionalMartinSection({ name, label, martin, onChange }) {
+  const color = "#ef6c00";
   const triggerMode = String(martin.trigger_mode || "M").toUpperCase() === "H" ? "H" : "M";
   const triggerKey = triggerMode === "H" ? "trigger_hit_streak" : "trigger_miss_streak";
   const noCondition = Number(martin[triggerKey] || 0) === 0;
   return (
     <>
       <MartinSection
-        name={name || (isB ? "martin_b" : "martin_c")}
-        label={label || `마틴${kind}`}
+        name={name || "martin_c"}
+        label={label || "마틴C"}
         martin={martin}
         onChange={onChange}
         labelColor={color}
@@ -652,50 +701,41 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
       <tr>
         <td style={{ ...labelCellStyle, color }}>발동조건</td>
         <td colSpan={2} style={normalCell}>
-          {isB ? "계산기판 총 BET" : (
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5 }}>
-              <span>메인 빅로드</span>
-              <button type="button"
-                aria-pressed={noCondition}
-                onClick={() => onChange({ ...martin, [triggerKey]: 0 })}
-                style={{ background: noCondition ? "#388e3c" : "#252525", color: "#fff", border: "1px solid #555", borderRadius: 3, padding: "4px 8px", cursor: "pointer" }}>
-                조건 없음
-              </button>
-              {["M", "H"].map((mode) => (
-                <label key={mode} style={{ display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer" }}>
-                  <input
-                    type="radio"
-                    name={`${name || "martin_c"}-trigger-mode`}
-                    value={mode}
-                    checked={triggerMode === mode}
-                    onChange={() => onChange({ ...martin, trigger_mode: mode })}
-                  />
-                  {mode}
-                </label>
-              ))}
-            </Box>
-          )}
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5 }}>
+            <span>메인 빅로드</span>
+            <button type="button"
+              aria-pressed={noCondition}
+              onClick={() => onChange({ ...martin, [triggerKey]: 0 })}
+              style={{ background: noCondition ? "#388e3c" : "#252525", color: "#fff", border: "1px solid #555", borderRadius: 3, padding: "4px 8px", cursor: "pointer" }}>
+              조건 없음
+            </button>
+            {["M", "H"].map((mode) => (
+              <label key={mode} style={{ display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name={`${name || "martin_c"}-trigger-mode`}
+                  value={mode}
+                  checked={triggerMode === mode}
+                  onChange={() => onChange({ ...martin, trigger_mode: mode })}
+                />
+                {mode}
+              </label>
+            ))}
+          </Box>
         </td>
         <EditableCell
-          value={isB
-            ? (martin.trigger_bet_amount || 0)
-            : triggerMode === "H"
+          value={triggerMode === "H"
               ? (martin.trigger_hit_streak || 0)
               : (martin.trigger_miss_streak || 0)}
           onChange={(value) => onChange({
             ...martin,
-            [isB ? "trigger_bet_amount" : triggerMode === "H" ? "trigger_hit_streak" : "trigger_miss_streak"]: isB
-              ? Math.max(0, value)
-              : Math.max(0, Math.min(20, value)),
+            [triggerKey]: Math.max(0, Math.min(20, value)),
           })}
-          suffix={isB ? "P" : triggerMode}
+          suffix={triggerMode}
           style={greenCell}
-          decimal={isB}
         />
         <td colSpan={2} style={normalCell}>
-          {isB
-            ? "이상에서 1단계 발동"
-            : noCondition
+          {noCondition
               ? "승패 횟수 조건 생략 (패턴 조건 유지)"
               : triggerMode === "H"
               ? "연속 적중이 설정값과 정확히 일치하면 1단계 발동"
@@ -710,20 +750,16 @@ function ConditionalMartinSection({ kind, name, label, martin, onChange }) {
         color={color}
       />
       <MartinStopBetRoundRow martin={martin} onChange={onChange} color={color} />
-      {!isB && (
-        <>
-          <tr>
-            <td colSpan={6} style={normalCell}>이 배팅은 별도 트랙으로 배팅됩니다.</td>
-          </tr>
-          <MartinPatternOnlyRows
-            martin={martin}
-            onChange={onChange}
-            color={color}
-            highlightDuplicates
-            showExactLossCondition
-          />
-        </>
-      )}
+      <tr>
+        <td colSpan={6} style={normalCell}>이 배팅은 별도 트랙으로 배팅됩니다.</td>
+      </tr>
+      <MartinPatternOnlyRows
+        martin={martin}
+        onChange={onChange}
+        color={color}
+        highlightDuplicates
+        showExactLossCondition
+      />
     </>
   );
 }
@@ -2205,9 +2241,9 @@ const DEFAULT_MARTIN_Z = {
 };
 const DEFAULT_MARTIN_B = {
   ...DEFAULT_MARTIN,
-  trigger_bet_amount: 0,
   stop_bet_round: 0,
-  pattern_block: { ...EMPTY_MARTIN_PATTERN_RULE },
+  pattern_only: [],
+  pattern_options: martinBPatternOptions(),
 };
 const DEFAULT_MARTIN_C = {
   ...DEFAULT_MARTIN,
@@ -3512,13 +3548,12 @@ export default function GhUserSetupPage() {
         <table style={martinTableStyle}>
           <tbody>
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-            <ConditionalMartinSection kind="B" martin={martinB} onChange={martinChanges.martin_b} />
+            <MartinBSection martin={martinB} onChange={martinChanges.martin_b} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             {martinCs.map(([key, label, martin], index) => (
               <Fragment key={key}>
                 {index > 0 && <tr><td colSpan={6} style={{ height: 12 }}></td></tr>}
                 <ConditionalMartinSection
-                  kind="C"
                   name={key}
                   label={label}
                   martin={martin}
