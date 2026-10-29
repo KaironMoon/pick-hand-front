@@ -453,7 +453,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true }) {
+const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -462,6 +462,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
   const rules = Array.from({ length: rowCount }, (_, index) => ({
     ...EMPTY_MARTIN_PATTERN_RULE,
     ...(rawRules[index] && typeof rawRules[index] === "object" ? rawRules[index] : {}),
+    ...(showAssistUsage ? { assist_enabled: Boolean(rawRules[index]?.assist_enabled ?? rawRules[index]?.enabled) } : {}),
   }));
   const patternKeys = highlightDuplicates
     ? rules.map((rule) => patternCells(rule, PATTERN_ONLY_CELL_COUNT).join(""))
@@ -500,6 +501,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
                 ...EMPTY_MARTIN_PATTERN_RULE,
                 pattern: [],
                 ...(showMissCondition ? { min_miss_streak: 0 } : {}),
+                ...(showAssistUsage ? { assist_enabled: false } : {}),
               })),
             })}
             style={{ marginLeft: 12, cursor: "pointer" }}
@@ -627,6 +629,19 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
               >
                 {rule.enabled ? "사용함" : "사용안함"}
               </Box>
+              {showAssistUsage && (
+                <button
+                  type="button"
+                  aria-label={`패턴 ${rowLabel(rowIndex)} 어시사용`}
+                  aria-pressed={Boolean(rule.assist_enabled ?? rule.enabled)}
+                  onClick={() => updateRule(rowIndex, { assist_enabled: !(rule.assist_enabled ?? rule.enabled) })}
+                  style={{ padding: "4px 6px", border: "none", borderRadius: 4, cursor: "pointer",
+                    backgroundColor: (rule.assist_enabled ?? rule.enabled) ? GREEN : "#333",
+                    color: (rule.assist_enabled ?? rule.enabled) ? "#1b2e1b" : "#888", fontWeight: "bold" }}
+                >
+                  {(rule.assist_enabled ?? rule.enabled) ? "어시사용" : "어시사용안함"}
+                </button>
+              )}
             </Box>
           );
         }} />
@@ -654,10 +669,10 @@ function MartinBSection({ martin, onChange }) {
       <Box sx={{ maxHeight: 480, overflow: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }} aria-label="마틴B 패턴별 옵션">
           <thead style={{ position: "sticky", top: 0, background: "#252525", zIndex: 1 }}><tr>
-            {["전체패턴번호", "성공마감", "어시회차", "어시단계", "전체/부분", "부분패턴번호 지정선택 (0: 미지정)"].map((label) => <th key={label} style={headerStyle}>{label}</th>)}
+            {["전체패턴번호", "성공마감", "어시회차", "어시단계", "전체/부분", "부분패턴번호 지정선택 (0: 미지정)", "패턴 미발동 지정회차 (0: 미지정)", "지정회차까지 미발동 시"].map((label) => <th key={label} style={headerStyle}>{label}</th>)}
           </tr></thead>
           <tbody>{options.map((option, index) => <tr key={index}>
-            <td style={normalCell}>{index + 1}번{index === 0 ? " (1-1~1-10)" : ""}</td>
+            <td style={normalCell}>{index + 1}번{index < 5 ? ` (${index + 1}-1~${index + 1}-8)` : ""}</td>
             <td style={normalCell}>{numberInput(index, "success_limit", 80, "성공마감")} 승</td>
             <td style={normalCell}>{numberInput(index, "assist_round", 80, "어시회차")} 회차</td>
             <td style={normalCell}>{numberInput(index, "assist_losses", 80, "어시단계")} 패 시</td>
@@ -666,20 +681,28 @@ function MartinBSection({ martin, onChange }) {
               <option value="all">전체</option><option value="partial">부분</option>
             </select></td>
             <td style={normalCell}>{option.partial_patterns.map((number, partialIndex) => <input
-              key={partialIndex} type="number" min={0} max={30} step={1}
+              key={partialIndex} type="number" min={0} max={15} step={1}
               aria-label={`마틴B ${index + 1}번 부분패턴 ${partialIndex + 1}`}
               value={number}
               onChange={(event) => updateOption(index, {
                 partial_patterns: option.partial_patterns.map((value, i) => i === partialIndex ? Number(event.target.value) : value),
               })}
               style={{ width: 52, margin: "0 3px" }} />)}</td>
+            <td style={normalCell}>{numberInput(index, "untriggered_round", 80, "패턴 미발동 지정회차")} 회차</td>
+            <td style={normalCell}>
+              <select aria-label={`마틴B ${index + 1}번 지정회차 미발동 동작`} value={option.untriggered_action}
+                onChange={(event) => updateOption(index, { untriggered_action: event.target.value })}>
+                <option value="stop">베팅포기</option><option value="assist">어시패턴사용</option>
+              </select>
+            </td>
           </tr>)}</tbody>
         </table>
       </Box>
-      <Box sx={{ p: 0.75, textAlign: "left" }}>성공마감은 누적 승수입니다. 어시는 성공마감 여부와 관계없이 회차 또는 패배 조건을 충족하면 작동하며, 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동합니다.</Box>
+      <Box sx={{ p: 0.75, textAlign: "left" }}>성공마감은 번호별 누적 승수이며, 도달하면 해당 번호의 본베팅과 어시베팅을 모두 종료합니다. 어시 승수는 어시를 지정한 번호에 누적됩니다. 어시 대상으로는 어시사용인 입력 패턴만 사용하며, 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동합니다.</Box>
+      <Box sx={{ p: 0.75, textAlign: "left" }}>번호별 지정회차 결과까지 소속 패턴이 한 번도 나오지 않으면 다음 회차부터 베팅포기 또는 어시패턴사용을 적용합니다. 어시패턴사용은 어시회차·어시단계를 무시하고 전체/부분 설정을 따르며, 지정 승수에 도달하면 종료합니다.</Box>
     </td></tr>
     <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#6a1b9a"
-      rowCount={MARTIN_B_PATTERN_ROW_COUNT} rowLabel={martinBPatternLabel} recommendSingleStep={false} />
+      rowCount={MARTIN_B_PATTERN_ROW_COUNT} rowLabel={martinBPatternLabel} recommendSingleStep={false} showAssistUsage />
     <MartinStopBetRoundRow martin={martin} onChange={onChange} color="#6a1b9a" />
   </>;
 }

@@ -74,6 +74,40 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
                 </Box>
               </Box>
             </Box>
+            {Boolean(detail.martin_b_bets?.length) && (
+              <Box>
+                <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>마틴B 본베팅 · 어시베팅 내역</Typography>
+                {detail.martin_b_bets.map((bet) => (
+                  <Box key={bet.pattern_no} sx={{ mb: 1.5, p: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+                    <Typography fontWeight={700}>
+                      {bet.pattern_no}번 · {bet.step}단계 · 승수 귀속: {bet.pattern_no}번
+                    </Typography>
+                    {bet.untriggered_action === "assist" && (
+                      <Typography variant="body2" color="text.secondary">지정회차까지 패턴 미발동으로 어시 전환</Typography>
+                    )}
+                    <Box sx={{ overflowX: "auto", mt: 1 }}>
+                      <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13,
+                        "& th, & td": { p: 0.75, textAlign: "left", borderBottom: "1px solid", borderColor: "divider" } }}>
+                        <thead><tr><th scope="col">구분</th><th scope="col">사용 패턴</th><th scope="col">일치 패턴</th><th scope="col">방향</th><th scope="col">금액</th></tr></thead>
+                        <tbody>{bet.matches.map((match) => (
+                          <tr key={match.rule_no}>
+                            <td>{match.bet_role === "main" ? "본베팅" : "어시베팅"}</td>
+                            <td>{match.pattern_label}번</td>
+                            <td style={{ fontFamily: "monospace" }}>{sequenceText(match.matched_sequence)}</td>
+                            <td>{match.direction}</td><td>{formatP(match.amount)}</td>
+                          </tr>
+                        ))}</tbody>
+                      </Box>
+                    </Box>
+                    <Typography sx={{ mt: 1 }}>
+                      번호 내 합산: {sideText(bet.direction)} · {formatP(bet.amount)}
+                      {" · "}결과: {bet.status === "hit" ? "승" : bet.status === "miss" ? "패" : detail.actual === "T" ? "타이" : "—"}
+                      {" · "}손익: {formatP(bet.pnl)}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
             <Box>
               <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>글로벌히트 생성픽 근거</Typography>
               {!detail.globalhit_generated_picks?.length ? (
