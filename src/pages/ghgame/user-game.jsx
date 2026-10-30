@@ -2389,6 +2389,8 @@ export default function GhUserGamePage() {
       {showAutoOnly ? (
         <Box role="status" aria-live="polite" sx={{
           minHeight: isMobile ? 102 : 162, mb: 2, px: 2, py: 1,
+          // 왼쪽 조작부 372 + 사이 간격 8 + 배팅판 안쪽 여백 4 + 배팅표 686 + 끝선 보정 15.
+          width: 1085,
           border: "1px solid #87ceeb", boxSizing: "border-box",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
           textAlign: "center", backgroundColor: "background.paper",

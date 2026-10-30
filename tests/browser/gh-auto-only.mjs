@@ -156,6 +156,20 @@ export default async function verifyGhAutoOnly(page) {
     check(await board.getByRole('row').count() === 6, 'Six pattern rows');
     check(await board.getByRole('rowheader').count() === 6, 'Six left pattern headers');
     check(await board.getByRole('cell').count() === 60, 'Sixty random cells');
+    const checkNoticeAlignment = async () => {
+      const noticeRight = await page.getByText('Global hit ai system service testing...', { exact: true })
+        .locator('..').evaluate(el => el.getBoundingClientRect().right);
+      const boardRight = await board.evaluate(el => el.getBoundingClientRect().right);
+      const pnlRight = await page.getByText('전체 PNL', { exact: true })
+        .locator('..').evaluate(el => el.getBoundingClientRect().right);
+      check(Math.abs(noticeRight - boardRight - 15) < 1 && Math.abs(noticeRight - pnlRight - 15) < 1,
+        `Notice must extend 15px beyond board and PNL: ${JSON.stringify({ noticeRight, boardRight, pnlRight })}`);
+    };
+    for (const width of [1280, 1920, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await checkNoticeAlignment();
+    }
+
     const patternBoardSize = await board.evaluate(el => ({ width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height }));
     check(patternBoardSize.width === originalBoardSize.width && patternBoardSize.height === originalBoardSize.height,
       `Pattern board must match original dimensions: ${JSON.stringify({ originalBoardSize, patternBoardSize })}`);
@@ -230,7 +244,7 @@ export default async function verifyGhAutoOnly(page) {
     check(await checkbox.count() === 0, 'Administrator editor must not offer auto-only');
     await page.getByRole('button', { name: '취소', exact: true }).click();
 
-    return { passed: ['original board dimensions retained', 'toolbar and PNL retained', 'new game dialog retained', 'only amount grid replaced', 'Martin B board 6 x 11', '60 server labels', 'gray/green outcomes', 'reload stability', 'mobile board', 'impersonation view toggle', 'target permissions retained', 'Martin B disabled unchanged', 'stopped notice', 'running notice', 'P/B blocked', 'BigRoad absent', 'bet amount event', 'result event', 'server PNL settlement', 'new shoe transition', 'stop current session', 'normal member unchanged', 'admin exempt', 'user list edit and save', 'admin editor exempt'], mockedApiRequests: mock.calls.length };
+    return { passed: ['notice extends 15px beyond board and PNL at 1280/1440/1920', 'original board dimensions retained', 'toolbar and PNL retained', 'new game dialog retained', 'only amount grid replaced', 'Martin B board 6 x 11', '60 server labels', 'gray/green outcomes', 'reload stability', 'mobile board', 'impersonation view toggle', 'target permissions retained', 'Martin B disabled unchanged', 'stopped notice', 'running notice', 'P/B blocked', 'BigRoad absent', 'bet amount event', 'result event', 'server PNL settlement', 'new shoe transition', 'stop current session', 'normal member unchanged', 'admin exempt', 'user list edit and save', 'admin editor exempt'], mockedApiRequests: mock.calls.length };
   } finally {
     await page.goto('about:blank');
     await page.unroute('**/api/**', handler);
