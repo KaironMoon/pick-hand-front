@@ -401,6 +401,7 @@ function GhLossStopStatus({ roundState, autoStatus }) {
 
 function GhRoundAmountTable({
   roundState,
+  patternDisplay,
   amountMode,
   onSetup,
   setupDisabled = false,
@@ -703,7 +704,7 @@ function GhRoundAmountTable({
           </React.Fragment>
         ))}
       </Box>
-      <Box sx={{ display: "grid", gridTemplateRows: `repeat(${amountGridRowCount}, 31px)`, gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
+      {patternDisplay ? <Box sx={{ width: amountGridWidth, maxWidth: "100%" }}><MartinBPatternBoard display={patternDisplay} /></Box> : <Box sx={{ display: "grid", gridTemplateRows: `repeat(${amountGridRowCount}, 31px)`, gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
         {Array.from({ length: cellCount }, (_, idx) => {
           const martinAmount = martinNetAmount(strategyCells[idx]);
           const showMartinAmount = amountMode !== "actual" && martinAmount > 0;
@@ -727,7 +728,7 @@ function GhRoundAmountTable({
             </Box>
           );
         })}
-      </Box>
+      </Box>}
       <GhRoundBetDetailDialog
         open={detailOpen}
         onClose={() => setDetailSelection(null)}
@@ -2891,8 +2892,9 @@ export default function GhUserGamePage() {
           />
           </Box>
 
-          {showMartinBBoard ? <MartinBPatternBoard display={martinBDisplay} /> : <GhRoundAmountTable
+          <GhRoundAmountTable
             roundState={roundState}
+            patternDisplay={showMartinBBoard ? martinBDisplay : null}
             amountMode={amountViewMode}
             onSetup={() => {
               const qs = new URLSearchParams();
@@ -2918,7 +2920,7 @@ export default function GhUserGamePage() {
             onEnd={() => setShowEndConfirm(true)}
             endDisabled={endDisabled}
             endDisabledReason={endDisabledReason}
-          />}
+          />
 
           </Box>
           {/* /1|2 row */}

@@ -6,9 +6,9 @@ test("마틴B의 기존 저장 인덱스와 번호 매핑을 유지한다", () =
   assert.equal(MARTIN_B_PATTERN_COUNT, 15);
   assert.equal(MARTIN_B_PATTERN_ROW_COUNT, 50);
   const labels = Array.from({ length: 50 }, (_, i) => martinBPatternLabel(i));
-  assert.deepEqual(labels.slice(0, 8), ["1-1", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7", "1-8"]);
-  assert.equal(labels[8], "2-1");
-  assert.equal(labels[39], "5-8");
+  assert.deepEqual(labels.slice(0, 8), Array(8).fill("1"));
+  assert.equal(labels[8], "2");
+  assert.equal(labels[39], "5");
   assert.deepEqual(labels.slice(40), ["6", "7", "8", "9", "10", "11", "12", "13", "14", "15"]);
 });
 
@@ -26,7 +26,7 @@ test("번호별 미발동 설정을 보존하고 다른 번호에 전파하지 �
 test("마틴B는 하위 패턴 없이 1~15번만 표시한다", async () => {
   const { MARTIN_B_VISIBLE_INDICES } = await import("../src/pages/ghgame/martin-b-settings.js");
   assert.deepEqual(MARTIN_B_VISIBLE_INDICES.map(martinBPatternLabel),
-    ["1-1", "2-1", "3-1", "4-1", "5-1", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"]);
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"]);
 });
 
 test("벽치기 체크 조건과 패턴 수정 시 자동 해제", async () => {

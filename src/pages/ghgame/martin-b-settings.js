@@ -1,7 +1,7 @@
 export const MARTIN_B_PATTERN_ROW_COUNT = 50;
 export const MARTIN_B_PATTERN_COUNT = 15;
 export const martinBPatternLabel = (index) => index < 40
-  ? `${Math.floor(index / 8) + 1}-${index % 8 + 1}` : String(index - 34);
+  ? String(Math.floor(index / 8) + 1) : String(index - 34);
 
 export const defaultMartinBPatternOption = () => ({
   success_limit: 1,

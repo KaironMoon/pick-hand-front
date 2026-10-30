@@ -136,6 +136,12 @@ export default async function verifyGhAutoOnly(page) {
     check(mock.calls.some(call => call.path.endsWith('/auto/stop') && call.body?.auto_session_id === 'mock-auto-2'), 'Stop must use the restarted session');
     await checkBlocked();
 
+    const originalBoardSize = await page.getByRole('button', { name: '1회차 배팅 상세 보기', exact: true })
+      .locator('..').evaluate(el => {
+        const cells = [...el.querySelectorAll(':scope > button')].map(cell => cell.getBoundingClientRect());
+        return { width: Math.max(...cells.map(cell => cell.right)) - Math.min(...cells.map(cell => cell.left)),
+          height: Math.max(...cells.map(cell => cell.bottom)) - Math.min(...cells.map(cell => cell.top)) };
+      });
     // Martin B changes only the auto-only presentation. All 60 labels come from the server.
     mock.martinBDisplay = { enabled: true, rows: [1, 2, 6, 7, 9, 10].map((pattern_no, row) => ({
       pattern_no, cells: Array.from({ length: 10 }, (_, col) => ({
@@ -150,6 +156,21 @@ export default async function verifyGhAutoOnly(page) {
     check(await board.getByRole('row').count() === 6, 'Six pattern rows');
     check(await board.getByRole('rowheader').count() === 6, 'Six left pattern headers');
     check(await board.getByRole('cell').count() === 60, 'Sixty random cells');
+    const patternBoardSize = await board.evaluate(el => ({ width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height }));
+    check(patternBoardSize.width === originalBoardSize.width && patternBoardSize.height === originalBoardSize.height,
+      `Pattern board must match original dimensions: ${JSON.stringify({ originalBoardSize, patternBoardSize })}`);
+    for (const label of ['H', 'M', '1', '2', '3', '4', '5', '6', 'UP', 'NW', 'ED']) {
+      check(await page.getByRole('button', { name: label, exact: true }).isVisible(), `Toolbar ${label} remains visible`);
+    }
+    for (const label of ['BET', '전체 PNL', '글로벌히트 BET', '글로벌히트 PNL', 'Z PnL', 'B PnL', 'C1 PnL', 'K PnL']) {
+      check(await page.getByText(label, { exact: true }).isVisible(), `${label} remains visible`);
+    }
+    check(await page.getByRole('button', { name: '1회차 배팅 상세 보기', exact: true }).count() === 0, 'Only the amount grid is replaced');
+    await page.getByRole('button', { name: 'NW', exact: true }).click();
+    const newGameDialog = page.getByRole('dialog');
+    await newGameDialog.waitFor();
+    await newGameDialog.getByRole('button', { name: '취소', exact: true }).click();
+    await newGameDialog.waitFor({ state: 'hidden' });
     const labels = await board.getByRole('cell').allTextContents();
     check(new Set(labels).size === 60, 'No duplicated labels');
     check((await board.getByRole('row').first().locator(':scope > *').first().getAttribute('role')) === 'rowheader', 'Pattern number must be leftmost');
@@ -209,7 +230,7 @@ export default async function verifyGhAutoOnly(page) {
     check(await checkbox.count() === 0, 'Administrator editor must not offer auto-only');
     await page.getByRole('button', { name: '취소', exact: true }).click();
 
-    return { passed: ['Martin B board 6 x 11', '60 server labels', 'gray/green outcomes', 'reload stability', 'mobile board', 'impersonation view toggle', 'target permissions retained', 'Martin B disabled unchanged', 'stopped notice', 'running notice', 'P/B blocked', 'BigRoad absent', 'bet amount event', 'result event', 'server PNL settlement', 'new shoe transition', 'stop current session', 'normal member unchanged', 'admin exempt', 'user list edit and save', 'admin editor exempt'], mockedApiRequests: mock.calls.length };
+    return { passed: ['original board dimensions retained', 'toolbar and PNL retained', 'new game dialog retained', 'only amount grid replaced', 'Martin B board 6 x 11', '60 server labels', 'gray/green outcomes', 'reload stability', 'mobile board', 'impersonation view toggle', 'target permissions retained', 'Martin B disabled unchanged', 'stopped notice', 'running notice', 'P/B blocked', 'BigRoad absent', 'bet amount event', 'result event', 'server PNL settlement', 'new shoe transition', 'stop current session', 'normal member unchanged', 'admin exempt', 'user list edit and save', 'admin editor exempt'], mockedApiRequests: mock.calls.length };
   } finally {
     await page.goto('about:blank');
     await page.unroute('**/api/**', handler);
