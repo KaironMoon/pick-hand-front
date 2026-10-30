@@ -8,7 +8,7 @@ export default async function verifyGhAutoOnly(page) {
   const mock = {
     user: { username: 'auto-test', nickname: '오토 테스트', role: 'user', auto_only: true },
     running: false, seq: 'PB', gameId: 9001, session: 'mock-auto-1', pnl: 0,
-    actualTable: { cells: [] }, calls: [],
+    actualTable: { cells: [] }, calls: [], martinBDisplay: null,
     users: [
       { id: 2, username: 'auto-test', nickname: '오토 테스트', role: 'user', auto_only: true, is_active: true, created_at: '2026-10-20T00:00:00Z' },
       { id: 1, username: 'admin-test', nickname: '관리자 테스트', role: 'admin', auto_only: false, is_active: true, created_at: '2026-10-20T00:00:00Z' },
@@ -19,6 +19,7 @@ export default async function verifyGhAutoOnly(page) {
     round_state_upper: {
       round_num: mock.seq.length + 1, shoe_results: mock.seq,
       round_amount_table: { cells: [] }, actual_bet_table: mock.actualTable,
+      martin_b_display: mock.martinBDisplay,
     },
     cum_pnl: { gh: mock.pnl }, bet: {}, user_martin: {},
   });
@@ -135,6 +136,48 @@ export default async function verifyGhAutoOnly(page) {
     check(mock.calls.some(call => call.path.endsWith('/auto/stop') && call.body?.auto_session_id === 'mock-auto-2'), 'Stop must use the restarted session');
     await checkBlocked();
 
+    // Martin B changes only the auto-only presentation. All 60 labels come from the server.
+    mock.martinBDisplay = { enabled: true, rows: [1, 2, 6, 7, 9, 10].map((pattern_no, row) => ({
+      pattern_no, cells: Array.from({ length: 10 }, (_, col) => ({
+        number: row * 10 + col + 21,
+        status: col === 2 ? (row === 0 ? 'miss' : 'hit') : null,
+      })),
+    })) };
+    await open();
+    const board = page.getByRole('table', { name: '마틴B 패턴 현황' });
+    await board.waitFor();
+    await page.getByText('Global hit ai system service testing...', { exact: true }).waitFor();
+    check(await board.getByRole('row').count() === 6, 'Six pattern rows');
+    check(await board.getByRole('rowheader').count() === 6, 'Six left pattern headers');
+    check(await board.getByRole('cell').count() === 60, 'Sixty random cells');
+    const labels = await board.getByRole('cell').allTextContents();
+    check(new Set(labels).size === 60, 'No duplicated labels');
+    check((await board.getByRole('row').first().locator(':scope > *').first().getAttribute('role')) === 'rowheader', 'Pattern number must be leftmost');
+    check(await board.getByRole('cell', { name: '1번 패턴 3단계 실패', exact: true }).evaluate(el => getComputedStyle(el).backgroundColor) === 'rgb(133, 137, 141)', 'Miss is gray');
+    check(await board.getByRole('cell', { name: '2번 패턴 3단계 성공', exact: true }).evaluate(el => getComputedStyle(el).backgroundColor) === 'rgb(0, 199, 129)', 'Hit is green');
+    await page.reload();
+    await board.waitFor();
+    check(JSON.stringify(await board.getByRole('cell').allTextContents()) === JSON.stringify(labels), 'Numbers remain on reload');
+    await checkBlocked();
+    await page.setViewportSize({ width: 390, height: 844 });
+    check(await board.isVisible(), 'Board visible on mobile');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
+    mock.user.impersonator = { id: 1, username: 'admin-test' };
+    await open();
+    await page.getByRole('button', { name: '관리자로 돌아가기', exact: true }).waitFor();
+    await page.getByRole('button', { name: '오토 보기', exact: true }).click();
+    await road().waitFor();
+    check(await board.count() === 0, 'Full view restores the ordinary betting board');
+    check(await p().isDisabled() && await b().isDisabled(), 'Viewing does not change target account input permissions');
+    await page.getByRole('button', { name: '오토 전용 보기', exact: true }).click();
+    await board.waitFor();
+    await checkBlocked();
+    mock.martinBDisplay.enabled = false;
+    await open();
+    await page.getByText('오토 플레이가 정지되어 있습니다', { exact: true }).waitFor();
+    check(await board.count() === 0, 'Disabled Martin B preserves old presentation');
+
     // Existing members and administrators retain their BigRoad and manual input.
     for (const user of [
       { username: 'member-test', nickname: '일반 테스트', role: 'user', auto_only: false },
@@ -166,7 +209,7 @@ export default async function verifyGhAutoOnly(page) {
     check(await checkbox.count() === 0, 'Administrator editor must not offer auto-only');
     await page.getByRole('button', { name: '취소', exact: true }).click();
 
-    return { passed: ['stopped notice', 'running notice', 'P/B blocked', 'BigRoad absent', 'bet amount event', 'result event', 'server PNL settlement', 'new shoe transition', 'stop current session', 'normal member unchanged', 'admin exempt', 'user list edit and save', 'admin editor exempt'], mockedApiRequests: mock.calls.length };
+    return { passed: ['Martin B board 6 x 11', '60 server labels', 'gray/green outcomes', 'reload stability', 'mobile board', 'impersonation view toggle', 'target permissions retained', 'Martin B disabled unchanged', 'stopped notice', 'running notice', 'P/B blocked', 'BigRoad absent', 'bet amount event', 'result event', 'server PNL settlement', 'new shoe transition', 'stop current session', 'normal member unchanged', 'admin exempt', 'user list edit and save', 'admin editor exempt'], mockedApiRequests: mock.calls.length };
   } finally {
     await page.goto('about:blank');
     await page.unroute('**/api/**', handler);

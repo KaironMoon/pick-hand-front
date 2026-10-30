@@ -4,6 +4,12 @@ import apiCaller from "@/services/api-caller";
 import { ABOO_API } from "@/constants/api-url";
 
 const userAtom = atom(null);
+// 표시 전환만 허용한다. 대상 계정 권한과 수동 입력 제한은 그대로 유지한다.
+const impersonationAutoViewAtom = atom(null);
+const showImpersonationAutoAtom = atom((get) => {
+  const user = get(userAtom);
+  return !!user?.impersonator && get(impersonationAutoViewAtom) === user.username;
+});
 
 const isAuthenticatedAtom = atom((get) => get(userAtom) !== null);
 
@@ -31,6 +37,7 @@ async function _autoRegisterPickhandId(username) {
 
 const loginAtom = atom(null, async (get, set, { username, password }) => {
   const user = await authService.login(username, password);
+  set(impersonationAutoViewAtom, null);
   set(userAtom, user);
   const token = authService.getToken();
   _notifyNativeBridge(user, token);
@@ -40,6 +47,7 @@ const loginAtom = atom(null, async (get, set, { username, password }) => {
 
 const logoutAtom = atom(null, async (get, set) => {
   authService.logout();
+  set(impersonationAutoViewAtom, null);
   set(userAtom, null);
 });
 
@@ -69,4 +77,4 @@ const initAuthAtom = atom(null, async (get, set) => {
   set(userAtom, null);
 });
 
-export { userAtom, isAuthenticatedAtom, loginAtom, logoutAtom, initAuthAtom };
+export { impersonationAutoViewAtom, showImpersonationAutoAtom, userAtom, isAuthenticatedAtom, loginAtom, logoutAtom, initAuthAtom };

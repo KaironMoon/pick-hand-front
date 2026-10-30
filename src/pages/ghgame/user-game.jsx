@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip, Snackbar, Alert, MenuItem } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
-import { userAtom } from "@/store/auth-store";
+import { userAtom, showImpersonationAutoAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
 import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
 import GhBigRoad2 from "./components/GhBigRoad2";
+import MartinBPatternBoard from "./components/MartinBPatternBoard";
 import GhRoundBetDetailDialog from "./components/GhRoundBetDetailDialog";
 import { finalBetCapSummary, martinZRateSummary, martinZPatternPrioritySummary } from "./components/AutoRiskSettings";
 import GhAutoTotalControl from "./components/GhAutoTotalControl";
@@ -1061,6 +1062,8 @@ export default function GhUserGamePage() {
   const user = useAtomValue(userAtom);
   const isAdmin = user?.role === "admin";
   const isAutoOnly = !isAdmin && !!user?.auto_only;
+  const showImpersonationAuto = useAtomValue(showImpersonationAutoAtom);
+  const showAutoOnly = isAutoOnly && !showImpersonationAuto;
   const [searchParams, setSearchParams] = useSearchParams();
   const historyReplayGameId = searchParams.get("replayGameId");
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
@@ -1085,6 +1088,8 @@ export default function GhUserGamePage() {
   const [roundStateUpper, setRoundStateUpper] = useState(null);
   const [roundStateLower, setRoundStateLower] = useState(null);
   const roundState = roundStateUpper;
+  const martinBDisplay = roundState?.martin_b_display;
+  const showMartinBBoard = showAutoOnly && !!martinBDisplay?.enabled;
   const [batExpanded, setBatExpanded] = useState({}); // {`gi-ri`: true} — Bat 셀 전체 표시 토글
   const [trackStreakHidden, setTrackStreakHidden] = useState({}); // {sckey: true} — 트랙 연승/연패 셀 숨김 토글
   const [betData, setBetData] = useState(null);
@@ -2380,19 +2385,25 @@ export default function GhUserGamePage() {
         <Alert severity="info" sx={{ mb: 1 }}>{autoStatus.sync_notice}</Alert>
       )}
       {/* 빅로드 표시만 교체한다. 결과 수신·베팅·정산 상태는 계속 갱신한다. */}
-      {isAutoOnly ? (
+      {showAutoOnly ? (
         <Box role="status" aria-live="polite" sx={{
           minHeight: isMobile ? 102 : 162, mb: 2, px: 2, py: 1,
           border: "1px solid #87ceeb", boxSizing: "border-box",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
           textAlign: "center", backgroundColor: "background.paper",
         }}>
+          {showMartinBBoard ? (
+            <Typography sx={{ fontSize: isMobile ? 20 : 32, fontWeight: "bold", alignSelf: "flex-start", textAlign: "left" }}>
+              Global hit ai system service testing...
+            </Typography>
+          ) : <>
           <Typography sx={{ fontSize: isMobile ? 20 : 32, fontWeight: "bold" }}>
             {autoStatus.running ? "오토 플레이 중입니다" : "오토 플레이가 정지되어 있습니다"}
           </Typography>
           <Typography sx={{ fontSize: isMobile ? 18 : 28 }}>
             {autoStatus.running ? "중단하려면 stop 버튼을 눌러주세요." : "시작하려면 play 버튼을 눌러주세요."}
           </Typography>
+          </>}
         </Box>
       ) : (
       <Box
@@ -2880,7 +2891,7 @@ export default function GhUserGamePage() {
           />
           </Box>
 
-          <GhRoundAmountTable
+          {showMartinBBoard ? <MartinBPatternBoard display={martinBDisplay} /> : <GhRoundAmountTable
             roundState={roundState}
             amountMode={amountViewMode}
             onSetup={() => {
@@ -2907,7 +2918,7 @@ export default function GhUserGamePage() {
             onEnd={() => setShowEndConfirm(true)}
             endDisabled={endDisabled}
             endDisabledReason={endDisabledReason}
-          />
+          />}
 
           </Box>
           {/* /1|2 row */}
