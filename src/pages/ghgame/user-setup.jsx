@@ -2,7 +2,7 @@ import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } f
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
 import { duplicatePatternRows } from "./pattern-duplicates.js";
-import { MARTIN_B_PATTERN_ROW_COUNT, martinBPatternLabel, martinBPatternOptions } from "./martin-b-settings.js";
+import { MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions } from "./martin-b-settings.js";
 import { Fragment, memo, useMemo, useState, useEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
@@ -361,7 +361,7 @@ const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
 const MARTIN_Z_PATTERN_ONLY_ROW_COUNT = 1000;
 
-function PatternCell({ value, onClick, cellKey }) {
+function PatternCell({ value, onClick, cellKey, wallHighlight = false }) {
   return (
     <Box
       key={cellKey}
@@ -374,7 +374,8 @@ function PatternCell({ value, onClick, cellKey }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        border: "1px solid #777",
+        border: wallHighlight ? "2px solid #4caf50" : "1px solid #777",
+        boxSizing: "border-box",
         borderRadius: 0.5,
         backgroundColor: value === "B" ? "#d32f2f" : value === "P" ? "#1976d2" : "#333",
         color: "#fff",
@@ -453,24 +454,27 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false }) {
+const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false, showWall = false, visibleIndices }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
       ? [martin.pattern_only]
       : [];
-  const rules = Array.from({ length: rowCount }, (_, index) => ({
-    ...EMPTY_MARTIN_PATTERN_RULE,
-    ...(rawRules[index] && typeof rawRules[index] === "object" ? rawRules[index] : {}),
-    ...(showAssistUsage ? { assist_enabled: Boolean(rawRules[index]?.assist_enabled ?? rawRules[index]?.enabled) } : {}),
-  }));
+  const rules = Array.from({ length: rowCount }, (_, index) => {
+    const rawRule = (!visibleIndices || visibleIndices.includes(index)) ? rawRules[index] : undefined;
+    return {
+      ...EMPTY_MARTIN_PATTERN_RULE,
+      ...(rawRule && typeof rawRule === "object" ? rawRule : {}),
+      ...(showAssistUsage ? { assist_enabled: Boolean(rawRule?.assist_enabled ?? rawRule?.enabled) } : {}),
+    };
+  });
   const patternKeys = highlightDuplicates
     ? rules.map((rule) => patternCells(rule, PATTERN_ONLY_CELL_COUNT).join(""))
     : [];
   const duplicateRows = duplicatePatternRows(patternKeys);
   const updateRule = (index, patch) => {
     const next = rules.map((rule, ruleIndex) => (
-      ruleIndex === index ? { ...rule, ...patch } : rule
+      ruleIndex === index ? (showWall ? patchMartinBRule(rule, patch) : { ...rule, ...patch }) : rule
     ));
     onChange({ ...martin, pattern_only: next });
   };
@@ -532,7 +536,8 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
           )}
         </Box>
         {/* All rules stay in state; only the visible inputs are mounted. */}
-        <WindowedPatternRows rowCount={rowCount} renderRow={(rowIndex) => {
+        <WindowedPatternRows rowCount={visibleIndices?.length ?? rowCount} renderRow={(visibleIndex) => {
+          const rowIndex = visibleIndices ? visibleIndices[visibleIndex] : visibleIndex;
           const rule = rules[rowIndex];
           const cells = patternCells(rule, PATTERN_ONLY_CELL_COUNT);
           const isDuplicate = duplicateRows[rowIndex];
@@ -554,7 +559,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
                 borderTop: CELL_BORDER,
                 borderLeft: CELL_BORDER,
                 borderRight: CELL_BORDER,
-                borderBottom: rowIndex === rowCount - 1 ? CELL_BORDER : undefined,
+                borderBottom: visibleIndex === (visibleIndices?.length ?? rowCount) - 1 ? CELL_BORDER : undefined,
                 whiteSpace: "nowrap",
               }}
             >
@@ -578,6 +583,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
                     key={`pattern-only-${rowIndex}-${cellIndex}`}
                     cellKey={`pattern-only-${rowIndex}-${cellIndex}`}
                     value={value}
+                    wallHighlight={showWall && rule.wall_enabled && cellIndex < 2}
                     onClick={() => updateRule(rowIndex, {
                       pattern: cyclePatternCell(cells, cellIndex),
                     })}
@@ -590,13 +596,25 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
                 value={direction}
                 onClick={() => updateRule(rowIndex, { direction: nextDirection })}
               />
+              {showWall && <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
+                <input type="checkbox" aria-label={`마틴B ${rowLabel(rowIndex)}번 벽치기`}
+                  checked={Boolean(rule.wall_enabled)}
+                  onChange={(event) => {
+                    if (event.target.checked && !validWallPattern(rule.pattern)) {
+                      window.alert("벽치기는 3칸 이상이며 앞 두 칸이 BB 또는 PP인 패턴만 사용할 수 있습니다.");
+                      return;
+                    }
+                    updateRule(rowIndex, { wall_enabled: event.target.checked });
+                  }} />
+                벽치기
+              </label>}
               <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
                 <input
                   type="checkbox"
                   checked={Boolean(rule.include_inverse)}
                   onChange={(event) => updateRule(rowIndex, { include_inverse: event.target.checked })}
                 />
-                BP반전도 포함
+                {showWall ? "반전" : "BP반전도 포함"}
               </label>
               {showMissCondition && (
                 <select
@@ -665,6 +683,13 @@ function MartinBSection({ martin, onChange }) {
   );
   return <>
     <MartinSection name="martin_b" label="마틴B" martin={martin} onChange={onChange} labelColor="#6a1b9a" />
+    <tr><td colSpan={6} style={{ ...normalCell, textAlign: "left" }}>
+      <label style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+        <input type="checkbox" checked={martin.assist_no_overlap ?? true}
+          onChange={(event) => onChange({ ...martin, assist_no_overlap: event.target.checked })} />
+        어시 중첩배팅 불가
+      </label>
+    </td></tr>
     <tr><td colSpan={6} style={{ ...normalCell, padding: 0 }}>
       <Box sx={{ maxHeight: 480, overflow: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }} aria-label="마틴B 패턴별 옵션">
@@ -672,7 +697,7 @@ function MartinBSection({ martin, onChange }) {
             {["전체패턴번호", "성공마감", "어시회차", "어시단계", "전체/부분", "부분패턴번호 지정선택 (0: 미지정)", "패턴 미발동 지정회차 (0: 미지정)", "지정회차까지 미발동 시"].map((label) => <th key={label} style={headerStyle}>{label}</th>)}
           </tr></thead>
           <tbody>{options.map((option, index) => <tr key={index}>
-            <td style={normalCell}>{index + 1}번{index < 5 ? ` (${index + 1}-1~${index + 1}-8)` : ""}</td>
+            <td style={normalCell}>{index + 1}번</td>
             <td style={normalCell}>{numberInput(index, "success_limit", 80, "성공마감")} 승</td>
             <td style={normalCell}>{numberInput(index, "assist_round", 80, "어시회차")} 회차</td>
             <td style={normalCell}>{numberInput(index, "assist_losses", 80, "어시단계")} 패 시</td>
@@ -698,11 +723,11 @@ function MartinBSection({ martin, onChange }) {
           </tr>)}</tbody>
         </table>
       </Box>
-      <Box sx={{ p: 0.75, textAlign: "left" }}>성공마감은 번호별 누적 승수이며, 도달하면 해당 번호의 본베팅과 어시베팅을 모두 종료합니다. 어시 승수는 어시를 지정한 번호에 누적됩니다. 어시 대상으로는 어시사용인 입력 패턴만 사용하며, 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동합니다.</Box>
+      <Box sx={{ p: 0.75, textAlign: "left" }}>성공마감은 번호별 누적 승수이며, 도달하면 해당 번호의 본베팅과 어시베팅을 모두 종료합니다. 어시 승수는 어시를 지정한 번호에 누적됩니다. 어시 대상으로는 어시사용인 입력 패턴만 사용하며, 어시 중첩배팅 불가를 체크하면 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동하고, 해제하면 동시에 발동합니다.</Box>
       <Box sx={{ p: 0.75, textAlign: "left" }}>번호별 지정회차 결과까지 소속 패턴이 한 번도 나오지 않으면 다음 회차부터 베팅포기 또는 어시패턴사용을 적용합니다. 어시패턴사용은 어시회차·어시단계를 무시하고 전체/부분 설정을 따르며, 지정 승수에 도달하면 종료합니다.</Box>
     </td></tr>
     <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#6a1b9a"
-      rowCount={MARTIN_B_PATTERN_ROW_COUNT} rowLabel={martinBPatternLabel} recommendSingleStep={false} showAssistUsage />
+      rowCount={MARTIN_B_PATTERN_ROW_COUNT} rowLabel={martinBPatternLabel} recommendSingleStep={false} showAssistUsage showWall visibleIndices={MARTIN_B_VISIBLE_INDICES} />
     <MartinStopBetRoundRow martin={martin} onChange={onChange} color="#6a1b9a" />
   </>;
 }
@@ -2264,6 +2289,7 @@ const DEFAULT_MARTIN_Z = {
 };
 const DEFAULT_MARTIN_B = {
   ...DEFAULT_MARTIN,
+  assist_no_overlap: true,
   stop_bet_round: 0,
   pattern_only: [],
   pattern_options: martinBPatternOptions(),
