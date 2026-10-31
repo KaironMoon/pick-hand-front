@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { PATTERN_ROW_HEIGHT, patternRowWindow } from "../pattern-row-window.js";
 
 // Keep the first row for intrinsic table width, plus the visible rows and any focused row.
-export default function WindowedPatternRows({ rowCount, renderRow }) {
+export default function WindowedPatternRows({ rowCount, renderRow, constrainWidth = false }) {
   const listRef = useRef(null);
   const [range, setRange] = useState({ start: 1, end: 1 });
   const [focusedRow, setFocusedRow] = useState(null);
@@ -40,7 +40,7 @@ export default function WindowedPatternRows({ rowCount, renderRow }) {
   return (
     <div
       ref={listRef}
-      style={{ width: "max-content", minWidth: "100%", overflowAnchor: "none" }}
+      style={{ width: constrainWidth ? "100%" : "max-content", minWidth: "100%", overflowAnchor: "none" }}
       onFocusCapture={(event) => {
         const row = event.target.closest("[data-pattern-row]");
         if (row) setFocusedRow(Number(row.dataset.patternRow));

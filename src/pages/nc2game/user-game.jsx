@@ -871,7 +871,7 @@ export default function Nc2UserGamePage() {
               round_state: applyActualBetSettlement(previous.round_state, data),
             } : previous);
           } else if (type === "bet_rejected") {
-            setError("배팅이 거부되었습니다 (카지노 미체결)");
+            setError(data.detail || "배팅이 거부되었습니다 (카지노 미체결)");
             refreshEventGame(data.game_id || game.game_id);
           }
         } catch (_) {}

@@ -1698,7 +1698,7 @@ export default function GhUserGamePage() {
             // running 유지 — 자동 재시작이 따라올 수 있음. 진짜 정지는 status poll(5s)이 잡거나 stop 버튼이 처리.
           } else if (t === "bet_rejected") {
             // 카지노가 베팅을 받지 않음(미체결) → 실 PnL 보정됨. 레이어 팝업 안내.
-            setRejectMsg("베팅이 거부되었습니다 (카지노 미체결)");
+            setRejectMsg(data.detail || "베팅이 거부되었습니다 (카지노 미체결)");
             if (data.game_id) restoreGame(data.game_id);
           }
         } catch (e) {

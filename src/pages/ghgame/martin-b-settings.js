@@ -1,5 +1,7 @@
-export const MARTIN_B_PATTERN_ROW_COUNT = 60;
-export const MARTIN_B_PATTERN_COUNT = 25;
+export const MARTIN_B_PATTERN_ROW_COUNT = 65;
+export const MARTIN_B_PATTERN_COUNT = 30;
+export const MARTIN_B_SPECIAL_NUMBER = 31;
+export const MARTIN_B_PARTIAL_COUNT = 15;
 export const martinBPatternLabel = (index) => index < 40
   ? String(Math.floor(index / 8) + 1) : String(index - 34);
 
@@ -10,12 +12,15 @@ export const defaultMartinBPatternOption = () => ({
   assist_mode: "all",
   untriggered_round: 0,
   untriggered_action: "stop",
-  partial_patterns: [0, 0, 0, 0, 0],
+  partial_patterns: Array(MARTIN_B_PARTIAL_COUNT).fill(0),
 });
 
 export const martinBPatternOptions = (options) => Array.from(
   { length: MARTIN_B_PATTERN_COUNT },
-  (_, index) => ({ ...defaultMartinBPatternOption(), ...options?.[index] }),
+  (_, index) => ({
+    ...defaultMartinBPatternOption(), ...options?.[index],
+    partial_patterns: Array.from({ length: MARTIN_B_PARTIAL_COUNT }, (_, i) => options?.[index]?.partial_patterns?.[i] ?? 0),
+  }),
 );
 
 export const MARTIN_B_VISIBLE_INDICES = [0, 8, 16, 24, 32, ...Array.from({ length: MARTIN_B_PATTERN_COUNT - 5 }, (_, i) => i + 40)];

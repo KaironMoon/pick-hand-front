@@ -2,8 +2,8 @@ import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } f
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
 import { duplicatePatternRows } from "./pattern-duplicates.js";
-import { MARTIN_B_PATTERN_COUNT, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions } from "./martin-b-settings.js";
-import { Fragment, memo, useMemo, useState, useEffect, useRef } from "react";
+import { MARTIN_B_SPECIAL_NUMBER, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions } from "./martin-b-settings.js";
+import { Fragment, memo, useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
 import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
@@ -222,7 +222,7 @@ function cruiseStepLabel(idx) {
   return `${(idx + 1) / 2 + 1}`;
 }
 
-function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp }) {
+function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp, collapsed = false, onToggleCollapse, collapseDisabled = false }) {
   const isCruise = name === "cruise";
   const usesDecimalP = ["martin_a", "martin_z", "martin_b", "martin_k", "martin_kp"].includes(name) || name.startsWith("martin_c") || name.startsWith("martin_p");
   const enabled = martin.enabled;
@@ -287,10 +287,20 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
                 사용안함
               </Box>
             )}
+            {onToggleCollapse && (
+              <Box component="button" type="button" onClick={onToggleCollapse} disabled={collapseDisabled}
+                aria-label={`${label} ${collapsed ? "보이기" : "감추기"}`} aria-expanded={!collapsed}
+                sx={{ border: "1px solid #555", backgroundColor: "#333", color: "#fff",
+                  borderRadius: 1, px: 1.5, py: 0.5, fontSize: 14, cursor: "pointer",
+                  "&:disabled": { opacity: 0.5, cursor: "default" } }}>
+                {collapsed ? "보이기" : "감추기"}
+              </Box>
+            )}
           </Box>
         </td>
       </tr>
 
+      {!collapsed && <>
       {/* 배팅종류 */}
       <tr>
         <td style={labelCellStyle}>배팅종류</td>
@@ -345,6 +355,7 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
           </tr>
         ));
       })()}
+      </>}
     </>
   );
 }
@@ -454,7 +465,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false, showWall = false, visibleIndices }) {
+const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false, showWall = false, visibleIndices, constrainWidth = false }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -536,7 +547,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
           )}
         </Box>
         {/* All rules stay in state; only the visible inputs are mounted. */}
-        <WindowedPatternRows rowCount={visibleIndices?.length ?? rowCount} renderRow={(visibleIndex) => {
+        <WindowedPatternRows constrainWidth={constrainWidth} rowCount={visibleIndices?.length ?? rowCount} renderRow={(visibleIndex) => {
           const rowIndex = visibleIndices ? visibleIndices[visibleIndex] : visibleIndex;
           const rule = rules[rowIndex];
           const cells = patternCells(rule, PATTERN_ONLY_CELL_COUNT);
@@ -572,7 +583,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
                 title={isDuplicate ? "동일하거나 BP가 반전된 패턴이 중복 입력되어 있습니다." : undefined}
                 sx={{
                   display: "flex",
-                  gap: 0.75,
+                  gap: constrainWidth ? 0.5 : 0.75,
                   outline: isDuplicate ? "2px solid #ff5252" : "none",
                   outlineOffset: 2,
                   borderRadius: 0.5,
@@ -669,17 +680,18 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
 });
 
 function MartinBSection({ martin, onChange }) {
+  const compactCell = { ...normalCell, minWidth: 0, padding: "3px 2px", whiteSpace: "normal", overflowWrap: "anywhere", fontSize: 12 };
   const options = martinBPatternOptions(martin.pattern_options);
   const updateOption = (index, patch) => onChange({
     ...martin,
     pattern_options: options.map((option, i) => i === index ? { ...option, ...patch } : option),
   });
-  const numberInput = (index, field, max, label) => (
+  const numberInput = (index, field, max, label, width = 34) => (
     <input type="number" min={0} max={max} step={1}
       aria-label={`마틴B ${index + 1}번 ${label}`}
       value={options[index][field]}
       onChange={(event) => updateOption(index, { [field]: Number(event.target.value) })}
-      style={{ width: 58 }} />
+      style={{ width, maxWidth: "100%", boxSizing: "border-box" }} />
   );
   return <>
     <MartinSection name="martin_b" label="마틴B" martin={martin} onChange={onChange} labelColor="#6a1b9a" />
@@ -690,44 +702,55 @@ function MartinBSection({ martin, onChange }) {
         어시 중첩배팅 불가
       </label>
     </td></tr>
-    <tr><td colSpan={6} style={{ ...normalCell, padding: 0 }}>
-      <Box sx={{ maxHeight: 480, overflow: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }} aria-label="마틴B 패턴별 옵션">
+    <tr><td colSpan={6} style={{ ...normalCell, padding: 0, whiteSpace: "normal" }}>
+      <Box sx={{ "& th, & td, & input, & select, & option": { fontWeight: 700 } }}>
+        <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }} aria-label="마틴B 패턴별 옵션">
+          <colgroup>{[6, 6, 6, 6, 7, 48, 9, 12].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
           <thead style={{ position: "sticky", top: 0, background: "#252525", zIndex: 1 }}><tr>
-            {["전체패턴번호", "성공마감", "어시회차", "어시단계", "전체/부분", "부분패턴번호 지정선택 (0: 미지정)", "패턴 미발동 지정회차 (0: 미지정)", "지정회차까지 미발동 시"].map((label) => <th key={label} style={headerStyle}>{label}</th>)}
+            {["번호", "성공마감", "어시회차", "어시패시", "전체/부분", "부분패턴번호 지정선택 (0: 미지정)", "미발동 지정", "미발동시 동작"].map((label) => <th key={label} style={{ ...headerStyle, padding: "4px 2px", fontSize: 12, overflowWrap: "anywhere" }}>{label}</th>)}
           </tr></thead>
           <tbody>{options.map((option, index) => <tr key={index}>
-            <td style={normalCell}>{index + 1}번</td>
-            <td style={normalCell}>{numberInput(index, "success_limit", 80, "성공마감")} 승</td>
-            <td style={normalCell}>{numberInput(index, "assist_round", 80, "어시회차")} 회차</td>
-            <td style={normalCell}>{numberInput(index, "assist_losses", 80, "어시단계")} 패 시</td>
-            <td style={normalCell}><select aria-label={`마틴B ${index + 1}번 전체/부분`} value={option.assist_mode}
+            <td style={compactCell}>{index + 1}번</td>
+            <td style={compactCell}>{numberInput(index, "success_limit", 80, "성공마감")} 승</td>
+            <td style={compactCell}>{numberInput(index, "assist_round", 80, "어시회차", 52)}</td>
+            <td style={compactCell}>{numberInput(index, "assist_losses", 80, "어시패시")}</td>
+            <td style={compactCell}><select style={{ maxWidth: "100%", fontSize: 12,
+              backgroundColor: option.assist_mode === "partial" ? "#1565c0" : "#c62828", color: "#fff" }}
+              aria-label={`마틴B ${index + 1}번 전체/부분`} value={option.assist_mode}
               onChange={(event) => updateOption(index, { assist_mode: event.target.value })}>
-              <option value="all">전체</option><option value="partial">부분</option>
+              <option value="all" style={{ backgroundColor: "#c62828", color: "#fff" }}>전체</option>
+              <option value="partial" style={{ backgroundColor: "#1565c0", color: "#fff" }}>부분</option>
             </select></td>
-            <td style={normalCell}>{option.partial_patterns.map((number, partialIndex) => <input
-              key={partialIndex} type="number" min={0} max={MARTIN_B_PATTERN_COUNT} step={1}
+            <td style={compactCell}><Box sx={{ display: "grid", gridTemplateColumns: "repeat(15, minmax(0, 1fr))", gap: "1px" }}>{option.partial_patterns.map((number, partialIndex) => <input
+              key={partialIndex} type="number" min={0} max={MARTIN_B_SPECIAL_NUMBER} step={1}
               aria-label={`마틴B ${index + 1}번 부분패턴 ${partialIndex + 1}`}
               value={number}
               onChange={(event) => updateOption(index, {
                 partial_patterns: option.partial_patterns.map((value, i) => i === partialIndex ? Number(event.target.value) : value),
               })}
-              style={{ width: 52, margin: "0 3px" }} />)}</td>
-            <td style={normalCell}>{numberInput(index, "untriggered_round", 80, "패턴 미발동 지정회차")} 회차</td>
-            <td style={normalCell}>
-              <select aria-label={`마틴B ${index + 1}번 지정회차 미발동 동작`} value={option.untriggered_action}
+              style={{ width: "100%", minWidth: 0, boxSizing: "border-box", padding: "2px 0", fontSize: 12 }} />)}</Box></td>
+            <td style={compactCell}>{numberInput(index, "untriggered_round", 80, "패턴 미발동 지정회차")} 회차</td>
+            <td style={compactCell}>
+              <select style={{ maxWidth: "100%", fontSize: 12,
+                backgroundColor: option.untriggered_action === "assist" ? "#1565c0" : "#c62828", color: "#fff" }}
+                aria-label={`마틴B ${index + 1}번 지정회차 미발동 동작`} value={option.untriggered_action}
                 onChange={(event) => updateOption(index, { untriggered_action: event.target.value })}>
-                <option value="stop">베팅포기</option><option value="assist">어시패턴사용</option>
+                <option value="stop" style={{ backgroundColor: "#c62828", color: "#fff" }}>베팅포기</option>
+                <option value="assist" style={{ backgroundColor: "#1565c0", color: "#fff" }}>어시패턴사용</option>
               </select>
             </td>
           </tr>)}</tbody>
         </table>
       </Box>
-      <Box sx={{ p: 0.75, textAlign: "left" }}>성공마감은 번호별 누적 승수이며, 도달하면 해당 번호의 본베팅과 어시베팅을 모두 종료합니다. 어시 승수는 어시를 지정한 번호에 누적됩니다. 어시 대상으로는 어시사용인 입력 패턴만 사용하며, 어시 중첩배팅 불가를 체크하면 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동하고, 해제하면 동시에 발동합니다.</Box>
+      <Box sx={{ p: 0.75, textAlign: "left" }}>성공마감은 번호별 누적 승수이며, 도달하면 해당 번호의 본베팅과 어시베팅을 모두 종료합니다. 어시 승수는 어시를 지정한 번호에 누적됩니다. 어시 대상으로는 어시사용인 입력 패턴과 특수 패턴 31번을 사용하며, 어시 중첩배팅 불가를 체크하면 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동하고, 해제하면 동시에 발동합니다.</Box>
       <Box sx={{ p: 0.75, textAlign: "left" }}>번호별 지정회차 결과까지 소속 패턴이 한 번도 나오지 않으면 다음 회차부터 베팅포기 또는 어시패턴사용을 적용합니다. 어시패턴사용은 어시회차·어시단계를 무시하고 전체/부분 설정을 따르며, 지정 승수에 도달하면 종료합니다.</Box>
     </td></tr>
     <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#6a1b9a"
-      rowCount={MARTIN_B_PATTERN_ROW_COUNT} rowLabel={martinBPatternLabel} recommendSingleStep={false} showAssistUsage showWall visibleIndices={MARTIN_B_VISIBLE_INDICES} />
+      rowCount={MARTIN_B_PATTERN_ROW_COUNT} rowLabel={martinBPatternLabel} recommendSingleStep={false} showAssistUsage showWall constrainWidth visibleIndices={MARTIN_B_VISIBLE_INDICES} />
+    <tr><td colSpan={6} style={{ ...normalCell, whiteSpace: "normal", textAlign: "left" }}>
+      <strong>31번 특수 패턴 (어시 전용)</strong>: 현재 줄을 제외한 앞 4줄 중 같은 결과가 2개 이상 나온 줄이 3줄 이상이고, 현재 줄은 1개만 나왔을 때 현재 줄과 같은 쪽에 베팅합니다.
+      예: PPBBPPPBBP → P, PPBBPPPBBPB → B. 단독 베팅은 하지 않으며, 전체 어시에 포함되고 부분 어시에서는 31번으로 지정합니다.
+    </td></tr>
     <MartinStopBetRoundRow martin={martin} onChange={onChange} color="#6a1b9a" />
   </>;
 }
@@ -2342,7 +2365,12 @@ export default function GhUserSetupPage() {
   const [signalReady, setSignalReady] = useState(false);
   const signalRef = useRef(null);
   const martinZTableRef = useRef(null);
+  const [martinZCollapsed, setMartinZCollapsed] = useState(false);
+  const [martinZViewReady, setMartinZViewReady] = useState(false);
+  const [martinZViewSaving, setMartinZViewSaving] = useState(false);
   const [martinTableWidth, setMartinTableWidth] = useState(undefined);
+  // 저장된 감추기 상태도 펼친 표의 원래 너비를 측정한 뒤 적용한다.
+  const martinZIsCollapsed = martinZCollapsed && martinTableWidth !== undefined;
   const martinTableStyle = {
     borderCollapse: "collapse",
     width: martinTableWidth,
@@ -2370,10 +2398,39 @@ export default function GhUserSetupPage() {
   const blocker = useBlocker(dirty || signalDirty);
 
   useEffect(() => {
+    if (!isAdmin) return;
+    let active = true;
+    setMartinZViewReady(false);
+    apiCaller.get(USER_BET_SETTINGS_API.GET("common")).then(({ data }) => {
+      if (!active) return;
+      setMartinZCollapsed(data.config.gh_martin_z_collapsed);
+      setMartinZViewReady(true);
+    }).catch((err) => {
+      if (!active) return;
+      setSnack({ open: true, message: err?.response?.data?.detail || "감추기 상태를 불러오지 못했습니다.", severity: "error" });
+    });
+    return () => { active = false; };
+  }, [currentUser?.id, isAdmin]);
+
+  const toggleMartinZVisibility = async () => {
+    if (!martinZViewReady || martinZViewSaving) return;
+    setMartinZViewSaving(true);
+    try {
+      const { data } = await apiCaller.put(USER_BET_SETTINGS_API.SAVE("common"), {
+        config: { gh_martin_z_collapsed: !martinZCollapsed },
+      });
+      setMartinZCollapsed(data.config.gh_martin_z_collapsed);
+    } catch (err) {
+      setSnack({ open: true, message: err?.response?.data?.detail || "감추기 상태 저장에 실패했습니다.", severity: "error" });
+    } finally {
+      setMartinZViewSaving(false);
+    }
+  };
+
+  useLayoutEffect(() => {
     const table = martinZTableRef.current;
     if (!table) return;
     const updateWidth = () => setMartinTableWidth(table.getBoundingClientRect().width);
-    updateWidth();
     const observer = new ResizeObserver(updateWidth);
     observer.observe(table);
     return () => observer.disconnect();
@@ -3541,11 +3598,14 @@ export default function GhUserSetupPage() {
       )}
 
       <Box sx={{ overflowX: "auto" }}>
-        <table ref={martinZTableRef} style={{ borderCollapse: "collapse", width: "fit-content" }}>
+        <table ref={martinZTableRef} style={{ borderCollapse: "collapse", width: martinZIsCollapsed ? martinTableWidth : "fit-content" }}>
           <tbody>
             <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={martinChanges.martin_a} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-            <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={martinChanges.martin_z} />
+            <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={martinChanges.martin_z}
+              collapsed={martinZIsCollapsed} onToggleCollapse={toggleMartinZVisibility}
+              collapseDisabled={!martinZViewReady || martinZViewSaving} />
+            {!martinZIsCollapsed && <>
             <tr><td colSpan={6} style={{ padding: 8 }}>
               <Tooltip title={martinZPatternPrioritySummary(martinZ.pattern_match_priority)}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -3592,12 +3652,17 @@ export default function GhUserSetupPage() {
               onChange={martinChanges.martin_z}
               color="#1565c0"
             />
+            </>}
           </tbody>
         </table>
         <table style={martinTableStyle}>
           <tbody>
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             <MartinBSection martin={martinB} onChange={martinChanges.martin_b} />
+          </tbody>
+        </table>
+        <table style={martinTableStyle}>
+          <tbody>
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
             {martinCs.map(([key, label, martin], index) => (
               <Fragment key={key}>
