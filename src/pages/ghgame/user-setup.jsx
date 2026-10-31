@@ -2,7 +2,7 @@ import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } f
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
 import { duplicatePatternRows } from "./pattern-duplicates.js";
-import { MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions } from "./martin-b-settings.js";
+import { MARTIN_B_PATTERN_COUNT, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions } from "./martin-b-settings.js";
 import { Fragment, memo, useMemo, useState, useEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
@@ -706,7 +706,7 @@ function MartinBSection({ martin, onChange }) {
               <option value="all">전체</option><option value="partial">부분</option>
             </select></td>
             <td style={normalCell}>{option.partial_patterns.map((number, partialIndex) => <input
-              key={partialIndex} type="number" min={0} max={15} step={1}
+              key={partialIndex} type="number" min={0} max={MARTIN_B_PATTERN_COUNT} step={1}
               aria-label={`마틴B ${index + 1}번 부분패턴 ${partialIndex + 1}`}
               value={number}
               onChange={(event) => updateOption(index, {
