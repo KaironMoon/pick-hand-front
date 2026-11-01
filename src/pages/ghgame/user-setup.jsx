@@ -701,6 +701,14 @@ function MartinBSection({ martin, onChange }) {
           onChange={(event) => onChange({ ...martin, assist_no_overlap: event.target.checked })} />
         어시 중첩배팅 불가
       </label>
+      <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 12 }}>
+        어시 패턴 우선순위
+        <select aria-label="마틴B 어시 패턴 우선순위" value={martin.assist_pattern_priority ?? "longest"}
+          onChange={(event) => onChange({ ...martin, assist_pattern_priority: event.target.value })}>
+          <option value="longest">긴 것부터</option>
+          <option value="shortest">짧은 것부터</option>
+        </select>
+      </label>
     </td></tr>
     <tr><td colSpan={6} style={{ ...normalCell, padding: 0, whiteSpace: "normal" }}>
       <Box sx={{ "& th, & td, & input, & select, & option": { fontWeight: 700 } }}>
@@ -2313,6 +2321,7 @@ const DEFAULT_MARTIN_Z = {
 const DEFAULT_MARTIN_B = {
   ...DEFAULT_MARTIN,
   assist_no_overlap: true,
+  assist_pattern_priority: "longest",
   stop_bet_round: 0,
   pattern_only: [],
   pattern_options: martinBPatternOptions(),
