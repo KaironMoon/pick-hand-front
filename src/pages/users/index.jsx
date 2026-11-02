@@ -28,7 +28,6 @@ import {
   Tooltip,
   Snackbar,
   Alert,
-  Link,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -42,6 +41,7 @@ import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
 import authService from "@/services/auth-service";
 import { USERS_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
+import TelegramRecipientField from "./TelegramRecipientField";
 import { emergencyStopResultMessage } from "@/utils/emergency-stop-result";
 
 function UsersPage() {
@@ -52,12 +52,13 @@ function UsersPage() {
   const [loading, setLoading] = useState(true);
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ username: "", password: "", nickname: "", role: "user", auto_only: false, telegram_chat_id: "" });
+  const [addForm, setAddForm] = useState({ username: "", password: "", nickname: "", role: "user", auto_only: false, telegram_username: "" });
   const [addError, setAddError] = useState("");
 
   const [editOpen, setEditOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
-  const [editForm, setEditForm] = useState({ nickname: "", password: "", is_active: true, role: "user", auto_only: false, telegram_chat_id: "" });
+  const [editForm, setEditForm] = useState({ nickname: "", password: "", is_active: true, role: "user", auto_only: false, telegram_username: "" });
+  const [editTelegramConnected, setEditTelegramConnected] = useState(false);
   const [editError, setEditError] = useState("");
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -121,7 +122,7 @@ function UsersPage() {
     try {
       await apiCaller.post(USERS_API.BASE, { ...addForm, auto_only: addForm.role !== "admin" && addForm.auto_only });
       setAddOpen(false);
-      setAddForm({ username: "", password: "", nickname: "", role: "user", auto_only: false, telegram_chat_id: "" });
+      setAddForm({ username: "", password: "", nickname: "", role: "user", auto_only: false, telegram_username: "" });
       fetchUsers();
     } catch (err) {
       setAddError(err.response?.data?.detail || "사용자 추가에 실패했습니다.");
@@ -130,14 +131,15 @@ function UsersPage() {
 
   const handleEditOpen = (user) => {
     setEditUser(user);
-    setEditForm({ nickname: user.nickname || "", password: "", is_active: user.is_active, role: user.role || "user", manual_pick_signal_enabled: !!user.manual_pick_signal_enabled, auto_only: !!user.auto_only, telegram_chat_id: user.telegram_chat_id || "" });
+    setEditForm({ nickname: user.nickname || "", password: "", is_active: user.is_active, role: user.role || "user", manual_pick_signal_enabled: !!user.manual_pick_signal_enabled, auto_only: !!user.auto_only, telegram_username: user.telegram_username || "" });
     setEditError("");
+    setEditTelegramConnected(user.telegram_connected === true);
     setEditOpen(true);
   };
 
   const handleEditSubmit = async () => {
     setEditError("");
-    const payload = { nickname: editForm.nickname, is_active: editForm.is_active, role: editForm.role, telegram_chat_id: editForm.telegram_chat_id.trim() };
+    const payload = { nickname: editForm.nickname, is_active: editForm.is_active, role: editForm.role, telegram_username: editForm.telegram_username.trim() };
     if (editForm.role !== "admin") {
       payload.manual_pick_signal_enabled = !!editForm.manual_pick_signal_enabled;
       payload.auto_only = !!editForm.auto_only;
@@ -273,7 +275,7 @@ function UsersPage() {
           variant="contained"
           startIcon={<PersonAddIcon />}
           onClick={() => {
-            setAddForm({ username: "", password: "", nickname: "", role: "user", auto_only: false, telegram_chat_id: "" });
+            setAddForm({ username: "", password: "", nickname: "", role: "user", auto_only: false, telegram_username: "" });
             setAddError("");
             setAddOpen(true);
           }}
@@ -436,12 +438,8 @@ function UsersPage() {
             onChange={(e) => setAddForm((f) => ({ ...f, nickname: e.target.value }))}
             margin="dense" sx={dialogFieldSx}
           />
-          <TextField
-            fullWidth label="텔레그램 채팅 ID" value={addForm.telegram_chat_id}
-            onChange={(e) => setAddForm((f) => ({ ...f, telegram_chat_id: e.target.value }))}
-            helperText={<><Link href="https://t.me/pick_hand_bot" target="_blank" rel="noopener noreferrer">픽미알림봇(@pick_hand_bot)</Link>에서 시작(Start)을 누른 뒤 알림을 받을 숫자 채팅 ID를 입력하세요. 빈 값은 알림 해제입니다.</>}
-            margin="dense" sx={dialogFieldSx}
-          />
+          <TelegramRecipientField value={addForm.telegram_username} connected={false}
+            onChange={(e) => setAddForm((f) => ({ ...f, telegram_username: e.target.value }))} sx={dialogFieldSx} />
           <FormControl fullWidth margin="dense" sx={dialogFieldSx}>
             <InputLabel id="add-role-label">권한</InputLabel>
             <Select
@@ -515,12 +513,8 @@ function UsersPage() {
             onChange={(e) => setEditForm((f) => ({ ...f, nickname: e.target.value }))}
             margin="dense" sx={dialogFieldSx}
           />
-          <TextField
-            fullWidth label="텔레그램 채팅 ID" value={editForm.telegram_chat_id}
-            onChange={(e) => setEditForm((f) => ({ ...f, telegram_chat_id: e.target.value }))}
-            helperText={<><Link href="https://t.me/pick_hand_bot" target="_blank" rel="noopener noreferrer">픽미알림봇(@pick_hand_bot)</Link>에서 시작(Start)을 누른 뒤 알림을 받을 숫자 채팅 ID를 입력하세요. 빈 값은 알림 해제입니다.</>}
-            margin="dense" sx={dialogFieldSx}
-          />
+          <TelegramRecipientField value={editForm.telegram_username} connected={editTelegramConnected}
+            onChange={(e) => setEditForm((f) => ({ ...f, telegram_username: e.target.value }))} sx={dialogFieldSx} />
           <TextField
             fullWidth label="새 비밀번호 (변경 시에만 입력)" type="password" value={editForm.password}
             onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}

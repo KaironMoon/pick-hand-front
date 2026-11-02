@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Link, TextField } from "@mui/material";
+import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from "@mui/material";
 import { useSetAtom } from "jotai";
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
 import { USERS_API } from "@/constants/api-url";
+import TelegramRecipientField from "@/pages/users/TelegramRecipientField";
 
 export default function ProfileDialog({ open, onClose }) {
   const setUser = useSetAtom(userAtom);
-  const [form, setForm] = useState({ nickname: "", telegram_chat_id: "", password: "" });
+  const [form, setForm] = useState({ nickname: "", telegram_username: "", password: "" });
+  const [telegramConnected, setTelegramConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -19,10 +21,12 @@ export default function ProfileDialog({ open, onClose }) {
     setLoading(true);
     setLoaded(false);
     setError("");
-    setForm({ nickname: "", telegram_chat_id: "", password: "" });
+    setForm({ nickname: "", telegram_username: "", password: "" });
+    setTelegramConnected(false);
     apiCaller.get(USERS_API.PROFILE).then(({ data }) => {
       if (active) {
-        setForm({ nickname: data.nickname, telegram_chat_id: data.telegram_chat_id, password: "" });
+        setForm({ nickname: data.nickname, telegram_username: data.telegram_username || "", password: "" });
+        setTelegramConnected(data.telegram_connected === true);
         setLoaded(true);
       }
     }).catch(() => {
@@ -39,7 +43,7 @@ export default function ProfileDialog({ open, onClose }) {
     setSaving(true);
     setError("");
     try {
-      const payload = { nickname: form.nickname, telegram_chat_id: form.telegram_chat_id.trim() };
+      const payload = { nickname: form.nickname, telegram_username: form.telegram_username.trim() };
       if (form.password.trim()) payload.password = form.password;
       const { data } = await apiCaller.put(USERS_API.PROFILE, payload);
       setUser((current) => ({ ...current, nickname: data.nickname }));
@@ -62,9 +66,8 @@ export default function ProfileDialog({ open, onClose }) {
           {loading && <Alert severity="info">내 정보를 불러오는 중입니다.</Alert>}
           <TextField fullWidth label="닉네임" value={form.nickname} margin="dense" disabled={!loaded || saving}
             onChange={(event) => setForm((current) => ({ ...current, nickname: event.target.value }))} />
-          <TextField fullWidth label="텔레그램 채팅 ID" value={form.telegram_chat_id} margin="dense" disabled={!loaded || saving}
-            onChange={(event) => setForm((current) => ({ ...current, telegram_chat_id: event.target.value }))}
-            helperText={<><Link href="https://t.me/pick_hand_bot" target="_blank" rel="noopener noreferrer">픽미알림봇(@pick_hand_bot)</Link>에서 시작(Start)을 누른 뒤 알림을 받을 숫자 채팅 ID를 입력하세요. 빈 값은 알림 해제입니다.</>} />
+          <TelegramRecipientField value={form.telegram_username} connected={telegramConnected} disabled={!loaded || saving}
+            onChange={(event) => setForm((current) => ({ ...current, telegram_username: event.target.value }))} />
           <TextField fullWidth label="새 비밀번호 (변경 시에만 입력)" type="password" autoComplete="new-password"
             value={form.password} margin="dense" disabled={!loaded || saving}
             onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} />

@@ -169,7 +169,7 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
               일반 stop 또는 긴급종료 시 전체 자동 반복이 해제됩니다.
             </Typography>
             {(!risk?.auto_telegram_bot_configured || (repeatEnabled && !risk?.auto_telegram_chat_configured)) && <Alert severity="warning" sx={{ mb: 1.5 }}>
-              {!risk?.auto_telegram_bot_configured ? "서버의 공용 텔레그램 봇 설정이 필요합니다." : "사용자 관리에서 본인의 텔레그램 채팅 ID를 등록해야 알림을 받을 수 있습니다."}
+              {!risk?.auto_telegram_bot_configured ? "서버의 공용 텔레그램 봇 설정이 필요합니다." : "내 정보 또는 사용자 관리에서 텔레그램 @아이디를 저장하고 픽미알림봇에서 /start를 보내 연결해 주세요."}
             </Alert>}
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
               <Button type="submit" variant="contained" disabled={busy || !canEditGoal}>자동 반복 설정 저장</Button>
