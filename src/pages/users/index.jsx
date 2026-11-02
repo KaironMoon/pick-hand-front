@@ -28,6 +28,7 @@ import {
   Tooltip,
   Snackbar,
   Alert,
+  Link,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -438,7 +439,7 @@ function UsersPage() {
           <TextField
             fullWidth label="텔레그램 채팅 ID" value={addForm.telegram_chat_id}
             onChange={(e) => setAddForm((f) => ({ ...f, telegram_chat_id: e.target.value }))}
-            helperText="공용 봇과 대화를 시작한 뒤 알림을 받을 숫자 채팅 ID를 입력하세요. 빈 값은 알림 해제입니다."
+            helperText={<><Link href="https://t.me/pick_hand_bot" target="_blank" rel="noopener noreferrer">픽미알림봇(@pick_hand_bot)</Link>에서 시작(Start)을 누른 뒤 알림을 받을 숫자 채팅 ID를 입력하세요. 빈 값은 알림 해제입니다.</>}
             margin="dense" sx={dialogFieldSx}
           />
           <FormControl fullWidth margin="dense" sx={dialogFieldSx}>
@@ -517,7 +518,7 @@ function UsersPage() {
           <TextField
             fullWidth label="텔레그램 채팅 ID" value={editForm.telegram_chat_id}
             onChange={(e) => setEditForm((f) => ({ ...f, telegram_chat_id: e.target.value }))}
-            helperText="공용 봇과 대화를 시작한 뒤 알림을 받을 숫자 채팅 ID를 입력하세요. 빈 값은 알림 해제입니다."
+            helperText={<><Link href="https://t.me/pick_hand_bot" target="_blank" rel="noopener noreferrer">픽미알림봇(@pick_hand_bot)</Link>에서 시작(Start)을 누른 뒤 알림을 받을 숫자 채팅 ID를 입력하세요. 빈 값은 알림 해제입니다.</>}
             margin="dense" sx={dialogFieldSx}
           />
           <TextField
