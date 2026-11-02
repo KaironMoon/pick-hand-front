@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import { useAtomValue, useSetAtom } from "jotai";
 import { userAtom, logoutAtom } from "@/store/auth-store";
 import { blockedGamesAtom, fetchBlockedGamesAtom } from "@/store/app-settings-store";
+import ProfileDialog from "./ProfileDialog";
 import autoService from "@/services/auto-service";
 import { emergencyStopResultMessage } from "@/utils/emergency-stop-result";
 
@@ -27,6 +28,7 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
   const logout = useSetAtom(logoutAtom);
   const blockedGames = useAtomValue(blockedGamesAtom);
   const fetchBlocked = useSetAtom(fetchBlockedGamesAtom);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [popupOpen, setPopupOpen] = useState(false);
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [emergencyBusy, setEmergencyBusy] = useState(false);
@@ -260,11 +262,19 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
           )}
         </DialogActions>
       </Dialog>
+      <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
       <Box sx={{ mt: "auto", p: 1.5 }}>
         <Divider sx={{ bgcolor: "military.border", mb: 1.5 }} />
         {user && (
           <Box sx={{ px: 1, mb: 1 }}>
-            <Box sx={{ color: "#888", fontSize: "0.75rem" }}>{user.nickname || user.username}</Box>
+            {user.role === "user" ? (
+              <Button onClick={() => setProfileOpen(true)} size="small"
+                sx={{ color: "text.secondary", fontSize: "0.75rem", textTransform: "none", justifyContent: "flex-start" }}>
+                {user.nickname || user.username}
+              </Button>
+            ) : (
+              <Box sx={{ color: "#888", fontSize: "0.75rem" }}>{user.nickname || user.username}</Box>
+            )}
           </Box>
         )}
         <Button

@@ -8,6 +8,7 @@ const AUTH_API = {
 
 const USERS_API = {
   BASE: "/api/v1/users",
+  PROFILE: "/api/v1/users/profile",
   DETAIL: (id) => `/api/v1/users/${id}`,
   IMPERSONATE: (id) => `/api/v1/users/${id}/impersonate`,
   EMERGENCY_STOP: (id) => `/api/v1/users/${id}/emergency-stop`,
