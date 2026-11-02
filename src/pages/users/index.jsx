@@ -51,12 +51,12 @@ function UsersPage() {
   const [loading, setLoading] = useState(true);
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ username: "", password: "", nickname: "", role: "user", auto_only: false });
+  const [addForm, setAddForm] = useState({ username: "", password: "", nickname: "", role: "user", auto_only: false, telegram_chat_id: "" });
   const [addError, setAddError] = useState("");
 
   const [editOpen, setEditOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
-  const [editForm, setEditForm] = useState({ nickname: "", password: "", is_active: true, role: "user", auto_only: false });
+  const [editForm, setEditForm] = useState({ nickname: "", password: "", is_active: true, role: "user", auto_only: false, telegram_chat_id: "" });
   const [editError, setEditError] = useState("");
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -120,7 +120,7 @@ function UsersPage() {
     try {
       await apiCaller.post(USERS_API.BASE, { ...addForm, auto_only: addForm.role !== "admin" && addForm.auto_only });
       setAddOpen(false);
-      setAddForm({ username: "", password: "", nickname: "", role: "user", auto_only: false });
+      setAddForm({ username: "", password: "", nickname: "", role: "user", auto_only: false, telegram_chat_id: "" });
       fetchUsers();
     } catch (err) {
       setAddError(err.response?.data?.detail || "사용자 추가에 실패했습니다.");
@@ -129,14 +129,14 @@ function UsersPage() {
 
   const handleEditOpen = (user) => {
     setEditUser(user);
-    setEditForm({ nickname: user.nickname || "", password: "", is_active: user.is_active, role: user.role || "user", manual_pick_signal_enabled: !!user.manual_pick_signal_enabled, auto_only: !!user.auto_only });
+    setEditForm({ nickname: user.nickname || "", password: "", is_active: user.is_active, role: user.role || "user", manual_pick_signal_enabled: !!user.manual_pick_signal_enabled, auto_only: !!user.auto_only, telegram_chat_id: user.telegram_chat_id || "" });
     setEditError("");
     setEditOpen(true);
   };
 
   const handleEditSubmit = async () => {
     setEditError("");
-    const payload = { nickname: editForm.nickname, is_active: editForm.is_active, role: editForm.role };
+    const payload = { nickname: editForm.nickname, is_active: editForm.is_active, role: editForm.role, telegram_chat_id: editForm.telegram_chat_id.trim() };
     if (editForm.role !== "admin") {
       payload.manual_pick_signal_enabled = !!editForm.manual_pick_signal_enabled;
       payload.auto_only = !!editForm.auto_only;
@@ -272,7 +272,7 @@ function UsersPage() {
           variant="contained"
           startIcon={<PersonAddIcon />}
           onClick={() => {
-            setAddForm({ username: "", password: "", nickname: "", role: "user", auto_only: false });
+            setAddForm({ username: "", password: "", nickname: "", role: "user", auto_only: false, telegram_chat_id: "" });
             setAddError("");
             setAddOpen(true);
           }}
@@ -435,6 +435,12 @@ function UsersPage() {
             onChange={(e) => setAddForm((f) => ({ ...f, nickname: e.target.value }))}
             margin="dense" sx={dialogFieldSx}
           />
+          <TextField
+            fullWidth label="텔레그램 채팅 ID" value={addForm.telegram_chat_id}
+            onChange={(e) => setAddForm((f) => ({ ...f, telegram_chat_id: e.target.value }))}
+            helperText="공용 봇과 대화를 시작한 뒤 알림을 받을 숫자 채팅 ID를 입력하세요. 빈 값은 알림 해제입니다."
+            margin="dense" sx={dialogFieldSx}
+          />
           <FormControl fullWidth margin="dense" sx={dialogFieldSx}>
             <InputLabel id="add-role-label">권한</InputLabel>
             <Select
@@ -506,6 +512,12 @@ function UsersPage() {
           <TextField
             fullWidth label="닉네임" value={editForm.nickname}
             onChange={(e) => setEditForm((f) => ({ ...f, nickname: e.target.value }))}
+            margin="dense" sx={dialogFieldSx}
+          />
+          <TextField
+            fullWidth label="텔레그램 채팅 ID" value={editForm.telegram_chat_id}
+            onChange={(e) => setEditForm((f) => ({ ...f, telegram_chat_id: e.target.value }))}
+            helperText="공용 봇과 대화를 시작한 뒤 알림을 받을 숫자 채팅 ID를 입력하세요. 빈 값은 알림 해제입니다."
             margin="dense" sx={dialogFieldSx}
           />
           <TextField

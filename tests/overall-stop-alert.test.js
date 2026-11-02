@@ -3,6 +3,14 @@ import test from "node:test";
 
 import { claimOverallStopAlert } from "../src/pages/ghgame/overall-stop-alert.js";
 
+test("server pending repeat does not announce a final stop or consume the alert", () => {
+  const alerted = new Set();
+  for (const reason of ["auto_total_goal_reached", "auto_total_drawdown_reached", "auto_total_stopped_slots_reached"]) {
+    assert.equal(claimOverallStopAlert(alerted, 100, reason, "auto", { auto_total_repeat_pending: true }), null);
+    assert.ok(claimOverallStopAlert(alerted, 100, reason, "auto", { auto_total_repeat_pending: false }));
+  }
+});
+
 test("common auto total goal reports that every GH slot stopped", () => {
   const alerted = new Set();
   const alert = claimOverallStopAlert(alerted, 100, "auto_total_goal_reached", "auto");

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Switch, TextField, Tooltip, Typography } from "@mui/material";
 
 import { autoRiskSummary, finalBetCapSummary } from "./AutoRiskSettings";
 
@@ -13,7 +13,7 @@ function errorMessage(error, fallback) {
   return typeof detail === "string" ? detail : fallback;
 }
 
-export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditGoal, onSaveGoal, onSaveRisk, onReset }) {
+export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditGoal, onSaveGoal, onSaveRisk, onStopRepeat, onReset }) {
   const configuredGoal = Number(risk?.configured_auto_total_goal_amount ?? 0);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -22,6 +22,8 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
   const busyRef = useRef(false);
   const [notice, setNotice] = useState(null);
   const [riskDraft, setRiskDraft] = useState({});
+  const [repeatDraft, setRepeatDraft] = useState(false);
+  const repeatEnabled = risk?.auto_total_repeat_enabled === true;
 
   useEffect(() => {
     if (!dirty) setDraft(configuredGoal > 0 ? String(configuredGoal) : "");
@@ -36,6 +38,7 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
       auto_total_stopped_slot_pnl: risk?.configured_auto_total_stopped_slot_pnl ?? 0,
     });
     setDirty(false);
+    setRepeatDraft(repeatEnabled);
     setNotice(null);
     setOpen(true);
   };
@@ -66,10 +69,15 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
     runAction(onReset, "오토 합계를 초기화했습니다.", "오토 합계를 초기화하지 못했습니다.");
   };
 
+  const stopRepeat = () => runAction(async () => {
+    await onStopRepeat();
+    setRepeatDraft(false);
+  }, "전체 자동 반복을 해제했습니다. 현재 텀이 끝나면 재시작하지 않습니다.", "자동 반복을 해제하지 못했습니다.");
+
   return (
     <>
       <Box sx={{ position: "relative", flex: "0 0 auto" }}>
-        <Tooltip title={<Box sx={{ whiteSpace: "pre-line" }}>{`${autoRiskSummary(risk)}\n${finalBetCapSummary(betCap)}`}</Box>}>
+        <Tooltip title={<Box sx={{ whiteSpace: "pre-line" }}>{`자동 반복 ${repeatEnabled ? "ON" : "OFF"}\n${autoRiskSummary(risk)}\n${finalBetCapSummary(betCap)}`}</Box>}>
         <Box component="button" type="button" onClick={showDialog}
           aria-label="오토 합계 설정" aria-haspopup="dialog" aria-expanded={open}
           sx={{
@@ -78,7 +86,7 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
             "&:focus-visible": { outline: "2px solid #90caf9", outlineOffset: 2 },
           }}>
           <Box component="span" sx={{
-            borderRadius: 1, px: 0.5, backgroundColor: "#1565c0", display: "flex",
+            borderRadius: 1, px: 0.5, backgroundColor: repeatEnabled ? "#2e7d32" : "#1565c0", display: "flex",
             alignItems: "center", justifyContent: "center", minWidth: 44, height: 20,
             fontSize: 11, fontWeight: "bold", color: "#fff",
           }}>오토 합계</Box>
@@ -131,7 +139,7 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
               helperText={goal > 0 ? `실제 목표 ${formatAmount(goal)}P · 0은 사용 안 함` : "목표액 미설정 · 0은 사용 안 함"}
             />
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-              모든 슬롯의 오토 합계가 목표 이상이면 모든 GH 슬롯 오토 정지 · 공통 실배팅 배율 적용
+              {repeatEnabled ? "목표 달성 시 KEEP 복원 후 오토 합계 0으로 다음 텀 시작" : "모든 슬롯의 오토 합계가 목표 이상이면 모든 GH 슬롯 오토 정지"} · 공통 실배팅 배율 적용
             </Typography>
             <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
               <Button type="submit" variant="contained" disabled={busy || !canEditGoal || draft.trim() === ""}>
@@ -141,6 +149,37 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
                 목표액 삭제
               </Button>
             </Box>
+          </Box>
+          <Box component="form" sx={{ mt: 3, pt: 2, borderTop: "1px solid", borderColor: "divider" }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (repeatEnabled && !repeatDraft) {
+                stopRepeat();
+                return;
+              }
+              runAction(() => onSaveRisk({ auto_total_repeat_enabled: repeatDraft }),
+                "자동 반복 설정을 저장했습니다.", "자동 반복 설정을 저장하지 못했습니다.");
+            }}>
+            <FormControlLabel label={`자동 반복 ${repeatDraft ? "ON" : "OFF"}`}
+              control={<Switch checked={repeatDraft} disabled={busy || !canEditGoal}
+                onChange={(event) => setRepeatDraft(event.target.checked)} />} />
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+              ON으로 저장한 뒤 시작하는 KEEP 오토에 적용됩니다. 전체 KEEP 소진 또는 전체 종료 조건 도달 시,
+              본전 이상이면 KEEP 복원 후 합계 0으로 다시 시작하고 적자면 종료합니다.
+              일반 stop 또는 긴급종료 시 전체 자동 반복이 해제됩니다.
+            </Typography>
+            {(!risk?.auto_telegram_bot_configured || (repeatEnabled && !risk?.auto_telegram_chat_configured)) && <Alert severity="warning" sx={{ mb: 1.5 }}>
+              {!risk?.auto_telegram_bot_configured ? "서버의 공용 텔레그램 봇 설정이 필요합니다." : "사용자 관리에서 본인의 텔레그램 채팅 ID를 등록해야 알림을 받을 수 있습니다."}
+            </Alert>}
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+              <Button type="submit" variant="contained" disabled={busy || !canEditGoal}>자동 반복 설정 저장</Button>
+              <Button type="button" variant="outlined" disabled={busy || !canEditGoal || !repeatEnabled} onClick={stopRepeat}>
+                정상 종료 · 이번 텀까지만
+              </Button>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+              정상 종료는 전체 자동 반복만 해제합니다. 진행 중인 오토는 이번 텀까지 계속 진행합니다.
+            </Typography>
           </Box>
           <Box component="form" sx={{ mt: 3, pt: 2, borderTop: "1px solid", borderColor: "divider" }}
             onSubmit={(event) => {
@@ -166,7 +205,8 @@ export default function GhAutoTotalControl({ total, goal, risk, betCap, canEditG
               </Box>
             ))}
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
-              각 조건의 두 값이 모두 충족되면 전체 GH 오토가 정지됩니다. 0은 사용 안 함입니다.
+              각 조건의 두 값이 모두 충족되면 전체 GH 오토가 정지됩니다.
+              자동 반복 ON이면 정지 시 합계가 본전 이상일 때 재시작하며 적자이면 종료합니다. 0은 사용 안 함입니다.
               금액에는 공통 실배팅 배율을 적용하며 슬롯 수와 손실률에는 적용하지 않습니다.
               종료 슬롯은 현재 연결된 슬롯의 마지막 오토가 종료된 슬롯입니다.
               종료 슬롯 조건의 합계 PNL은 음수도 입력할 수 있으며, 설정값 이상이면 조건을 충족합니다.

@@ -92,6 +92,7 @@ export const claimOverallStopAlert = (
   mode,
   stopDetail,
 ) => {
+  if (stopDetail?.auto_total_repeat_pending === true) return null;
   const alert = STOP_ALERTS[reason];
   if (!alert || gameId === null || gameId === undefined) return null;
   const key = reason.startsWith("auto_total_")

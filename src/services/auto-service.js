@@ -46,6 +46,11 @@ const autoService = {
     return resp.data;
   },
 
+  async stopRepeatAfterCycle() {
+    const resp = await apiCaller.post(ABOO_API.AUTO_REPEAT_STOP);
+    return resp.data;
+  },
+
   async getAutoStatus(gameId, gameType = "gh") {
     const resp = await apiCaller.get(ABOO_API.AUTO_STATUS, { game_id: gameId, game_type: gameType });
     return resp.data;

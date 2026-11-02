@@ -1306,6 +1306,18 @@ export default function GhUserGamePage() {
     }
   };
 
+  const stopAutoRepeatAfterCycle = async () => {
+    autoTotalVersionRef.current += 1;
+    try {
+      const data = await autoService.stopRepeatAfterCycle();
+      setAutoPnlTotal(Number(data.auto_pnl_total_p));
+      setAutoTotalGoal(Number(data.auto_total_goal_amount));
+      setAutoTotalRisk(data);
+    } finally {
+      autoTotalVersionRef.current += 1;
+    }
+  };
+
   const startGame = useCallback(async ({ slotNo = null, replaceGameId = null } = {}) => {
     try {
       goalAlertedRef.current = { a: false, z: false };
@@ -2532,7 +2544,7 @@ export default function GhUserGamePage() {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                   <GhAutoTotalControl total={autoPnlTotal} goal={autoTotalGoal} risk={autoTotalRisk} betCap={roundState?.auto_final_bet_cap_amount}
                     canEditGoal onSaveGoal={(amount) => saveAutoTotalSettings({ auto_total_goal_amount: amount })}
-                    onSaveRisk={saveAutoTotalSettings} onReset={resetAutoTotal} />
+                    onSaveRisk={saveAutoTotalSettings} onStopRepeat={stopAutoRepeatAfterCycle} onReset={resetAutoTotal} />
                   {/* 라보쉐르 활성이면 크루즈/마틴Z 대신 라보쉐르 표시 */}
                   {betData?.user_martin?.labouchere?.enabled ? (() => {
                     const lb = betData.user_martin.labouchere;

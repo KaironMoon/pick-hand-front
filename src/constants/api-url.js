@@ -194,6 +194,7 @@ const ABOO_API = {
   PICKHAND_ID: "/api/v1/users/profile/pickhand-id",
   AUTO_START: "/api/v1/games/auto/start",
   AUTO_STOP: "/api/v1/games/auto/stop",
+  AUTO_REPEAT_STOP: "/api/v1/games/auto/repeat/stop",
   AUTO_EMERGENCY_STOP: "/api/v1/games/auto/emergency-stop",
   AUTO_HISTORY: "/api/v1/games/auto/history",
   AUTO_STATUS: "/api/v1/games/auto/status",
