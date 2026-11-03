@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Container, Box, Divider, Drawer, useMediaQuery } from "@mui/material";
 import AppBar from "@mui/material/AppBar";
 import { Outlet } from "react-router-dom";
@@ -9,6 +9,7 @@ import PageLeftMenu from "@/pages/components/layout/PageLeftMenu";
 import PageFooter from "@/pages/components/layout/PageFooter";
 import GameBlockedDialog from "@/pages/components/GameBlockedDialog";
 import MaintenanceGate from "@/pages/components/MaintenanceGate";
+import PageLoading from "@/pages/components/PageLoading";
 
 const DRAWER_WIDTH = 200;
 
@@ -70,7 +71,11 @@ function PageLayout() {
             overflow: "auto",
           }}
         >
-          <MaintenanceGate><Outlet /></MaintenanceGate>
+          <MaintenanceGate>
+            <Suspense fallback={<PageLoading />}>
+              <Outlet />
+            </Suspense>
+          </MaintenanceGate>
         </Box>
       </Box>
       {!isMobile && (

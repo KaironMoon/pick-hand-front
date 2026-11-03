@@ -329,14 +329,14 @@ function GhLossStopStatus({ roundState, autoStatus }) {
         <Typography variant="caption" sx={{ color: "#ffc107", fontWeight: 900 }}>현재 게임 배팅조건</Typography>
         <Tooltip title={martinZPatternPrioritySummary(roundState?.martin_z_pattern_match_priority)}>
           <Typography variant="caption" sx={{ color: "#ffe082" }}>
-            마틴Z 끝일치: {{ all: "전부", longest: "긴 것 우선", shortest: "짧은 것 우선" }[roundState?.martin_z_pattern_match_priority || "all"]} ⓘ
+            마틴{roundState?.martin_z_variant === "z2" ? "Z2" : "Z"} 끝일치: {{ all: "전부", longest: "긴 것 우선", shortest: "짧은 것 우선" }[roundState?.martin_z_pattern_match_priority || "all"]} ⓘ
           </Typography>
         </Tooltip>
         <Tooltip title={finalBetCapSummary(roundState?.auto_final_bet_cap_amount)}>
           <Typography variant="caption" sx={{ color: "#ffe082" }}>최종 배팅 상한(×1): {roundState?.auto_final_bet_cap_amount || "사용안함"} {roundState?.auto_final_bet_cap_amount > 0 ? "P" : ""} ⓘ</Typography>
         </Tooltip>
         <Tooltip title={martinZRateSummary({}, roundState?.pick_martin)}>
-          <Typography variant="caption" sx={{ color: roundState?.pick_martin?.win_rate_blocked ? "#ff8a80" : "#ffe082" }}>마틴Z 승률 조건: {roundState?.pick_martin?.win_rate_threshold || "사용안함"}{roundState?.pick_martin?.win_rate_threshold > 0 ? "%" : ""} ⓘ</Typography>
+          <Typography variant="caption" sx={{ color: roundState?.pick_martin?.win_rate_blocked ? "#ff8a80" : "#ffe082" }}>마틴{roundState?.martin_z_variant === "z2" ? "Z2" : "Z"} 승률 조건: {roundState?.pick_martin?.win_rate_threshold || "사용안함"}{roundState?.pick_martin?.win_rate_threshold > 0 ? "%" : ""} ⓘ</Typography>
         </Tooltip>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.overall_stop?.reason === "overall_loss_limit_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
           전체 손실종료조건: {overallLossStopStatusLabel(roundState?.overall_stop)}
@@ -2653,7 +2653,7 @@ export default function GhUserGamePage() {
                       <React.Fragment>
                         <Tooltip title={<Box sx={{ whiteSpace: "pre-line" }}>{`${martinZPatternPrioritySummary(roundState?.martin_z_pattern_match_priority)}\n${martinZRateSummary({}, roundState?.pick_martin)}`}</Box>}>
                           <Box sx={tagSx("#c62828")}>
-                            <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>Z</Typography>
+                            <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{roundState?.martin_z_variant === "z2" ? "Z2" : "Z"}</Typography>
                           </Box>
                         </Tooltip>
                         <Box sx={{ ...fieldSx, minWidth: 80, px: 0.6 }}>
@@ -3435,7 +3435,7 @@ export default function GhUserGamePage() {
                       <tbody>
                         <tr>
                           <td style={{ ...dcB, color: fColor }}>{`formal(${fDir})`}</td>
-                          <td style={{ ...dcB, color: "#c62828", ...mDimStyle }}>마틴Z</td>
+                          <td style={{ ...dcB, color: "#c62828", ...mDimStyle }}>{roundState?.martin_z_variant === "z2" ? "마틴Z2" : "마틴Z"}</td>
                           <td style={{ ...dc, color: "#1565c0", ...mDimStyle }}>{`${mP.toLocaleString()}P`}</td>
                           <td style={{ ...dc, color: "#f44336", ...mDimStyle }}>{`${mB.toLocaleString()}P`}</td>
                           <td style={{ ...dcB, color: "#fff" }}>{currentTurn}</td>

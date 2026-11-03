@@ -224,7 +224,7 @@ function cruiseStepLabel(idx) {
 
 function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp, collapsed = false, onToggleCollapse, collapseDisabled = false }) {
   const isCruise = name === "cruise";
-  const usesDecimalP = ["martin_a", "martin_z", "martin_b", "martin_k", "martin_kp"].includes(name) || name.startsWith("martin_c") || name.startsWith("martin_p");
+  const usesDecimalP = ["martin_a", "martin_z", "martin_z2", "martin_b", "martin_k", "martin_kp"].includes(name) || name.startsWith("martin_c") || name.startsWith("martin_p");
   const enabled = martin.enabled;
   // 크루즈는 29 단계(15-2까지)를 위해 6행×5칸 = 30칸 사용, 다른 섹션은 4행×5 = 20
   const totalSteps = isCruise ? 30 : 20;
@@ -679,22 +679,27 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
   );
 });
 
-function MartinBSection({ martin, onChange }) {
+function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
+  const label = z2 ? "마틴Z2" : "마틴B";
+  const specialNumber = z2 ? 999 : MARTIN_B_SPECIAL_NUMBER;
   const compactCell = { ...normalCell, minWidth: 0, padding: "3px 2px", whiteSpace: "normal", overflowWrap: "anywhere", fontSize: 12 };
-  const options = martinBPatternOptions(martin.pattern_options);
+  const options = z2 ? Array.from({ length: 100 }, (_, index) => ({
+    ...martinBPatternOptions()[0], ...martin.pattern_options?.[index],
+    partial_patterns: Array.from({ length: 15 }, (_, i) => martin.pattern_options?.[index]?.partial_patterns?.[i] ?? 0),
+  })) : martinBPatternOptions(martin.pattern_options);
   const updateOption = (index, patch) => onChange({
     ...martin,
     pattern_options: options.map((option, i) => i === index ? { ...option, ...patch } : option),
   });
   const numberInput = (index, field, max, label, width = 34) => (
     <input type="number" min={0} max={max} step={1}
-      aria-label={`마틴B ${index + 1}번 ${label}`}
+      aria-label={`${label} ${index + 1}번 ${label}`}
       value={options[index][field]}
       onChange={(event) => updateOption(index, { [field]: Number(event.target.value) })}
       style={{ width, maxWidth: "100%", boxSizing: "border-box" }} />
   );
   return <>
-    <MartinSection name="martin_b" label="마틴B" martin={martin} onChange={onChange} labelColor="#6a1b9a" />
+    {!optionsOnly && <MartinSection name="martin_b" label={label} martin={martin} onChange={onChange} labelColor="#6a1b9a" />}
     <tr><td colSpan={6} style={{ ...normalCell, textAlign: "left" }}>
       <label style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
         <input type="checkbox" checked={martin.assist_no_overlap ?? true}
@@ -703,7 +708,7 @@ function MartinBSection({ martin, onChange }) {
       </label>
       <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 12 }}>
         어시 패턴 우선순위
-        <select aria-label="마틴B 어시 패턴 우선순위" value={martin.assist_pattern_priority ?? "longest"}
+        <select aria-label={`${label} 어시 패턴 우선순위`} value={martin.assist_pattern_priority ?? "longest"}
           onChange={(event) => onChange({ ...martin, assist_pattern_priority: event.target.value })}>
           <option value="longest">긴 것부터</option>
           <option value="shortest">짧은 것부터</option>
@@ -712,7 +717,7 @@ function MartinBSection({ martin, onChange }) {
     </td></tr>
     <tr><td colSpan={6} style={{ ...normalCell, padding: 0, whiteSpace: "normal" }}>
       <Box sx={{ "& th, & td, & input, & select, & option": { fontWeight: 700 } }}>
-        <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }} aria-label="마틴B 패턴별 옵션">
+        <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }} aria-label={`${label} 패턴별 옵션`}>
           <colgroup>{[6, 6, 6, 6, 7, 48, 9, 12].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
           <thead style={{ position: "sticky", top: 0, background: "#252525", zIndex: 1 }}><tr>
             {["번호", "성공마감", "어시회차", "어시패시", "전체/부분", "부분패턴번호 지정선택 (0: 미지정)", "미발동 지정", "미발동시 동작"].map((label) => <th key={label} style={{ ...headerStyle, padding: "4px 2px", fontSize: 12, overflowWrap: "anywhere" }}>{label}</th>)}
@@ -724,14 +729,14 @@ function MartinBSection({ martin, onChange }) {
             <td style={compactCell}>{numberInput(index, "assist_losses", 80, "어시패시")}</td>
             <td style={compactCell}><select style={{ maxWidth: "100%", fontSize: 12,
               backgroundColor: option.assist_mode === "partial" ? "#1565c0" : "#c62828", color: "#fff" }}
-              aria-label={`마틴B ${index + 1}번 전체/부분`} value={option.assist_mode}
+              aria-label={`${label} ${index + 1}번 전체/부분`} value={option.assist_mode}
               onChange={(event) => updateOption(index, { assist_mode: event.target.value })}>
               <option value="all" style={{ backgroundColor: "#c62828", color: "#fff" }}>전체</option>
               <option value="partial" style={{ backgroundColor: "#1565c0", color: "#fff" }}>부분</option>
             </select></td>
             <td style={compactCell}><Box sx={{ display: "grid", gridTemplateColumns: "repeat(15, minmax(0, 1fr))", gap: "1px" }}>{option.partial_patterns.map((number, partialIndex) => <input
-              key={partialIndex} type="number" min={0} max={MARTIN_B_SPECIAL_NUMBER} step={1}
-              aria-label={`마틴B ${index + 1}번 부분패턴 ${partialIndex + 1}`}
+              key={partialIndex} type="number" min={0} max={specialNumber} step={1}
+              aria-label={`${label} ${index + 1}번 부분패턴 ${partialIndex + 1}`}
               value={number}
               onChange={(event) => updateOption(index, {
                 partial_patterns: option.partial_patterns.map((value, i) => i === partialIndex ? Number(event.target.value) : value),
@@ -741,7 +746,7 @@ function MartinBSection({ martin, onChange }) {
             <td style={compactCell}>
               <select style={{ maxWidth: "100%", fontSize: 12,
                 backgroundColor: option.untriggered_action === "assist" ? "#1565c0" : "#c62828", color: "#fff" }}
-                aria-label={`마틴B ${index + 1}번 지정회차 미발동 동작`} value={option.untriggered_action}
+                aria-label={`${label} ${index + 1}번 지정회차 미발동 동작`} value={option.untriggered_action}
                 onChange={(event) => updateOption(index, { untriggered_action: event.target.value })}>
                 <option value="stop" style={{ backgroundColor: "#c62828", color: "#fff" }}>베팅포기</option>
                 <option value="assist" style={{ backgroundColor: "#1565c0", color: "#fff" }}>어시패턴사용</option>
@@ -750,16 +755,16 @@ function MartinBSection({ martin, onChange }) {
           </tr>)}</tbody>
         </table>
       </Box>
-      <Box sx={{ p: 0.75, textAlign: "left" }}>성공마감은 번호별 누적 승수이며, 도달하면 해당 번호의 본베팅과 어시베팅을 모두 종료합니다. 어시 승수는 어시를 지정한 번호에 누적됩니다. 어시 대상으로는 어시사용인 입력 패턴과 특수 패턴 31번을 사용하며, 어시 중첩배팅 불가를 체크하면 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동하고, 해제하면 동시에 발동합니다.</Box>
+      <Box sx={{ p: 0.75, textAlign: "left" }}>본픽이 발동하는 번호에는 어시를 사용하지 않습니다. 성공마감은 번호별 누적 승수이며, 도달하면 해당 번호의 본베팅과 어시베팅을 모두 종료합니다. 어시 승수는 어시를 지정한 번호에 누적됩니다. 어시 대상으로는 어시사용인 입력 패턴과 특수 패턴 {specialNumber}번을 사용하며, 어시 중첩배팅 불가를 체크하면 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동하고, 해제하면 동시에 발동합니다.</Box>
       <Box sx={{ p: 0.75, textAlign: "left" }}>번호별 지정회차 결과까지 소속 패턴이 한 번도 나오지 않으면 다음 회차부터 베팅포기 또는 어시패턴사용을 적용합니다. 어시패턴사용은 어시회차·어시단계를 무시하고 전체/부분 설정을 따르며, 지정 승수에 도달하면 종료합니다.</Box>
     </td></tr>
-    <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#6a1b9a"
-      rowCount={MARTIN_B_PATTERN_ROW_COUNT} rowLabel={martinBPatternLabel} recommendSingleStep={false} showAssistUsage showWall constrainWidth visibleIndices={MARTIN_B_VISIBLE_INDICES} />
+    {!optionsOnly && <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#6a1b9a"
+      rowCount={MARTIN_B_PATTERN_ROW_COUNT} rowLabel={martinBPatternLabel} recommendSingleStep={false} showAssistUsage showWall constrainWidth visibleIndices={MARTIN_B_VISIBLE_INDICES} />}
     <tr><td colSpan={6} style={{ ...normalCell, whiteSpace: "normal", textAlign: "left" }}>
-      <strong>31번 특수 패턴 (어시 전용)</strong>: 현재 줄을 제외한 앞 4줄 중 같은 결과가 2개 이상 나온 줄이 3줄 이상이고, 현재 줄은 1개만 나왔을 때 현재 줄과 같은 쪽에 베팅합니다.
-      예: PPBBPPPBBP → P, PPBBPPPBBPB → B. 단독 베팅은 하지 않으며, 전체 어시에 포함되고 부분 어시에서는 31번으로 지정합니다.
+      <strong>{specialNumber}번 특수 패턴 (어시 전용)</strong>: 현재 줄을 제외한 앞 4줄 중 같은 결과가 2개 이상 나온 줄이 3줄 이상이고, 현재 줄은 1개만 나왔을 때 현재 줄과 같은 쪽에 베팅합니다.
+      예: PPBBPPPBBP → P, PPBBPPPBBPB → B. 단독 베팅은 하지 않으며, 전체 어시에 포함되고 부분 어시에서는 {specialNumber}번으로 지정합니다.
     </td></tr>
-    <MartinStopBetRoundRow martin={martin} onChange={onChange} color="#6a1b9a" />
+    {!optionsOnly && <MartinStopBetRoundRow martin={martin} onChange={onChange} color="#6a1b9a" />}
   </>;
 }
 
@@ -2702,10 +2707,17 @@ export default function GhUserSetupPage() {
     setDirty(true);
   };
   const martinChanges = useMemo(() => Object.fromEntries([
-    "martin_a", "martin_z", "martin_b", "martin_c", "martin_c2", "martin_c3",
+    "martin_a", "martin_z", "martin_z2", "martin_b", "martin_c", "martin_c2", "martin_c3",
     "martin_c4", "martin_c5", "martin_k", "martin_p1", "martin_p2", "martin_p3", "martin_kp",
   ].map((key) => [key, (martin) => {
-    setConfig((prev) => updatePbjStrategy(prev, key, martin));
+    setConfig((prev) => {
+      const other = key === "martin_z" ? "martin_z2" : key === "martin_z2" ? "martin_z" : null;
+      if (other && martin.enabled && prev[other]?.enabled) {
+        window.alert("마틴 Z와 Z2는 동시에 사용할 수 없습니다. 사용 중인 마틴을 먼저 꺼 주세요.");
+        return prev;
+      }
+      return updatePbjStrategy(prev, key, martin);
+    });
     setDirty(true);
   }])), []);
 
@@ -2742,6 +2754,7 @@ export default function GhUserSetupPage() {
 
   const martinA = config.martin_a || { ...DEFAULT_MARTIN, enabled: true };
   const martinZ = config.martin_z || { ...DEFAULT_MARTIN_Z };
+  const martinZ2 = config.martin_z2 || { ...DEFAULT_MARTIN_Z, pattern_only: [], pattern_options: [] };
   const martinB = config.martin_b || { ...DEFAULT_MARTIN_B };
   const martinC = config.martin_c || { ...DEFAULT_MARTIN_C };
   const martinCs = [
@@ -3662,6 +3675,58 @@ export default function GhUserSetupPage() {
               color="#1565c0"
             />
             </>}
+            <tr><td colSpan={6} style={{ height: 12 }} /></tr>
+            <MartinSection name="martin_z2" label="마틴Z2" martin={martinZ2} onChange={martinChanges.martin_z2} />
+            <>
+            <tr><td colSpan={6} style={{ padding: 8 }}>
+              <Tooltip title={martinZPatternPrioritySummary(martinZ2.pattern_match_priority).replaceAll("마틴Z", "마틴Z2")}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Typography component="label" htmlFor="martin-z2-pattern-priority" variant="caption">끝일치 패턴 선택 ⓘ</Typography>
+                  <select id="martin-z2-pattern-priority" value={martinZ2.pattern_match_priority ?? "all"}
+                    onChange={(event) => martinChanges.martin_z2({ ...martinZ2, pattern_match_priority: event.target.value })}
+                    style={{ padding: "4px 8px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4 }}>
+                    <option value="all">전부</option>
+                    <option value="longest">긴 것 우선</option>
+                    <option value="shortest">짧은 것 우선</option>
+                  </select>
+                  <Typography variant="caption">동시에 끝일치한 패턴에 적용 · 새 게임부터 적용</Typography>
+                </Box>
+              </Tooltip>
+            </td></tr>
+            <tr><td colSpan={6} style={{ padding: 8 }}>
+              <Tooltip title={martinZRateSummary(martinZ2).replaceAll("마틴Z", "마틴Z2")}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <TextField size="small" type="number" label="마틴Z2 최소 승률 (%)"
+                    value={martinZ2.win_rate_threshold ?? 0} inputProps={{ min: 0, max: 100, step: 0.1 }}
+                    onChange={(event) => martinChanges.martin_z2({ ...martinZ2, win_rate_threshold: Number(event.target.value) })} />
+                  <Typography variant="caption">미만이면 단계 유지·0.0P, 이상으로 회복하면 정상 배팅 · 0은 사용안함 ⓘ</Typography>
+                </Box>
+              </Tooltip>
+            </td></tr>
+            <MartinPatternRow
+              martin={martinZ2}
+              onChange={martinChanges.martin_z2}
+              ruleKey="pattern_block"
+              label="패턴일 때 배팅 안 하기"
+              color="#1565c0"
+            />
+            <MartinBSection martin={martinZ2} onChange={martinChanges.martin_z2} z2 optionsOnly />
+            <MartinPatternOnlyRows
+              martin={martinZ2}
+              onChange={martinChanges.martin_z2}
+              color="#1565c0"
+              rowCount={100}
+              showAssistUsage showWall
+              showMissCondition
+              highlightDuplicates
+            />
+            <MartinStopBetRoundRow
+              martin={martinZ2}
+              showStepRecovery
+              onChange={martinChanges.martin_z2}
+              color="#1565c0"
+            />
+            </>
           </tbody>
         </table>
         <table style={martinTableStyle}>
