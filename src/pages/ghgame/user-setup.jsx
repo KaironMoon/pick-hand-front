@@ -371,6 +371,7 @@ const PATTERN_BLOCK_CELL_COUNT = 10;
 const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
 const MARTIN_Z_PATTERN_ONLY_ROW_COUNT = 1000;
+const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = 150;
 
 function PatternCell({ value, onClick, cellKey, wallHighlight = false }) {
   return (
@@ -683,7 +684,7 @@ function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
   const label = z2 ? "마틴Z2" : "마틴B";
   const specialNumber = z2 ? 999 : MARTIN_B_SPECIAL_NUMBER;
   const compactCell = { ...normalCell, minWidth: 0, padding: "3px 2px", whiteSpace: "normal", overflowWrap: "anywhere", fontSize: 12 };
-  const options = z2 ? Array.from({ length: 100 }, (_, index) => ({
+  const options = z2 ? Array.from({ length: MARTIN_Z2_PATTERN_ONLY_ROW_COUNT }, (_, index) => ({
     ...martinBPatternOptions()[0], ...martin.pattern_options?.[index],
     partial_patterns: Array.from({ length: 15 }, (_, i) => martin.pattern_options?.[index]?.partial_patterns?.[i] ?? 0),
   })) : martinBPatternOptions(martin.pattern_options);
@@ -3715,7 +3716,7 @@ export default function GhUserSetupPage() {
               martin={martinZ2}
               onChange={martinChanges.martin_z2}
               color="#1565c0"
-              rowCount={100}
+              rowCount={MARTIN_Z2_PATTERN_ONLY_ROW_COUNT}
               showAssistUsage showWall
               showMissCondition
               highlightDuplicates
