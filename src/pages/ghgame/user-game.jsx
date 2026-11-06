@@ -3347,7 +3347,9 @@ export default function GhUserGamePage() {
                   const key = `${pat}-${sec + 1}`;
                   const step = isUnified ? unifiedStep : (patternSteps[key] || stepMin);
                   const idx = step - 1;
-                  const amt = (idx >= 0 && idx < amounts.length) ? amounts[idx] : 0;
+                  const amt = dash?.bet_type === "labouchere"
+                    ? (isUnified ? dash.current_amount : dash.current_amounts?.[key]) ?? 0
+                    : (idx >= 0 && idx < amounts.length) ? amounts[idx] : 0;
                   const detail = betData?.globalhit?.details?.find((d) => d.pattern === pat && d.group === sec + 1);
                   const predict = detail?.direction || null;
                   return { step, amt, predict };

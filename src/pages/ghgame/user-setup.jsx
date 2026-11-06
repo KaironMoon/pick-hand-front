@@ -1,3 +1,4 @@
+import MartinLabouchereRows from "./components/MartinLabouchereRows.jsx";
 import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } from "./components/AutoRiskSettings";
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
@@ -34,7 +35,7 @@ const CELL_BORDER = "1px solid #555";
 const LABEL_BG = "rgba(255,255,255,0.04)";
 
 const BET_TYPES = ["martin", "kkangbet", "fixed", "manual", "cruise"];
-const BET_TYPE_LABELS = { martin: "마틴", kkangbet: "깡벳", fixed: "고정벳", manual: "수동", cruise: "크루즈" };
+const BET_TYPE_LABELS = { martin: "마틴", kkangbet: "깡벳", fixed: "고정벳", manual: "수동", cruise: "크루즈", labouchere: "라보쉐르" };
 const DISABLED_BET_TYPES = ["cruise"];
 
 const headerStyle = {
@@ -225,6 +226,8 @@ function cruiseStepLabel(idx) {
 function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp, collapsed = false, onToggleCollapse, collapseDisabled = false }) {
   const isCruise = name === "cruise";
   const usesDecimalP = ["martin_a", "martin_z", "martin_z2", "martin_b", "martin_k", "martin_kp"].includes(name) || name.startsWith("martin_c") || name.startsWith("martin_p");
+  const availableBetTypes = usesDecimalP ? [...BET_TYPES, "labouchere"] : BET_TYPES;
+  const isLab = usesDecimalP && martin.bet_type === "labouchere";
   const enabled = martin.enabled;
   // 크루즈는 29 단계(15-2까지)를 위해 6행×5칸 = 30칸 사용, 다른 섹션은 4행×5 = 20
   const totalSteps = isCruise ? 30 : 20;
@@ -234,7 +237,12 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
   const sectionDisabledBetTypes = isCruise
     ? BET_TYPES.filter((t) => t !== "cruise")
     : DISABLED_BET_TYPES;
-  const betType = (type) => { if (sectionDisabledBetTypes.includes(type)) return; onChange({ ...martin, bet_type: type }); };
+  const betType = (type) => {
+    if (sectionDisabledBetTypes.includes(type)) return;
+    onChange({ ...martin, bet_type: type, ...(type === "labouchere" ? {
+      labouchere: martin.labouchere || { target: 0, count: 10, mode: "even", sequence: [] },
+    } : {}) });
+  };
   const amount = (idx, val) => {
     const base = martin.amounts || [];
     const padded = base.length >= totalSteps ? base : [...base, ...new Array(totalSteps - base.length).fill(0)];
@@ -304,11 +312,20 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
       {/* 배팅종류 */}
       <tr>
         <td style={labelCellStyle}>배팅종류</td>
-        {BET_TYPES.map((t) => (
-          <ToggleCell key={t} active={martin.bet_type === t} label={BET_TYPE_LABELS[t]}
-            onClick={() => betType(t)} disabled={sectionDisabledBetTypes.includes(t)} />
-        ))}
+        <td colSpan={5} style={normalCell}>
+          <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+            {availableBetTypes.map((type) => <button key={type} type="button"
+              disabled={sectionDisabledBetTypes.includes(type)} onClick={() => betType(type)}
+              aria-pressed={martin.bet_type === type}
+              style={{ flex: 1, padding: "5px 8px", border: CELL_BORDER, cursor: "pointer",
+                backgroundColor: martin.bet_type === type ? GREEN : "transparent",
+                color: sectionDisabledBetTypes.includes(type) ? "#555" : martin.bet_type === type ? "#1b2e1b" : "inherit" }}>
+              {BET_TYPE_LABELS[type]}
+            </button>)}
+          </Box>
+        </td>
       </tr>
+      {isLab ? <MartinLabouchereRows label={label} martin={martin} onChange={onChange} /> : <>
       {/* 단계설정 */}
       <tr>
         <td style={labelCellStyle}>단계설정</td>
@@ -355,6 +372,7 @@ function MartinSection({ name, label, martin, onChange, disabled, labelColor: la
           </tr>
         ));
       })()}
+      </>}
       </>}
     </>
   );
