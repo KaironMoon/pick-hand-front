@@ -23,7 +23,7 @@ const autoService = {
     return resp.data;
   },
 
-  async startAuto({ gameId, pickhandId, tableId, server, gameType = "gh", playMode = "keep", keepCount = null }) {
+  async startAuto({ gameId, pickhandId, tableId, server, gameType = "gh", playMode = "keep", keepCount = null, startMode = "first_round" }) {
     const resp = await apiCaller.post(ABOO_API.AUTO_START, {
       game_id: gameId,
       caller_user_id: pickhandId,
@@ -31,6 +31,7 @@ const autoService = {
       server: server || null,
       game_type: gameType,
       play_mode: playMode,
+      start_mode: startMode,
       keep_count: playMode === "keep" ? keepCount : null,
     });
     return resp.data;

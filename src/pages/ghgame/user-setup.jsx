@@ -2,7 +2,7 @@ import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } f
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
 import { duplicatePatternRows } from "./pattern-duplicates.js";
-import { MARTIN_B_SPECIAL_NUMBER, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions } from "./martin-b-settings.js";
+import { MARTIN_B_SPECIAL_NUMBER, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, validBackWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions } from "./martin-b-settings.js";
 import { Fragment, memo, useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
@@ -466,7 +466,7 @@ function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
   );
 }
 
-const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false, showWall = false, visibleIndices, constrainWidth = false }) {
+const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false, showWall = false, showBackWall = false, visibleIndices, constrainWidth = false }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -552,6 +552,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
           const rowIndex = visibleIndices ? visibleIndices[visibleIndex] : visibleIndex;
           const rule = rules[rowIndex];
           const cells = patternCells(rule, PATTERN_ONLY_CELL_COUNT);
+          const backWallIndices = cells.flatMap((value, index) => value === "P" || value === "B" ? [index] : []).slice(-2);
           const isDuplicate = duplicateRows[rowIndex];
           const direction = rule.direction === "P" || rule.direction === "B" ? rule.direction : "";
           const nextDirection = direction === "" ? "B" : direction === "B" ? "P" : "";
@@ -595,7 +596,8 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
                     key={`pattern-only-${rowIndex}-${cellIndex}`}
                     cellKey={`pattern-only-${rowIndex}-${cellIndex}`}
                     value={value}
-                    wallHighlight={showWall && rule.wall_enabled && cellIndex < 2}
+                    wallHighlight={(showWall && rule.wall_enabled && cellIndex < 2)
+                      || (showBackWall && rule.back_wall_enabled && backWallIndices.includes(cellIndex))}
                     onClick={() => updateRule(rowIndex, {
                       pattern: cyclePatternCell(cells, cellIndex),
                     })}
@@ -619,6 +621,18 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
                     updateRule(rowIndex, { wall_enabled: event.target.checked });
                   }} />
                 벽치기
+              </label>}
+              {showBackWall && <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
+                <input type="checkbox" aria-label={`마틴Z2 ${rowLabel(rowIndex)}번 뒷벽치기`}
+                  checked={Boolean(rule.back_wall_enabled)}
+                  onChange={(event) => {
+                    if (event.target.checked && !validBackWallPattern(rule.pattern)) {
+                      window.alert("뒷벽치기는 3칸 이상이며 뒤 두 칸이 BB 또는 PP인 패턴만 사용할 수 있습니다.");
+                      return;
+                    }
+                    updateRule(rowIndex, { back_wall_enabled: event.target.checked });
+                  }} />
+                뒷벽치기
               </label>}
               <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
                 <input
@@ -1684,20 +1698,38 @@ function StrategySetupSection({ name, displayName = name, strat, onChange, varia
   const blueOff = condLo <= 0;     // 하한 0 → 파랑 구간 없음(회색)
   const redOff = condHi >= 100;    // 상한 100 → 빨강 구간 없음(회색)
 
-  const setMethod = (t) => {
-    if (t === "labouchere") {
-      const seq = generateLabouchereSequence(s.target_man, count, s.dist_mode || "even");
+  const labRequestId = useRef(0);
+  const latestStrategy = useRef(s);
+  latestStrategy.current = s;
+  const regenLab = async (patch) => {
+    const requestId = ++labRequestId.current;
+    const next = { ...latestStrategy.current, ...patch };
+    const empty = new Array(GH_STRATEGY_MAX_STEP).fill(0);
+    latestStrategy.current = { ...next, sequence: [], amounts_white: empty, amounts_blue: [...empty], amounts_red: [...empty] };
+    onChange(latestStrategy.current);
+    try {
+      const response = await apiCaller.post(USER_BET_SETTINGS_API.GH_LABOUCHERE_SEQUENCE, {
+        target: next.target_man || 0, count: next.count || 10, mode: next.dist_mode || "even",
+      });
+      if (requestId !== labRequestId.current) return;
+      const seq = response.data.sequence;
+      const current = latestStrategy.current;
       const arr = new Array(GH_STRATEGY_MAX_STEP).fill(0);
-      seq.forEach((v, i) => { const idx = (stepMin - 1) + i; if (idx >= 0 && idx < GH_STRATEGY_MAX_STEP) arr[idx] = v; });
-      onChange({ ...s, bet_type: t, amounts_white: arr, amounts_blue: [...arr], amounts_red: [...arr] });
-    } else onChange({ ...s, bet_type: t });
+      seq.forEach((value, index) => {
+        const position = (current.step_min || 1) - 1 + index;
+        if (position < GH_STRATEGY_MAX_STEP) arr[position] = value;
+      });
+      onChange({ ...current, sequence: seq, amounts_white: arr, amounts_blue: [...arr], amounts_red: [...arr] });
+    } catch {
+      if (requestId === labRequestId.current) window.alert("라보쉐르 수열을 계산하지 못했습니다. 설정을 다시 입력해 주세요.");
+    }
   };
-  const regenLab = (patch) => {
-    const next = { ...s, ...patch };
-    const seq = generateLabouchereSequence(next.target_man, next.count || count, next.dist_mode || "even");
-    const arr = new Array(GH_STRATEGY_MAX_STEP).fill(0);
-    seq.forEach((v, i) => { const idx = (next.step_min || stepMin) - 1 + i; if (idx >= 0 && idx < GH_STRATEGY_MAX_STEP) arr[idx] = v; });
-    onChange({ ...next, sequence: seq, amounts_white: arr, amounts_blue: [...arr], amounts_red: [...arr] });
+  const setMethod = (t) => {
+    if (t === "labouchere") regenLab({ bet_type: t });
+    else {
+      labRequestId.current += 1;
+      onChange({ ...s, bet_type: t });
+    }
   };
 
   // 그룹별(white/blue/red) P배열 편집. 마틴이면 입력칸 기준 앞 절반·뒤 2배 자동채움.
@@ -1954,6 +1986,11 @@ function StrategySetupSection({ name, displayName = name, strat, onChange, varia
           </td>
         ))}
       </tr>
+      {isLab && <tr><td colSpan={10} style={{ ...mkCell, textAlign: "left", whiteSpace: "normal" }}>
+        라보쉐르: 목표금액·개수·분배 방식으로 초기 수열을 만들며 색상별 금액칸에서 수정할 수 있습니다.
+        배팅액은 남은 수열의 양끝 합(1개면 해당 값)입니다. 적중 시 양끝 제거, 실패 시 배팅액을 끝에 추가하며 수열이 소진되면 종료합니다.
+        각 섹션의 회차·쿼터는 독립 수열로 진행하고, 진행 중에는 시작 시 선택한 색상의 수열을 유지합니다.
+      </td></tr>}
       {/* 2행: P설정 | 최저 (단계) 최고 (단계) */}
       <tr>
         <td style={mkBlue}>P설정</td>
@@ -3717,7 +3754,7 @@ export default function GhUserSetupPage() {
               onChange={martinChanges.martin_z2}
               color="#1565c0"
               rowCount={MARTIN_Z2_PATTERN_ONLY_ROW_COUNT}
-              showAssistUsage showWall
+              showAssistUsage showWall showBackWall
               showMissCondition
               highlightDuplicates
             />

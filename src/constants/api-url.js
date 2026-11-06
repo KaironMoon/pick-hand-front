@@ -86,6 +86,7 @@ const USER_BET_SETTINGS_API = {
   ADMIN_GH_SLOT: (userId, slotNo) => `/api/v1/user-settings/admin/${userId}/gh/slots/${slotNo}`,
   COPY_GH: "/api/v1/user-settings/gh/copy",
   GH_PICK_SETS: "/api/v1/user-settings/gh/pick-sets",
+  GH_LABOUCHERE_SEQUENCE: "/api/v1/user-settings/gh/labouchere-sequence",
 };
 
 const NC_GAMES_API = {

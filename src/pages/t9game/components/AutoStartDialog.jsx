@@ -85,6 +85,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
   const [server, setServer] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [startMode, setStartMode] = useState("first_round");
   const [featureDisabled, setFeatureDisabled] = useState(false);
 
   // 테이블 목록 (pick-aboo /tables/discover 프록시)
@@ -158,6 +159,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
     if (!open) {
       setError(null);
       setBusy(false);
+      setStartMode("first_round");
       return;
     }
     if (!pickhandId) {
@@ -202,6 +204,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
         gameType,
         playMode,
         keepCount,
+        startMode,
       });
       onStarted?.(resp);
       onClose?.();
@@ -271,6 +274,21 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
           </Stack>
         )}
         <Stack spacing={2}>
+          {gameType === "gh" && <FormControl size="small" disabled={busy} fullWidth>
+            <InputLabel id="auto-start-mode-label">시작 방식</InputLabel>
+            <Select labelId="auto-start-mode-label" label="시작 방식" value={startMode}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value === "immediate") {
+                  window.alert("고단계 배팅이 있는 경우 대기하다가 해소 후 시작됩니다.\n전략별로 현재 계산이 2단계 이상이면 1단계로 내려올 때까지 대기한 후 배팅을 시작합니다.");
+                }
+                setStartMode(value);
+              }}>
+              <MenuItem value="first_round">1회차부터 시작</MenuItem>
+              <MenuItem value="immediate">바로 시작</MenuItem>
+            </Select>
+          </FormControl>}
+
           {/* 서버 먼저 선택 — 비워두면 pick-aboo 자동탐지 (find_working_server) */}
           <FormControl size="small" disabled={!isCaptureOk || busy} fullWidth>
             <InputLabel id="server-select-label">server</InputLabel>
