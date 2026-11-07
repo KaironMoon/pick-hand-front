@@ -6,6 +6,7 @@ const sideText = (value) => value === "P" ? "Player (P)" : value === "B" ? "Bank
 
 export default function GhRoundBetDetailDialog({ open, onClose, round, detail, actualCell, amountMode }) {
   const reversal = actualCell?.final_bet_reversal;
+  const manualFinal = amountMode === "actual" ? null : detail?.manual_final_bet;
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" aria-labelledby="gh-round-bet-detail-title">
       <DialogTitle id="gh-round-bet-detail-title">{round}회차 배팅 상세</DialogTitle>
@@ -15,6 +16,15 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
             <AlertTitle>반대 배팅</AlertTitle>
             <Typography fontWeight={700}>원래 {reversal.original_direction} → 실제 {reversal.actual_direction}</Typography>
             <Typography variant="body2">최종 배팅 조건으로 방향이 변경되었습니다.</Typography>
+          </Alert>
+        )}
+        {manualFinal && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <AlertTitle>{manualFinal.action === "stop" ? "배팅 정지" : "반대 배팅"}</AlertTitle>
+            <Typography>
+              수동 최종 배팅 · {sideText(manualFinal.direction)} · {formatP(manualFinal.amount)}
+              {detail.actual && ` · 손익 ${formatP(manualFinal.pnl)}`}
+            </Typography>
           </Alert>
         )}
         {!detail ? (

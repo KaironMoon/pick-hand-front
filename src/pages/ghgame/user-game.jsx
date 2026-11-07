@@ -551,6 +551,7 @@ function GhRoundAmountTable({
     ["B", Number(pnlBreakdown.martin_b || 0)],
     ...MARTIN_C_ITEMS.map(([key, label]) => [label, Number(pnlBreakdown[key] || 0)]),
     ...MARTIN_KPKP_ITEMS.map(([key, label]) => [label, Number(pnlBreakdown[key] || 0)]),
+    ...(pnlBreakdown.manual_final_bet == null ? [] : [["최종 보정", pnlBreakdown.manual_final_bet]]),
   ];
   const basePnl = componentPnls[0][1];
   const martinPnls = componentPnls.slice(1);
