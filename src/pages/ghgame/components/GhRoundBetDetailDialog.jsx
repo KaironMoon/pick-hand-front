@@ -1,14 +1,22 @@
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
+import { Alert, AlertTitle, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
 
 const formatP = (value) => value == null ? "—" : `${Number(value).toFixed(1)}P`;
 const sequenceText = (values) => Array.isArray(values) ? values.join(" ") : "—";
 const sideText = (value) => value === "P" ? "Player (P)" : value === "B" ? "Banker (B)" : "상계 / 배팅 없음";
 
 export default function GhRoundBetDetailDialog({ open, onClose, round, detail, actualCell, amountMode }) {
+  const reversal = actualCell?.final_bet_reversal;
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" aria-labelledby="gh-round-bet-detail-title">
       <DialogTitle id="gh-round-bet-detail-title">{round}회차 배팅 상세</DialogTitle>
       <DialogContent dividers>
+        {reversal && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <AlertTitle>반대 배팅</AlertTitle>
+            <Typography fontWeight={700}>원래 {reversal.original_direction} → 실제 {reversal.actual_direction}</Typography>
+            <Typography variant="body2">최종 배팅 조건으로 방향이 변경되었습니다.</Typography>
+          </Alert>
+        )}
         {!detail ? (
           <Typography color="text.secondary">이 회차의 상세 배팅 기록이 없습니다.</Typography>
         ) : (

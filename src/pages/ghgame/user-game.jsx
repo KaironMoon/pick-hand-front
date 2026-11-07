@@ -765,6 +765,7 @@ function applyActualBetAttempt(roundState, data) {
     round: idx + 1,
     external_game_id: data.ext_game_id || null,
     bet_side: data.direction || null,
+    final_bet_reversal: data.final_bet_reversal ?? null,
     bet_amount_won: amountWon,
     bet_amount_p: amountP,
     actual_pnl_won: 0,
