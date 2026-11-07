@@ -18,13 +18,13 @@ export default function FinalBetConditionSettings({ value = {}, onChange }) {
       <Typography variant="caption">회차 이후</Typography>
       <select aria-label="최종 배팅 조건 종류" value={value.condition || "pnl"} style={{ ...inputStyle, width: 130 }}
         onChange={(event) => patch({ condition: event.target.value })}>
-        <option value="pnl">전체 PNL</option><option value="long_runs">긴줄 개수</option>
+        <option value="pnl">전체 실배팅 PNL</option><option value="long_runs">긴줄 개수</option>
       </select>
       {value.condition === "long_runs"
         ? <input aria-label="긴줄 개수 기준" type="number" min="0" step="1"
           value={value.long_run_limit ?? 0} style={inputStyle}
           onChange={(event) => patch({ long_run_limit: event.target.value })} />
-        : <input aria-label="전체 PNL 기준 (P)" type="number" step="0.1"
+        : <input aria-label="전체 실배팅 PNL 기준 (P, ×1)" type="number" step="0.1"
           value={value.pnl_limit ?? 0} style={inputStyle}
           onChange={(event) => patch({ pnl_limit: event.target.value })} />}
       <Typography variant="caption">{value.condition === "long_runs" ? "개" : "P"} 이하이면</Typography>
@@ -36,10 +36,10 @@ export default function FinalBetConditionSettings({ value = {}, onChange }) {
         onChange={(event) => patch({ restore: event.target.checked })} />조건 해소 시 원래 배팅으로 복귀</label>}
     </Box>
     <Typography variant="caption" color="text.secondary">
-      해당 슈 회차 기준 · 긴줄은 5개 이상 연속된 줄 · 전체 PNL은 모든 전략을 합친 배율 적용 전 PNL입니다.
-      최종 합산 후 실배율 적용 직전에 처리합니다. 정지는 해당 슈가 끝날 때까지 유지하며 다음 슈에서 재개합니다.
+      해당 슈 회차 기준 · 긴줄은 5개 이상 연속된 줄입니다.
+      정산된 실배팅 PNL을 설정 기준값 × 실배율과 비교합니다. 정지는 해당 슈가 끝날 때까지 유지하며 다음 슈에서 재개합니다.
       {value.action !== "stop" && (value.restore
-        ? " 선택한 기준값을 초과하면 원래 배팅으로 복귀합니다."
+        ? " 적용 기준값을 초과하면 원래 배팅으로 복귀합니다."
         : " 자동 복귀를 끄면 해당 슈에서는 반대 배팅을 유지합니다.")}
     </Typography>
   </Box>;
