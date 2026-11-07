@@ -1,4 +1,5 @@
 import MartinLabouchereRows from "./components/MartinLabouchereRows.jsx";
+import FinalBetConditionSettings from "./components/FinalBetConditionSettings.jsx";
 import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } from "./components/AutoRiskSettings";
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
@@ -2977,6 +2978,10 @@ export default function GhUserSetupPage() {
           <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>오토 운영 옵션</Typography>
           <AutoRiskSettings config={config} onChange={(key, value) => {
             setConfig((prev) => ({ ...prev, [key]: value }));
+            setDirty(true);
+          }} />
+          <FinalBetConditionSettings value={config.auto_final_bet_condition} onChange={(value) => {
+            setConfig((prev) => ({ ...prev, auto_final_bet_condition: value }));
             setDirty(true);
           }} />
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
