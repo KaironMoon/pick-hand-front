@@ -1,12 +1,14 @@
 import { Alert, AlertTitle, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
 
 const formatP = (value) => value == null ? "—" : `${Number(value).toFixed(1)}P`;
+const formatPnl = (value) => `${value > 0 ? "+" : ""}${formatP(value)}`;
 const sequenceText = (values) => Array.isArray(values) ? values.join(" ") : "—";
 const sideText = (value) => value === "P" ? "Player (P)" : value === "B" ? "Banker (B)" : "상계 / 배팅 없음";
 
 export default function GhRoundBetDetailDialog({ open, onClose, round, detail, actualCell, amountMode }) {
   const reversal = actualCell?.final_bet_reversal;
   const manualFinal = amountMode === "actual" ? null : detail?.manual_final_bet;
+  const reversedComponents = amountMode === "actual" ? actualCell?.final_bet_components : detail?.final_bet_components;
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" aria-labelledby="gh-round-bet-detail-title">
       <DialogTitle id="gh-round-bet-detail-title">{round}회차 배팅 상세</DialogTitle>
@@ -71,7 +73,9 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
               </Box>
             )}
             <Box>
-              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>전략별 금액 구성 · 계산 손익</Typography>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+                {reversedComponents?.length ? "반전 전 전략별 금액 구성 · 계산 손익" : "전략별 금액 구성 · 계산 손익"}
+              </Typography>
               <Box sx={{ overflowX: "auto" }}>
                 <Box component="table" sx={{
                   width: "100%", borderCollapse: "collapse", fontSize: 13,
@@ -196,6 +200,25 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
                 </Box>
               ))}
             </Box>
+            {Boolean(reversedComponents?.length) && (
+              <Box>
+                <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+                  최종 반전으로 바뀐 전략별 픽과 손익
+                </Typography>
+                <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", "& th, & td": { borderBottom: "1px solid", borderColor: "divider", p: 0.75, textAlign: "left" } }}>
+                  <thead><tr><th scope="col">전략</th><th scope="col">픽 변경</th><th scope="col">회차 PnL 변경</th></tr></thead>
+                  <tbody>
+                    {reversedComponents.map((row) => (
+                      <tr key={row.key}>
+                        <th scope="row">{row.label}</th>
+                        <td>{row.original_direction} {formatP(row.amount)} → {row.direction} {formatP(row.amount)}</td>
+                        <td>{formatPnl(row.original_pnl)} → <strong>{formatPnl(row.pnl)}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Box>
+              </Box>
+            )}
           </Box>
         )}
       </DialogContent>

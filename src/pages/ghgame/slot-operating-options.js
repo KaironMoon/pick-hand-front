@@ -55,7 +55,7 @@ export const martinGoalStatusLabel = (status) => {
   const target = Number(status?.configured_target || 0);
   if (target <= 0) return "사용안함";
   const state = status?.reason === "martin_goal_reached" ? " · 중지" : " · 정상";
-  return `목표 ${formatConditionNumber(target)} P · 마틴 Z+B+C+K+P+KP PNL ${formatConditionNumber(status?.pnl)} P${state}`;
+  return `목표 ${formatConditionNumber(target)} P · 마틴 Z+B+C+K+P+KP PNL ${formatConditionNumber(status?.goal_pnl ?? status?.pnl)} P${state}`;
 };
 
 export const martinSlotLossStatusLabel = (status) => {
