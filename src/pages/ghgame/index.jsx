@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
+import autoService from "@/services/auto-service";
 import { GH_GAMES_API } from "@/constants/api-url";
 
 // blink 애니메이션
@@ -99,6 +100,9 @@ export default function GhGamePage() {
   const [collapsedPatterns, setCollapsedPatterns] = useState({});
   const processingRef = useRef(false);
   const [processing, setProcessing] = useState(false);
+  const [autoStatus, setAutoStatus] = useState(null);
+  const autoRunning = autoStatus?.gameId === gameId && autoStatus.running;
+  const inputLocked = processing || autoRunning;
 
   const currentTurn = results.length + 1;
   const grid = calculateCircleGrid(results);
@@ -146,6 +150,25 @@ export default function GhGamePage() {
     return () => { cancelled = true; };
   }, [searchParams.get("new"), searchParams.get("gameId")]);
 
+  useEffect(() => {
+    if (!gameId) return undefined;
+    let cancelled = false;
+    const refreshAutoStatus = async () => {
+      try {
+        const status = await autoService.getAutoStatus(gameId);
+        if (!cancelled) setAutoStatus({ gameId, running: status.running });
+      } catch {
+        // The result endpoint still enforces the lock if status polling fails.
+      }
+    };
+    refreshAutoStatus();
+    const timer = setInterval(refreshAutoStatus, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [gameId]);
+
   const restoreGame = async (gid) => {
     try {
       const res = await apiCaller.get(GH_GAMES_API.STATE(gid));
@@ -175,7 +198,7 @@ export default function GhGamePage() {
 
   // P/B 입력
   const handleInput = async (inputValue) => {
-    if (!gameId || processingRef.current) return;
+    if (inputLocked || !gameId || processingRef.current) return;
     processingRef.current = true;
     setProcessing(true);
 
@@ -200,6 +223,12 @@ export default function GhGamePage() {
 
     } catch (err) {
       console.error("Failed to record round:", err);
+      if (err.response?.data?.detail?.error === "auto_running_stop_first") {
+        setResults((prev) => prev.slice(0, -1));
+        setAutoStatus({ gameId, running: true });
+        alert("오토를 먼저 정지한 뒤 결과를 입력해주세요.");
+        return;
+      }
       if (err.response?.status === 409) {
         alert(err.response?.data?.detail || "이 게임은 계속 진행할 수 없습니다.");
         return;
@@ -339,23 +368,27 @@ export default function GhGamePage() {
           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: isMobile ? 10 : 16 }}>{currentTurn}</Typography>
         </Box>
         <Box
+          component="button" type="button" disabled={inputLocked} aria-label="P 결과 입력"
+          title={autoRunning ? "오토를 먼저 정지해주세요." : undefined}
           onClick={() => handleInput("P")}
           sx={{
             width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
             backgroundColor: "#1565c0", display: "flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
-            cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
-            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
+            border: 0, p: 0, cursor: inputLocked ? "not-allowed" : "pointer", opacity: inputLocked ? 0.4 : 1,
+            "&:hover": { opacity: inputLocked ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >P</Box>
         <Box
+          component="button" type="button" disabled={inputLocked} aria-label="B 결과 입력"
+          title={autoRunning ? "오토를 먼저 정지해주세요." : undefined}
           onClick={() => handleInput("B")}
           sx={{
             width: isMobile ? 38 : 55, height: isMobile ? 38 : 55, borderRadius: 2,
             backgroundColor: "#f44336", display: "flex", alignItems: "center", justifyContent: "center",
             color: "#fff", fontSize: isMobile ? 16 : 24, fontWeight: "bold",
-            cursor: processing ? "not-allowed" : "pointer", opacity: processing ? 0.4 : 1, pointerEvents: processing ? "none" : "auto",
-            "&:hover": { opacity: processing ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
+            border: 0, p: 0, cursor: inputLocked ? "not-allowed" : "pointer", opacity: inputLocked ? 0.4 : 1,
+            "&:hover": { opacity: inputLocked ? 0.4 : 0.85 }, "&:active": { transform: "scale(0.95)" },
           }}
         >B</Box>
         <Box sx={{ width: isMobile ? 32 : 0 }} />

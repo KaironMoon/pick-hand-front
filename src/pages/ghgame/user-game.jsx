@@ -1170,7 +1170,10 @@ export default function GhUserGamePage() {
     setReplayRoundInput(displayedRound > 0 ? String(displayedRound) : "");
   }, [replay.active, replay.roundNum, strategyResults.length]);
   const currentTurn = strategyResults.length + 1;
-  const inputLocked = isAutoOnly || processing || legacyRestoreBlocked || (replay.active && replay.external);
+  const autoResultInputLocked = autoStatus.running
+    || gameSlots.some((slot) => slot.game_id === gameId && slot.auto_running);
+  const inputLocked = isAutoOnly || processing || legacyRestoreBlocked
+    || (replay.active && replay.external) || autoResultInputLocked;
   // LEGACY COMPAT ONLY: displaySnapshot 별칭은 남은 레거시 보조표용이다.
   // 새 화면/상태 판단/픽 표시/닷 표시에는 사용 금지. 필요한 데이터는 서버에서 roundState에 추가한다.
   const displaySnapshot = picksSnapshot;
@@ -1796,8 +1799,7 @@ export default function GhUserGamePage() {
   };
 
   const handleInput = async (inputValue) => {
-    if (isAutoOnly || !gameId || processingRef.current) return;
-    if (replay.active && replay.external) return;
+    if (inputLocked || !gameId || processingRef.current) return;
     const wasCurrentReplay = replay.active;
     processingRef.current = true;
     setProcessing(true);
@@ -1856,6 +1858,11 @@ export default function GhUserGamePage() {
       if (!gameResponseGuardRef.current.canApply(ticket)) return;
       console.error("Failed to record round:", err);
       setResults((prev) => prev.slice(0, -1));
+      if (err.response?.data?.detail?.error === "auto_running_stop_first") {
+        setRejectMsg("오토를 먼저 정지한 뒤 결과를 입력해주세요.");
+        await Promise.all([restoreGame(gameId), refreshGameSlots().catch(() => {})]);
+        return;
+      }
       if (err.response?.status === 409) {
         setRejectMsg(err.response?.data?.detail || "이 게임은 계속 진행할 수 없습니다.");
         return;
@@ -2861,11 +2868,11 @@ export default function GhUserGamePage() {
                     const blinkSx = { animation: "pbBlink 0.8s infinite", "@keyframes pbBlink": { "0%, 100%": { opacity: 1 }, "50%": { opacity: 0.3 } } };
                     return (
                       <>
-                        <Box component="button" type="button" disabled={inputLocked} aria-label="P 결과 입력" sx={{ ...pbBtnSx("#1565c0"), border: 0, p: 0 }} onClick={() => handleInput("P")}>P</Box>
+                        <Box component="button" type="button" disabled={inputLocked} aria-label="P 결과 입력" title={autoResultInputLocked ? "오토를 먼저 정지해주세요." : undefined} sx={{ ...pbBtnSx("#1565c0"), border: 0, p: 0 }} onClick={() => handleInput("P")}>P</Box>
                         <Box sx={{ ...turnBoxSx, width: 38, height: 38, ...(pBlink ? blinkSx : {}) }}>
                           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{pCount}</Typography>
                         </Box>
-                        <Box component="button" type="button" disabled={inputLocked} aria-label="B 결과 입력" sx={{ ...pbBtnSx("#f44336"), border: 0, p: 0 }} onClick={() => handleInput("B")}>B</Box>
+                        <Box component="button" type="button" disabled={inputLocked} aria-label="B 결과 입력" title={autoResultInputLocked ? "오토를 먼저 정지해주세요." : undefined} sx={{ ...pbBtnSx("#f44336"), border: 0, p: 0 }} onClick={() => handleInput("B")}>B</Box>
                         <Box sx={{ ...turnBoxSx, width: 38, height: 38, ...(bBlink ? blinkSx : {}) }}>
                           <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: 14 }}>{bCount}</Typography>
                         </Box>
