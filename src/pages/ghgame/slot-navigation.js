@@ -18,15 +18,6 @@ export const ghEntrySlot = (slots, { gameId, slotNo } = {}) => {
     || { slot_no: selected, occupied: false };
 };
 
-export const ghSetupsArray = (raw) => Array.from({ length: 6 }, (_, index) => {
-  const saved = Array.isArray(raw?.gh_setups) ? raw.gh_setups[index] : null;
-  return saved || raw || null;
-});
-
-export const replaceGhSlotSetup = (setups, slotNo, nextSetup) => (
-  setups.map((setup, index) => (index === slotNo - 1 ? nextSetup : setup))
-);
-
 export const updateGhGameSearchParams = (current, { slotNo, gameId } = {}) => {
   const next = new URLSearchParams(current);
   const validSlotNo = validGhSlotNo(slotNo);
