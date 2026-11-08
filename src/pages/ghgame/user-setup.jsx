@@ -390,7 +390,7 @@ const PATTERN_BLOCK_CELL_COUNT = 10;
 const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
 const MARTIN_Z_PATTERN_ONLY_ROW_COUNT = 1000;
-const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = 250;
+const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = 350;
 
 function PatternCell({ value, onClick, cellKey, wallHighlight = false }) {
   return (
