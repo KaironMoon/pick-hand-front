@@ -10,7 +10,6 @@ const CURRENT_BG = "#ffffff";
 const FUTURE_BG = "#1c1f25";
 const BORDER = "1px solid #3a3a3a";
 const GENERATED_PICK_BORDER = "#00ff66";
-const MARTIN_C_COLOR = "#ff9800";
 const CELL_W = 23;
 const CELL_H = 19;
 const MAX_CELLS = 78;
@@ -171,32 +170,22 @@ function getQuarterCells(ctx, spec, assist = false) {
   );
 }
 
-function getMartinCCells(ctx, martinKey) {
-  const track = ctx.roundState?.conditional_martins?.[martinKey]?.tracks?.main_bigroad;
-  if (!track) return null;
-  const cells = new Array(MAX_CELLS).fill(null);
-  (track.history || []).forEach((entry) => {
-    const idx = Number(entry?.round || 0) - 1;
-    if (idx < 0 || idx >= MAX_CELLS) return;
-    cells[idx] = {
-      pick: entry.direction,
-      status: entry.status,
-      round: idx + 1,
-      martinCStep: entry.step,
-      martinCAmount: entry.amount,
-    };
-  });
-  const currentIdx = ctx.actualSeq?.length || 0;
-  if (track.direction && currentIdx < MAX_CELLS && !cells[currentIdx]) {
-    cells[currentIdx] = {
-      pick: track.direction,
-      status: "current",
-      round: currentIdx + 1,
-      martinCStep: track.step,
-      martinCAmount: track.amount,
-    };
-  }
-  return cells;
+function getBetBoardCells(roundState) {
+  const cells = roundState?.round_amount_table?.cells || [];
+  const completed = roundState?.round_num || 0;
+  const current = roundState?.bet_pause?.mode && roundState.bet_pause.mode !== "play"
+    ? null
+    : cells[completed]?.side;
+  return cellsFromStateBigRoad2(
+    cells.slice(0, completed).map((cell) => ({
+      pick: cell?.side || "W",
+      status: cell?.status || "wait",
+      result: cell?.status,
+    })),
+    current,
+    current ? "current" : "wait",
+    roundState?.actuals || "",
+  );
 }
 
 function Cell({ cell, onClick }) {
@@ -642,12 +631,8 @@ export default function GhBigRoad2({
           </Box>
         ))}
       </Box>
-      <Block title="메인 빅로드 마틴 C1~C5" color={MARTIN_C_COLOR}>
-        {[1, 2, 3, 4, 5].map((number) => {
-          const key = number === 1 ? "martin_c" : `martin_c${number}`;
-          const cells = getMartinCCells(ctx, key);
-          return Array.isArray(cells) && <RoadRow key={key} label={`마틴C${number}`} cells={cells} labelColor={MARTIN_C_COLOR} />;
-        })}
+      <Block title="빅로드2">
+        <RoadRow label="배팅판" cells={getBetBoardCells(roundState)} />
       </Block>
       {active.length === 0
         ? <Box sx={{ color: "#777", fontSize: 12, py: 1 }}>표시할 섹션을 선택하세요.</Box>

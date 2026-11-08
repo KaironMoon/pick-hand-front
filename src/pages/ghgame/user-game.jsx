@@ -37,13 +37,9 @@ import {
   ghRoundPnlStopStatusLabel,
   ghSlotLossStatusLabel,
   overallLossStopStatusLabel,
-  martinBetStopReasonLabel,
-  martinCBetAdjustmentStatusLabel,
   martinDrawdownStatusLabel,
   martinGoalStatusLabel,
   martinOperatingStopReasonLabel,
-  martinProfitStopStatusLabel,
-  martinSlotLossStatusLabel,
 } from "./slot-operating-options.js";
 import {
   GH_KEEP_COUNT_DEFAULT,
@@ -71,20 +67,7 @@ if (typeof document !== "undefined" && !document.getElementById("gh-blink-style"
 
 const LSC_COLOR = "#000000";  // LSC: 검정 (모든 배경에서 고대비)
 const DS_COLOR = "#FF6600";   // 데칼/그림자: 형광 주황
-const MARTIN_C_ITEMS = [
-  ["martin_c", "C1"],
-  ["martin_c2", "C2"],
-  ["martin_c3", "C3"],
-  ["martin_c4", "C4"],
-  ["martin_c5", "C5"],
-];
-const MARTIN_KPKP_ITEMS = [
-  ["martin_k", "K"],
-  ["martin_p1", "P1"],
-  ["martin_p2", "P2"],
-  ["martin_p3", "P3"],
-  ["martin_kp", "KP"],
-];
+const MARTIN_KPKP_ITEMS = [["martin_kp", "KP"]];
 
 const buildShoePreviewGrid = (actuals) => {
   const cols = Math.max(1, Math.ceil((actuals?.length || 0) / GRID_ROWS));
@@ -307,7 +290,6 @@ function GhLossStopStatus({ roundState, autoStatus }) {
   const recoveryNames = {
     martin_z: "Z",
     martin_b: "B",
-    ...Object.fromEntries(MARTIN_C_ITEMS),
   };
   const pendingRecovery = Object.entries(recoveryTargets)
     .filter(([, target]) => target?.required && !target?.recovered)
@@ -319,10 +301,7 @@ function GhLossStopStatus({ roundState, autoStatus }) {
       : null;
   const betStopReason = ghBetStopReasonLabel(roundState);
   const martinOperatingStop = roundState?.martin_operating_stop;
-  const martinCOperatingStop = roundState?.martin_c_operating_stop;
-  const martinCBetAdjustment = roundState?.martin_c_bet_adjustment;
   const martinStopReason = martinOperatingStopReasonLabel(martinOperatingStop);
-  const martinCStopReason = martinBetStopReasonLabel(martinCOperatingStop);
   return (
     <>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: betStopReason ? 0.5 : 1.5, px: 1, py: 0.7, border: "1px solid rgba(255,193,7,.3)", borderRadius: 1, backgroundColor: "rgba(255,193,7,.035)" }}>
@@ -354,19 +333,10 @@ function GhLossStopStatus({ roundState, autoStatus }) {
           구간 GH PNL: {ghRoundPnlStopStatusLabel(roundState?.overall_stop)}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_goal_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
-          마틴(Z+B+C+K+P+KP) 목표금액: {martinGoalStatusLabel(martinOperatingStop)}
+          마틴(Z2+B+KP) 목표금액: {martinGoalStatusLabel(martinOperatingStop)}
         </Typography>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinOperatingStop?.reason === "martin_drawdown_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
-          마틴(Z+B+C+K+P+KP) 손실종료조건: {martinDrawdownStatusLabel(martinOperatingStop)}
-        </Typography>
-        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: ["martin_c_current_loss_reached", "martin_c_projected_loss_reached"].includes(martinCOperatingStop?.reason) ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
-          슬롯 마틴C 손실조건: {martinSlotLossStatusLabel(martinCOperatingStop)}
-        </Typography>
-        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: martinCOperatingStop?.reason === "martin_c_profit_bet_limit_reached" ? "#ff8a80" : "#ffab91", fontWeight: 800 }}>
-          마틴C수익보호: {martinProfitStopStatusLabel(martinCOperatingStop)}
-        </Typography>
-        <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,87,34,.5)", borderRadius: 1, color: "#ffab91", fontWeight: 800 }}>
-          마틴C 금액조정: {martinCBetAdjustmentStatusLabel(martinCBetAdjustment)}
+          마틴(Z2+B+KP) 손실종료조건: {martinDrawdownStatusLabel(martinOperatingStop)}
         </Typography>
         {recoveryDetail && (
           <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,82,82,.55)", borderRadius: 1, color: martinRecovery?.active ? "#ffcc80" : "#ff8a80", fontWeight: 900 }}>
@@ -388,14 +358,59 @@ function GhLossStopStatus({ roundState, autoStatus }) {
           </Typography>
         </Box>
       )}
-      {martinCStopReason && (
-        <Box sx={{ mb: 1.5, px: 1, py: 0.65, border: "1px solid rgba(255,87,34,.55)", borderRadius: 1, backgroundColor: "rgba(255,87,34,.08)" }}>
-          <Typography variant="caption" sx={{ color: "#ff8a80", fontWeight: 900 }}>
-            마틴C 배팅 종료 이유: {martinCStopReason} (GH와 마틴 Z/B 배팅은 계속)
-          </Typography>
-        </Box>
-      )}
     </>
+  );
+}
+
+const betPauseTileSx = {
+  minHeight: 24, border: "1px solid #3f4650", backgroundColor: "#111821",
+  color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35,
+  display: "flex", alignItems: "center", justifyContent: "space-between",
+};
+
+function GhBetPauseControls({ mode, settings, disabled, onToggle, onSave }) {
+  const playing = mode === "play";
+  const settingsDisabled = disabled || mode === "manual_stop";
+  return (
+    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", width: "100%", pl: 4 }}>
+      <Button variant="outlined" size="small" disabled={disabled}
+        aria-label={playing ? "실배팅 중지" : "실배팅 재개"} aria-pressed={!playing}
+        onClick={() => onToggle(playing ? "manual_stop" : "play")}
+        sx={{ ...betPauseTileSx, width: 145, justifyContent: "center", color: playing ? "#00e676" : "#ffd54f" }}>
+        {playing ? "BET PLAY" : "BET STOP"}
+      </Button>
+      {[
+        ["bet_pause_losses", "연속패 STOP", "#ffd54f"],
+        ["bet_resume_wins", "연속승리 PLAY", "#00e676"],
+      ].map(([key, label, color]) => {
+        const saved = settings?.[key] ?? 0;
+        return (
+          <Box key={key} component="label" sx={{
+            ...betPauseTileSx, color, gap: 0.5, width: 145, opacity: settingsDisabled ? 0.4 : 1,
+          }}>
+            <input key={saved} type="number" min="0" step="1" defaultValue={saved} disabled={settingsDisabled}
+              onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+              onBlur={(event) => {
+                if (settingsDisabled) return;
+                const value = Number(event.currentTarget.value);
+                if (!Number.isSafeInteger(value) || value < 0 || value === saved) {
+                  event.currentTarget.value = saved;
+                  return;
+                }
+                onSave(key, value).then((success) => {
+                  if (!success && event.target.isConnected) event.target.value = saved;
+                });
+              }}
+              style={{ width: 45, color: "#fff", background: "#16213e", border: "1px solid #59616d" }}
+            />
+            <span>{label}</span>
+          </Box>
+        );
+      })}
+      <Button variant="outlined" size="small" disabled sx={{ ...betPauseTileSx, width: 145, justifyContent: "center" }}>
+        픽체인지
+      </Button>
+    </Box>
   );
 }
 
@@ -419,6 +434,9 @@ function GhRoundAmountTable({
   onEnd,
   endDisabled = true,
   endDisabledReason,
+  betPauseDisabled,
+  onBetPauseToggle,
+  onBetPauseSetting,
 }) {
   const [detailSelection, setDetailSelection] = useState(null);
   const selectedGameId = gameSlots.find((slot) => slot.slot_no === selectedSlotNo)?.game_id;
@@ -524,17 +542,14 @@ function GhRoundAmountTable({
       martin_z_pnl: Number(actualCell.server_component_pnl_p?.martin_z || 0),
       martin_b_pnl: Number(actualCell.server_component_pnl_p?.martin_b || 0),
       ...Object.fromEntries(MARTIN_KPKP_ITEMS.map(([key]) => [`${key}_pnl`, Number(actualCell.server_component_pnl_p?.[key] || 0)])),
-      martin_c_pnl: Number(actualCell.server_component_pnl_p?.martin_c || 0),
-      martin_c2_pnl: Number(actualCell.server_component_pnl_p?.martin_c2 || 0),
-      martin_c3_pnl: Number(actualCell.server_component_pnl_p?.martin_c3 || 0),
-      martin_c4_pnl: Number(actualCell.server_component_pnl_p?.martin_c4 || 0),
-      martin_c5_pnl: Number(actualCell.server_component_pnl_p?.martin_c5 || 0),
     };
   });
   const fmt = (v) => v === "N/A" ? "-" : Number(v || 0).toFixed(1);
-  const finalSide = resolveBetBoardDirection(roundState);
+  const pauseMode = roundState?.bet_pause?.mode || "play";
+  const betPaused = pauseMode !== "play";
+  const finalSide = betPaused ? null : resolveBetBoardDirection(roundState);
   const currentRoundIdx = Math.max(0, Number(roundState?.round_num || 0));
-  const totalAmount = amountMode === "actual"
+  const totalAmount = betPaused ? 0 : amountMode === "actual"
     ? Number(actualTable.server_current_bet_p
       ?? actualCells[currentRoundIdx]?.bet_amount_p
       ?? 0)
@@ -545,26 +560,19 @@ function GhRoundAmountTable({
   const pnlBreakdown = amountMode === "actual"
     ? actualTable.server_pnl_breakdown_p || {}
     : table.pnl_breakdown || { globalhit: table.total_pnl || 0 };
-  const componentPnls = [
-    ["PnL", Number(pnlBreakdown.globalhit || 0)],
-    ["Z", Number(pnlBreakdown.martin_z || 0)],
-    ["B", Number(pnlBreakdown.martin_b || 0)],
-    ...MARTIN_C_ITEMS.map(([key, label]) => [label, Number(pnlBreakdown[key] || 0)]),
-    ...MARTIN_KPKP_ITEMS.map(([key, label]) => [label, Number(pnlBreakdown[key] || 0)]),
-  ];
-  const basePnl = componentPnls[0][1];
-  const martinPnls = componentPnls.slice(1);
+  const basePnl = Number(pnlBreakdown.globalhit || 0);
+  const virtualPnl = roundState?.virtual_pnl || {};
   const pnlColor = (value) => value >= 0 ? "#00e676" : "#ef5350";
   const globalhitAggregate = roundState?.globalhit_aggregate || {};
-  const globalhitDirection = globalhitAggregate.direction;
-  const globalhitBetAmount = amountMode === "actual"
+  const globalhitDirection = betPaused ? null : globalhitAggregate.direction;
+  const globalhitBetAmount = betPaused ? 0 : amountMode === "actual"
     ? Number(actualTable.server_globalhit_bet_p ?? globalhitAggregate.amount ?? 0)
     : Number(globalhitAggregate.amount || 0);
   const globalhitDirectionColor = globalhitDirection === "P" ? "#1565d8" : globalhitDirection === "B" ? "#e53935" : "#555";
   const martinNetAmount = (cell) => Number(cell?.martin_net_amount || 0);
   const hasMartinZBet = (cell) => cell?.martin_z_included ?? Number(cell?.pick_martin_amount || 0) > 0;
   const currentMartinAmount = martinNetAmount(strategyCells[currentRoundIdx]);
-  const showCurrentMartinAmount = amountMode !== "actual" && currentMartinAmount > 0;
+  const showCurrentMartinAmount = !betPaused && amountMode !== "actual" && currentMartinAmount > 0;
   const finalSideColor = finalSide === "P" ? "#1565d8" : finalSide === "B" ? "#e53935" : "#555";
   const cellSx = (idx) => {
     const cell = cells[idx] || {};
@@ -695,15 +703,32 @@ function GhRoundAmountTable({
         <Box sx={{ width: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: pnlColor(basePnl), fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>글로벌히트 PNL</span><span>{fmt(basePnl)}</span>
         </Box>
-        {martinPnls.map(([label, value]) => (
-          <React.Fragment key={label}>
-            {(label === "C1" || label === "K") && <Box sx={{ flexBasis: "100%", height: 0 }} />}
-            <Box sx={{ width: label === "Z" ? 112 : 118, border: "1px solid #3f4650", backgroundColor: "#111821", color: pnlColor(value), fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span>{label} PnL</span><span>{fmt(value)}</span>
+        {[
+          ["B", "martin_b", strategyCells[currentRoundIdx]?.martin_b_amount],
+          ["Z", "martin_z", strategyCells[currentRoundIdx]?.pick_martin_amount],
+          ["KP", "martin_kp", strategyCells[currentRoundIdx]?.martin_kp_amount],
+        ].map(([label, key, amount]) => (
+          <React.Fragment key={key}>
+            {key === "martin_z" && <>
+              <Box sx={{ flexBasis: "100%", height: 0 }} />
+              <Box sx={{ width: 28, minWidth: 28 }} />
+            </>}
+            <Box sx={{ ...betPauseTileSx, width: 145 }}>
+              <span>{label} BET</span><span>{fmt(betPaused ? 0 : amount)}</span>
+            </Box>
+            <Box sx={{ ...betPauseTileSx, width: 145, color: pnlColor(Number(virtualPnl[key] || 0)) }}>
+              <span>{label} VPnl</span><span>{fmt(virtualPnl[key])}</span>
             </Box>
           </React.Fragment>
         ))}
       </Box>
+      <GhBetPauseControls
+        mode={pauseMode}
+        settings={roundState?.bet_pause_settings}
+        disabled={betPauseDisabled}
+        onToggle={onBetPauseToggle}
+        onSave={onBetPauseSetting}
+      />
       {patternDisplay ? <Box sx={{ width: amountGridWidth, maxWidth: "100%" }}><MartinBPatternBoard display={patternDisplay} /></Box> : <Box sx={{ display: "grid", gridTemplateRows: `repeat(${amountGridRowCount}, 31px)`, gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
         {Array.from({ length: cellCount }, (_, idx) => {
           const martinAmount = martinNetAmount(strategyCells[idx]);
@@ -719,7 +744,7 @@ function GhRoundAmountTable({
               sx={{ ...cellSx(idx), p: 0, font: "inherit", cursor: "pointer",
                 "&:focus-visible": { outline: "2px solid #2f9bff", outlineOffset: -2 },
               }}
-              title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / 마틴 상계 ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)}${[...MARTIN_C_ITEMS, ...MARTIN_KPKP_ITEMS].map(([key, label]) => ` / ${label} ${fmt(cells[idx]?.[`${key}_pnl`])}`).join("")}`}>
+              title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / 마틴 상계 ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)}${MARTIN_KPKP_ITEMS.map(([key, label]) => ` / ${label} ${fmt(cells[idx]?.[`${key}_pnl`])}`).join("")}`}>
               <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
               <Box sx={{ color: "#fff", fontSize: showMartinAmount ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>
                 {fmt(cells[idx]?.amount)}
@@ -765,7 +790,6 @@ function applyActualBetAttempt(roundState, data) {
     round: idx + 1,
     external_game_id: data.ext_game_id || null,
     bet_side: data.direction || null,
-    final_bet_reversal: data.final_bet_reversal ?? null,
     bet_amount_won: amountWon,
     bet_amount_p: amountP,
     actual_pnl_won: 0,
@@ -1088,6 +1112,7 @@ export default function GhUserGamePage() {
   // 기존 보조 컴포넌트가 아직 남아 있어 state로 보관하지만, 신규 참조를 추가하지 말 것.
   const [picksSnapshot, setPicksSnapshot] = useState(null);
   const [roundStateUpper, setRoundStateUpper] = useState(null);
+  const [betPauseBusy, setBetPauseBusy] = useState(false);
   const [roundStateLower, setRoundStateLower] = useState(null);
   const roundState = roundStateUpper;
   const martinBDisplay = roundState?.martin_b_display;
@@ -1445,6 +1470,34 @@ export default function GhUserGamePage() {
     }
   }, [applyGameData, refreshGameSlots]);
 
+  const updateBetPause = async (mode) => {
+    if (!gameId || betPauseBusy || replay.active) return;
+    setBetPauseBusy(true);
+    try {
+      await apiCaller.put(GH_GAMES_API.BET_PAUSE(gameId), { mode });
+      await restoreGame(gameId);
+    } catch (err) {
+      setRejectMsg(err.response?.data?.detail || "배팅 상태를 바꾸지 못했습니다.");
+    } finally {
+      setBetPauseBusy(false);
+    }
+  };
+
+  const updateBetPauseSetting = async (key, value) => {
+    if (!gameId || betPauseBusy || replay.active) return false;
+    setBetPauseBusy(true);
+    try {
+      await apiCaller.put(USER_BET_SETTINGS_API.SAVE("gh"), { config: { [key]: value } }, { timeout: 120000 });
+      await restoreGame(gameId);
+      return true;
+    } catch (err) {
+      setRejectMsg(err.response?.data?.detail || "연속 승패 설정을 저장하지 못했습니다.");
+      return false;
+    } finally {
+      setBetPauseBusy(false);
+    }
+  };
+
   const syncToReplacementSlot = useCallback(async (slots, staleGameId, slotNo) => {
     const replacement = findGhSlotReplacement(slots, staleGameId, slotNo);
     if (!replacement) return false;
@@ -1701,6 +1754,7 @@ export default function GhUserGamePage() {
             console.info(`[Auto] 재시작: new_session=${data.auto_session_id} game=${data.game_id}`);
           } else if (t === "bet_attempt") {
             setRoundStateUpper((prev) => applyActualBetAttempt(prev, data));
+            if (data.bet_pause) restoreGame(data.game_id || gameId);
           } else if (t === "bet_settled") {
             // PNL은 프론트에서 합산하지 않고 서버 계산 결과를 다시 조회한다.
             restoreGame(data.game_id || gameId);
@@ -2792,22 +2846,13 @@ export default function GhUserGamePage() {
                       direction: martinB.direction || "",
                       active: !!martinB.active,
                       step: martinB.step || 1,
-                    }, ...MARTIN_C_ITEMS.map(([key, label]) => {
-                      const martinC = roundState?.conditional_martins?.[key] || {};
-                      return {
-                        key,
-                        label,
-                        color: "#ef6c00",
-                        amount: Number(martinC.amount || 0),
-                        direction: martinC.direction || "",
-                      };
-                    })];
+                    }];
                   })();
                   const kpkpItems = MARTIN_KPKP_ITEMS.map(([key, label]) => {
                     const martin = roundState?.kpkp_martins?.[key] || {};
                     return { key, label, color: "#00897b", amount: Number(martin.amount || 0),
-                      direction: martin.direction || "", active: key === "martin_k" ? (martin.missions?.length || 0) > 0 : !!martin.active,
-                      step: key === "martin_k" ? (martin.missions?.length || 0) : martin.step || 1 };
+                      direction: martin.direction || "", active: !!martin.active,
+                      step: martin.step || 1 };
                   });
 
                   const renderMartinItem = (item) => (
@@ -2818,7 +2863,7 @@ export default function GhUserGamePage() {
                       <Box sx={compactFieldSx}>
                         {item.active && (
                           <Typography variant="caption" sx={{ fontSize: 9, color: "#ba68c8", whiteSpace: "nowrap" }}>
-                            {item.label === "K" ? `${item.step}개` : `${item.step}S`}
+                            {`${item.step}S`}
                           </Typography>
                         )}
                         <Typography
@@ -2942,6 +2987,9 @@ export default function GhUserGamePage() {
             onEnd={() => setShowEndConfirm(true)}
             endDisabled={endDisabled}
             endDisabledReason={endDisabledReason}
+            betPauseDisabled={!gameId || replay.active || slotBusy || betPauseBusy || legacyRestoreBlocked}
+            onBetPauseToggle={updateBetPause}
+            onBetPauseSetting={updateBetPauseSetting}
           />
 
           </Box>

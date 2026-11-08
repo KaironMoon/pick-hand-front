@@ -1,5 +1,4 @@
 import MartinLabouchereRows from "./components/MartinLabouchereRows.jsx";
-import FinalBetConditionSettings from "./components/FinalBetConditionSettings.jsx";
 import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } from "./components/AutoRiskSettings";
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
@@ -225,7 +224,7 @@ function cruiseStepLabel(idx) {
 
 function MartinSection({ name, label, martin, onChange, disabled, labelColor: labelColorProp, collapsed = false, onToggleCollapse, collapseDisabled = false }) {
   const isCruise = name === "cruise";
-  const usesDecimalP = ["martin_a", "martin_z", "martin_z2", "martin_b", "martin_k", "martin_kp"].includes(name) || name.startsWith("martin_c") || name.startsWith("martin_p");
+  const usesDecimalP = ["martin_a", "martin_z2", "martin_b", "martin_kp"].includes(name);
   const availableBetTypes = usesDecimalP ? [...BET_TYPES, "labouchere"] : BET_TYPES;
   const isLab = usesDecimalP && martin.bet_type === "labouchere";
   const enabled = martin.enabled;
@@ -388,8 +387,7 @@ const EMPTY_MARTIN_PATTERN_RULE = {
 const PATTERN_BLOCK_CELL_COUNT = 10;
 const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
-const MARTIN_Z_PATTERN_ONLY_ROW_COUNT = 1000;
-const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = 350;
+const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = 450;
 
 function PatternCell({ value, onClick, cellKey, wallHighlight = false }) {
   return (
@@ -801,87 +799,7 @@ function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
   </>;
 }
 
-function ConditionalMartinSection({ name, label, martin, onChange }) {
-  const color = "#ef6c00";
-  const triggerMode = String(martin.trigger_mode || "M").toUpperCase() === "H" ? "H" : "M";
-  const triggerKey = triggerMode === "H" ? "trigger_hit_streak" : "trigger_miss_streak";
-  const noCondition = Number(martin[triggerKey] || 0) === 0;
-  return (
-    <>
-      <MartinSection
-        name={name || "martin_c"}
-        label={label || "마틴C"}
-        martin={martin}
-        onChange={onChange}
-        labelColor={color}
-      />
-      <tr>
-        <td style={{ ...labelCellStyle, color }}>발동조건</td>
-        <td colSpan={2} style={normalCell}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5 }}>
-            <span>메인 빅로드</span>
-            <button type="button"
-              aria-pressed={noCondition}
-              onClick={() => onChange({ ...martin, [triggerKey]: 0 })}
-              style={{ background: noCondition ? "#388e3c" : "#252525", color: "#fff", border: "1px solid #555", borderRadius: 3, padding: "4px 8px", cursor: "pointer" }}>
-              조건 없음
-            </button>
-            {["M", "H"].map((mode) => (
-              <label key={mode} style={{ display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer" }}>
-                <input
-                  type="radio"
-                  name={`${name || "martin_c"}-trigger-mode`}
-                  value={mode}
-                  checked={triggerMode === mode}
-                  onChange={() => onChange({ ...martin, trigger_mode: mode })}
-                />
-                {mode}
-              </label>
-            ))}
-          </Box>
-        </td>
-        <EditableCell
-          value={triggerMode === "H"
-              ? (martin.trigger_hit_streak || 0)
-              : (martin.trigger_miss_streak || 0)}
-          onChange={(value) => onChange({
-            ...martin,
-            [triggerKey]: Math.max(0, Math.min(20, value)),
-          })}
-          suffix={triggerMode}
-          style={greenCell}
-        />
-        <td colSpan={2} style={normalCell}>
-          {noCondition
-              ? "승패 횟수 조건 생략 (패턴 조건 유지)"
-              : triggerMode === "H"
-              ? "연속 적중이 설정값과 정확히 일치하면 1단계 발동"
-              : "연속 미적중이 설정값과 정확히 일치하면 1단계 발동"}
-        </td>
-      </tr>
-      <MartinPatternRow
-        martin={martin}
-        onChange={onChange}
-        ruleKey="pattern_block"
-        label="패턴일 때 배팅 안 하기"
-        color={color}
-      />
-      <MartinStopBetRoundRow martin={martin} onChange={onChange} color={color} />
-      <tr>
-        <td colSpan={6} style={normalCell}>이 배팅은 별도 트랙으로 배팅됩니다.</td>
-      </tr>
-      <MartinPatternOnlyRows
-        martin={martin}
-        onChange={onChange}
-        color={color}
-        highlightDuplicates
-        showExactLossCondition
-      />
-    </>
-  );
-}
-
-function KpkpChoiceRow({ label, value, choices, onSelect, children }) {
+function KpChoiceRow({ label, value, choices, onSelect }) {
   return (
     <tr>
       <td style={labelCellStyle}>{label}</td>
@@ -894,47 +812,21 @@ function KpkpChoiceRow({ label, value, choices, onSelect, children }) {
               {text}
             </button>
           ))}
-          {children}
         </Box>
       </td>
     </tr>
   );
 }
 
-function KpkpSection({ name, label, martin, onChange }) {
-  const isK = name === "martin_k";
-  const isP = name.startsWith("martin_p") && name !== "martin_kp";
-  const patternMode = isK && martin.start_mode === "pattern";
+function KpSection({ martin, onChange }) {
   const update = (patch) => onChange({ ...martin, ...patch });
   return (
     <>
-      <MartinSection name={name} label={label} martin={martin} onChange={onChange} labelColor={isK ? "#c62828" : isP ? "#1565c0" : "#8e24aa"} />
+      <MartinSection name="martin_kp" label="마틴KP" martin={martin} onChange={onChange} labelColor="#8e24aa" />
       <tr>
         <td style={labelCellStyle}>발동조건</td>
-        <td colSpan={2} style={normalCell}>{isP ? "GH+Z+C+K+KP 상계액" : isK ? "GH + 마틴Z 합계" : "순수 글로벌히트 BET"}</td>
-        {isP ? <EditableCell value={martin.trigger_bet_amount || 0}
-          onChange={(value) => update({ trigger_bet_amount: Math.max(0, value) })}
-          suffix="P" style={greenCell} decimal />
-          : <td style={greenCell}>{isK ? "0.0P" : "항상"}</td>}
-        <td colSpan={2} style={normalCell}>{isK ? (
-          <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center", flexWrap: "wrap" }}>
-            {[["pattern", "해당회차 진행(패턴방향)"], ["next_round", "다음 회차부터 진행"]].map(([value, text]) => (
-              <button key={value} type="button" aria-pressed={(patternMode ? "pattern" : "next_round") === value}
-                onClick={() => update({ start_mode: value })}
-                style={{ background: (patternMode ? "pattern" : "next_round") === value ? "#388e3c" : "#252525", color: "#fff", border: "1px solid #555", borderRadius: 3, padding: "4px 8px", cursor: "pointer" }}>
-                {text}
-              </button>
-            ))}
-          </Box>
-        ) : isP ? "해당 포인트에서만 진행" : "방향이 있을 때 진행"}</td>
+        <td colSpan={5} style={normalCell}>GH + 마틴 Z2 상계 방향이 있을 때 진행</td>
       </tr>
-      {patternMode && <>
-        <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#c62828" rowCount={100} recommendSingleStep={false} />
-        <tr><td colSpan={6} style={{ ...normalCell, textAlign: "left", padding: 8, whiteSpace: "normal" }}>
-          진행 중 일치하는 패턴이 없는 회차에는 마틴K 배팅을 하지 않습니다. 미션은 종료하지 않고 현재 단계를 그대로 보류했다가, 다시 패턴이 일치하는 회차에 그 단계의 금액으로 배팅을 재개합니다.
-        </td></tr>
-      </>}
-      {name === "martin_kp" && <>
         <tr>
           <td style={labelCellStyle}>어시스트(단계별 방향)</td>
           <td colSpan={5} style={{ ...normalCell, textAlign: "left", whiteSpace: "normal" }}>
@@ -951,46 +843,15 @@ function KpkpSection({ name, label, martin, onChange }) {
                 </label>
               ))}
             </Box>
-            <Box sx={{ mt: 1, color: "#aaa", fontSize: 12 }}>1~4회차의 0.0은 제외하고, 5회차 이후 GH+마틴Z 0.0 구간 종료 후 첫 KP 배팅부터 어시스트 1단계로 시작합니다. GH+마틴Z+KP를 상계한 금액의 방향만 변경하며, 변경 후 패배하면 단계가 올라가고 승리하면 집계를 종료합니다.</Box>
+            <Box sx={{ mt: 1, color: "#aaa", fontSize: 12 }}>1~4회차의 0.0은 제외하고, 5회차 이후 GH+마틴Z2 0.0 구간 종료 후 첫 KP 배팅부터 어시스트 1단계로 시작합니다. GH+마틴Z2+KP를 상계한 금액의 방향만 변경하며, 변경 후 패배하면 단계가 올라가고 승리하면 집계를 종료합니다.</Box>
           </td>
         </tr>
-      </>}
-      {!patternMode && <>
-        <KpkpChoiceRow label="어시스트" value={martin.assist_wait_losses || 0}
-          choices={[[0, "해당진행"], [1, "1패후진행"], [2, "2패후진행"], [3, "3패후진행"]]}
-          onSelect={(value) => update({ assist_wait_losses: value, ...(value ? { assist_wait_wins: 0 } : {}) })} />
-        <KpkpChoiceRow label="어시스트3" value={martin.assist_wait_wins || 0}
-          choices={[[0, "해당진행"], [1, "1승후진행"], [2, "2승후진행"], [3, "3승후진행"]]}
-          onSelect={(value) => update({ assist_wait_wins: value, ...(value ? { assist_wait_losses: 0 } : {}) })} />
-      </>}
-      {(isP || name === "martin_kp") && (
-        <KpkpChoiceRow label="어시스트2" value={martin.assist2_k_losses || 0}
-          choices={[[0, "해당진행"], [2, "2패시K"], [3, "3패시K"], [4, "4패시K"]]}
-          onSelect={(value) => update({ assist2_k_losses: value })}>
-          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, whiteSpace: "nowrap", ml: 1 }}>
-            <input type="number" min={0} max={80} inputMode="numeric"
-              aria-label={`${label} K 발동 대기 회차`}
-              title="0이면 KP 전환 없이 K 배팅을 기다립니다."
-              placeholder="X"
-              value={martin.assist2_wait_rounds || ""}
-              onChange={(event) => update({ assist2_wait_rounds: Math.max(0, Math.min(80, Number(event.target.value) || 0)) })}
-              style={{ width: 42, padding: "3px 4px", background: "#1b1b1b", color: "#fff", border: "1px solid #777", borderRadius: 3, textAlign: "center" }} />
-            <span>회까지 발동안되면 KP</span>
-          </Box>
-        </KpkpChoiceRow>
-      )}
-      {isK && <>
-        <KpkpChoiceRow label="미션진행중 추가발생처리" value={martin.additional_mission_limit || 0}
-          choices={[[0, "전체진행"], [2, "2미션이상제외"], [3, "3미션이상제외"]]}
-          onSelect={(value) => update({ additional_mission_limit: value, distribution_limit: value ? 0 : martin.distribution_limit || 0 })} />
-        <KpkpChoiceRow label="진행미션연패중 추가발생" value={martin.additional_miss_limit || 0}
-          choices={[[0, "전체진행"], [2, "2패시발생제외"], [3, "3패시발생제외"], [4, "4패시발생제외"]]}
-          onSelect={(value) => update({ additional_miss_limit: value, distribution_limit: value ? 0 : martin.distribution_limit || 0 })} />
-        <KpkpChoiceRow label="분산처리" value={martin.distribution_limit || 0}
-          choices={[[0, "사용안함"], [1, "1개씩처리"], [2, "2개씩처리"]]}
-          onSelect={(value) => update({ distribution_limit: value,
-            ...(value ? { additional_mission_limit: 0, additional_miss_limit: 0 } : {}) })} />
-      </>}
+      <KpChoiceRow label="어시스트" value={martin.assist_wait_losses || 0}
+        choices={[[0, "해당진행"], [1, "1패후진행"], [2, "2패후진행"], [3, "3패후진행"]]}
+        onSelect={(value) => update({ assist_wait_losses: value, ...(value ? { assist_wait_wins: 0 } : {}) })} />
+      <KpChoiceRow label="어시스트3" value={martin.assist_wait_wins || 0}
+        choices={[[0, "해당진행"], [1, "1승후진행"], [2, "2승후진행"], [3, "3승후진행"]]}
+        onSelect={(value) => update({ assist_wait_wins: value, ...(value ? { assist_wait_losses: 0 } : {}) })} />
       {[["베팅시작", "bet_start_round", "설정 회차부터 시작"],
         ["베팅금지", "stop_bet_round", "설정 회차부터 신규 발동 금지"],
         ["미처리종료 조건", "finish_round", "설정 회차까지 처리 후 종료"]].map(([rowLabel, field, hint]) => (
@@ -2387,27 +2248,9 @@ const DEFAULT_MARTIN_B = {
   pattern_only: [],
   pattern_options: martinBPatternOptions(),
 };
-const DEFAULT_MARTIN_C = {
-  ...DEFAULT_MARTIN,
-  exact_loss_enabled: false,
-  exact_loss_count: 3,
-  trigger_mode: "M",
-  trigger_miss_streak: 0,
-  trigger_hit_streak: 0,
-  stop_bet_round: 0,
-  pattern_block: { ...EMPTY_MARTIN_PATTERN_RULE },
-  pattern_only: { ...EMPTY_MARTIN_PATTERN_RULE },
-};
-const DEFAULT_MARTIN_K = { ...DEFAULT_MARTIN, assist_wait_losses: 0, assist_wait_wins: 0,
-  start_mode: "next_round", pattern_only: [],
-  additional_mission_limit: 0, additional_miss_limit: 0, distribution_limit: 0,
-  bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
-const DEFAULT_MARTIN_P = { ...DEFAULT_MARTIN, trigger_bet_amount: 0,
-  assist_wait_losses: 0, assist_wait_wins: 0, assist2_k_losses: 0, assist2_wait_rounds: 0,
-  bet_start_round: 1, stop_bet_round: 0, finish_round: 0 };
 const DEFAULT_MARTIN_KP = { ...DEFAULT_MARTIN, assist_wait_losses: 0, assist_wait_wins: 0, bet_start_round: 1,
   stage_assists: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [String(index + 1), "해당진행"])),
-  stop_bet_round: 0, finish_round: 0, assist2_k_losses: 0, assist2_wait_rounds: 0 };
+  stop_bet_round: 0, finish_round: 0 };
 const DEFAULT_FAIL = {
   ...DEFAULT_MARTIN,
   fail_count: 2,
@@ -2437,12 +2280,7 @@ export default function GhUserSetupPage() {
   const [signalReady, setSignalReady] = useState(false);
   const signalRef = useRef(null);
   const martinZTableRef = useRef(null);
-  const [martinZCollapsed, setMartinZCollapsed] = useState(false);
-  const [martinZViewReady, setMartinZViewReady] = useState(false);
-  const [martinZViewSaving, setMartinZViewSaving] = useState(false);
   const [martinTableWidth, setMartinTableWidth] = useState(undefined);
-  // 저장된 감추기 상태도 펼친 표의 원래 너비를 측정한 뒤 적용한다.
-  const martinZIsCollapsed = martinZCollapsed && martinTableWidth !== undefined;
   const martinTableStyle = {
     borderCollapse: "collapse",
     width: martinTableWidth,
@@ -2464,36 +2302,6 @@ export default function GhUserSetupPage() {
   const [bettingExcelResult, setBettingExcelResult] = useState(null);
 
   const blocker = useBlocker(dirty || signalDirty);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    let active = true;
-    setMartinZViewReady(false);
-    apiCaller.get(USER_BET_SETTINGS_API.GET("common")).then(({ data }) => {
-      if (!active) return;
-      setMartinZCollapsed(data.config.gh_martin_z_collapsed);
-      setMartinZViewReady(true);
-    }).catch((err) => {
-      if (!active) return;
-      setSnack({ open: true, message: err?.response?.data?.detail || "감추기 상태를 불러오지 못했습니다.", severity: "error" });
-    });
-    return () => { active = false; };
-  }, [currentUser?.id, isAdmin]);
-
-  const toggleMartinZVisibility = async () => {
-    if (!martinZViewReady || martinZViewSaving) return;
-    setMartinZViewSaving(true);
-    try {
-      const { data } = await apiCaller.put(USER_BET_SETTINGS_API.SAVE("common"), {
-        config: { gh_martin_z_collapsed: !martinZCollapsed },
-      });
-      setMartinZCollapsed(data.config.gh_martin_z_collapsed);
-    } catch (err) {
-      setSnack({ open: true, message: err?.response?.data?.detail || "감추기 상태 저장에 실패했습니다.", severity: "error" });
-    } finally {
-      setMartinZViewSaving(false);
-    }
-  };
 
   useLayoutEffect(() => {
     const table = martinZTableRef.current;
@@ -2737,17 +2545,9 @@ export default function GhUserSetupPage() {
     setDirty(true);
   };
   const martinChanges = useMemo(() => Object.fromEntries([
-    "martin_a", "martin_z", "martin_z2", "martin_b", "martin_c", "martin_c2", "martin_c3",
-    "martin_c4", "martin_c5", "martin_k", "martin_p1", "martin_p2", "martin_p3", "martin_kp",
+    "martin_a", "martin_z2", "martin_b", "martin_kp",
   ].map((key) => [key, (martin) => {
-    setConfig((prev) => {
-      const other = key === "martin_z" ? "martin_z2" : key === "martin_z2" ? "martin_z" : null;
-      if (other && martin.enabled && prev[other]?.enabled) {
-        window.alert("마틴 Z와 Z2는 동시에 사용할 수 없습니다. 사용 중인 마틴을 먼저 꺼 주세요.");
-        return prev;
-      }
-      return updatePbjStrategy(prev, key, martin);
-    });
+    setConfig((prev) => updatePbjStrategy(prev, key, martin));
     setDirty(true);
   }])), []);
 
@@ -2796,22 +2596,8 @@ export default function GhUserSetupPage() {
   if (!config) return <Box sx={{ p: 2, color: "#888" }}>불러오는 중...</Box>;
 
   const martinA = config.martin_a || { ...DEFAULT_MARTIN, enabled: true };
-  const martinZ = config.martin_z || { ...DEFAULT_MARTIN_Z };
   const martinZ2 = config.martin_z2 || { ...DEFAULT_MARTIN_Z, pattern_only: [], pattern_options: [] };
   const martinB = config.martin_b || { ...DEFAULT_MARTIN_B };
-  const martinC = config.martin_c || { ...DEFAULT_MARTIN_C };
-  const martinCs = [
-    ["martin_c", "마틴C1", martinC],
-    ...[2, 3, 4, 5].map((number) => {
-      const key = `martin_c${number}`;
-      return [key, `마틴C${number}`, config[key] || { ...DEFAULT_MARTIN_C }];
-    }),
-  ];
-  const martinK = config.martin_k || { ...DEFAULT_MARTIN_K };
-  const martinPs = [0.2, 0.4, 0.6].map((trigger, index) => {
-    const key = `martin_p${index + 1}`;
-    return [key, `마틴P${index + 1}`, config[key] || { ...DEFAULT_MARTIN_P, trigger_bet_amount: trigger }];
-  });
   const martinKp = config.martin_kp || { ...DEFAULT_MARTIN_KP };
   const cruise = config.cruise || { ...DEFAULT_MARTIN };
   const martinS = config.martin_s || { ...DEFAULT_MARTIN };
@@ -2882,29 +2668,6 @@ export default function GhUserSetupPage() {
     });
     setDirty(true);
   };
-  const martinBetDownConditions = Array.from({ length: 3 }, (_, index) => {
-    const saved = Array.isArray(config.martin_c_bet_down_conditions)
-      ? config.martin_c_bet_down_conditions[index]
-      : null;
-    return saved && typeof saved === "object"
-      ? saved
-      : { start_amount: 0, end_amount: 0, bet_percent: 1 };
-  });
-  const updateMartinBetDownCondition = (index, patch) => {
-    setConfig((prev) => {
-      const previousConditions = Array.from({ length: 3 }, (_, itemIndex) => {
-        const saved = Array.isArray(prev.martin_c_bet_down_conditions)
-          ? prev.martin_c_bet_down_conditions[itemIndex]
-          : null;
-        return saved && typeof saved === "object"
-          ? { ...saved }
-          : { start_amount: 0, end_amount: 0, bet_percent: 1 };
-      });
-      previousConditions[index] = { ...previousConditions[index], ...patch };
-      return { ...prev, martin_c_bet_down_conditions: previousConditions };
-    });
-    setDirty(true);
-  };
   const assignedJmhPickSetNames = Object.fromEntries(
     Array.from({ length: 50 }, (_, index) => {
       const key = `JMH${index + 1}`;
@@ -2964,10 +2727,6 @@ export default function GhUserSetupPage() {
           <Typography variant="caption" sx={{ fontSize: 11, color: "#bbb", fontWeight: "bold" }}>오토 운영 옵션</Typography>
           <AutoRiskSettings config={config} onChange={(key, value) => {
             setConfig((prev) => ({ ...prev, [key]: value }));
-            setDirty(true);
-          }} />
-          <FinalBetConditionSettings value={config.auto_final_bet_condition} onChange={(value) => {
-            setConfig((prev) => ({ ...prev, auto_final_bet_condition: value }));
             setDirty(true);
           }} />
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
@@ -3068,7 +2827,7 @@ export default function GhUserSetupPage() {
               </Typography>
             )}
             <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              전체 PNL이 목표에 도달하면 GH를 정지하고 진행 중인 마틴 Z/B/C는 첫 적중까지 회수
+              전체 PNL이 목표에 도달하면 GH를 정지하고 진행 중인 마틴 Z2/B는 첫 적중까지 회수
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
@@ -3147,7 +2906,7 @@ export default function GhUserSetupPage() {
               </Typography>
             )}
             <Typography variant="caption" sx={{ fontSize: 10, color: "#666" }}>
-              마틴 Z/B/C를 제외한 현재 GH 손실 또는 다음 배팅 패배예상손실이 한도에 도달하면 GH 배팅만 중지
+              마틴 Z2/B를 제외한 현재 GH 손실 또는 다음 배팅 패배예상손실이 한도에 도달하면 GH 배팅만 중지
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
@@ -3254,7 +3013,7 @@ export default function GhUserSetupPage() {
               }}
               style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 달성 시 최고 마틴 Z+B+C+K+P+KP PNL에서</Typography>
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이상 달성 시 최고 마틴 Z2+B+KP PNL에서</Typography>
             <input
               type="number"
               min="0"
@@ -3268,142 +3027,11 @@ export default function GhUserSetupPage() {
               }}
               style={{ width: 70, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
             />
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>% 이상 손실 나면 마틴 Z·B·C·K·P·KP 배팅 정지</Typography>
+            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>% 이상 손실 나면 마틴 Z2·B·KP 배팅 정지</Typography>
             {(Number(config.martin_drawdown_start_amount || 0) === 0 || Number(config.martin_drawdown_percent || 0) === 0) && (
               <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
             )}
           </Box>
-          </Box>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1, order: 2 }}>
-            <Typography
-              variant="caption"
-              sx={{ mt: 0.5, pt: 1, borderTop: "1px solid rgba(255,255,255,0.35)", fontSize: 11, color: "#fff", fontWeight: "bold" }}
-            >
-              마틴C 운영 옵션
-            </Typography>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
-              슬롯 마틴C 손실조건
-            </Typography>
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>현재손실</Typography>
-            <input
-              type="number"
-              min="0"
-              step="0.1"
-              value={config.slot_martin_c_loss_stop_amount ?? 0}
-              onChange={(event) => {
-                const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
-                setConfig((prev) => ({ ...prev, slot_martin_c_loss_stop_amount: value }));
-                setDirty(true);
-              }}
-              style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
-            />
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>패배예상손실</Typography>
-            <input
-              type="number"
-              min="0"
-              step="0.1"
-              value={config.slot_martin_c_loss_stop_projected_amount ?? 0}
-              onChange={(event) => {
-                const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
-                setConfig((prev) => ({ ...prev, slot_martin_c_loss_stop_projected_amount: value }));
-                setDirty(true);
-              }}
-              style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
-            />
-            {Number(config.slot_martin_c_loss_stop_amount || 0) === 0 && Number(config.slot_martin_c_loss_stop_projected_amount || 0) === 0 && (
-              <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
-            )}
-          </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-            <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
-              마틴C수익보호
-            </Typography>
-            <input
-              type="number"
-              min="0"
-              max="60"
-              step="1"
-              value={config.martin_c_profit_stop_after_round ?? 0}
-              onChange={(event) => {
-                const value = Math.max(0, Math.min(60, parseInt(event.target.value || "0", 10) || 0));
-                setConfig((prev) => ({ ...prev, martin_c_profit_stop_after_round: value }));
-                setDirty(true);
-              }}
-              style={{ width: 70, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
-            />
-            <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>
-              회차 이후 마틴C PNL이 +인 경우 현재 마틴C PNL 이상 배팅 금지
-            </Typography>
-            {Number(config.martin_c_profit_stop_after_round || 0) === 0 && (
-              <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
-            )}
-          </Box>
-          {martinBetDownConditions.map((condition, index) => (
-            <Box key={`martin-bet-down-${index}`} sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
-                마틴C 배팅액 하향 조건 {index + 1}
-              </Typography>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={condition.start_amount ?? 0}
-                onChange={(event) => updateMartinBetDownCondition(index, {
-                  start_amount: Math.max(0, parseFloat(event.target.value || "0") || 0),
-                })}
-                style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
-              />
-              <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 초과</Typography>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={condition.end_amount ?? 0}
-                onChange={(event) => updateMartinBetDownCondition(index, {
-                  end_amount: Math.max(0, parseFloat(event.target.value || "0") || 0),
-                })}
-                style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
-              />
-              <Typography variant="caption" sx={{ fontSize: 11, color: "#888" }}>P 이하</Typography>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={condition.bet_percent ?? 1}
-                onChange={(event) => updateMartinBetDownCondition(index, {
-                  bet_percent: Math.max(0, Math.min(100, parseFloat(event.target.value || "0") || 0)),
-                })}
-                style={{ width: 70, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
-              />
-              <Typography variant="caption" sx={{ fontSize: 11, color: "#fff" }}>%로 하향하여 배팅</Typography>
-              {Number(condition.start_amount || 0) === 0 && Number(condition.end_amount || 0) === 0 && (
-                <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
-              )}
-            </Box>
-          ))}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-              <Typography variant="caption" sx={{ fontSize: 12, color: "#fff", minWidth: 140 }}>
-                마틴C 회차별 고정배팅
-              </Typography>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={config.martin_c_round_fixed_bet_amount ?? 0}
-                onChange={(event) => {
-                  const value = Math.max(0, parseFloat(event.target.value || "0") || 0);
-                  setConfig((prev) => ({ ...prev, martin_c_round_fixed_bet_amount: value }));
-                  setDirty(true);
-                }}
-                style={{ width: 90, padding: "4px 6px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4, fontSize: 12 }}
-              />
-              <Typography variant="caption" sx={{ fontSize: 11, color: "#fff" }}>금액 무시하고 지정한 금액만 베팅</Typography>
-              {Number(config.martin_c_round_fixed_bet_amount || 0) === 0 && (
-                <Typography variant="caption" sx={{ fontSize: 10, color: "#888" }}>(사용안함)</Typography>
-              )}
-            </Box>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Typography variant="caption" sx={{ fontSize: 12, color: "#aaa", minWidth: 110 }}>
@@ -3439,7 +3067,7 @@ export default function GhUserSetupPage() {
                 설정 회차까지 배팅하고 다음 회차부터 GH·K·P·KP를 중지합니다. (예: 60 설정 → 61회차부터)
               </Typography>
               <Typography variant="caption" display="block" sx={{ fontSize: 11, color: "#aaa" }}>
-                마감 시 이미 진행 중인 Z·B·C1~C5만 각각 첫 적중까지 회수한 뒤 중지하며, 신규 마틴은 시작하지 않습니다.
+                마감 시 이미 진행 중인 Z2·B만 각각 첫 적중까지 회수한 뒤 중지하며, 신규 마틴은 시작하지 않습니다.
               </Typography>
               <Typography variant="caption" display="block" sx={{ fontSize: 11, color: "#aaa" }}>
                 회수할 마틴이 없으면 즉시 배팅을 중지하고 관찰 상태로 전환합니다. 0은 사용안함입니다.
@@ -3641,62 +3269,10 @@ export default function GhUserSetupPage() {
       )}
 
       <Box sx={{ overflowX: "auto" }}>
-        <table ref={martinZTableRef} style={{ borderCollapse: "collapse", width: martinZIsCollapsed ? martinTableWidth : "fit-content" }}>
+        <table ref={martinZTableRef} style={{ borderCollapse: "collapse", width: "fit-content" }}>
           <tbody>
             <MartinSection name="martin_a" label="마틴A" martin={martinA} onChange={martinChanges.martin_a} />
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-            <MartinSection name="martin_z" label="마틴Z" martin={martinZ} onChange={martinChanges.martin_z}
-              collapsed={martinZIsCollapsed} onToggleCollapse={toggleMartinZVisibility}
-              collapseDisabled={!martinZViewReady || martinZViewSaving} />
-            {!martinZIsCollapsed && <>
-            <tr><td colSpan={6} style={{ padding: 8 }}>
-              <Tooltip title={martinZPatternPrioritySummary(martinZ.pattern_match_priority)}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Typography component="label" htmlFor="martin-z-pattern-priority" variant="caption">끝일치 패턴 선택 ⓘ</Typography>
-                  <select id="martin-z-pattern-priority" value={martinZ.pattern_match_priority ?? "all"}
-                    onChange={(event) => martinChanges.martin_z({ ...martinZ, pattern_match_priority: event.target.value })}
-                    style={{ padding: "4px 8px", background: "#16213e", color: "#fff", border: "1px solid #2a3a5a", borderRadius: 4 }}>
-                    <option value="all">전부</option>
-                    <option value="longest">긴 것 우선</option>
-                    <option value="shortest">짧은 것 우선</option>
-                  </select>
-                  <Typography variant="caption">동시에 끝일치한 패턴에 적용 · 새 게임부터 적용</Typography>
-                </Box>
-              </Tooltip>
-            </td></tr>
-            <tr><td colSpan={6} style={{ padding: 8 }}>
-              <Tooltip title={martinZRateSummary(martinZ)}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <TextField size="small" type="number" label="마틴Z 최소 승률 (%)"
-                    value={martinZ.win_rate_threshold ?? 0} inputProps={{ min: 0, max: 100, step: 0.1 }}
-                    onChange={(event) => martinChanges.martin_z({ ...martinZ, win_rate_threshold: Number(event.target.value) })} />
-                  <Typography variant="caption">미만이면 단계 유지·0.0P, 이상으로 회복하면 정상 배팅 · 0은 사용안함 ⓘ</Typography>
-                </Box>
-              </Tooltip>
-            </td></tr>
-            <MartinPatternRow
-              martin={martinZ}
-              onChange={martinChanges.martin_z}
-              ruleKey="pattern_block"
-              label="패턴일 때 배팅 안 하기"
-              color="#1565c0"
-            />
-            <MartinPatternOnlyRows
-              martin={martinZ}
-              onChange={martinChanges.martin_z}
-              color="#1565c0"
-              rowCount={MARTIN_Z_PATTERN_ONLY_ROW_COUNT}
-              showMissCondition
-              highlightDuplicates
-            />
-            <MartinStopBetRoundRow
-              martin={martinZ}
-              showStepRecovery
-              onChange={martinChanges.martin_z}
-              color="#1565c0"
-            />
-            </>}
-            <tr><td colSpan={6} style={{ height: 12 }} /></tr>
             <MartinSection name="martin_z2" label="마틴Z2" martin={martinZ2} onChange={martinChanges.martin_z2} />
             <>
             <tr><td colSpan={6} style={{ padding: 8 }}>
@@ -3759,25 +3335,7 @@ export default function GhUserSetupPage() {
         <table style={martinTableStyle}>
           <tbody>
             <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-            {martinCs.map(([key, label, martin], index) => (
-              <Fragment key={key}>
-                {index > 0 && <tr><td colSpan={6} style={{ height: 12 }}></td></tr>}
-                <ConditionalMartinSection
-                  name={key}
-                  label={label}
-                  martin={martin}
-                  onChange={martinChanges[key]}
-                />
-              </Fragment>
-            ))}
-            <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-            <KpkpSection name="martin_k" label="마틴K" martin={martinK} onChange={martinChanges.martin_k} />
-            {martinPs.map(([key, label, martin]) => <Fragment key={key}>
-              <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-              <KpkpSection name={key} label={label} martin={martin} onChange={martinChanges[key]} />
-            </Fragment>)}
-            <tr><td colSpan={6} style={{ height: 12 }}></td></tr>
-            <KpkpSection name="martin_kp" label="마틴KP" martin={martinKp} onChange={martinChanges.martin_kp} />
+            <KpSection martin={martinKp} onChange={martinChanges.martin_kp} />
           </tbody>
         </table>
       </Box>

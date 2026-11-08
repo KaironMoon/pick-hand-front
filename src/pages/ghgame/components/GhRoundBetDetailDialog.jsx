@@ -1,34 +1,14 @@
-import { Alert, AlertTitle, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
 
 const formatP = (value) => value == null ? "—" : `${Number(value).toFixed(1)}P`;
-const formatPnl = (value) => `${value > 0 ? "+" : ""}${formatP(value)}`;
 const sequenceText = (values) => Array.isArray(values) ? values.join(" ") : "—";
 const sideText = (value) => value === "P" ? "Player (P)" : value === "B" ? "Banker (B)" : "상계 / 배팅 없음";
 
 export default function GhRoundBetDetailDialog({ open, onClose, round, detail, actualCell, amountMode }) {
-  const reversal = actualCell?.final_bet_reversal;
-  const manualFinal = amountMode === "actual" ? null : detail?.manual_final_bet;
-  const reversedComponents = amountMode === "actual" ? actualCell?.final_bet_components : detail?.final_bet_components;
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" aria-labelledby="gh-round-bet-detail-title">
       <DialogTitle id="gh-round-bet-detail-title">{round}회차 배팅 상세</DialogTitle>
       <DialogContent dividers>
-        {reversal && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            <AlertTitle>반대 배팅</AlertTitle>
-            <Typography fontWeight={700}>원래 {reversal.original_direction} → 실제 {reversal.actual_direction}</Typography>
-            <Typography variant="body2">최종 배팅 조건으로 방향이 변경되었습니다.</Typography>
-          </Alert>
-        )}
-        {manualFinal && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            <AlertTitle>{manualFinal.action === "stop" ? "배팅 정지" : "반대 배팅"}</AlertTitle>
-            <Typography>
-              수동 최종 배팅 · {sideText(manualFinal.direction)} · {formatP(manualFinal.amount)}
-              {detail.actual && ` · 손익 ${formatP(manualFinal.pnl)}`}
-            </Typography>
-          </Alert>
-        )}
         {!detail ? (
           <Typography color="text.secondary">이 회차의 상세 배팅 기록이 없습니다.</Typography>
         ) : (
@@ -74,7 +54,7 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
             )}
             <Box>
               <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
-                {reversedComponents?.length ? "반전 전 전략별 금액 구성 · 계산 손익" : "전략별 금액 구성 · 계산 손익"}
+                전략별 금액 구성 · 계산 손익
               </Typography>
               <Box sx={{ overflowX: "auto" }}>
                 <Box component="table" sx={{
@@ -200,25 +180,6 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
                 </Box>
               ))}
             </Box>
-            {Boolean(reversedComponents?.length) && (
-              <Box>
-                <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
-                  최종 반전으로 바뀐 전략별 픽과 손익
-                </Typography>
-                <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", "& th, & td": { borderBottom: "1px solid", borderColor: "divider", p: 0.75, textAlign: "left" } }}>
-                  <thead><tr><th scope="col">전략</th><th scope="col">픽 변경</th><th scope="col">회차 PnL 변경</th></tr></thead>
-                  <tbody>
-                    {reversedComponents.map((row) => (
-                      <tr key={row.key}>
-                        <th scope="row">{row.label}</th>
-                        <td>{row.original_direction} {formatP(row.amount)} → {row.direction} {formatP(row.amount)}</td>
-                        <td>{formatPnl(row.original_pnl)} → <strong>{formatPnl(row.pnl)}</strong></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Box>
-              </Box>
-            )}
           </Box>
         )}
       </DialogContent>

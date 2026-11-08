@@ -30,7 +30,7 @@ export const shouldDisplaySlotAutoError = (slot) => Boolean(
 );
 
 export const shouldDisplayBetFailure = (failureCode) => Boolean(
-  failureCode && failureCode !== "phase_not_betting"
+  failureCode && !["phase_not_betting", "gh_bet_paused"].includes(failureCode)
 );
 
 export const autoStatusLookupError = (status) => (
