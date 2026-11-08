@@ -368,6 +368,16 @@ const betPauseTileSx = {
   display: "flex", alignItems: "center", justifyContent: "space-between",
 };
 
+function GhBetDirectionBadge({ side }) {
+  const color = side === "P" ? "#1565d8" : side === "B" ? "#e53935" : "#555";
+  return (
+    <Box sx={{ ...betPauseTileSx, width: 28, minWidth: 28, boxSizing: "border-box", px: 0, fontSize: 13,
+      justifyContent: "center", backgroundColor: color }}>
+      {side || "-"}
+    </Box>
+  );
+}
+
 function GhBetPauseControls({ mode, settings, disabled, onToggle, onSave }) {
   const playing = mode === "play";
   const settingsDisabled = disabled || mode === "manual_stop";
@@ -381,7 +391,7 @@ function GhBetPauseControls({ mode, settings, disabled, onToggle, onSave }) {
       </Button>
       {[
         ["bet_pause_losses", "연속패 STOP", "#ffd54f"],
-        ["bet_resume_wins", "연속승리 PLAY", "#00e676"],
+        ["bet_resume_wins", "연속승리 START", "#00e676"],
       ].map(([key, label, color]) => {
         const saved = settings?.[key] ?? 0;
         return (
@@ -416,6 +426,8 @@ function GhBetPauseControls({ mode, settings, disabled, onToggle, onSave }) {
 
 function GhRoundAmountTable({
   roundState,
+  realBetAmount,
+  realBetSide,
   patternDisplay,
   amountMode,
   onSetup,
@@ -546,14 +558,9 @@ function GhRoundAmountTable({
   });
   const fmt = (v) => v === "N/A" ? "-" : Number(v || 0).toFixed(1);
   const pauseMode = roundState?.bet_pause?.mode || "play";
-  const betPaused = pauseMode !== "play";
-  const finalSide = betPaused ? null : resolveBetBoardDirection(roundState);
-  const currentRoundIdx = Math.max(0, Number(roundState?.round_num || 0));
-  const totalAmount = betPaused ? 0 : amountMode === "actual"
-    ? Number(actualTable.server_current_bet_p
-      ?? actualCells[currentRoundIdx]?.bet_amount_p
-      ?? 0)
-    : Number(table.total_amount || 0);
+  const virtualBets = roundState?.virtual_bets;
+  const virtualCurrent = virtualBets?.current || {};
+  const virtualBetTileSx = { ...betPauseTileSx, width: 145, boxSizing: "border-box" };
   const totalPnl = amountMode === "actual"
     ? Number(actualTable.server_total_pnl_p || 0)
     : Number(table.total_pnl || 0);
@@ -563,17 +570,10 @@ function GhRoundAmountTable({
   const basePnl = Number(pnlBreakdown.globalhit || 0);
   const virtualPnl = roundState?.virtual_pnl || {};
   const pnlColor = (value) => value >= 0 ? "#00e676" : "#ef5350";
-  const globalhitAggregate = roundState?.globalhit_aggregate || {};
-  const globalhitDirection = betPaused ? null : globalhitAggregate.direction;
-  const globalhitBetAmount = betPaused ? 0 : amountMode === "actual"
-    ? Number(actualTable.server_globalhit_bet_p ?? globalhitAggregate.amount ?? 0)
-    : Number(globalhitAggregate.amount || 0);
-  const globalhitDirectionColor = globalhitDirection === "P" ? "#1565d8" : globalhitDirection === "B" ? "#e53935" : "#555";
+  const globalhitDirection = virtualCurrent.globalhit?.side;
+  const globalhitBetAmount = virtualCurrent.globalhit?.amount;
   const martinNetAmount = (cell) => Number(cell?.martin_net_amount || 0);
   const hasMartinZBet = (cell) => cell?.martin_z_included ?? Number(cell?.pick_martin_amount || 0) > 0;
-  const currentMartinAmount = martinNetAmount(strategyCells[currentRoundIdx]);
-  const showCurrentMartinAmount = !betPaused && amountMode !== "actual" && currentMartinAmount > 0;
-  const finalSideColor = finalSide === "P" ? "#1565d8" : finalSide === "B" ? "#e53935" : "#555";
   const cellSx = (idx) => {
     const cell = cells[idx] || {};
     const hasResult = !!cell.actual;
@@ -680,44 +680,39 @@ function GhRoundAmountTable({
             {label}
           </Box>
         ))}
-        <Box sx={{ width: 28, border: "1px solid #3f4650", backgroundColor: finalSideColor, color: "#fff", fontSize: 13, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {finalSide || "-"}
-        </Box>
+        <GhBetDirectionBadge side={realBetSide} />
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>BET</span><span>
-            {fmt(totalAmount)}
-            {showCurrentMartinAmount && <span style={{ color: hasMartinZBet(strategyCells[currentRoundIdx]) ? "#ef5350" : "inherit" }}> ({fmt(currentMartinAmount)})</span>}
-          </span>
+          <span>전체 BET</span><span>{fmt(realBetAmount)}</span>
         </Box>
         <Box sx={{ flex: 1, minWidth: 112, border: "1px solid #3f4650", backgroundColor: "#111821", color: totalPnl >= 0 ? "#00e676" : "#ef5350", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>전체 PNL</span><span>{fmt(totalPnl)}</span>
         </Box>
       </Box>
       <Box sx={{ display: "flex", justifyContent: "flex-start", alignItems: "stretch", gap: 0.5, width: "100%", flexWrap: "wrap" }}>
-        <Box sx={{ width: 28, minWidth: 28, border: "1px solid #3f4650", backgroundColor: globalhitDirectionColor, color: "#fff", fontSize: 13, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {globalhitDirection || "-"}
-        </Box>
-        <Box sx={{ width: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: "#fff", fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>글로벌히트 BET</span><span>{fmt(globalhitBetAmount)}</span>
-        </Box>
-        <Box sx={{ width: 145, border: "1px solid #3f4650", backgroundColor: "#111821", color: pnlColor(basePnl), fontSize: 11, fontWeight: "bold", px: 0.75, py: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>글로벌히트 PNL</span><span>{fmt(basePnl)}</span>
+        <Box sx={{ display: "flex", gap: 0.5 }}>
+          <GhBetDirectionBadge side={globalhitDirection} />
+          <Box sx={virtualBetTileSx}>
+            <span>글로벌히트 VBET</span><span>{fmt(globalhitBetAmount)}</span>
+          </Box>
+          <Box sx={{ ...virtualBetTileSx, color: pnlColor(basePnl) }}>
+            <span>글로벌히트 PNL</span><span>{fmt(basePnl)}</span>
+          </Box>
         </Box>
         {[
-          ["B", "martin_b", strategyCells[currentRoundIdx]?.martin_b_amount],
-          ["Z", "martin_z", strategyCells[currentRoundIdx]?.pick_martin_amount],
-          ["KP", "martin_kp", strategyCells[currentRoundIdx]?.martin_kp_amount],
-        ].map(([label, key, amount]) => (
+          ["B", "martin_b"],
+          [roundState?.martin_z_variant === "z2" ? "Z2" : "Z", "martin_z"],
+          ["KP", "martin_kp"],
+        ].map(([label, key]) => (
           <React.Fragment key={key}>
-            {key === "martin_z" && <>
-              <Box sx={{ flexBasis: "100%", height: 0 }} />
-              <Box sx={{ width: 28, minWidth: 28 }} />
-            </>}
-            <Box sx={{ ...betPauseTileSx, width: 145 }}>
-              <span>{label} BET</span><span>{fmt(betPaused ? 0 : amount)}</span>
-            </Box>
-            <Box sx={{ ...betPauseTileSx, width: 145, color: pnlColor(Number(virtualPnl[key] || 0)) }}>
-              <span>{label} VPnl</span><span>{fmt(virtualPnl[key])}</span>
+            {key === "martin_z" && <Box sx={{ flexBasis: "100%", height: 0 }} />}
+            <Box sx={{ display: "flex", gap: 0.5 }}>
+              <GhBetDirectionBadge side={virtualCurrent[key]?.side} />
+              <Box sx={virtualBetTileSx}>
+                <span>{label} VBET</span><span>{fmt(virtualCurrent[key]?.amount)}</span>
+              </Box>
+              <Box sx={{ ...virtualBetTileSx, color: pnlColor(Number(virtualPnl[key] || 0)) }}>
+                <span>{label} VPnl</span><span>{fmt(virtualPnl[key])}</span>
+              </Box>
             </Box>
           </React.Fragment>
         ))}
@@ -760,7 +755,7 @@ function GhRoundAmountTable({
         round={detailSelection === null ? null : detailSelection.index + 1}
         detail={strategyCells[detailSelection?.index]?.bet_detail}
         actualCell={actualCells[detailSelection?.index]}
-        amountMode={amountMode}
+        virtualBet={virtualBets?.rounds?.[detailSelection?.index]}
       />
     </Box>
   );
@@ -1255,7 +1250,20 @@ export default function GhUserGamePage() {
     );
   }, [gameId, roundState?.round_num, roundState?.overall_stop, showOverallStopAlert]);
 
-  const displayPick = resolveBetBoardDirection(roundState);
+  const nextRoundIndex = Math.max(0, Number(roundState?.round_num || 0));
+  const nextRealCell = roundState?.round_amount_table?.cells?.[nextRoundIndex];
+  const nextAutoOrder = roundState?.actual_bet_table?.cells?.[nextRoundIndex];
+  const liveAuto = autoStatus.running && !replay.active;
+  const realBetPaused = (roundState?.bet_pause?.mode || "play") !== "play";
+  const pendingAutoBet = autoStatus.phase === "betting" && !nextAutoOrder?.external_game_id;
+  const nextRealAmount = realBetPaused ? 0 : liveAuto
+    ? Number(nextAutoOrder?.bet_placed ? nextAutoOrder.bet_amount_p : pendingAutoBet ? autoStatus.pending_amount_p : 0) || 0
+    : Number(nextRealCell?.amount) || 0;
+  const displayPick = nextRealAmount > 0
+    ? liveAuto
+      ? nextAutoOrder?.bet_placed ? nextAutoOrder.bet_side : autoStatus.pending_direction
+      : resolveBetBoardDirection(roundState)
+    : null;
   const pickImage = displayPick === "P" ? "/player.png" : displayPick === "B" ? "/banker.png" : "/wait.png";
 
   const applySavedRoundState = useCallback((data) => {
@@ -1487,7 +1495,7 @@ export default function GhUserGamePage() {
     if (!gameId || betPauseBusy || replay.active) return false;
     setBetPauseBusy(true);
     try {
-      await apiCaller.put(USER_BET_SETTINGS_API.SAVE("gh"), { config: { [key]: value } }, { timeout: 120000 });
+      await apiCaller.put(GH_GAMES_API.BET_PAUSE_SETTINGS(gameId), { key, value });
       await restoreGame(gameId);
       return true;
     } catch (err) {
@@ -2610,7 +2618,7 @@ export default function GhUserGamePage() {
                   {/* 라보쉐르 활성이면 크루즈/마틴Z 대신 라보쉐르 표시 */}
                   {betData?.user_martin?.labouchere?.enabled ? (() => {
                     const lb = betData.user_martin.labouchere;
-                    const lbAmt = lb?.amount || 0;
+                    const lbAmt = realBetPaused ? 0 : lb?.amount || 0;
                     const lbPaused = !!lb?.paused;
                     const refreshState = async () => {
                       const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
@@ -2656,7 +2664,7 @@ export default function GhUserGamePage() {
                   })() : betData?.user_martin?.cruise?.enabled ? (() => {
                     const cr = betData.user_martin.cruise;
                     const cStep = cr?.step || 1;
-                    const cAmt = cr?.amount || 0;
+                    const cAmt = realBetPaused ? 0 : cr?.amount || 0;
                     const cPaused = !!cr?.paused;
                     const cruiseLabel = (idx) => {
                       if (idx === 0) return "1";
@@ -2707,10 +2715,9 @@ export default function GhUserGamePage() {
                       </React.Fragment>
                     );
                   })() : (() => {
-                    const td = betData?.user_martin?.martin_z;
-                    const amt = td?.amount || 0;
-                    const dir = td?.direction || "";
-                    const step = td?.step || 1;
+                    const amt = nextRealAmount > 0 ? Number(nextRealCell?.pick_martin_amount || 0) : 0;
+                    const dir = nextRealCell?.pick_martin_direction || "";
+                    const step = roundState?.pick_martin?.step || 1;
                     return (
                       <React.Fragment>
                         <Tooltip title={<Box sx={{ whiteSpace: "pre-line" }}>{`${martinZPatternPrioritySummary(roundState?.martin_z_pattern_match_priority)}\n${martinZRateSummary({}, roundState?.pick_martin)}`}</Box>}>
@@ -2811,7 +2818,7 @@ export default function GhUserGamePage() {
                   )}
                 </Box>
 
-                {/* 행1-2: 배팅금액판과 실제 주문에 합산되는 조건부 마틴 B/C */}
+                {/* 결과 입력 직전의 실배팅 계획 */}
                 {(() => {
                   const itemSx = { width: 120, display: "flex", alignItems: "center", gap: "4px" };
                   const conditionRowSx = {
@@ -2836,28 +2843,23 @@ export default function GhUserGamePage() {
                     overflow: "hidden",
                   };
 
-                  const martinItems = (() => {
-                    const martinB = roundState?.conditional_martins?.martin_b || {};
-                    return [{
-                      key: "martin_b",
-                      label: "B",
-                      color: "#7b1fa2",
-                      amount: Number(martinB.amount || 0),
-                      direction: martinB.direction || "",
-                      active: !!martinB.active,
-                      step: martinB.step || 1,
-                    }];
-                  })();
-                  const kpkpItems = MARTIN_KPKP_ITEMS.map(([key, label]) => {
-                    const martin = roundState?.kpkp_martins?.[key] || {};
-                    return { key, label, color: "#00897b", amount: Number(martin.amount || 0),
-                      direction: martin.direction || "", active: !!martin.active,
-                      step: martin.step || 1 };
+                  const martinItems = [
+                    ["martin_b", "B", "#7b1fa2", roundState?.conditional_martins?.martin_b],
+                    ["martin_kp", "KP", "#00897b", roundState?.kpkp_martins?.martin_kp],
+                  ].map(([key, label, color, martin]) => {
+                    const boardAmount = Number(nextRealCell?.[`${key}_amount`] || 0);
+                    return {
+                      key, label, color,
+                      amount: nextRealAmount > 0 && boardAmount > 0 ? Number(martin?.amount ?? boardAmount) : 0,
+                      direction: nextRealCell?.[`${key}_direction`] || "",
+                      active: !!martin?.active, step: martin?.step || 1,
+                    };
                   });
+                  martinItems.push({ key: "bet", label: "BET", color: "#37474f", amount: nextRealAmount, direction: displayPick || "" });
 
                   const renderMartinItem = (item) => (
                     <Box key={item.key} sx={itemSx}>
-                      <Box sx={compactTagSx(item.color)} title={`마틴${item.label} 배팅액`}>
+                      <Box sx={compactTagSx(item.color)} title={item.key === "bet" ? "실배팅 합계" : `마틴${item.label} 실배팅 계획`}>
                         <Typography variant="caption" sx={{ fontSize: 11, fontWeight: "bold", color: "#fff" }}>{item.label}</Typography>
                       </Box>
                       <Box sx={compactFieldSx}>
@@ -2882,19 +2884,8 @@ export default function GhUserGamePage() {
                   );
 
                   return (
-                    <Box sx={{ width: 372, display: "flex", flexDirection: "column", rowGap: 0.5 }}>
-                      <Box sx={conditionRowSx}>
-                        {martinItems.slice(0, 3).map(renderMartinItem)}
-                      </Box>
-                      <Box sx={conditionRowSx}>
-                        {martinItems.slice(3, 6).map(renderMartinItem)}
-                      </Box>
-                      <Box sx={conditionRowSx}>
-                        {kpkpItems.slice(0, 3).map(renderMartinItem)}
-                      </Box>
-                      <Box sx={conditionRowSx}>
-                        {kpkpItems.slice(3).map(renderMartinItem)}
-                      </Box>
+                    <Box sx={conditionRowSx}>
+                      {martinItems.map(renderMartinItem)}
                     </Box>
                   );
                 })()}
@@ -2961,6 +2952,8 @@ export default function GhUserGamePage() {
 
           <GhRoundAmountTable
             roundState={roundState}
+            realBetAmount={nextRealAmount}
+            realBetSide={displayPick}
             patternDisplay={showMartinBBoard ? martinBDisplay : null}
             amountMode={amountViewMode}
             onSetup={() => {

@@ -1,10 +1,14 @@
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
 
-const formatP = (value) => value == null ? "—" : `${Number(value).toFixed(1)}P`;
+const formatP = (value) => value == null || value === "N/A" ? "—" : `${Number(value).toFixed(1)}P`;
 const sequenceText = (values) => Array.isArray(values) ? values.join(" ") : "—";
 const sideText = (value) => value === "P" ? "Player (P)" : value === "B" ? "Banker (B)" : "상계 / 배팅 없음";
 
-export default function GhRoundBetDetailDialog({ open, onClose, round, detail, actualCell, amountMode }) {
+export default function GhRoundBetDetailDialog({ open, onClose, round, detail, actualCell, virtualBet }) {
+  const hasOrder = Boolean(actualCell?.external_game_id || actualCell?.bet_placed || actualCell?.failure_code);
+  const realSide = hasOrder ? actualCell.bet_placed ? actualCell.bet_side : null : detail?.side;
+  const realAmount = hasOrder ? actualCell.bet_amount_p ?? 0 : detail?.amount;
+  const realPnl = hasOrder ? actualCell.settled ? actualCell.actual_pnl_p : null : detail?.pnl;
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" aria-labelledby="gh-round-bet-detail-title">
       <DialogTitle id="gh-round-bet-detail-title">{round}회차 배팅 상세</DialogTitle>
@@ -14,15 +18,32 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
         ) : (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
             <Box>
-              <Typography variant="subtitle1" fontWeight={700}>계산 배팅액</Typography>
-              <Typography>{sideText(detail.side)} · {formatP(detail.amount)}</Typography>
-              <Typography sx={{ mt: 0.5, fontFamily: "monospace" }}>{detail.offset_formula}</Typography>
-              <Typography color="text.secondary" variant="body2">
-                실제 결과: {detail.actual || "미입력"} · 계산 손익: {formatP(detail.pnl)}
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                실제 결과: {detail.actual || "미입력"}
               </Typography>
-              {detail.bet_unavailable_reason && (
-                <Typography color="text.secondary" variant="body2">배팅 보류 상태가 적용된 회차입니다.</Typography>
-              )}
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={700}>실배팅 (BET)</Typography>
+                  <Typography>{sideText(realSide)} · {formatP(realAmount)}</Typography>
+                  <Typography color="text.secondary" variant="body2">손익: {formatP(realPnl)}</Typography>
+                  {hasOrder && (
+                    <Typography color="text.secondary" variant="body2">
+                      체결: {actualCell.bet_placed ? "완료" : "없음"} · 정산: {actualCell.settled ? "완료" : "미정산"}
+                    </Typography>
+                  )}
+                  {actualCell?.failure_detail && <Typography color="error">{actualCell.failure_detail}</Typography>}
+                  {detail.bet_unavailable_reason && (
+                    <Typography color="text.secondary" variant="body2">배팅 보류 상태가 적용된 회차입니다.</Typography>
+                  )}
+                </Box>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={700}>가상 배팅 (VBET)</Typography>
+                  {virtualBet ? <>
+                    <Typography>{sideText(virtualBet.side)} · {formatP(virtualBet.amount)}</Typography>
+                    <Typography color="text.secondary" variant="body2">가상 손익: {formatP(virtualBet.pnl)}</Typography>
+                  </> : <Typography color="text.secondary" variant="body2">이 회차의 가상 배팅 기록이 없습니다.</Typography>}
+                </Box>
+              </Box>
             </Box>
             {detail.kp_assist && (
               <Box>
@@ -40,22 +61,11 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
                 </Typography>
               </Box>
             )}
-            {amountMode === "actual" && (
-              <Box>
-                <Typography variant="subtitle1" fontWeight={700}>실제 배팅 기록</Typography>
-                <Typography>
-                  체결: {actualCell?.bet_placed ? "완료" : "없음"} · 표시 금액: {formatP(actualCell?.server_bet_amount_p ?? actualCell?.bet_amount_p)}
-                </Typography>
-                <Typography color="text.secondary" variant="body2">
-                  정산: {actualCell?.settled ? "완료" : "미정산"} · 표시 손익: {formatP(actualCell?.server_pnl_p)}
-                </Typography>
-                {actualCell?.failure_detail && <Typography color="error">{actualCell.failure_detail}</Typography>}
-              </Box>
-            )}
             <Box>
               <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
                 전략별 금액 구성 · 계산 손익
               </Typography>
+              <Typography variant="body2" sx={{ mb: 1, fontFamily: "monospace" }}>{detail.offset_formula}</Typography>
               <Box sx={{ overflowX: "auto" }}>
                 <Box component="table" sx={{
                   width: "100%", borderCollapse: "collapse", fontSize: 13,
