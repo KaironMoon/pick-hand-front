@@ -754,6 +754,8 @@ function GhRoundAmountTable({
       <GhRoundBetDetailDialog
         open={detailOpen}
         onClose={() => setDetailSelection(null)}
+        gameId={gameId}
+        completedRounds={roundState?.round_num ?? 0}
         round={detailSelection === null ? null : detailSelection.index + 1}
         detail={strategyCells[detailSelection?.index]?.bet_detail}
         actualCell={actualCells[detailSelection?.index]}

@@ -1,10 +1,47 @@
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
+import { useEffect, useState } from "react";
+import { GH_GAMES_API } from "@/constants/api-url";
+import apiCaller from "@/services/api-caller";
 
 const formatP = (value) => value == null || value === "N/A" ? "—" : `${Number(value).toFixed(1)}P`;
 const sequenceText = (values) => Array.isArray(values) ? values.join(" ") : "—";
 const sideText = (value) => value === "P" ? "Player (P)" : value === "B" ? "Banker (B)" : "상계 / 배팅 없음";
 
-export default function GhRoundBetDetailDialog({ open, onClose, round, detail, actualCell, virtualBet }) {
+function LabouchereSequences({ entries, loading, error }) {
+  return (
+    <Box sx={{ mt: 1 }}>
+      <Typography variant="body2" fontWeight={700}>라보쉐르 배열</Typography>
+      {entries?.length ? entries.map(({ label, sequence }, index) => (
+        <Typography key={`${label}-${index}`} variant="body2" sx={{ overflowWrap: "anywhere" }}>
+          {label} · [{sequence.join(", ")}]
+        </Typography>
+      )) : (
+        <Typography variant="body2" color={error ? "error" : "text.secondary"}>
+          {loading ? "배열 불러오는 중…" : error ? "배열을 불러오지 못했습니다." : "배열 기록 없음"}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+export default function GhRoundBetDetailDialog({ open, onClose, gameId, completedRounds, round, detail, actualCell, virtualBet }) {
+  const [labouchere, setLabouchere] = useState(null);
+  const canLoad = open && gameId && round && detail && round <= completedRounds + 1;
+  const lookupKey = canLoad ? `${gameId}-${round}-${detail.actual ?? ""}` : null;
+  useEffect(() => {
+    if (!lookupKey) return;
+    const controller = new AbortController();
+    apiCaller.get(GH_GAMES_API.ROUND_LABOUCHERE(gameId, round), undefined, { signal: controller.signal })
+      .then(({ data }) => {
+        if (!controller.signal.aborted) setLabouchere({ key: lookupKey, data });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setLabouchere({ key: lookupKey, error: true });
+      });
+    return () => controller.abort();
+  }, [gameId, round, lookupKey]);
+  const sequenceResult = labouchere?.key === lookupKey ? labouchere : null;
+  const sequenceLoading = Boolean(lookupKey && !sequenceResult);
   const hasOrder = Boolean(actualCell?.external_game_id || actualCell?.bet_placed || actualCell?.failure_code);
   const realSide = hasOrder ? actualCell.bet_placed ? actualCell.bet_side : null : detail?.side;
   const realAmount = hasOrder ? actualCell.bet_amount_p ?? 0 : detail?.amount;
@@ -35,6 +72,7 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
                   {detail.bet_unavailable_reason && (
                     <Typography color="text.secondary" variant="body2">배팅 보류 상태가 적용된 회차입니다.</Typography>
                   )}
+                  <LabouchereSequences entries={sequenceResult?.data?.real} loading={sequenceLoading} error={sequenceResult?.error} />
                 </Box>
                 <Box>
                   <Typography variant="subtitle1" fontWeight={700}>가상 배팅 (VBET)</Typography>
@@ -42,6 +80,7 @@ export default function GhRoundBetDetailDialog({ open, onClose, round, detail, a
                     <Typography>{sideText(virtualBet.side)} · {formatP(virtualBet.amount)}</Typography>
                     <Typography color="text.secondary" variant="body2">가상 손익: {formatP(virtualBet.pnl)}</Typography>
                   </> : <Typography color="text.secondary" variant="body2">이 회차의 가상 배팅 기록이 없습니다.</Typography>}
+                  <LabouchereSequences entries={sequenceResult?.data?.virtual} loading={sequenceLoading} error={sequenceResult?.error} />
                 </Box>
               </Box>
             </Box>
