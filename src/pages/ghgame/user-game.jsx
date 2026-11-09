@@ -176,8 +176,17 @@ function GoalStatusBar({ roundState, autoStatus, gameSlots, gameId, onSlotSelect
 const CELL_BG = {
   hit: "#00e676",
   miss: "#ffeb3b",
-  wait: "#ffffff",
 };
+
+function roundWagerStatus(strategyCell, actualCell, amountMode) {
+  if (!strategyCell?.actual) return null;
+  const isActual = amountMode === "actual";
+  const hasWager = isActual
+    ? actualCell?.bet_placed
+    : !strategyCell.bet_unavailable_reason && Number(strategyCell.amount) > 0;
+  const status = isActual ? actualCell?.status : strategyCell.status;
+  return hasWager && (status === "hit" || status === "miss") ? status : null;
+}
 
 const GhCircle = ({ type, filled = true, size = 24, label }) => {
   const colors = { P: "#1565c0", B: "#f44336" };
@@ -203,7 +212,7 @@ const calculateGhCircleGrid = (results) => {
   let col = 0, row = 0, prevValue = null, verticalStartCol = 0, isBent = false;
   for (let i = 0; i < results.length; i++) {
     const current = results[i].value;
-    const status = results[i].status || "wait";
+    const status = results[i].status;
     const decalShadow = !!results[i].decalShadow;
     if (prevValue === null) {
       grid[row][col] = { type: current, status, idx: i, decalShadow };
@@ -547,7 +556,6 @@ function GhRoundAmountTable({
       ...strategyCell,
       pick: actualCell.bet_placed ? actualCell.bet_side : null,
       side: actualCell.bet_placed ? actualCell.bet_side : null,
-      status: actualCell.status ?? null,
       amount: Number(actualCell.server_bet_amount_p ?? actualCell.bet_amount_p ?? 0),
       pnl: Number(actualCell.server_pnl_p || 0),
       betPlaced: !!actualCell.bet_placed,
@@ -581,17 +589,14 @@ function GhRoundAmountTable({
   const isHeld = (cell) => !cell?.betPlaced
     && Boolean(cell?.bet_unavailable_reason || cell?.failureCode === "gh_bet_paused");
   const cellSx = (idx) => {
-    const cell = cells[idx] || {};
-    const hasResult = !!cell.actual;
-    const hasWager = amountMode === "actual" ? cell.betPlaced : Number(cell.amount) > 0;
-    const hasJudgement = !isHeld(cell) && hasWager && (cell.status === "hit" || cell.status === "miss");
+    const status = roundWagerStatus(strategyCells[idx], actualCells[idx], amountMode);
     return {
       width: 84,
       height: 31,
       border: "1px solid #3f4650",
       ...manualPickSignalStyle(roundState?.manual_pick_signals?.[idx + 1]),
-      backgroundColor: hasResult && hasJudgement
-        ? (cell.status === "hit" ? "#2e9e5b" : "#5b6068")
+      backgroundColor: status
+        ? (status === "hit" ? "#2e9e5b" : "#5b6068")
         : "#101318",
       display: "grid",
       gridTemplateColumns: "22px 1fr",
@@ -1214,18 +1219,11 @@ export default function GhUserGamePage() {
   // 새 화면/상태 판단/픽 표시/닷 표시에는 사용 금지. 필요한 데이터는 서버에서 roundState에 추가한다.
   const displaySnapshot = picksSnapshot;
   const roundAmountCells = roundState?.round_amount_table?.cells || [];
-  const amountTableStatusFor = (idx) => {
-    const cell = roundAmountCells[idx] || {};
-    const pick = cell.pick ?? cell.side;
-    const actual = cell.actual ?? strategyResults[idx]?.value;
-    if (cell.status === "hit" || cell.status === "miss") return cell.status;
-    if ((pick === "P" || pick === "B") && (actual === "P" || actual === "B")) {
-      return pick === actual ? "hit" : "miss";
-    }
-    return "wait";
-  };
-  // 빅로드1: 지난 회차의 실제 결과 P/B를 표시하고, 배경색은 금액 합산표의 적/미적으로 결정한다.
-  const gridResults = strategyResults.map((r, i) => ({ ...r, status: amountTableStatusFor(i) }));
+  const actualBetCells = roundState?.actual_bet_table?.cells || [];
+  const gridResults = strategyResults.map((result, index) => ({
+    ...result,
+    status: roundWagerStatus(roundAmountCells[index], actualBetCells[index], amountViewMode),
+  }));
   const grid = calculateGhCircleGrid(gridResults);
 
   const checkGoalAlert = useCallback((summary, strategyGoals) => {
