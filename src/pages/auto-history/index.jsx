@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Link, MenuItem, Paper,
-  Table, TableBody, TableCell, TableContainer, TableHead, TablePagination,
+  Tab, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, Tabs,
   TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
@@ -32,18 +32,28 @@ export default function AutoHistoryPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [revision, setRevision] = useState(0);
+  const [showHidden, setShowHidden] = useState(false);
+  const [hidingId, setHidingId] = useState(null);
+  const [hideError, setHideError] = useState("");
   const [data, setData] = useState({ items: [], total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [inputError, setInputError] = useState("");
   const [filterError, setFilterError] = useState("");
+  const canHide = !showHidden && data.can_hide;
+  const columnCount = canHide ? 9 : 8;
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError("");
-    autoService.getAutoHistory({ ...query, page: page + 1, page_size: pageSize })
-      .then((result) => { if (active) setData(result); })
+    autoService.getAutoHistory({ ...query, hidden: showHidden, page: page + 1, page_size: pageSize })
+      .then((result) => {
+        if (!active) return;
+        setData(result);
+        const lastPage = Math.max(0, Math.ceil(result.total / pageSize) - 1);
+        if (page > lastPage) setPage(lastPage);
+      })
       .catch((error) => {
         if (active) setError(typeof error.response?.data?.detail === "string"
           ? error.response.data.detail
@@ -51,7 +61,22 @@ export default function AutoHistoryPage() {
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [query, page, pageSize, revision]);
+  }, [query, page, pageSize, revision, showHidden]);
+
+  const hideHistory = async (sessionId) => {
+    if (!canHide || hidingId !== null) return;
+    setHidingId(sessionId);
+    setHideError("");
+    try {
+      await autoService.hideAutoHistory(sessionId);
+      setRevision((value) => value + 1);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setHideError(typeof detail === "string" ? detail : "오토플레이 기록을 숨기지 못했습니다.");
+    } finally {
+      setHidingId(null);
+    }
+  };
 
   const search = (event) => {
     event.preventDefault();
@@ -92,6 +117,11 @@ export default function AutoHistoryPage() {
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       <Typography variant="h5" sx={{ mb: 2 }}>오토플레이 기록</Typography>
+      <Tabs value={showHidden ? "hidden" : "visible"} aria-label="오토플레이 기록 보기"
+        onChange={(_, value) => { setShowHidden(value === "hidden"); setPage(0); setHideError(""); }} sx={{ mb: 2 }}>
+        <Tab value="visible" label="기본 기록" />
+        <Tab value="hidden" label="숨긴 기록" />
+      </Tabs>
       <Box component="form" onSubmit={search} sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2, alignItems: "flex-start" }}>
         {isAdmin && <TextField label="로그인 아이디" size="small" value={username}
           onChange={(e) => setUsername(e.target.value)} helperText="정확한 아이디로 검색 · 비워두면 본인 기록" />}
@@ -114,18 +144,20 @@ export default function AutoHistoryPage() {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>PNL은 실제 오토 베팅 손익(P), 시각은 한국 시간 기준입니다.</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>최고연패는 최종 계산픽 기준이며 종료·중지·오류 시 저장됩니다. 미집계 기록은 최고연패 검색에서 제외됩니다.</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {hideError && <Alert severity="error" sx={{ mb: 2 }}>{hideError}</Alert>}
       <Paper>
         <TableContainer>
           <Table size="small" aria-label="오토플레이 실행 기록" sx={{ minWidth: 850 }}>
             <TableHead>
               <TableRow>
                 {["게임 종류", "게임 번호", "PNL (P)", "최고연패", "진행 회차", "시작 시각", "종료 시각", "상태"].map((label) => <TableCell key={label}>{label}</TableCell>)}
+                {canHide && <TableCell>관리</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? <TableRow><TableCell colSpan={8} align="center"><CircularProgress size={24} aria-label="기록 불러오는 중" /></TableCell></TableRow>
-                : error ? <TableRow><TableCell colSpan={8} align="center">기록을 조회할 수 없습니다.</TableCell></TableRow>
-                : data.items.length === 0 ? <TableRow><TableCell colSpan={8} align="center">조건에 맞는 오토플레이 기록이 없습니다.</TableCell></TableRow>
+              {loading ? <TableRow><TableCell colSpan={columnCount} align="center"><CircularProgress size={24} aria-label="기록 불러오는 중" /></TableCell></TableRow>
+                : error ? <TableRow><TableCell colSpan={columnCount} align="center">기록을 조회할 수 없습니다.</TableCell></TableRow>
+                : data.items.length === 0 ? <TableRow><TableCell colSpan={columnCount} align="center">조건에 맞는 오토플레이 기록이 없습니다.</TableCell></TableRow>
                 : data.items.map((row) => (
                   <TableRow key={row.id} hover>
                     <TableCell>{GAME_LABELS[row.game_type]}</TableCell>
@@ -144,6 +176,11 @@ export default function AutoHistoryPage() {
                         <Chip size="small" label={STATUS_LABELS[row.status]} color={STATUS_COLORS[row.status]} />
                       </Tooltip>
                     </TableCell>
+                    {canHide && <TableCell>
+                      <Button size="small" disabled={hidingId !== null} onClick={() => hideHistory(row.id)}>
+                        {hidingId === row.id ? "숨기는 중" : "숨기기"}
+                      </Button>
+                    </TableCell>}
                   </TableRow>
                 ))}
             </TableBody>

@@ -200,6 +200,7 @@ const ABOO_API = {
   AUTO_REPEAT_STOP: "/api/v1/games/auto/repeat/stop",
   AUTO_EMERGENCY_STOP: "/api/v1/games/auto/emergency-stop",
   AUTO_HISTORY: "/api/v1/games/auto/history",
+  AUTO_HISTORY_HIDE: (sessionId) => `/api/v1/games/auto/history/${encodeURIComponent(sessionId)}/hide`,
   AUTO_STATUS: "/api/v1/games/auto/status",
   DISCOVER_TABLES: "/api/v1/games/auto/discover-tables",
 };

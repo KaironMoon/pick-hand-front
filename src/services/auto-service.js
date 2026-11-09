@@ -62,6 +62,10 @@ const autoService = {
     return resp.data;
   },
 
+  async hideAutoHistory(sessionId) {
+    await apiCaller.put(ABOO_API.AUTO_HISTORY_HIDE(sessionId));
+  },
+
   async discoverTables(pickhandId, refresh = false) {
     const resp = await apiCaller.get(ABOO_API.DISCOVER_TABLES, {
       caller_user_id: pickhandId,
