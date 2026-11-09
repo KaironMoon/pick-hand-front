@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import apiCaller from "@/services/api-caller";
 import { USER_BET_SETTINGS_API } from "@/constants/api-url";
+import { GH_LABOUCHERE_MAX_COUNT } from "../strategy-step-capacity.js";
 
 const defaults = { target: 0, count: 10, mode: "even", sequence: [] };
 const inputStyle = { width: 72, background: "#1a1a1a", border: "1px solid #555", color: "#fff", padding: 4 };
@@ -39,8 +40,8 @@ export default function MartinLabouchereRows({ label, martin, onChange }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <label>목표금액 <input aria-label={`${label} 라보쉐르 목표금액`} type="number" min={0} step={0.1}
           value={config.target} style={inputStyle} onChange={(event) => regenerate({ target: Math.max(0, Number(event.target.value)) })} /> P</label>
-        <label>개수 <input aria-label={`${label} 라보쉐르 개수`} type="number" min={1} max={16} step={1}
-          value={config.count} style={inputStyle} onChange={(event) => regenerate({ count: Math.max(1, Math.min(16, Math.trunc(Number(event.target.value) || 1))) })} /></label>
+        <label>개수 <input aria-label={`${label} 라보쉐르 개수`} type="number" min={1} max={GH_LABOUCHERE_MAX_COUNT} step={1}
+          value={config.count} style={inputStyle} onChange={(event) => regenerate({ count: Math.max(1, Math.min(GH_LABOUCHERE_MAX_COUNT, Math.trunc(Number(event.target.value) || 1))) })} /></label>
         <label>분배 <select aria-label={`${label} 라보쉐르 분배 방식`} value={config.mode}
           style={inputStyle} onChange={(event) => regenerate({ mode: event.target.value })}>
           <option value="even">균등</option><option value="asc">증가</option><option value="desc">감소</option>

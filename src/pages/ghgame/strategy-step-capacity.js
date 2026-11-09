@@ -1,4 +1,5 @@
 export const GH_STRATEGY_MAX_STEP = 20;
+export const GH_LABOUCHERE_MAX_COUNT = 20;
 export const GH_FIXED_PASI_LEVELS = Array.from(
   { length: GH_STRATEGY_MAX_STEP - 1 },
   (_, index) => index + 2,

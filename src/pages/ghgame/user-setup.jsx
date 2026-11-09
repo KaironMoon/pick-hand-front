@@ -3,7 +3,7 @@ import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } f
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
 import { duplicatePatternRows } from "./pattern-duplicates.js";
-import { MARTIN_B_SPECIAL_NUMBER, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, validBackWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions } from "./martin-b-settings.js";
+import { MARTIN_B_SPECIAL_NUMBER, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, validBackWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions, defaultMartinBPatternOption } from "./martin-b-settings.js";
 import { Fragment, memo, useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
@@ -13,7 +13,7 @@ import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 import { userAtom } from "@/store/auth-store";
 import ManualPickSignalOptions from "./components/ManualPickSignalOptions";
 import { updatePbjStrategy } from "./pbj-goal.js";
-import { extendMartinAmounts, GH_FIXED_PASI_LEVELS, GH_STRATEGY_MAX_STEP } from "./strategy-step-capacity.js";
+import { extendMartinAmounts, GH_FIXED_PASI_LEVELS, GH_LABOUCHERE_MAX_COUNT, GH_STRATEGY_MAX_STEP } from "./strategy-step-capacity.js";
 import {
   assistDisplayLabel,
   GH_ASSIST_OPTIONS,
@@ -387,7 +387,7 @@ const EMPTY_MARTIN_PATTERN_RULE = {
 const PATTERN_BLOCK_CELL_COUNT = 10;
 const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
-const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = 450;
+const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = 600;
 
 function PatternCell({ value, onClick, cellKey, wallHighlight = false }) {
   return (
@@ -715,7 +715,7 @@ function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
   const specialNumber = z2 ? 999 : MARTIN_B_SPECIAL_NUMBER;
   const compactCell = { ...normalCell, minWidth: 0, padding: "3px 2px", whiteSpace: "normal", overflowWrap: "anywhere", fontSize: 12 };
   const options = z2 ? Array.from({ length: MARTIN_Z2_PATTERN_ONLY_ROW_COUNT }, (_, index) => ({
-    ...martinBPatternOptions()[0], ...martin.pattern_options?.[index],
+    ...defaultMartinBPatternOption(), ...martin.pattern_options?.[index],
     partial_patterns: Array.from({ length: 15 }, (_, i) => martin.pattern_options?.[index]?.partial_patterns?.[i] ?? 0),
   })) : martinBPatternOptions(martin.pattern_options);
   const updateOption = (index, patch) => onChange({
@@ -1856,8 +1856,8 @@ function StrategySetupSection({ name, displayName = name, strat, onChange, varia
             {STRAT_BET_LABELS[t]}
           </td>
         ))}
-        <MkInput value={count} onChange={(v) => regenLab({ count: Math.max(1, Math.min(16, v)) })} suffix="개"
-          range={[1, 16]} style={isLab ? mkCell : mkDisabled} disabled={!isLab} />
+        <MkInput value={count} onChange={(v) => regenLab({ count: v })} suffix="개"
+          range={[1, GH_LABOUCHERE_MAX_COUNT]} style={isLab ? mkCell : mkDisabled} disabled={!isLab} />
         {STRAT_DIST_MODES.map((m) => (
           <td key={m} style={!isLab ? mkDisabled : (s.dist_mode === m ? { ...mkGreen, cursor: "pointer" } : mkMethod)}
             onClick={isLab ? () => regenLab({ dist_mode: m }) : undefined}>

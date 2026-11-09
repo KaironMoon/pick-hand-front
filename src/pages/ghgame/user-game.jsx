@@ -1177,11 +1177,16 @@ export default function GhUserGamePage() {
   const [keepCount, setKeepCount] = useState(GH_KEEP_COUNT_DEFAULT);
   const [keepCountInput, setKeepCountInput] = useState(String(GH_KEEP_COUNT_DEFAULT));
   const [keepCountOpen, setKeepCountOpen] = useState(false);
-  const [amountViewMode, setAmountViewMode] = useState("calculated");
+  const [preferredAmountViewMode, setAmountViewMode] = useState("calculated");
   const [autoError, setAutoError] = useState(null);
   const [rejectMsg, setRejectMsg] = useState(null);  // 베팅 거부 레이어 팝업
   const [legacyRestoreBlocked, setLegacyRestoreBlocked] = useState(false);
   const [myPickhandId, setMyPickhandId] = useState(null);
+
+  const canToggleAmountView = replay.active
+    ? Boolean(roundState?.actual_bet_table?.has_auto_history)
+    : autoStatus.running;
+  const amountViewMode = canToggleAmountView ? preferredAmountViewMode : "calculated";
 
   const strategyResults = results.filter((result) => result.value === "P" || result.value === "B");
 
@@ -2777,19 +2782,19 @@ export default function GhUserGamePage() {
                     );
                   })()}
                   <Box
-                    role="button"
-                    tabIndex={0}
+                    role={canToggleAmountView ? "button" : undefined}
+                    tabIndex={canToggleAmountView ? 0 : undefined}
                     title={amountViewMode === "actual" ? "실제 베팅 금액 표시 중" : "전략 계산 금액 표시 중"}
-                    onClick={() => setAmountViewMode((prev) => prev === "actual" ? "calculated" : "actual")}
-                    onKeyDown={(event) => {
+                    onClick={canToggleAmountView ? () => setAmountViewMode((prev) => prev === "actual" ? "calculated" : "actual") : undefined}
+                    onKeyDown={canToggleAmountView ? (event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         setAmountViewMode((prev) => prev === "actual" ? "calculated" : "actual");
                       }
-                    }}
+                    } : undefined}
                     sx={{
                       ...compactBtnSx(amountViewMode === "actual" ? "#00a85a" : "#2f80ed"),
                       color: amountViewMode === "actual" ? "#00e676" : "#64b5f6",
-                      cursor: "pointer",
+                      cursor: canToggleAmountView ? "pointer" : "default",
                     }}
                   >
                     {amountViewMode === "actual" ? "BT" : "RE"}
