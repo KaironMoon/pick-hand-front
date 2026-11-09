@@ -425,6 +425,7 @@ function GhBetPauseControls({ mode, settings, disabled, onToggle, onSave }) {
 }
 
 function GhRoundAmountTable({
+  gameId,
   roundState,
   realBetAmount,
   realBetSide,
@@ -718,6 +719,7 @@ function GhRoundAmountTable({
         ))}
       </Box>
       <GhBetPauseControls
+        key={gameId}
         mode={pauseMode}
         settings={roundState?.bet_pause_settings}
         disabled={betPauseDisabled}
@@ -2956,6 +2958,7 @@ export default function GhUserGamePage() {
           </Box>
 
           <GhRoundAmountTable
+            gameId={gameId}
             roundState={roundState}
             realBetAmount={nextRealAmount}
             realBetSide={displayPick}
