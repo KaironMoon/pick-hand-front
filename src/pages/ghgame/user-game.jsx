@@ -545,6 +545,9 @@ function GhRoundAmountTable({
     const actualCell = actualCells[idx] || {};
     return {
       ...strategyCell,
+      pick: actualCell.bet_placed ? actualCell.bet_side : null,
+      side: actualCell.bet_placed ? actualCell.bet_side : null,
+      status: actualCell.status ?? null,
       amount: Number(actualCell.server_bet_amount_p ?? actualCell.bet_amount_p ?? 0),
       pnl: Number(actualCell.server_pnl_p || 0),
       betPlaced: !!actualCell.bet_placed,
@@ -575,17 +578,18 @@ function GhRoundAmountTable({
   const globalhitBetAmount = virtualCurrent.globalhit?.amount;
   const martinNetAmount = (cell) => Number(cell?.martin_net_amount || 0);
   const hasMartinZBet = (cell) => cell?.martin_z_included ?? Number(cell?.pick_martin_amount || 0) > 0;
+  const isHeld = (cell) => !cell?.betPlaced
+    && Boolean(cell?.bet_unavailable_reason || cell?.failureCode === "gh_bet_paused");
   const cellSx = (idx) => {
     const cell = cells[idx] || {};
     const hasResult = !!cell.actual;
-    const hasJudgement = cell.status === "hit" || cell.status === "miss";
+    const hasWager = amountMode === "actual" ? cell.betPlaced : Number(cell.amount) > 0;
+    const hasJudgement = !isHeld(cell) && hasWager && (cell.status === "hit" || cell.status === "miss");
     return {
       width: 84,
       height: 31,
       border: "1px solid #3f4650",
       ...manualPickSignalStyle(roundState?.manual_pick_signals?.[idx + 1]),
-      // 실제 배팅 여부와 픽 판정은 별개다. 실 모드에서 금액이 0이어도
-      // 배팅금액판 픽의 hit/miss 결과 색상은 그대로 보여준다.
       backgroundColor: hasResult && hasJudgement
         ? (cell.status === "hit" ? "#2e9e5b" : "#5b6068")
         : "#101318",
@@ -596,6 +600,7 @@ function GhRoundAmountTable({
     };
   };
   const roundColor = (idx) => {
+    if (isHeld(cells[idx])) return "#777";
     const v = cells[idx]?.pick ?? cells[idx]?.side;
     if (v === "P") return "#1565d8";
     if (v === "B") return "#e53935";
@@ -729,7 +734,8 @@ function GhRoundAmountTable({
       {patternDisplay ? <Box sx={{ width: amountGridWidth, maxWidth: "100%" }}><MartinBPatternBoard display={patternDisplay} /></Box> : <Box sx={{ display: "grid", gridTemplateRows: `repeat(${amountGridRowCount}, 31px)`, gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
         {Array.from({ length: cellCount }, (_, idx) => {
           const martinAmount = martinNetAmount(strategyCells[idx]);
-          const showMartinAmount = amountMode !== "actual" && martinAmount > 0;
+          const held = isHeld(cells[idx]);
+          const showMartinAmount = !held && amountMode !== "actual" && martinAmount > 0;
           return (
             <Box
               key={idx}
@@ -741,10 +747,10 @@ function GhRoundAmountTable({
               sx={{ ...cellSx(idx), p: 0, font: "inherit", cursor: "pointer",
                 "&:focus-visible": { outline: "2px solid #2f9bff", outlineOffset: -2 },
               }}
-              title={`${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / 마틴 상계 ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)}${MARTIN_KPKP_ITEMS.map(([key, label]) => ` / ${label} ${fmt(cells[idx]?.[`${key}_pnl`])}`).join("")}`}>
+              title={held ? `${idx + 1}회차 / 배팅 보류` : `${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / 마틴 상계 ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)}${MARTIN_KPKP_ITEMS.map(([key, label]) => ` / ${label} ${fmt(cells[idx]?.[`${key}_pnl`])}`).join("")}`}>
               <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
               <Box sx={{ color: "#fff", fontSize: showMartinAmount ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>
-                {fmt(cells[idx]?.amount)}
+                {fmt(held ? 0 : cells[idx]?.amount)}
                 {showMartinAmount && <span style={{ color: hasMartinZBet(strategyCells[idx]) ? "#ef5350" : "inherit" }}> ({fmt(martinAmount)})</span>}
               </Box>
             </Box>
@@ -759,6 +765,7 @@ function GhRoundAmountTable({
         round={detailSelection === null ? null : detailSelection.index + 1}
         detail={strategyCells[detailSelection?.index]?.bet_detail}
         actualCell={actualCells[detailSelection?.index]}
+        amountMode={amountMode}
         virtualBet={virtualBets?.rounds?.[detailSelection?.index]}
       />
     </Box>
