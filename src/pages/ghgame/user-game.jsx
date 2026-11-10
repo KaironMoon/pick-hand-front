@@ -196,9 +196,9 @@ function virtualOnlyWager(virtualCell, strategyCell, actualCell, amountMode) {
   return virtualCell;
 }
 
-const VIRTUAL_ROUND_BG = {
-  hit: "#14532d",
-  miss: "#454a53",
+const BET_BOARD_WAGER_BG = {
+  hit: "#2e9e5b",
+  miss: "#5b6068",
 };
 
 const GhCircle = ({ type, filled = true, size = 24, label, ringColor }) => {
@@ -608,9 +608,7 @@ function GhRoundAmountTable({
       height: 31,
       border: "1px solid #3f4650",
       ...manualPickSignalStyle(roundState?.manual_pick_signals?.[idx + 1]),
-      backgroundColor: status
-        ? (status === "hit" ? "#2e9e5b" : "#5b6068")
-        : "#101318",
+      backgroundColor: BET_BOARD_WAGER_BG[status] || "#101318",
       display: "grid",
       gridTemplateColumns: "22px 1fr",
       alignItems: "center",
@@ -773,7 +771,7 @@ function GhRoundAmountTable({
                   width: 18, height: 18, justifySelf: "center", borderRadius: "50%",
                   display: "grid", placeItems: "center", border: "1px solid #77818c",
                   color: virtualBet.side === "P" ? "#90caf9" : "#ffaaaa",
-                  backgroundColor: VIRTUAL_ROUND_BG[virtualBet.status] || "transparent",
+                  backgroundColor: BET_BOARD_WAGER_BG[virtualBet.status] || "transparent",
                 }),
               }}>{idx + 1}</Box>
               <Box sx={{ color: "#fff", fontSize: showMartinAmount ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>
