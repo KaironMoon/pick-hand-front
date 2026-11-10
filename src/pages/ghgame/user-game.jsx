@@ -178,17 +178,30 @@ const CELL_BG = {
   miss: "#ffeb3b",
 };
 
-function roundWagerStatus(strategyCell, actualCell, amountMode) {
-  if (!strategyCell?.actual) return null;
-  const isActual = amountMode === "actual";
-  const hasWager = isActual
+function hasRoundWager(strategyCell, actualCell, amountMode) {
+  return amountMode === "actual"
     ? actualCell?.bet_placed
-    : !strategyCell.bet_unavailable_reason && Number(strategyCell.amount) > 0;
-  const status = isActual ? actualCell?.status : strategyCell.status;
-  return hasWager && (status === "hit" || status === "miss") ? status : null;
+    : !strategyCell?.bet_unavailable_reason && Number(strategyCell?.amount) > 0;
 }
 
-const GhCircle = ({ type, filled = true, size = 24, label }) => {
+function roundWagerStatus(strategyCell, actualCell, amountMode) {
+  if (!strategyCell?.actual || !hasRoundWager(strategyCell, actualCell, amountMode)) return null;
+  const status = amountMode === "actual" ? actualCell?.status : strategyCell.status;
+  return status === "hit" || status === "miss" ? status : null;
+}
+
+function virtualOnlyWager(virtualCell, strategyCell, actualCell, amountMode) {
+  if (!(Number(virtualCell?.amount) > 0) || (virtualCell.side !== "P" && virtualCell.side !== "B")) return null;
+  if (actualCell?.bet_placed || hasRoundWager(strategyCell, actualCell, amountMode)) return null;
+  return virtualCell;
+}
+
+const VIRTUAL_ROUND_BG = {
+  hit: "#14532d",
+  miss: "#454a53",
+};
+
+const GhCircle = ({ type, filled = true, size = 24, label, ringColor }) => {
   const colors = { P: "#1565c0", B: "#f44336" };
   const display = label != null ? label : type;
   return (
@@ -196,7 +209,7 @@ const GhCircle = ({ type, filled = true, size = 24, label }) => {
       sx={{
         width: size, height: size, borderRadius: "50%",
         backgroundColor: filled ? colors[type] : "#fff",
-        border: "1px solid", borderColor: colors[type],
+        border: ringColor ? "2px solid" : "1px solid", borderColor: ringColor || colors[type],
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: label != null ? size * 0.4 : size * 0.5,
         fontWeight: "bold", color: filled ? "#fff" : colors[type],
@@ -740,7 +753,8 @@ function GhRoundAmountTable({
         {Array.from({ length: cellCount }, (_, idx) => {
           const martinAmount = martinNetAmount(strategyCells[idx]);
           const held = isHeld(cells[idx]);
-          const showMartinAmount = !held && amountMode !== "actual" && martinAmount > 0;
+          const virtualBet = virtualOnlyWager(virtualBets?.rounds?.[idx], strategyCells[idx], actualCells[idx], amountMode);
+          const showMartinAmount = !held && !virtualBet && amountMode !== "actual" && martinAmount > 0;
           return (
             <Box
               key={idx}
@@ -753,9 +767,17 @@ function GhRoundAmountTable({
                 "&:focus-visible": { outline: "2px solid #2f9bff", outlineOffset: -2 },
               }}
               title={held ? `${idx + 1}회차 / 배팅 보류` : `${idx + 1}회차 / ${amountMode === "actual" ? "실제" : "계산"} ${fmt(cells[idx]?.amount)}P${amountMode !== "actual" ? ` / 마틴 상계 ${fmt(martinAmount)}P` : ""} / PnL ${fmt(cells[idx]?.globalhit_pnl)} / Z ${fmt(cells[idx]?.martin_z_pnl)} / B ${fmt(cells[idx]?.martin_b_pnl)}${MARTIN_KPKP_ITEMS.map(([key, label]) => ` / ${label} ${fmt(cells[idx]?.[`${key}_pnl`])}`).join("")}`}>
-              <Box sx={{ color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center" }}>{idx + 1}</Box>
+              <Box sx={{
+                color: roundColor(idx), fontSize: 10, fontWeight: "bold", textAlign: "center",
+                ...(virtualBet && {
+                  width: 18, height: 18, justifySelf: "center", borderRadius: "50%",
+                  display: "grid", placeItems: "center", border: "1px solid #77818c",
+                  color: virtualBet.side === "P" ? "#90caf9" : "#ffaaaa",
+                  backgroundColor: VIRTUAL_ROUND_BG[virtualBet.status] || "transparent",
+                }),
+              }}>{idx + 1}</Box>
               <Box sx={{ color: "#fff", fontSize: showMartinAmount ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>
-                {fmt(held ? 0 : cells[idx]?.amount)}
+                {fmt(held || virtualBet ? 0 : cells[idx]?.amount)}
                 {showMartinAmount && <span style={{ color: hasMartinZBet(strategyCells[idx]) ? "#ef5350" : "inherit" }}> ({fmt(martinAmount)})</span>}
               </Box>
             </Box>
@@ -1220,6 +1242,7 @@ export default function GhUserGamePage() {
   const displaySnapshot = picksSnapshot;
   const roundAmountCells = roundState?.round_amount_table?.cells || [];
   const actualBetCells = roundState?.actual_bet_table?.cells || [];
+  const virtualBetRounds = roundState?.virtual_bets?.rounds || [];
   const gridResults = strategyResults.map((result, index) => ({
     ...result,
     status: roundWagerStatus(roundAmountCells[index], actualBetCells[index], amountViewMode),
@@ -2519,6 +2542,9 @@ export default function GhUserGamePage() {
         {grid.map((row, rowIndex) =>
           row.map((cell, colIndex) => {
             const isMiddleRow = rowIndex === 3;
+            const virtualBet = cell && virtualOnlyWager(
+              virtualBetRounds[cell.idx], roundAmountCells[cell.idx], actualBetCells[cell.idx], amountViewMode,
+            );
             const isLscMatch = cell && Array.isArray(lscMatches) && lscMatches.some(
               (m) => cell.idx >= m.start && cell.idx < m.end
             );
@@ -2553,7 +2579,7 @@ export default function GhUserGamePage() {
                     borderRight: `${triSize}px solid transparent`,
                   }} />
                 )}
-                {cell && <GhCircle type={cell.type} filled={true} size={isMobile ? 12 : 22} label={cell.idx + 1} />}
+                {cell && <GhCircle type={cell.type} filled={true} size={isMobile ? 12 : 22} label={cell.idx + 1} ringColor={CELL_BG[virtualBet?.status]} />}
               </Box>
             );
           })
