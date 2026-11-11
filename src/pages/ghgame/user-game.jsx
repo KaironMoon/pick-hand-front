@@ -12,6 +12,7 @@ import MartinBPatternBoard from "./components/MartinBPatternBoard";
 import GhRoundBetDetailDialog from "./components/GhRoundBetDetailDialog";
 import { finalBetCapSummary, martinZRateSummary, martinZPatternPrioritySummary } from "./components/AutoRiskSettings";
 import GhAutoTotalControl from "./components/GhAutoTotalControl";
+import GhSupportNotice from "./components/GhSupportNotice";
 import { ghEntrySlot, updateGhGameSearchParams } from "./slot-navigation.js";
 import { manualPickSignalStyle } from "./manual-pick-signals.js";
 import {
@@ -2985,6 +2986,7 @@ export default function GhUserGamePage() {
             replayActive={replay.active}
             disabled={slotBusy || !gameId || legacyRestoreBlocked || replay.active}
           />
+          <GhSupportNotice key={`${user?.username}:${user?.impersonator?.username || ""}`} isAdmin={isAdmin} />
           </Box>
 
           <GhRoundAmountTable

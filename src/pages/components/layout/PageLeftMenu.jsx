@@ -9,6 +9,7 @@ import StarIcon from "@mui/icons-material/Star";
 import HomeIcon from "@mui/icons-material/Home";
 import PeopleIcon from "@mui/icons-material/People";
 import SettingsIcon from "@mui/icons-material/Settings";
+import ChatIcon from "@mui/icons-material/Chat";
 import ConstructionIcon from "@mui/icons-material/Construction";
 import LogoutIcon from "@mui/icons-material/Logout";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
@@ -200,6 +201,12 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
               <ListItemButton onClick={() => handleNavClick("/app-settings")}>
                 <ListItemIcon><SettingsIcon /></ListItemIcon>
                 <ListItemText primary="앱 설정" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => handleNavClick("/gh-support-admin")}>
+                <ListItemIcon><ChatIcon /></ListItemIcon>
+                <ListItemText primary="GH 공지·상담 관리" />
               </ListItemButton>
             </ListItem>
             <ListItem disablePadding>

@@ -384,9 +384,10 @@ const EMPTY_MARTIN_PATTERN_RULE = {
   direction: "",
 };
 
-const PATTERN_BLOCK_CELL_COUNT = 10;
 const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
+const MARTIN_Z2_PATTERN_CELL_COUNT = 30;
+const MARTIN_Z2_PATTERN_BLOCK_ROW_COUNT = 20;
 const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = 600;
 
 function PatternCell({ value, onClick, cellKey, wallHighlight = false }) {
@@ -430,59 +431,71 @@ function cyclePatternCell(cells, index) {
   return next;
 }
 
-function MartinPatternRow({ martin, onChange, ruleKey, label, color }) {
-  const rule = martin[ruleKey] && typeof martin[ruleKey] === "object"
-    ? martin[ruleKey]
-    : EMPTY_MARTIN_PATTERN_RULE;
-  const cells = patternCells(rule, PATTERN_BLOCK_CELL_COUNT);
-  const updateRule = (patch) => onChange({
-    ...martin,
-    [ruleKey]: { ...EMPTY_MARTIN_PATTERN_RULE, ...rule, ...patch },
-  });
+function MartinPatternBlockRows({ martin, onChange, color }) {
+  const raw = martin.pattern_block;
+  const saved = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const rules = Array.from({ length: MARTIN_Z2_PATTERN_BLOCK_ROW_COUNT }, (_, index) => (
+    { ...EMPTY_MARTIN_PATTERN_RULE, ...saved[index] }
+  ));
   return (
-    <tr>
-      <td style={{ ...labelCellStyle, color }}>{label}</td>
-      <td colSpan={5} style={normalCell}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
-          {cells.map((value, index) => (
-            <PatternCell
-              key={`${ruleKey}-${index}`}
-              cellKey={`${ruleKey}-${index}`}
-              value={value}
-              onClick={() => updateRule({ pattern: cyclePatternCell(cells, index) })}
-            />
-          ))}
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={Boolean(rule.include_inverse)}
-              onChange={(event) => updateRule({ include_inverse: event.target.checked })}
-            />
-            BP반전도 포함
-          </label>
-          <Box
-            onClick={() => updateRule({ enabled: !rule.enabled })}
-            sx={{
-              ml: 0.5,
-              px: 1.25,
-              py: 0.5,
-              borderRadius: 1,
-              backgroundColor: rule.enabled ? GREEN : "#333",
-              color: rule.enabled ? "#1b2e1b" : "#888",
-              fontWeight: "bold",
-              cursor: "pointer",
-              userSelect: "none",
-            }}
-          >
-            {rule.enabled ? "사용함" : "사용안함"}
-          </Box>
-        </Box>
-      </td>
-    </tr>
+    <>
+      <tr>
+        <td colSpan={6} style={{ ...labelCellStyle, color }}>패턴일 때 배팅 안 하기</td>
+      </tr>
+      {rules.map((rule, rowIndex) => {
+        const cells = patternCells(rule, MARTIN_Z2_PATTERN_CELL_COUNT);
+        const updateRule = (patch) => onChange({
+          ...martin,
+          pattern_block: rules.map((entry, index) => index === rowIndex ? { ...entry, ...patch } : entry),
+        });
+        return (
+          <tr key={rowIndex}>
+            <td colSpan={6} style={normalCell}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, whiteSpace: "nowrap" }}>
+                <Typography component="span" sx={{ minWidth: 34, textAlign: "left", fontSize: 13 }}>
+                  {rowIndex + 1}번
+                </Typography>
+                {cells.map((value, index) => (
+                  <PatternCell
+                    key={index}
+                    value={value}
+                    onClick={() => updateRule({ pattern: cyclePatternCell(cells, index) })}
+                  />
+                ))}
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(rule.include_inverse)}
+                    onChange={(event) => updateRule({ include_inverse: event.target.checked })}
+                  />
+                  BP반전도 포함
+                </label>
+                <Box
+                  onClick={() => updateRule({ enabled: !rule.enabled })}
+                  sx={{
+                    ml: 0.5,
+                    px: 1.25,
+                    py: 0.5,
+                    borderRadius: 1,
+                    backgroundColor: rule.enabled ? GREEN : "#333",
+                    color: rule.enabled ? "#1b2e1b" : "#888",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                >
+                  {rule.enabled ? "사용함" : "사용안함"}
+                </Box>
+              </Box>
+            </td>
+          </tr>
+        );
+      })}
+    </>
   );
 }
 
-const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false, showWall = false, showBackWall = false, visibleIndices, constrainWidth = false }) {
+const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, cellCount = PATTERN_ONLY_CELL_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false, showWall = false, showBackWall = false, visibleIndices, constrainWidth = false }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -497,7 +510,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
     };
   });
   const patternKeys = highlightDuplicates
-    ? rules.map((rule) => patternCells(rule, PATTERN_ONLY_CELL_COUNT).join(""))
+    ? rules.map((rule) => patternCells(rule, cellCount).join(""))
     : [];
   const duplicateRows = duplicatePatternRows(patternKeys);
   const updateRule = (index, patch) => {
@@ -567,7 +580,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
         <WindowedPatternRows constrainWidth={constrainWidth} rowCount={visibleIndices?.length ?? rowCount} renderRow={(visibleIndex) => {
           const rowIndex = visibleIndices ? visibleIndices[visibleIndex] : visibleIndex;
           const rule = rules[rowIndex];
-          const cells = patternCells(rule, PATTERN_ONLY_CELL_COUNT);
+          const cells = patternCells(rule, cellCount);
           const backWallIndices = cells.flatMap((value, index) => value === "P" || value === "B" ? [index] : []).slice(-2);
           const isDuplicate = duplicateRows[rowIndex];
           const direction = rule.direction === "P" || rule.direction === "B" ? rule.direction : "";
@@ -3300,11 +3313,9 @@ export default function GhUserSetupPage() {
                 </Box>
               </Tooltip>
             </td></tr>
-            <MartinPatternRow
+            <MartinPatternBlockRows
               martin={martinZ2}
               onChange={martinChanges.martin_z2}
-              ruleKey="pattern_block"
-              label="패턴일 때 배팅 안 하기"
               color="#1565c0"
             />
             <MartinBSection martin={martinZ2} onChange={martinChanges.martin_z2} z2 optionsOnly />
@@ -3313,6 +3324,7 @@ export default function GhUserSetupPage() {
               onChange={martinChanges.martin_z2}
               color="#1565c0"
               rowCount={MARTIN_Z2_PATTERN_ONLY_ROW_COUNT}
+              cellCount={MARTIN_Z2_PATTERN_CELL_COUNT}
               showAssistUsage showWall showBackWall
               showMissCondition
               highlightDuplicates

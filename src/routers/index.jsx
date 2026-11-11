@@ -53,6 +53,7 @@ const DhPatternPage = lazy(() => import("../pages/dhgame/pattern.jsx"));
 const UsersPage = lazy(() => import("../pages/users"));
 const AppSettingsPage = lazy(() => import("../pages/app-settings"));
 const MaintenancePage = lazy(() => import("../pages/maintenance"));
+const GhSupportAdminPage = lazy(() => import("../pages/gh-support-admin"));
 const MaintenanceAdminPage = lazy(() => import("../pages/maintenance-admin"));
 
 const ProductLayout = lazy(() => import("../pages/product/ProductLayout"));
@@ -215,6 +216,10 @@ const router = createBrowserRouter([
               {
                 path: "/app-settings",
                 element: <AppSettingsPage />,
+              },
+              {
+                path: "/gh-support-admin",
+                element: <GhSupportAdminPage />,
               },
               {
                 path: "/maintenance-admin",
