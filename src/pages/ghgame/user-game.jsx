@@ -1581,8 +1581,7 @@ export default function GhUserGamePage() {
   }, [gameId, replay.active, replay.roundNum, replay.sourceGameId]);
 
   // ─── Auto 모드 (pick-aboo 통합) — t9game/index.jsx 패턴 동일 ───
-  // pickhand_id: userAtom에서 직접. fallback으로 username 사용
-  // (auth-store.js가 로그인 시 username을 pickhand_id로 자동 등록한다는 가정)
+  // 계정 생성 시 로그인 아이디를 pickhand_id에도 저장한다.
   useEffect(() => {
     setMyPickhandId(user?.pickhand_id || user?.username || null);
   }, [user]);

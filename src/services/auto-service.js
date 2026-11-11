@@ -4,10 +4,7 @@
  * 모든 호출은 백엔드 AUTO_BETTING_ENABLED 플래그에 따라 503 가능.
  * UI 측에서 503은 "기능 미활성" 안내로 처리.
  *
- * 식별자 키 규칙:
- *   - /users/profile/pickhand-id : pick-hand 자체 유저 ID → JSON 키 pickhand_id
- *   - auto/session/discover 계열 : 호출자(프론트) 관점 → 쿼리/바디 키 caller_user_id
- *   (둘 다 실제로는 같은 값 = pick-hand 로그인 username)
+ * 세션과 자동 베팅 API에는 Pick Hand 로그인 아이디를 caller_user_id로 전달한다.
  */
 import apiCaller from "./api-caller";
 import { ABOO_API } from "@/constants/api-url";
@@ -15,11 +12,6 @@ import { ABOO_API } from "@/constants/api-url";
 const autoService = {
   async getSessionStatus(pickhandId) {
     const resp = await apiCaller.get(ABOO_API.SESSION_STATUS, { caller_user_id: pickhandId });
-    return resp.data;
-  },
-
-  async updatePickhandId(pickhandId) {
-    const resp = await apiCaller.put(ABOO_API.PICKHAND_ID, { pickhand_id: pickhandId });
     return resp.data;
   },
 

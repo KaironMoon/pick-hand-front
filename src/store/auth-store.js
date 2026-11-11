@@ -1,7 +1,5 @@
 import { atom } from "jotai";
 import authService from "@/services/auth-service";
-import apiCaller from "@/services/api-caller";
-import { ABOO_API } from "@/constants/api-url";
 
 const userAtom = atom(null);
 // 표시 전환만 허용한다. 대상 계정 권한과 수동 입력 제한은 그대로 유지한다.
@@ -27,21 +25,12 @@ function _notifyNativeBridge(user, token) {
   } catch {/* ignore */}
 }
 
-// 로그인 직후 pickhand_id = username 자동 등록(§4.5 옵션 B).
-// 503/409는 무해(기능 off 또는 이미 등록됨), 그 외 에러도 silent — 로그인 흐름 막지 않음.
-async function _autoRegisterPickhandId(username) {
-  try {
-    await apiCaller.put(ABOO_API.PICKHAND_ID, { pickhand_id: username });
-  } catch {/* ignore */}
-}
-
 const loginAtom = atom(null, async (get, set, { username, password }) => {
   const user = await authService.login(username, password);
   set(impersonationAutoViewAtom, null);
   set(userAtom, user);
   const token = authService.getToken();
   _notifyNativeBridge(user, token);
-  await _autoRegisterPickhandId(user?.username || username);
   return user;
 });
 

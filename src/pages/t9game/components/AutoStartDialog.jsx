@@ -163,7 +163,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
       return;
     }
     if (!pickhandId) {
-      setError("프로필에서 pickhand_id를 먼저 등록하세요");
+      setError(null);
       setSessionInfo(null);
       return;
     }
@@ -257,7 +257,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
         )}
         {!featureDisabled && !pickhandId && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            프로필에서 pickhand_id를 등록한 뒤 다시 시도하세요
+            자동 베팅에 사용할 계정 정보를 확인할 수 없습니다.
           </Alert>
         )}
         {!featureDisabled && sessionInfo && (
