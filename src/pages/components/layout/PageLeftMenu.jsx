@@ -20,7 +20,28 @@ import { userAtom, logoutAtom } from "@/store/auth-store";
 import { blockedGamesAtom, fetchBlockedGamesAtom } from "@/store/app-settings-store";
 import ProfileDialog from "./ProfileDialog";
 import autoService from "@/services/auto-service";
+import { GH_SUPPORT_API, useSupportPoll } from "@/services/gh-support-service";
 import { emergencyStopResultMessage } from "@/utils/emergency-stop-result";
+
+function GhSupportMenuItem({ onClick }) {
+  const { data } = useSupportPoll(`${GH_SUPPORT_API}/admin/unread`, 4000);
+  const hasUnread = data?.has_unread === true;
+  return (
+    <ListItem disablePadding>
+      <ListItemButton onClick={onClick} aria-label={hasUnread ? "GH 공지·상담 관리, 미확인 문의 있음" : undefined}>
+        <ListItemIcon>
+          <ChatIcon sx={hasUnread ? {
+            color: "warning.main",
+            animation: "ghSupportUnread 1.4s ease-in-out infinite",
+            "@keyframes ghSupportUnread": { "50%": { opacity: 0.25 } },
+            "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+          } : undefined} />
+        </ListItemIcon>
+        <ListItemText primary="GH 공지·상담 관리" />
+      </ListItemButton>
+    </ListItem>
+  );
+}
 
 function PageLeftMenu({ isMobile, onMenuClose }) {
   const theme = useTheme();
@@ -203,12 +224,9 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
                 <ListItemText primary="앱 설정" />
               </ListItemButton>
             </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/gh-support-admin")}>
-                <ListItemIcon><ChatIcon /></ListItemIcon>
-                <ListItemText primary="GH 공지·상담 관리" />
-              </ListItemButton>
-            </ListItem>
+            {!user.impersonator && (
+              <GhSupportMenuItem key={user.username} onClick={() => handleNavClick("/gh-support-admin")} />
+            )}
             <ListItem disablePadding>
               <ListItemButton onClick={() => handleNavClick("/maintenance-admin")}>
                 <ListItemIcon><ConstructionIcon /></ListItemIcon>

@@ -127,6 +127,23 @@ export default function GhSupportChat({ path, title, admin = false, onClose, onR
             <TextField
               fullWidth multiline maxRows={5} size="small" label="메시지"
               value={draft} onChange={(event) => setDraft(event.target.value)} disabled={sending || !data}
+              slotProps={{
+                htmlInput: {
+                  onKeyDown: (event) => {
+                    if (event.key !== "Enter" || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+                    const input = event.currentTarget;
+                    if (event.ctrlKey) {
+                      event.preventDefault();
+                      input.setRangeText("\n", input.selectionStart, input.selectionEnd, "end");
+                      setDraft(input.value);
+                      return;
+                    }
+                    if (event.shiftKey || event.altKey || event.metaKey) return;
+                    event.preventDefault();
+                    if (!event.repeat) input.form?.requestSubmit();
+                  },
+                },
+              }}
             />
             <Button type="submit" variant="contained" disabled={!data || sending || !draft.trim()} sx={{ flexShrink: 0 }}>
               보내기
