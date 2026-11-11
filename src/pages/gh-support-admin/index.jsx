@@ -3,7 +3,7 @@ import { Alert, Box, Button, Chip, List, ListItemButton, ListItemText, MenuItem,
 import { useAtomValue } from "jotai";
 import { Navigate } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
-import { GH_SUPPORT_API, supportError, useSupportPoll } from "@/services/gh-support-service";
+import { GH_SUPPORT_API, supportAdminUsername, supportError, useSupportPoll } from "@/services/gh-support-service";
 import { userAtom } from "@/store/auth-store";
 import GhSupportChat from "../ghgame/components/GhSupportChat";
 
@@ -166,6 +166,7 @@ function SupportAdmin({ username }) {
 
 export default function GhSupportAdminPage() {
   const user = useAtomValue(userAtom);
-  if (user?.role !== "admin" || user.impersonator) return <Navigate to="/" replace />;
-  return <SupportAdmin key={user.username} username={user.username} />;
+  const username = supportAdminUsername(user);
+  if (!username) return <Navigate to="/" replace />;
+  return <SupportAdmin key={username} username={username} />;
 }

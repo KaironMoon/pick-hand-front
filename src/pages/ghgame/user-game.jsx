@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom, showImpersonationAutoAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
+import { supportAdminUsername } from "@/services/gh-support-service";
 import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
@@ -2986,7 +2987,7 @@ export default function GhUserGamePage() {
             replayActive={replay.active}
             disabled={slotBusy || !gameId || legacyRestoreBlocked || replay.active}
           />
-          <GhSupportNotice key={`${user?.username}:${user?.impersonator?.username || ""}`} isAdmin={isAdmin} />
+          <GhSupportNotice key={`${user?.username}:${user?.impersonator?.username || ""}`} isAdmin={Boolean(supportAdminUsername(user))} />
           </Box>
 
           <GhRoundAmountTable

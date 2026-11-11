@@ -3,6 +3,10 @@ import apiCaller from "./api-caller";
 
 export const GH_SUPPORT_API = "/api/v1/gh/support";
 
+export function supportAdminUsername(user) {
+  return user?.impersonator?.username ?? (user?.role === "admin" ? user.username : null);
+}
+
 export function supportError(error, fallback) {
   const detail = error.response?.data?.detail;
   return typeof detail === "string" ? detail : fallback;

@@ -163,6 +163,10 @@ const router = createBrowserRouter([
             element: <DhCurrentSetupPage />,
           },
           {
+            path: "/gh-support-admin",
+            element: <GhSupportAdminPage />,
+          },
+          {
             element: <ProtectedRoute adminOnly />,
             children: [
               {
@@ -216,10 +220,6 @@ const router = createBrowserRouter([
               {
                 path: "/app-settings",
                 element: <AppSettingsPage />,
-              },
-              {
-                path: "/gh-support-admin",
-                element: <GhSupportAdminPage />,
               },
               {
                 path: "/maintenance-admin",

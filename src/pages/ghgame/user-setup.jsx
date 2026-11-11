@@ -387,7 +387,7 @@ const EMPTY_MARTIN_PATTERN_RULE = {
 const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
 const MARTIN_Z2_PATTERN_CELL_COUNT = 30;
-const MARTIN_Z2_PATTERN_BLOCK_ROW_COUNT = 20;
+const MARTIN_Z2_PATTERN_BLOCK_ROW_COUNT = 100;
 const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = 600;
 
 function PatternCell({ value, onClick, cellKey, wallHighlight = false }) {
@@ -431,6 +431,27 @@ function cyclePatternCell(cells, index) {
   return next;
 }
 
+function PatternWallCheckbox({ rule, onChange, label, ariaLabel, back = false }) {
+  const field = back ? "back_wall_enabled" : "wall_enabled";
+  const isValid = back ? validBackWallPattern : validWallPattern;
+  return (
+    <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
+      <input
+        type="checkbox" aria-label={ariaLabel}
+        checked={Boolean(rule[field])}
+        onChange={(event) => {
+          if (event.target.checked && !isValid(rule.pattern)) {
+            window.alert(`${label}는 3칸 이상이며 ${back ? "뒤" : "앞"} 두 칸이 BB 또는 PP인 패턴만 사용할 수 있습니다.`);
+            return;
+          }
+          onChange({ [field]: event.target.checked });
+        }}
+      />
+      {label}
+    </label>
+  );
+}
+
 function MartinPatternBlockRows({ martin, onChange, color }) {
   const raw = martin.pattern_block;
   const saved = Array.isArray(raw) ? raw : raw ? [raw] : [];
@@ -438,20 +459,28 @@ function MartinPatternBlockRows({ martin, onChange, color }) {
     { ...EMPTY_MARTIN_PATTERN_RULE, ...saved[index] }
   ));
   return (
-    <>
+    <Fragment>
       <tr>
         <td colSpan={6} style={{ ...labelCellStyle, color }}>패턴일 때 배팅 안 하기</td>
       </tr>
-      {rules.map((rule, rowIndex) => {
-        const cells = patternCells(rule, MARTIN_Z2_PATTERN_CELL_COUNT);
-        const updateRule = (patch) => onChange({
-          ...martin,
-          pattern_block: rules.map((entry, index) => index === rowIndex ? { ...entry, ...patch } : entry),
-        });
-        return (
-          <tr key={rowIndex}>
-            <td colSpan={6} style={normalCell}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, whiteSpace: "nowrap" }}>
+      <tr>
+        <td colSpan={6} style={{ ...normalCell, padding: 0 }}>
+          <WindowedPatternRows rowCount={rules.length} renderRow={(rowIndex) => {
+            const rule = rules[rowIndex];
+            const cells = patternCells(rule, MARTIN_Z2_PATTERN_CELL_COUNT);
+            const backWallIndices = cells.flatMap((value, index) => value ? [index] : []).slice(-2);
+            const updateRule = (patch) => onChange({
+              ...martin,
+              pattern_block: rules.map((entry, index) => index === rowIndex ? patchMartinBRule(entry, patch) : entry),
+            });
+            return (
+              <Box
+                role="group" aria-label={`차단 패턴 ${rowIndex + 1}`} data-pattern-row={rowIndex}
+                sx={{
+                  height: PATTERN_ROW_HEIGHT, boxSizing: "border-box", display: "flex",
+                  alignItems: "center", gap: 0.75, whiteSpace: "nowrap", borderTop: CELL_BORDER, px: 0.25,
+                }}
+              >
                 <Typography component="span" sx={{ minWidth: 34, textAlign: "left", fontSize: 13 }}>
                   {rowIndex + 1}번
                 </Typography>
@@ -459,9 +488,17 @@ function MartinPatternBlockRows({ martin, onChange, color }) {
                   <PatternCell
                     key={index}
                     value={value}
+                    wallHighlight={(rule.wall_enabled && index < 2)
+                      || (rule.back_wall_enabled && backWallIndices.includes(index))}
                     onClick={() => updateRule({ pattern: cyclePatternCell(cells, index) })}
                   />
                 ))}
+                <PatternWallCheckbox
+                  rule={rule} onChange={updateRule} label="앞벽치기" ariaLabel={`차단 패턴 ${rowIndex + 1} 앞벽치기`}
+                />
+                <PatternWallCheckbox
+                  rule={rule} onChange={updateRule} label="뒷벽치기" ariaLabel={`차단 패턴 ${rowIndex + 1} 뒷벽치기`} back
+                />
                 <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
                   <input
                     type="checkbox"
@@ -487,11 +524,11 @@ function MartinPatternBlockRows({ martin, onChange, color }) {
                   {rule.enabled ? "사용함" : "사용안함"}
                 </Box>
               </Box>
-            </td>
-          </tr>
-        );
-      })}
-    </>
+            );
+          }} />
+        </td>
+      </tr>
+    </Fragment>
   );
 }
 
@@ -639,30 +676,14 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
                 value={direction}
                 onClick={() => updateRule(rowIndex, { direction: nextDirection })}
               />
-              {showWall && <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
-                <input type="checkbox" aria-label={`마틴B ${rowLabel(rowIndex)}번 벽치기`}
-                  checked={Boolean(rule.wall_enabled)}
-                  onChange={(event) => {
-                    if (event.target.checked && !validWallPattern(rule.pattern)) {
-                      window.alert("벽치기는 3칸 이상이며 앞 두 칸이 BB 또는 PP인 패턴만 사용할 수 있습니다.");
-                      return;
-                    }
-                    updateRule(rowIndex, { wall_enabled: event.target.checked });
-                  }} />
-                벽치기
-              </label>}
-              {showBackWall && <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
-                <input type="checkbox" aria-label={`마틴Z2 ${rowLabel(rowIndex)}번 뒷벽치기`}
-                  checked={Boolean(rule.back_wall_enabled)}
-                  onChange={(event) => {
-                    if (event.target.checked && !validBackWallPattern(rule.pattern)) {
-                      window.alert("뒷벽치기는 3칸 이상이며 뒤 두 칸이 BB 또는 PP인 패턴만 사용할 수 있습니다.");
-                      return;
-                    }
-                    updateRule(rowIndex, { back_wall_enabled: event.target.checked });
-                  }} />
-                뒷벽치기
-              </label>}
+              {showWall && <PatternWallCheckbox
+                rule={rule} onChange={(patch) => updateRule(rowIndex, patch)}
+                label="벽치기" ariaLabel={`마틴B ${rowLabel(rowIndex)}번 벽치기`}
+              />}
+              {showBackWall && <PatternWallCheckbox
+                rule={rule} onChange={(patch) => updateRule(rowIndex, patch)}
+                label="뒷벽치기" ariaLabel={`마틴Z2 ${rowLabel(rowIndex)}번 뒷벽치기`} back
+              />}
               <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
                 <input
                   type="checkbox"

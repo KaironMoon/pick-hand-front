@@ -20,7 +20,7 @@ import { userAtom, logoutAtom } from "@/store/auth-store";
 import { blockedGamesAtom, fetchBlockedGamesAtom } from "@/store/app-settings-store";
 import ProfileDialog from "./ProfileDialog";
 import autoService from "@/services/auto-service";
-import { GH_SUPPORT_API, useSupportPoll } from "@/services/gh-support-service";
+import { GH_SUPPORT_API, supportAdminUsername, useSupportPoll } from "@/services/gh-support-service";
 import { emergencyStopResultMessage } from "@/utils/emergency-stop-result";
 
 function GhSupportMenuItem({ onClick }) {
@@ -29,7 +29,7 @@ function GhSupportMenuItem({ onClick }) {
   return (
     <ListItem disablePadding>
       <ListItemButton onClick={onClick} aria-label={hasUnread ? "GH 공지·상담 관리, 미확인 문의 있음" : undefined}>
-        <ListItemIcon>
+        <ListItemIcon sx={{ minWidth: 32 }}>
           <ChatIcon sx={hasUnread ? {
             color: "warning.main",
             animation: "ghSupportUnread 1.4s ease-in-out infinite",
@@ -37,7 +37,7 @@ function GhSupportMenuItem({ onClick }) {
             "@media (prefers-reduced-motion: reduce)": { animation: "none" },
           } : undefined} />
         </ListItemIcon>
-        <ListItemText primary="GH 공지·상담 관리" />
+        <ListItemText primary="GH 공지·상담 관리" slotProps={{ primary: { noWrap: true } }} />
       </ListItemButton>
     </ListItem>
   );
@@ -47,6 +47,7 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
   const theme = useTheme();
   const navigate = useNavigate();
   const user = useAtomValue(userAtom);
+  const supportAdmin = supportAdminUsername(user);
   const logout = useSetAtom(logoutAtom);
   const blockedGames = useAtomValue(blockedGamesAtom);
   const fetchBlocked = useSetAtom(fetchBlockedGamesAtom);
@@ -208,31 +209,35 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
           </ListItemButton>
         </ListItem>
       </List>
-      {user?.role === "admin" && (
+      {supportAdmin && (
         <>
           <Divider sx={{ bgcolor: "military.border", my: 1 }} />
           <List>
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/users")}>
-                <ListItemIcon><PeopleIcon /></ListItemIcon>
-                <ListItemText primary="사용자 관리" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/app-settings")}>
-                <ListItemIcon><SettingsIcon /></ListItemIcon>
-                <ListItemText primary="앱 설정" />
-              </ListItemButton>
-            </ListItem>
-            {!user.impersonator && (
-              <GhSupportMenuItem key={user.username} onClick={() => handleNavClick("/gh-support-admin")} />
+            {user.role === "admin" && (
+              <>
+                <ListItem disablePadding>
+                  <ListItemButton onClick={() => handleNavClick("/users")}>
+                    <ListItemIcon><PeopleIcon /></ListItemIcon>
+                    <ListItemText primary="사용자 관리" />
+                  </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
+                  <ListItemButton onClick={() => handleNavClick("/app-settings")}>
+                    <ListItemIcon><SettingsIcon /></ListItemIcon>
+                    <ListItemText primary="앱 설정" />
+                  </ListItemButton>
+                </ListItem>
+              </>
             )}
-            <ListItem disablePadding>
-              <ListItemButton onClick={() => handleNavClick("/maintenance-admin")}>
-                <ListItemIcon><ConstructionIcon /></ListItemIcon>
-                <ListItemText primary="점검 관리" />
-              </ListItemButton>
-            </ListItem>
+            <GhSupportMenuItem key={supportAdmin} onClick={() => handleNavClick("/gh-support-admin")} />
+            {user.role === "admin" && (
+              <ListItem disablePadding>
+                <ListItemButton onClick={() => handleNavClick("/maintenance-admin")}>
+                  <ListItemIcon><ConstructionIcon /></ListItemIcon>
+                  <ListItemText primary="점검 관리" />
+                </ListItemButton>
+              </ListItem>
+            )}
           </List>
         </>
       )}
