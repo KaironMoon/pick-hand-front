@@ -750,6 +750,9 @@ function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
   const compactCell = { ...normalCell, minWidth: 0, padding: "3px 2px", whiteSpace: "normal", overflowWrap: "anywhere", fontSize: 12 };
   const options = z2 ? Array.from({ length: MARTIN_Z2_PATTERN_ONLY_ROW_COUNT }, (_, index) => ({
     ...defaultMartinBPatternOption(), ...martin.pattern_options?.[index],
+    success_limit: martin.pattern_options?.[index]?.success_limit ?? 31,
+    assist_round: martin.pattern_options?.[index]?.assist_round ?? 0,
+    assist_losses: martin.pattern_options?.[index]?.assist_losses ?? 0,
     partial_patterns: Array.from({ length: 15 }, (_, i) => martin.pattern_options?.[index]?.partial_patterns?.[i] ?? 0),
   })) : martinBPatternOptions(martin.pattern_options);
   const updateOption = (index, patch) => onChange({
