@@ -221,7 +221,7 @@ class ApiInterceptors {
 
 const apiCaller = new ApiCaller({
   baseUrl: import.meta.env.VITE_API_BASE_URL || "",
-  timeout: import.meta.env.VITE_API_TIMEOUT || 10000,
+  timeout: import.meta.env.VITE_API_TIMEOUT || 30000,
 });
 const apiInterceptors = new ApiInterceptors(apiCaller);
 

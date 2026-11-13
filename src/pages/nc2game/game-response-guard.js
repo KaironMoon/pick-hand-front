@@ -25,6 +25,12 @@ export const createGameResponseGuard = () => {
       return normalizeGameId(value) === activeGameId;
     },
 
+    getActiveGeneration(value) {
+      return activeGameId !== null && normalizeGameId(value) === activeGameId
+        ? activeGeneration
+        : null;
+    },
+
     begin(value) {
       const gameId = normalizeGameId(value);
       const sequence = ++requestSequence;

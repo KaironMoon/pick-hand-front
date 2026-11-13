@@ -33,6 +33,7 @@ import { resolvePickMartinSummary } from "./pick-martin-summary.js";
 import { resolveSlotPnl } from "./slot-summary.js";
 import { resolveBetBoardDirection } from "./bet-board-direction.js";
 import { createGameResponseGuard } from "../nc2game/game-response-guard.js";
+import { createStateRefreshQueue } from "./state-refresh-queue.js";
 import {
   ghBetStopReasonLabel,
   ghDrawdownStatusLabel,
@@ -1156,6 +1157,7 @@ export default function GhUserGamePage() {
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const gameResponseGuardRef = useRef(createGameResponseGuard());
+  const [queueStateRefresh] = useState(() => createStateRefreshQueue());
   const [config, setConfig] = useState(null);
   const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
   const [showNewConfirm, setShowNewConfirm] = useState(false);
@@ -1489,34 +1491,51 @@ export default function GhUserGamePage() {
     return () => { cancelled = true; };
   }, [searchParams.get("new"), searchParams.get("gameId"), searchParams.get("slot"), historyReplayGameId]);
 
-  const restoreGame = useCallback(async (gid, { activate = false, diagnostic } = {}) => {
-    if (activate) gameResponseGuardRef.current.activate(gid);
-    const ticket = gameResponseGuardRef.current.begin(gid);
-    try {
-      const res = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user");
-      if (!gameResponseGuardRef.current.canApply(ticket)) return;
-      applyGameData(res.data);
-      if (diagnostic) reportAutoDiagnostic(diagnostic, "round_applied", { response: res });
-    } catch (err) {
-      if (diagnostic) reportAutoDiagnostic(diagnostic, "refresh_failed", { error: err });
-      if (!gameResponseGuardRef.current.canApply(ticket)) return;
-      if (err.response?.status === 409) {
-        setGameId(gid);
-        setLegacyRestoreBlocked(true);
-        setResults([]);
-        setBetData(null);
-        setUserSummary(null);
-        setUserMartinDashboard(null);
-        setRoundStateUpper(null);
-        setRoundStateLower(null);
-        setRejectMsg(err.response?.data?.detail || "이 게임은 복원할 수 없습니다.");
-        return;
+  const restoreGame = useCallback(async (value, { activate = false, diagnostic, partial = false } = {}) => {
+    const gid = Number(value);
+    const guard = gameResponseGuardRef.current;
+    if (activate && !guard.isActive(gid)) guard.activate(gid);
+    const generation = guard.getActiveGeneration(gid);
+    if (generation === null) return;
+
+    return queueStateRefresh(gid, generation, { diagnostic, partial }, async (queuedGeneration, options) => {
+      if (guard.getActiveGeneration(gid) !== queuedGeneration) return;
+      const ticket = guard.begin(gid);
+      try {
+        const res = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user");
+        if (!guard.canApply(ticket)) return;
+        if (options.partial) {
+          const data = res.data;
+          setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
+          if (data.cum_pnl) setCumPnL((prev) => ({ ...prev, ...data.cum_pnl }));
+        } else {
+          applyGameData(res.data);
+        }
+        if (options.diagnostic) reportAutoDiagnostic(options.diagnostic, "round_applied", { response: res });
+      } catch (err) {
+        if (options.diagnostic) reportAutoDiagnostic(options.diagnostic, "refresh_failed", { error: err });
+        if (!guard.canApply(ticket)) return;
+        if (options.partial) throw err;
+        if (err.response?.status === 409) {
+          setGameId(gid);
+          setLegacyRestoreBlocked(true);
+          setResults([]);
+          setBetData(null);
+          setUserSummary(null);
+          setUserMartinDashboard(null);
+          setRoundStateUpper(null);
+          setRoundStateLower(null);
+          setRejectMsg(err.response?.data?.detail || "이 게임은 복원할 수 없습니다.");
+          return;
+        }
+        console.error("Failed to restore game:", err);
+        setRejectMsg("게임판을 불러오지 못했습니다. 슬롯 상태를 다시 확인해주세요.");
+        if (err.code !== "ECONNABORTED" && err.code !== "ETIMEDOUT") {
+          refreshGameSlots().catch(() => {});
+        }
       }
-      console.error("Failed to restore game:", err);
-      setRejectMsg("게임판을 불러오지 못했습니다. 슬롯 상태를 다시 확인해주세요.");
-      refreshGameSlots().catch(() => {});
-    }
-  }, [applyGameData, refreshGameSlots]);
+    });
+  }, [applyGameData, queueStateRefresh, refreshGameSlots]);
 
   const updateBetPause = async (mode) => {
     if (!gameId || betPauseBusy || replay.active) return;
@@ -2458,12 +2477,7 @@ export default function GhUserGamePage() {
     setLabHmPressed(which);
     try {
       await apiCaller.post(url);
-      const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
-      const data = res.data;
-      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
-      if (data.cum_pnl) {
-        setCumPnL((prev) => ({ ...prev, ...data.cum_pnl }));
-      }
+      await restoreGame(gameId, { partial: true });
     } catch (err) {
       console.error(`Labouchere ${which} failed:`, err);
     } finally {
@@ -2678,14 +2692,7 @@ export default function GhUserGamePage() {
                     const lb = betData.user_martin.labouchere;
                     const lbAmt = realBetPaused ? 0 : lb?.amount || 0;
                     const lbPaused = !!lb?.paused;
-                    const refreshState = async () => {
-                      const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
-                      const data = res.data;
-                      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
-                      if (data.cum_pnl) {
-                        setCumPnL((prev) => ({ ...prev, ...data.cum_pnl }));
-                      }
-                    };
+                    const refreshState = () => restoreGame(gameId, { partial: true });
                     const handleResetClick = async () => {
                       if (!gameId) return;
                       if (!window.confirm("초기 시퀀스로 리셋합니까?")) return;
@@ -2730,14 +2737,7 @@ export default function GhUserGamePage() {
                       if (idx % 2 === 0) return `${idx / 2 + 1}-2`;
                       return `${(idx + 1) / 2 + 1}`;
                     };
-                    const refreshState = async () => {
-                      const res = await apiCaller.get(GH_GAMES_API.STATE(gameId) + "?mode=user");
-                      const data = res.data;
-                      setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
-                      if (data.cum_pnl) {
-                        setCumPnL((prev) => ({ ...prev, ...data.cum_pnl }));
-                      }
-                    };
+                    const refreshState = () => restoreGame(gameId, { partial: true });
                     const handleResetClick = async () => {
                       if (!gameId) return;
                       if (!window.confirm("1단계로 돌아갑니까?")) return;
