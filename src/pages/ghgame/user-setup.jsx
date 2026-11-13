@@ -389,6 +389,7 @@ const PATTERN_ONLY_ROW_COUNT = 100;
 const MARTIN_Z2_PATTERN_CELL_COUNT = 30;
 const MARTIN_Z2_PATTERN_BLOCK_ROW_COUNT = 100;
 const MARTIN_Z2_SPECIAL_NUMBER = 999;
+const MARTIN_Z2_SPECIAL_ASSIST_ERROR = `마틴Z2 부분 어시에 ${MARTIN_Z2_SPECIAL_NUMBER}번을 지정할 수 없습니다.`;
 const MARTIN_Z2_MAX_PATTERN_NUMBER = 1100;
 const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = MARTIN_Z2_MAX_PATTERN_NUMBER - 1;
 const martinZ2PatternNumber = (index) => index < MARTIN_Z2_SPECIAL_NUMBER - 1 ? index + 1 : index + 2;
@@ -810,11 +811,14 @@ function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
             <td style={compactCell}><Box sx={{ display: "grid", gridTemplateColumns: "repeat(15, minmax(0, 1fr))", gap: "1px" }}>{option.partial_patterns.map((number, partialIndex) => <input
               key={partialIndex} type="number" min={0} max={maxPartialPatternNumber} step={1}
               aria-label={`${label} ${patternNumber(index)}번 부분패턴 ${partialIndex + 1}`}
+              aria-invalid={z2 && number === specialNumber ? true : undefined}
+              title={z2 && number === specialNumber ? MARTIN_Z2_SPECIAL_ASSIST_ERROR : undefined}
               value={number}
               onChange={(event) => updateOption(index, {
                 partial_patterns: option.partial_patterns.map((value, i) => i === partialIndex ? Number(event.target.value) : value),
               })}
-              style={{ width: "100%", minWidth: 0, boxSizing: "border-box", padding: "2px 0", fontSize: 12 }} />)}</Box></td>
+              style={{ width: "100%", minWidth: 0, boxSizing: "border-box", padding: "2px 0", fontSize: 12,
+                ...(z2 && number === specialNumber && { border: "1px solid #ff5252", color: "#ff5252" }) }} />)}</Box></td>
             <td style={compactCell}>{numberInput(index, "untriggered_round", 80, "패턴 미발동 지정회차")} 회차</td>
             <td style={compactCell}>
               <select style={{ maxWidth: "100%", fontSize: 12,
@@ -828,14 +832,22 @@ function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
           </tr>)}</tbody>
         </table>
       </Box>
-      <Box sx={{ p: 0.75, textAlign: "left" }}>본픽이 발동하는 번호에는 어시를 사용하지 않습니다. 성공마감은 번호별 누적 승수이며, 도달하면 해당 번호의 본베팅과 어시베팅을 모두 종료합니다. 어시 승수는 어시를 지정한 번호에 누적됩니다. 어시 대상으로는 어시사용인 입력 패턴과 특수 패턴 {specialNumber}번을 사용하며, 어시 중첩배팅 불가를 체크하면 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동하고, 해제하면 동시에 발동합니다.</Box>
+      <Box sx={{ p: 0.75, textAlign: "left" }}>본픽이 발동하는 번호에는 어시를 사용하지 않습니다. 성공마감은 번호별 누적 승수이며, 도달하면 해당 번호의 본베팅과 어시베팅을 모두 종료합니다. 어시 승수는 어시를 지정한 번호에 누적됩니다. 어시 대상으로는 어시사용인 입력 패턴{!z2 && `과 특수 패턴 ${specialNumber}번`}을 사용하며, 어시 중첩배팅 불가를 체크하면 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동하고, 해제하면 동시에 발동합니다.</Box>
       <Box sx={{ p: 0.75, textAlign: "left" }}>번호별 지정회차 결과까지 소속 패턴이 한 번도 나오지 않으면 다음 회차부터 베팅포기 또는 어시패턴사용을 적용합니다. 어시패턴사용은 어시회차·어시단계를 무시하고 전체/부분 설정을 따르며, 지정 승수에 도달하면 종료합니다.</Box>
     </td></tr>
     {!optionsOnly && <MartinPatternOnlyRows martin={martin} onChange={onChange} color="#6a1b9a"
       rowCount={MARTIN_B_PATTERN_ROW_COUNT} rowLabel={martinBPatternLabel} recommendSingleStep={false} showAssistUsage showWall constrainWidth visibleIndices={MARTIN_B_VISIBLE_INDICES} />}
     <tr><td colSpan={6} style={{ ...normalCell, whiteSpace: "normal", textAlign: "left" }}>
-      <strong>{specialNumber}번 특수 패턴 (어시 전용)</strong>: 현재 줄을 제외한 앞 4줄 중 같은 결과가 2개 이상 나온 줄이 3줄 이상이고, 현재 줄은 1개만 나왔을 때 현재 줄과 같은 쪽에 베팅합니다.
-      예: PPBBPPPBBP → P, PPBBPPPBBPB → B. 단독 베팅은 하지 않으며, 전체 어시에 포함되고 부분 어시에서는 {specialNumber}번으로 지정합니다.
+      <strong>{specialNumber}번 특수 패턴 ({z2 ? "본픽 전용" : "어시 전용"})</strong>
+      {z2 && <label style={{ display: "inline-flex", alignItems: "center", gap: 4, margin: "0 8px", cursor: "pointer" }}>
+        <input type="checkbox" aria-label={`마틴Z2 ${specialNumber}번 사용`} checked={martin.special_999_enabled ?? false}
+          onChange={(event) => onChange({ ...martin, special_999_enabled: event.target.checked })} />
+        사용
+      </label>}
+      <div>현재 줄을 제외한 앞 4줄 중 같은 결과가 2개 이상 나온 줄이 3줄 이상이고, 현재 줄은 1개만 나왔을 때 현재 줄과 같은 쪽에 베팅합니다.
+        예: PPBBPPPBBP → P, PPBBPPPBBPB → B. {z2
+          ? "사용을 체크하고 조건이 맞으면 해당 회차에는 999번만 발동합니다."
+          : `단독 베팅은 하지 않으며, 전체 어시에 포함되고 부분 어시에서는 ${specialNumber}번으로 지정합니다.`}</div>
     </td></tr>
     {!optionsOnly && <MartinStopBetRoundRow martin={martin} onChange={onChange} color="#6a1b9a" />}
   </>;
@@ -2402,6 +2414,10 @@ export default function GhUserSetupPage() {
 
   const handleSave = async () => {
     if ((!dirty && !signalDirty) || saving || (signalDirty && !signalReady)) return;
+    if (config?.martin_z2?.pattern_options?.some((option) => option?.partial_patterns?.includes(MARTIN_Z2_SPECIAL_NUMBER))) {
+      setSnack({ open: true, message: MARTIN_Z2_SPECIAL_ASSIST_ERROR, severity: "error" });
+      return;
+    }
     setSaving(true);
     try {
       const signalRules = signalDirty ? signalRef.current.rules : undefined;

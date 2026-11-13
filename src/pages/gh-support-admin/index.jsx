@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, Button, Chip, List, ListItemButton, ListItemText, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Checkbox, Chip, FormControlLabel, List, ListItem, ListItemButton, ListItemText, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
 import { useAtomValue } from "jotai";
 import { Navigate } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
@@ -11,14 +11,35 @@ const ADMIN_API = `${GH_SUPPORT_API}/admin`;
 
 function SupportInbox({ adminId }) {
   const [selected, setSelected] = useState(null);
+  const [savingUserId, setSavingUserId] = useState(null);
+  const [actionError, setActionError] = useState("");
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision((current) => current + 1), []);
   const { data: inbox, error } = useSupportPoll(adminId ? `${ADMIN_API}/inbox` : null, 4000, revision);
   const canChat = adminId && error?.response?.status !== 403;
 
+  const updateConversation = async (userId, action, fallback) => {
+    setSavingUserId(userId);
+    setActionError("");
+    try {
+      await action(`${ADMIN_API}/inbox/${userId}`);
+      refresh();
+    } catch (requestError) {
+      setActionError(supportError(requestError, fallback));
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
+  const deleteConversation = (entry) => {
+    if (!window.confirm(`${entry.nickname || entry.username}님과의 대화 내용을 모두 삭제하시겠습니까?`)) return;
+    updateConversation(entry.id, (path) => apiCaller.delete(path), "대화를 삭제하지 못했습니다.");
+  };
+
   return (
     <Paper component="section" variant="outlined" sx={{ p: 2 }}>
-      <Typography component="h2" variant="h6">상담함</Typography>
+      <Typography component="h2" variant="h6">1:1 대화</Typography>
+      {actionError && <Alert severity="error" onClose={() => setActionError("")}>{actionError}</Alert>}
       {!canChat ? (
         <Typography color="text.secondary">지정된 상담 담당 관리자 계정으로 상담함을 열 수 있습니다.</Typography>
       ) : error ? (
@@ -26,17 +47,47 @@ function SupportInbox({ adminId }) {
       ) : inbox?.length ? (
         <List disablePadding>
           {inbox.map((entry) => (
-            <ListItemButton key={entry.id} onClick={() => setSelected(entry)}>
-              <ListItemText
-                primary={entry.nickname || entry.username}
-                secondary={entry.nickname ? entry.username : undefined}
-              />
-              {entry.has_unread && <Chip size="small" color="primary" label="새 메시지" />}
-            </ListItemButton>
+            <ListItem key={entry.id} disableGutters divider sx={{ flexWrap: "wrap", columnGap: 1 }}>
+              <ListItemButton
+                onClick={() => setSelected(entry)}
+                aria-label={`${entry.username}님과 1:1 대화 시작`}
+                sx={{ flex: "1 1 160px", minWidth: 0, overflowWrap: "anywhere", gap: 1 }}
+              >
+                <ListItemText
+                  primary={entry.nickname || entry.username}
+                  secondary={entry.nickname ? entry.username : undefined}
+                />
+                {entry.has_unread && <Chip size="small" color="primary" label="새 메시지" />}
+              </ListItemButton>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: "auto" }}>
+                <Button
+                  size="small" color="error" disabled={!entry.has_messages || savingUserId !== null}
+                  onClick={() => deleteConversation(entry)}
+                  aria-label={`${entry.username}님과의 대화삭제`}
+                >
+                  대화삭제
+                </Button>
+                <FormControlLabel
+                  sx={{ mr: 0 }}
+                  label="대화거절"
+                  control={(
+                    <Checkbox
+                      size="small" checked={entry.rejected} disabled={savingUserId !== null}
+                      slotProps={{ input: { "aria-label": `${entry.username}님 대화거절` } }}
+                      onChange={(_, checked) => updateConversation(
+                        entry.id,
+                        (path) => apiCaller.put(`${path}/rejection`, { rejected: checked }),
+                        "대화거절 설정을 저장하지 못했습니다.",
+                      )}
+                    />
+                  )}
+                />
+              </Stack>
+            </ListItem>
           ))}
         </List>
       ) : (
-        <Typography color="text.secondary">{inbox ? "대화가 없습니다." : "상담함을 불러오는 중입니다."}</Typography>
+        <Typography color="text.secondary">{inbox ? "상담할 사용자가 없습니다." : "사용자 목록을 불러오는 중입니다."}</Typography>
       )}
       {canChat && selected && (
         <GhSupportChat
@@ -114,7 +165,6 @@ function SupportAdmin({ username }) {
         !feedback && <Typography color="text.secondary">설정을 불러오는 중입니다.</Typography>
       ) : (
         <>
-          <SupportInbox key={activeAdminId ?? "unassigned"} adminId={activeAdminId} />
           <Paper component="section" variant="outlined" sx={{ p: 2 }}>
             <Stack spacing={1.5}>
               <Typography component="h2" variant="h6">공지</Typography>
@@ -158,6 +208,7 @@ function SupportAdmin({ username }) {
               </Box>
             </Stack>
           </Paper>
+          <SupportInbox key={activeAdminId ?? "unassigned"} adminId={activeAdminId} />
         </>
       )}
     </Stack>
