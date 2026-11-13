@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { userAtom, showImpersonationAutoAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
+import { autoTabId, reportAutoDiagnostic } from "@/services/auto-diagnostics";
 import { supportAdminUsername } from "@/services/gh-support-service";
 import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
@@ -1488,14 +1489,16 @@ export default function GhUserGamePage() {
     return () => { cancelled = true; };
   }, [searchParams.get("new"), searchParams.get("gameId"), searchParams.get("slot"), historyReplayGameId]);
 
-  const restoreGame = useCallback(async (gid, { activate = false } = {}) => {
+  const restoreGame = useCallback(async (gid, { activate = false, diagnostic } = {}) => {
     if (activate) gameResponseGuardRef.current.activate(gid);
     const ticket = gameResponseGuardRef.current.begin(gid);
     try {
       const res = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user");
       if (!gameResponseGuardRef.current.canApply(ticket)) return;
       applyGameData(res.data);
+      if (diagnostic) reportAutoDiagnostic(diagnostic, "round_applied", { response: res });
     } catch (err) {
+      if (diagnostic) reportAutoDiagnostic(diagnostic, "refresh_failed", { error: err });
       if (!gameResponseGuardRef.current.canApply(ticket)) return;
       if (err.response?.status === 409) {
         setGameId(gid);
@@ -1667,12 +1670,17 @@ export default function GhUserGamePage() {
     const wsUrl = `${wsBase}/ws/auto?token=${encodeURIComponent(token)}`;
 
     let ws;
+    let socketContext;
     let pingTimer;
     let cancelled = false;
 
     const connect = () => {
       if (cancelled) return;
-      ws = new WebSocket(wsUrl);
+      const connectionId = globalThis.crypto?.randomUUID?.();
+      socketContext = { game_type: "gh", game_id: Number(gameId), connection_id: connectionId, auto_session_id: autoStatus.autoSessionId || undefined };
+      const context = socketContext;
+      const socketUrl = connectionId ? `${wsUrl}&connection_id=${connectionId}&tab_id=${autoTabId}` : wsUrl;
+      ws = new WebSocket(socketUrl);
       ws.onopen = () => {
         setAutoError(null);
         // keepalive ping 30초마다
@@ -1681,6 +1689,7 @@ export default function GhUserGamePage() {
         }, 30000);
       };
       ws.onmessage = (evt) => {
+        let diagnostic = context;
         try {
           const msg = JSON.parse(evt.data);
           const t = msg.type;
@@ -1709,7 +1718,10 @@ export default function GhUserGamePage() {
           }
           if (t === "round_committed") {
             // 라운드 추가 → restoreGame 호출이 가장 안전 (전체 state 동기화)
-            if (data.game_id) restoreGame(data.game_id);
+            diagnostic = { ...context, game_id: Number(data.game_id || gameId),
+              event_id: msg.event_id, round_num: data.round_num };
+            reportAutoDiagnostic(diagnostic, "round_received");
+            if (data.game_id) restoreGame(data.game_id, { diagnostic });
             // autoStatus 동기화 — phase / round_count / pnl_total / pnl_actual
             setAutoStatus((prev) => ({
               ...prev,
@@ -1815,18 +1827,22 @@ export default function GhUserGamePage() {
             setRejectMsg(data.detail || "베팅이 거부되었습니다 (카지노 미체결)");
             if (data.game_id) restoreGame(data.game_id);
           }
-        } catch (e) {
-          // ignore
+        } catch (error) {
+          reportAutoDiagnostic(diagnostic, "message_failed", { error });
         }
       };
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         clearInterval(pingTimer);
+        if (!cancelled && ![1000, 1001].includes(event.code)) {
+          reportAutoDiagnostic(context, "socket_close", { closeCode: event.code });
+        }
         if (!cancelled && autoStatus.running) {
           // 자동 재연결 5초
           setTimeout(connect, 5000);
         }
       };
       ws.onerror = () => {
+        reportAutoDiagnostic(context, "socket_error");
         setAutoError({ code: "realtime_connection_error", detail: "자동게임 실시간 연결에 문제가 발생했습니다." });
         try { ws.close(); } catch (_) {}
       };
@@ -1835,6 +1851,9 @@ export default function GhUserGamePage() {
 
     return () => {
       cancelled = true;
+      if (socketContext && ws?.readyState === WebSocket.OPEN) {
+        reportAutoDiagnostic(socketContext, "socket_cleanup");
+      }
       clearInterval(pingTimer);
       try { ws && ws.close(); } catch (_) {}
     };

@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { userAtom } from "@/store/auth-store";
 import apiCaller from "@/services/api-caller";
+import { autoTabId, reportAutoDiagnostic } from "@/services/auto-diagnostics";
 import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import { claimOverallStopAlert } from "../ghgame/overall-stop-alert.js";
@@ -555,12 +556,13 @@ export default function Nc2UserGamePage() {
     saveNc2KeepCombination(gameSeqs);
   }, [state?.items]);
 
-  const restore = useCallback(async (gameId, { activate = false } = {}) => {
+  const restore = useCallback(async (gameId, { activate = false, diagnostic } = {}) => {
     if (activate) gameResponseGuardRef.current.activate(gameId);
     const ticket = gameResponseGuardRef.current.begin(gameId);
     const response = await apiCaller.get(NC2_GAMES_API.STATE(gameId));
     if (!gameResponseGuardRef.current.canApply(ticket)) return null;
     applyGame(response.data);
+    if (diagnostic) reportAutoDiagnostic(diagnostic, "round_applied", { response });
     return response.data;
   }, [applyGame]);
 
@@ -770,17 +772,25 @@ export default function Nc2UserGamePage() {
     const base = import.meta.env.VITE_API_BASE_URL || window.location.origin;
     const wsUrl = `${base.replace(/^http/, "ws")}/ws/auto?token=${encodeURIComponent(token)}`;
     let ws;
+    let socketContext;
     let pingTimer;
     let reconnectTimer;
     let cancelled = false;
 
-    const refreshEventGame = (gameId, activate = false) => {
+    const refreshEventGame = (gameId, activate = false, diagnostic) => {
       if (!gameId) return;
-      restore(gameId, { activate }).catch(() => {});
+      restore(gameId, { activate, diagnostic }).catch((error) => {
+        reportAutoDiagnostic(diagnostic || { game_type: "nc2", game_id: Number(gameId) },
+          "refresh_failed", { error });
+      });
     };
     const connect = () => {
       if (cancelled) return;
-      ws = new WebSocket(wsUrl);
+      const connectionId = globalThis.crypto?.randomUUID?.();
+      socketContext = { game_type: "nc2", game_id: Number(game.game_id), connection_id: connectionId, auto_session_id: autoStatus.auto_session_id || undefined };
+      const context = socketContext;
+      const socketUrl = connectionId ? `${wsUrl}&connection_id=${connectionId}&tab_id=${autoTabId}` : wsUrl;
+      ws = new WebSocket(socketUrl);
       ws.onopen = () => {
         setAutoStatusError(null);
         pingTimer = setInterval(() => {
@@ -788,6 +798,7 @@ export default function Nc2UserGamePage() {
         }, 30000);
       };
       ws.onmessage = (event) => {
+        let diagnostic = context;
         try {
           if (!gameResponseGuardRef.current.isActive(game.game_id)) return;
           const message = JSON.parse(event.data);
@@ -809,7 +820,10 @@ export default function Nc2UserGamePage() {
 
           if (type === "round_committed") {
             const eventGameId = data.game_id || game.game_id;
-            refreshEventGame(eventGameId, Number(eventGameId) !== Number(game.game_id));
+            diagnostic = { ...context, game_id: Number(eventGameId),
+              event_id: message.event_id, round_num: data.round_num };
+            reportAutoDiagnostic(diagnostic, "round_received");
+            refreshEventGame(eventGameId, Number(eventGameId) !== Number(game.game_id), diagnostic);
             setAutoStatus((previous) => ({
               ...previous,
               phase: data.phase ?? previous.phase,
@@ -874,13 +888,19 @@ export default function Nc2UserGamePage() {
             setError(data.detail || "배팅이 거부되었습니다 (카지노 미체결)");
             refreshEventGame(data.game_id || game.game_id);
           }
-        } catch (_) {}
+        } catch (error) {
+          reportAutoDiagnostic(diagnostic, "message_failed", { error });
+        }
       };
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         clearInterval(pingTimer);
+        if (!cancelled && ![1000, 1001].includes(event.code)) {
+          reportAutoDiagnostic(context, "socket_close", { closeCode: event.code });
+        }
         if (!cancelled) reconnectTimer = setTimeout(connect, 5000);
       };
       ws.onerror = () => {
+        reportAutoDiagnostic(context, "socket_error");
         setAutoStatusError({
           code: "realtime_connection_error",
           detail: "오토 실시간 연결에 문제가 발생했습니다. 상태 조회로 복구 중입니다.",
@@ -892,6 +912,9 @@ export default function Nc2UserGamePage() {
 
     return () => {
       cancelled = true;
+      if (socketContext && ws?.readyState === WebSocket.OPEN) {
+        reportAutoDiagnostic(socketContext, "socket_cleanup");
+      }
       clearInterval(pingTimer);
       clearTimeout(reconnectTimer);
       try { ws?.close(); } catch (_) {}
