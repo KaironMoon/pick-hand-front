@@ -216,6 +216,12 @@ function PageLeftMenu({ isMobile, onMenuClose }) {
             {user.role === "admin" && (
               <>
                 <ListItem disablePadding>
+                  <ListItemButton onClick={() => handleNavClick("/gh-test-shoes")}>
+                    <ListItemIcon><HistoryIcon /></ListItemIcon>
+                    <ListItemText primary="카운터 슈 생성" />
+                  </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
                   <ListItemButton onClick={() => handleNavClick("/users")}>
                     <ListItemIcon><PeopleIcon /></ListItemIcon>
                     <ListItemText primary="사용자 관리" />

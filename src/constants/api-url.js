@@ -64,6 +64,7 @@ const GH_GAMES_API = {
   SHOE_COPY_PROCESS: "/api/v1/gh/games/shoe-copy/process",
   SHOE_COPY_PROGRESS: (id) => `/api/v1/gh/games/${id}/shoe-copy-progress`,
   SHOE_COPY_PREVIEW: (id) => `/api/v1/gh/games/shoe-copy/${id}`,
+  SHOE_SEARCH: "/api/v1/gh/games/shoe-search",
   REPLAY: (id) => `/api/v1/gh/games/replay/${id}`,
   ROUND_LABOUCHERE: (id, round) => `/api/v1/gh/games/${id}/rounds/${round}/labouchere`,
   LAST_ROUND: (id) => `/api/v1/gh/games/${id}/last-round`,

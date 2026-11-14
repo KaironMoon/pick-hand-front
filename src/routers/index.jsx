@@ -8,6 +8,7 @@ import ProtectedRoute from "../pages/components/ProtectedRoute";
 import GameGuard from "../pages/components/GameGuard";
 
 const AutoHistoryPage = lazy(() => import("../pages/auto-history"));
+const GhTestShoesPage = lazy(() => import("../pages/gh-test-shoes"));
 const Info = lazy(() => import("../pages/info"));
 const GamePage = lazy(() => import("../pages/t9game"));
 const PatternPage = lazy(() => import("../pages/t9game/pattern.jsx"));
@@ -169,6 +170,10 @@ const router = createBrowserRouter([
           {
             element: <ProtectedRoute adminOnly />,
             children: [
+              {
+                path: "/gh-test-shoes",
+                element: <GhTestShoesPage />,
+              },
               {
                 path: "/t9game/user-setup",
                 element: <T9UserSetupPage />,

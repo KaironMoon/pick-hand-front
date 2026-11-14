@@ -2164,6 +2164,7 @@ export default function GhUserGamePage() {
     setReplay({
       active: true,
       external,
+      testShoe: data.test_shoe === true,
       sourceGameId: data.game_id,
       roundNum: data.round_num,
       totalRounds: data.total_rounds,
@@ -2254,7 +2255,7 @@ export default function GhUserGamePage() {
     if (historyReplayGameId) {
       setReplay({ active: false, external: false, sourceGameId: null, roundNum: 0, totalRounds: 0 });
       setGameId(null);
-      navigate("/ghgame/user?slot=1", { replace: true });
+      navigate(replay.testShoe ? "/gh-test-shoes" : "/ghgame/user?slot=1", { replace: true });
       return;
     }
     setReplayLoading(true);
