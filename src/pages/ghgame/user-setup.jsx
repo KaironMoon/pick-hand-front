@@ -2,7 +2,7 @@ import MartinLabouchereRows from "./components/MartinLabouchereRows.jsx";
 import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } from "./components/AutoRiskSettings";
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
-import { duplicatePatternRows } from "./pattern-duplicates.js";
+import { duplicatePatternRowGroups, duplicatePatternRows } from "./pattern-duplicates.js";
 import { MARTIN_B_SPECIAL_NUMBER, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, validBackWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions, defaultMartinBPatternOption } from "./martin-b-settings.js";
 import { Fragment, memo, useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
@@ -464,7 +464,7 @@ function MartinPatternBlockRows({ martin, onChange, color }) {
     { ...EMPTY_MARTIN_PATTERN_RULE, ...saved[index] }
   ));
   const cellsByRow = rules.map((rule) => patternCells(rule, MARTIN_Z2_PATTERN_CELL_COUNT));
-  const duplicateRows = duplicatePatternRows(cellsByRow.map((cells) => cells.join("")));
+  const duplicateGroups = duplicatePatternRowGroups(cellsByRow.map((cells) => cells.join("")));
   return (
     <Fragment>
       <tr>
@@ -475,7 +475,11 @@ function MartinPatternBlockRows({ martin, onChange, color }) {
           <WindowedPatternRows rowCount={rules.length} renderRow={(rowIndex) => {
             const rule = rules[rowIndex];
             const cells = cellsByRow[rowIndex];
-            const isDuplicate = duplicateRows[rowIndex];
+            const duplicateGroup = duplicateGroups[rowIndex];
+            const duplicateNumbers = duplicateGroup
+              ?.filter((index) => index !== rowIndex)
+              .map((index) => `${index + 1}번`)
+              .join(", ");
             const backWallIndices = cells.flatMap((value, index) => value ? [index] : []).slice(-2);
             const updateRule = (patch) => onChange({
               ...martin,
@@ -484,19 +488,21 @@ function MartinPatternBlockRows({ martin, onChange, color }) {
             return (
               <Box
                 role="group"
-                aria-label={`차단 패턴 ${rowIndex + 1}${isDuplicate ? " (중복)" : ""}`}
-                title={isDuplicate ? DUPLICATE_PATTERN_TITLE : undefined}
+                aria-label={`차단 패턴 ${rowIndex + 1}${duplicateGroup ? " (중복)" : ""}`}
                 data-pattern-row={rowIndex}
                 sx={{
                   height: PATTERN_ROW_HEIGHT, boxSizing: "border-box", display: "flex",
                   alignItems: "center", gap: 0.75, whiteSpace: "nowrap", borderTop: CELL_BORDER, px: 0.25,
-                  outline: isDuplicate ? "2px solid #ff5252" : "none",
+                  outline: duplicateGroup ? "2px solid #ff5252" : "none",
                   outlineOffset: -2,
                 }}
               >
-                <Typography component="span" sx={{ minWidth: 34, textAlign: "left", fontSize: 13 }}>
-                  {rowIndex + 1}번
-                </Typography>
+                <Tooltip title={duplicateNumbers ? `${duplicateNumbers}과 중복` : ""} describeChild arrow>
+                  <Typography component="span" tabIndex={duplicateGroup ? 0 : undefined}
+                    sx={{ minWidth: 34, textAlign: "left", fontSize: 13 }}>
+                    {rowIndex + 1}번
+                  </Typography>
+                </Tooltip>
                 {cells.map((value, index) => (
                   <PatternCell
                     key={index}
