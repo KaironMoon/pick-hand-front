@@ -6,7 +6,7 @@ import {
   TextField, Typography,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
-import { GH_GAMES_API, USERS_API } from "@/constants/api-url";
+import { GH_GAMES_API, USER_BET_SETTINGS_API, USERS_API } from "@/constants/api-url";
 import apiCaller from "@/services/api-caller";
 
 const accountLabel = ({ username, nickname }) => nickname ? `${nickname} (${username})` : username;
@@ -62,6 +62,10 @@ export default function GhTestShoesPage() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [usersError, setUsersError] = useState("");
   const [account, setAccount] = useState(null);
+  const [pauseLosses, setPauseLosses] = useState("");
+  const [resumeWins, setResumeWins] = useState("");
+  const [loadingPause, setLoadingPause] = useState(false);
+  const [pauseError, setPauseError] = useState("");
   const [criterion, setCriterion] = useState("loss_streak");
   const [threshold, setThreshold] = useState("9");
   const [count, setCount] = useState("5");
@@ -88,7 +92,8 @@ export default function GhTestShoesPage() {
   const isStreak = criterion === "loss_streak";
   const number = Number(threshold);
   const requested = Number(count);
-  const valid = account && threshold.trim() && Number.isFinite(number)
+  const validPause = [pauseLosses, resumeWins].every((value) => /^\d+$/.test(value) && Number(value) <= 2147483647);
+  const valid = account && !loadingPause && validPause && threshold.trim() && Number.isFinite(number)
     && Number.isInteger(requested) && requested >= 1 && requested <= 2147483647
     && (!isStreak || (Number.isInteger(number) && number >= 0 && number < 60));
 
@@ -104,6 +109,24 @@ export default function GhTestShoesPage() {
       });
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    if (!account) return undefined;
+    const controller = new AbortController();
+    apiCaller.get(USER_BET_SETTINGS_API.ADMIN_GET_GH(account.id), {}, { signal: controller.signal })
+      .then(({ data }) => {
+        if (controller.signal.aborted) return;
+        setPauseLosses(String(data.config.bet_pause_losses ?? 0));
+        setResumeWins(String(data.config.bet_resume_wins ?? 0));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setPauseError("저장된 STOP·START 값을 불러오지 못했습니다. 사용할 값을 입력해 주세요.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingPause(false);
+      });
+    return () => controller.abort();
+  }, [account]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -175,6 +198,8 @@ export default function GhTestShoesPage() {
         criterion,
         [criterion]: number,
         count: requested,
+        bet_pause_losses: Number(pauseLosses),
+        bet_resume_wins: Number(resumeWins),
       });
       sessionStorage.setItem(jobKey, data.job_id);
       setJob(data);
@@ -222,7 +247,13 @@ export default function GhTestShoesPage() {
           options={users} value={account} getOptionLabel={accountLabel}
           loading={loadingUsers} loadingText="계정을 불러오는 중입니다."
           noOptionsText="계정이 없습니다." disabled={busy}
-          onChange={(_, value) => setAccount(value)}
+          onChange={(_, value) => {
+            setPauseLosses("");
+            setResumeWins("");
+            setPauseError("");
+            setLoadingPause(Boolean(value));
+            setAccount(value);
+          }}
           renderInput={(params) => <TextField {...params} label="글로벌히트 설정 계정" />}
         />
         <TextField
@@ -247,6 +278,12 @@ export default function GhTestShoesPage() {
           value={count} disabled={busy} inputProps={{ min: 1, max: 2147483647, step: 1 }}
           onChange={(event) => setCount(event.target.value)}
         />
+        <TextField size="small" type="number" label="연속패 STOP" value={pauseLosses}
+          disabled={!account || loadingPause || busy} inputProps={{ min: 0, max: 2147483647, step: 1 }}
+          helperText="0은 사용 안 함" onChange={(event) => setPauseLosses(event.target.value)} />
+        <TextField size="small" type="number" label="연속승리 START" value={resumeWins}
+          disabled={!account || loadingPause || busy} inputProps={{ min: 0, max: 2147483647, step: 1 }}
+          helperText="0은 사용 안 함" onChange={(event) => setResumeWins(event.target.value)} />
         <Button type="submit" variant="contained" disabled={!valid || busy}>{busy ? "생성 중" : "슈 생성"}</Button>
         {jobId && busy && (
           <Button color="error" variant="outlined" disabled={stopRequested || job?.phase === "stopping"} onClick={stopSearch}>
@@ -262,6 +299,7 @@ export default function GhTestShoesPage() {
         </Button>
       </Box>
       {usersError && <Alert severity="error">{usersError}</Alert>}
+      {pauseError && <Alert severity="warning">{pauseError}</Alert>}
       {searchError && <Alert severity="error">{searchError}</Alert>}
       {stopError && <Alert severity="error">{stopError}</Alert>}
       {busy && <LinearProgress aria-label="카운터 슈 생성 중" />}
@@ -310,7 +348,14 @@ export default function GhTestShoesPage() {
                     </Link>
                   </TableCell>
                   <TableCell>{row.username}</TableCell>
-                  <TableCell>{row.criterion === "loss_streak" ? `${row.threshold}연패 초과` : `${row.threshold}P 미만`}</TableCell>
+                  <TableCell>
+                    {row.criterion === "loss_streak" ? `${row.threshold}연패 초과` : `${row.threshold}P 미만`}
+                    {row.bet_pause_losses != null && (
+                      <Typography variant="caption" display="block">
+                        STOP {row.bet_pause_losses} · START {row.bet_resume_wins}
+                      </Typography>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {row.first_hit_round == null ? "—" : (
                       `${row.first_hit_round}회차 · ${row.first_hit_value}${row.criterion === "loss_streak" ? "연패" : "P"}`

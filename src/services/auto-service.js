@@ -58,6 +58,10 @@ const autoService = {
     await apiCaller.put(ABOO_API.AUTO_HISTORY_HIDE(sessionId));
   },
 
+  async hideAutoHistoryBatch(sessionIds) {
+    await apiCaller.put(`${ABOO_API.AUTO_HISTORY}/hide`, { session_ids: sessionIds });
+  },
+
   async discoverTables(pickhandId, refresh = false) {
     const resp = await apiCaller.get(ABOO_API.DISCOVER_TABLES, {
       caller_user_id: pickhandId,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Alert, Box, Button, Chip, CircularProgress, Link, MenuItem, Paper,
+  Alert, Box, Button, Checkbox, Chip, CircularProgress, Link, MenuItem, Paper,
   Tab, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, Tabs,
   TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
@@ -34,6 +34,7 @@ export default function AutoHistoryPage() {
   const [revision, setRevision] = useState(0);
   const [showHidden, setShowHidden] = useState(false);
   const [hidingId, setHidingId] = useState(null);
+  const [selected, setSelected] = useState([]);
   const [hideError, setHideError] = useState("");
   const [data, setData] = useState({ items: [], total: 0 });
   const [loading, setLoading] = useState(true);
@@ -41,11 +42,16 @@ export default function AutoHistoryPage() {
   const [inputError, setInputError] = useState("");
   const [filterError, setFilterError] = useState("");
   const canHide = !showHidden && data.can_hide;
-  const columnCount = canHide ? 9 : 8;
+  const columnCount = canHide ? 10 : 8;
+  const pageIds = data.items.map(({ id }) => id);
+  const selectedIds = pageIds.filter((id) => selected.includes(id));
+  const allSelected = pageIds.length > 0 && selectedIds.length === pageIds.length;
+  const selectionDisabled = loading || Boolean(error) || hidingId !== null;
 
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setSelected([]);
     setError("");
     autoService.getAutoHistory({ ...query, hidden: showHidden, page: page + 1, page_size: pageSize })
       .then((result) => {
@@ -64,11 +70,12 @@ export default function AutoHistoryPage() {
   }, [query, page, pageSize, revision, showHidden]);
 
   const hideHistory = async (sessionId) => {
-    if (!canHide || hidingId !== null) return;
-    setHidingId(sessionId);
+    if (!canHide || selectionDisabled || (!sessionId && !selectedIds.length)) return;
+    setHidingId(sessionId || "batch");
     setHideError("");
     try {
-      await autoService.hideAutoHistory(sessionId);
+      if (sessionId) await autoService.hideAutoHistory(sessionId);
+      else await autoService.hideAutoHistoryBatch(selectedIds);
       setRevision((value) => value + 1);
     } catch (err) {
       const detail = err.response?.data?.detail;
@@ -139,6 +146,11 @@ export default function AutoHistoryPage() {
         <TextField label="최고연패 이상 (패)" size="small" value={maxLossStreakMin} onChange={(e) => setMaxLossStreakMin(e.target.value)} inputProps={{ inputMode: "numeric" }} sx={{ width: 170 }} />
         <Button type="submit" variant="contained">검색</Button>
         <Button onClick={() => setRevision((value) => value + 1)} disabled={loading}>새로고침</Button>
+        {canHide && (
+          <Button type="button" disabled={selectionDisabled || !selectedIds.length} onClick={() => hideHistory()}>
+            {hidingId === "batch" ? "숨기는 중" : `선택 숨기기${selectedIds.length ? ` (${selectedIds.length})` : ""}`}
+          </Button>
+        )}
       </Box>
       {filterError && <Alert severity="error" sx={{ mb: 2 }}>{filterError}</Alert>}
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>PNL은 실제 오토 베팅 손익(P), 시각은 한국 시간 기준입니다.</Typography>
@@ -150,6 +162,14 @@ export default function AutoHistoryPage() {
           <Table size="small" aria-label="오토플레이 실행 기록" sx={{ minWidth: 850 }}>
             <TableHead>
               <TableRow>
+                {canHide && (
+                  <TableCell padding="checkbox">
+                    <Checkbox checked={allSelected} indeterminate={!allSelected && selectedIds.length > 0}
+                      disabled={selectionDisabled || !pageIds.length}
+                      onChange={() => setSelected(allSelected ? [] : pageIds)}
+                      slotProps={{ input: { "aria-label": "현재 페이지 전체 선택" } }} />
+                  </TableCell>
+                )}
                 {["게임 종류", "게임 번호", "PNL (P)", "최고연패", "진행 회차", "시작 시각", "종료 시각", "상태"].map((label) => <TableCell key={label}>{label}</TableCell>)}
                 {canHide && <TableCell>관리</TableCell>}
               </TableRow>
@@ -159,7 +179,14 @@ export default function AutoHistoryPage() {
                 : error ? <TableRow><TableCell colSpan={columnCount} align="center">기록을 조회할 수 없습니다.</TableCell></TableRow>
                 : data.items.length === 0 ? <TableRow><TableCell colSpan={columnCount} align="center">조건에 맞는 오토플레이 기록이 없습니다.</TableCell></TableRow>
                 : data.items.map((row) => (
-                  <TableRow key={row.id} hover>
+                  <TableRow key={row.id} hover selected={canHide && selected.includes(row.id)}>
+                    {canHide && (
+                      <TableCell padding="checkbox">
+                        <Checkbox checked={selected.includes(row.id)} disabled={selectionDisabled}
+                          onChange={(_, checked) => setSelected((ids) => checked ? [...ids, row.id] : ids.filter((id) => id !== row.id))}
+                          slotProps={{ input: { "aria-label": `게임 ${row.game_id} 기록 선택` } }} />
+                      </TableCell>
+                    )}
                     <TableCell>{GAME_LABELS[row.game_type]}</TableCell>
                     <TableCell>
                       <Link component={RouterLink} to={`${row.game_type === "gh" ? "/ghgame/user" : "/nc2game/user"}?slot=1&replayGameId=${row.game_id}`}>
