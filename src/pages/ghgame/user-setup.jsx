@@ -388,6 +388,7 @@ const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
 const MARTIN_Z2_PATTERN_CELL_COUNT = 30;
 const MARTIN_Z2_PATTERN_BLOCK_ROW_COUNT = 300;
+const DUPLICATE_PATTERN_TITLE = "동일하거나 BP가 반전된 패턴이 중복 입력되어 있습니다.";
 const MARTIN_Z2_SPECIAL_NUMBER = 999;
 const MARTIN_Z2_SPECIAL_ASSIST_ERROR = `마틴Z2 부분 어시에 ${MARTIN_Z2_SPECIAL_NUMBER}번을 지정할 수 없습니다.`;
 const MARTIN_Z2_MAX_PATTERN_NUMBER = 1100;
@@ -462,6 +463,8 @@ function MartinPatternBlockRows({ martin, onChange, color }) {
   const rules = Array.from({ length: MARTIN_Z2_PATTERN_BLOCK_ROW_COUNT }, (_, index) => (
     { ...EMPTY_MARTIN_PATTERN_RULE, ...saved[index] }
   ));
+  const cellsByRow = rules.map((rule) => patternCells(rule, MARTIN_Z2_PATTERN_CELL_COUNT));
+  const duplicateRows = duplicatePatternRows(cellsByRow.map((cells) => cells.join("")));
   return (
     <Fragment>
       <tr>
@@ -471,7 +474,8 @@ function MartinPatternBlockRows({ martin, onChange, color }) {
         <td colSpan={6} style={{ ...normalCell, padding: 0 }}>
           <WindowedPatternRows rowCount={rules.length} renderRow={(rowIndex) => {
             const rule = rules[rowIndex];
-            const cells = patternCells(rule, MARTIN_Z2_PATTERN_CELL_COUNT);
+            const cells = cellsByRow[rowIndex];
+            const isDuplicate = duplicateRows[rowIndex];
             const backWallIndices = cells.flatMap((value, index) => value ? [index] : []).slice(-2);
             const updateRule = (patch) => onChange({
               ...martin,
@@ -479,10 +483,15 @@ function MartinPatternBlockRows({ martin, onChange, color }) {
             });
             return (
               <Box
-                role="group" aria-label={`차단 패턴 ${rowIndex + 1}`} data-pattern-row={rowIndex}
+                role="group"
+                aria-label={`차단 패턴 ${rowIndex + 1}${isDuplicate ? " (중복)" : ""}`}
+                title={isDuplicate ? DUPLICATE_PATTERN_TITLE : undefined}
+                data-pattern-row={rowIndex}
                 sx={{
                   height: PATTERN_ROW_HEIGHT, boxSizing: "border-box", display: "flex",
                   alignItems: "center", gap: 0.75, whiteSpace: "nowrap", borderTop: CELL_BORDER, px: 0.25,
+                  outline: isDuplicate ? "2px solid #ff5252" : "none",
+                  outlineOffset: -2,
                 }}
               >
                 <Typography component="span" sx={{ minWidth: 34, textAlign: "left", fontSize: 13 }}>
@@ -652,7 +661,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
               <Box
                 role="group"
                 aria-label={`패턴 ${rowLabel(rowIndex)}${isDuplicate ? " (중복)" : ""}`}
-                title={isDuplicate ? "동일하거나 BP가 반전된 패턴이 중복 입력되어 있습니다." : undefined}
+                title={isDuplicate ? DUPLICATE_PATTERN_TITLE : undefined}
                 sx={{
                   display: "flex",
                   gap: constrainWidth ? 0.5 : 0.75,
