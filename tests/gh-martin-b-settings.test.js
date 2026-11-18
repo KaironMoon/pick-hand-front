@@ -45,13 +45,24 @@ test("벽치기 체크 조건과 패턴 수정 시 자동 해제", async () => {
 });
 
 test("마틴 Z2 벽치기는 두 칸부터 설정할 수 있고 앞 연속 전체를 표시한다", async () => {
-  const { patchMartinBRule, validZ2WallPattern, z2FrontWallIndices } = await import("../src/pages/ghgame/martin-b-settings.js");
+  const { patchMartinBRule, validZ2WallPattern, z2WallIndices } = await import("../src/pages/ghgame/martin-b-settings.js");
   const rule = { pattern: ["B", "B"], wall_enabled: true, start_only: true };
   assert.equal(validZ2WallPattern(rule.pattern), true);
   assert.equal(validZ2WallPattern(["B", "P", "B"]), false);
-  assert.deepEqual(z2FrontWallIndices(["B", "B", "", "B", "P", "B"]), [0, 1, 3]);
+  assert.deepEqual(z2WallIndices(["B", "B", "", "B", "P", "B"]), [0, 1, 3]);
   assert.deepEqual(patchMartinBRule(rule, {}, { z2: true }), { ...rule, back_wall_enabled: false });
   assert.equal(patchMartinBRule(rule, { pattern: ["B", "P"] }, { z2: true }).wall_enabled, false);
+});
+
+test("마틴 Z2 뒷벽치기는 두 칸부터 설정할 수 있고 끝 연속 전체를 표시한다", async () => {
+  const { patchMartinBRule, validZ2WallPattern, z2WallIndices } = await import("../src/pages/ghgame/martin-b-settings.js");
+  const rule = { pattern: ["B", "B"], back_wall_enabled: true };
+  assert.equal(validZ2WallPattern(rule.pattern, { back: true }), true);
+  assert.equal(validZ2WallPattern(["B", "B", "P"], { back: true }), false);
+  assert.deepEqual(z2WallIndices(["P", "B", "B", "", "B"], { back: true }), [1, 2, 4]);
+  assert.equal(patchMartinBRule(rule, {}, { z2: true }).back_wall_enabled, true);
+  assert.equal(patchMartinBRule(rule, { pattern: ["B", "P"] }, { z2: true }).back_wall_enabled, false);
+  assert.equal(patchMartinBRule(rule, {}).back_wall_enabled, false);
 });
 
 

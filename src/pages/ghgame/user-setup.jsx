@@ -3,7 +3,7 @@ import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } f
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
 import { duplicatePatternRowGroups, duplicatePatternRows } from "./pattern-duplicates.js";
-import { MARTIN_B_SPECIAL_NUMBER, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, validZ2WallPattern, z2FrontWallIndices, validBackWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions, defaultMartinBPatternOption } from "./martin-b-settings.js";
+import { MARTIN_B_SPECIAL_NUMBER, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, validZ2WallPattern, z2WallIndices, validBackWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions, defaultMartinBPatternOption } from "./martin-b-settings.js";
 import { Fragment, memo, useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
@@ -438,16 +438,17 @@ function cyclePatternCell(cells, index) {
 
 function PatternWallCheckbox({ rule, onChange, label, ariaLabel, back = false, z2 = false }) {
   const field = back ? "back_wall_enabled" : "wall_enabled";
-  const isValid = back ? validBackWallPattern : z2 ? validZ2WallPattern : validWallPattern;
+  const isValid = z2 ? validZ2WallPattern(rule.pattern, { back })
+    : (back ? validBackWallPattern : validWallPattern)(rule.pattern);
   return (
     <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
       <input
         type="checkbox" aria-label={ariaLabel}
         checked={Boolean(rule[field])}
         onChange={(event) => {
-          if (event.target.checked && !isValid(rule.pattern)) {
-            window.alert(z2 && !back
-              ? `${label}는 같은 결과가 두 칸 이상으로 시작하는 패턴에 사용할 수 있습니다.`
+          if (event.target.checked && !isValid) {
+            window.alert(z2
+              ? `${label}는 ${back ? "끝" : "앞"}에 같은 결과가 두 칸 이상 연속된 패턴에 사용할 수 있습니다.`
               : `${label}는 3칸 이상이며 ${back ? "뒤" : "앞"} 두 칸이 BB 또는 PP인 패턴만 사용할 수 있습니다.`);
             return;
           }
@@ -639,8 +640,9 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
           const rowIndex = visibleIndices ? visibleIndices[visibleIndex] : visibleIndex;
           const rule = rules[rowIndex];
           const cells = patternCells(rule, cellCount);
-          const frontWallIndices = z2 ? z2FrontWallIndices(cells) : [0, 1];
-          const backWallIndices = cells.flatMap((value, index) => value === "P" || value === "B" ? [index] : []).slice(-2);
+          const frontWallIndices = z2 ? z2WallIndices(cells) : [0, 1];
+          const backWallIndices = z2 ? z2WallIndices(cells, { back: true })
+            : cells.flatMap((value, index) => value === "P" || value === "B" ? [index] : []).slice(-2);
           const isDuplicate = duplicateRows[rowIndex];
           const direction = rule.direction === "P" || rule.direction === "B" ? rule.direction : "";
           const nextDirection = direction === "" ? "B" : direction === "B" ? "P" : "";
@@ -704,7 +706,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
               />}
               {showBackWall && <PatternWallCheckbox
                 rule={rule} onChange={(patch) => updateRule(rowIndex, patch)}
-                label="뒷벽치기" ariaLabel={`마틴Z2 ${rowLabel(rowIndex)}번 뒷벽치기`} back
+                label="뒷벽치기" ariaLabel={`마틴Z2 ${rowLabel(rowIndex)}번 뒷벽치기`} back z2={z2}
               />}
               {z2 && <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
                 <input
