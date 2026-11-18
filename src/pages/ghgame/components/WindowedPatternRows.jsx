@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { PATTERN_ROW_HEIGHT, patternRowWindow } from "../pattern-row-window.js";
 
 // Keep the first row for intrinsic table width, plus the visible rows and any focused row.
-export default function WindowedPatternRows({ rowCount, renderRow, constrainWidth = false }) {
+export default function WindowedPatternRows({ rowCount, renderRow, constrainWidth = false, columnCount }) {
   const listRef = useRef(null);
   const [range, setRange] = useState({ start: 1, end: 1 });
   const [focusedRow, setFocusedRow] = useState(null);
@@ -37,10 +37,20 @@ export default function WindowedPatternRows({ rowCount, renderRow, constrainWidt
   const visible = [...indices].sort((a, b) => a - b);
   let previous = -1;
 
+  const Container = columnCount ? "tbody" : "div";
+  const spacer = (rows) => {
+    const height = rows * PATTERN_ROW_HEIGHT;
+    return columnCount
+      ? <tr aria-hidden="true"><td colSpan={columnCount} style={{ height, padding: 0, border: 0 }} /></tr>
+      : <div aria-hidden="true" style={{ height }} />;
+  };
+
   return (
-    <div
+    <Container
       ref={listRef}
-      style={{ width: constrainWidth ? "100%" : "max-content", minWidth: "100%", overflowAnchor: "none" }}
+      style={columnCount
+        ? { overflowAnchor: "none" }
+        : { width: constrainWidth ? "100%" : "max-content", minWidth: "100%", overflowAnchor: "none" }}
       onFocusCapture={(event) => {
         const row = event.target.closest("[data-pattern-row]");
         if (row) setFocusedRow(Number(row.dataset.patternRow));
@@ -54,14 +64,12 @@ export default function WindowedPatternRows({ rowCount, renderRow, constrainWidt
         previous = index;
         return (
           <Fragment key={index}>
-            {gap > 0 && <div aria-hidden="true" style={{ height: gap * PATTERN_ROW_HEIGHT }} />}
+            {gap > 0 && spacer(gap)}
             {renderRow(index)}
           </Fragment>
         );
       })}
-      {previous < rowCount - 1 && (
-        <div aria-hidden="true" style={{ height: (rowCount - previous - 1) * PATTERN_ROW_HEIGHT }} />
-      )}
-    </div>
+      {previous < rowCount - 1 && spacer(rowCount - previous - 1)}
+    </Container>
   );
 }

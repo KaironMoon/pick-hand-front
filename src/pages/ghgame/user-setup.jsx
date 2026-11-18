@@ -3,7 +3,7 @@ import AutoRiskSettings, { martinZRateSummary, martinZPatternPrioritySummary } f
 import WindowedPatternRows from "./components/WindowedPatternRows.jsx";
 import { PATTERN_ROW_HEIGHT } from "./pattern-row-window.js";
 import { duplicatePatternRowGroups, duplicatePatternRows } from "./pattern-duplicates.js";
-import { MARTIN_B_SPECIAL_NUMBER, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, validBackWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions, defaultMartinBPatternOption } from "./martin-b-settings.js";
+import { MARTIN_B_SPECIAL_NUMBER, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, validZ2WallPattern, z2FrontWallIndices, validBackWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions, defaultMartinBPatternOption } from "./martin-b-settings.js";
 import { Fragment, memo, useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
@@ -391,7 +391,7 @@ const MARTIN_Z2_PATTERN_BLOCK_ROW_COUNT = 300;
 const DUPLICATE_PATTERN_TITLE = "동일하거나 BP가 반전된 패턴이 중복 입력되어 있습니다.";
 const MARTIN_Z2_SPECIAL_NUMBER = 999;
 const MARTIN_Z2_SPECIAL_ASSIST_ERROR = `마틴Z2 부분 어시에 ${MARTIN_Z2_SPECIAL_NUMBER}번을 지정할 수 없습니다.`;
-const MARTIN_Z2_MAX_PATTERN_NUMBER = 1100;
+const MARTIN_Z2_MAX_PATTERN_NUMBER = 1400;
 const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = MARTIN_Z2_MAX_PATTERN_NUMBER - 1;
 const martinZ2PatternNumber = (index) => index < MARTIN_Z2_SPECIAL_NUMBER - 1 ? index + 1 : index + 2;
 
@@ -436,9 +436,9 @@ function cyclePatternCell(cells, index) {
   return next;
 }
 
-function PatternWallCheckbox({ rule, onChange, label, ariaLabel, back = false }) {
+function PatternWallCheckbox({ rule, onChange, label, ariaLabel, back = false, z2 = false }) {
   const field = back ? "back_wall_enabled" : "wall_enabled";
-  const isValid = back ? validBackWallPattern : validWallPattern;
+  const isValid = back ? validBackWallPattern : z2 ? validZ2WallPattern : validWallPattern;
   return (
     <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
       <input
@@ -446,7 +446,9 @@ function PatternWallCheckbox({ rule, onChange, label, ariaLabel, back = false })
         checked={Boolean(rule[field])}
         onChange={(event) => {
           if (event.target.checked && !isValid(rule.pattern)) {
-            window.alert(`${label}는 3칸 이상이며 ${back ? "뒤" : "앞"} 두 칸이 BB 또는 PP인 패턴만 사용할 수 있습니다.`);
+            window.alert(z2 && !back
+              ? `${label}는 같은 결과가 두 칸 이상으로 시작하는 패턴에 사용할 수 있습니다.`
+              : `${label}는 3칸 이상이며 ${back ? "뒤" : "앞"} 두 칸이 BB 또는 PP인 패턴만 사용할 수 있습니다.`);
             return;
           }
           onChange({ [field]: event.target.checked });
@@ -551,7 +553,7 @@ function MartinPatternBlockRows({ martin, onChange, color }) {
   );
 }
 
-const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, cellCount = PATTERN_ONLY_CELL_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false, showWall = false, showBackWall = false, visibleIndices, constrainWidth = false }) {
+const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, cellCount = PATTERN_ONLY_CELL_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false, showWall = false, showBackWall = false, z2 = false, visibleIndices, constrainWidth = false }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -571,7 +573,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
   const duplicateRows = duplicatePatternRows(patternKeys);
   const updateRule = (index, patch) => {
     const next = rules.map((rule, ruleIndex) => (
-      ruleIndex === index ? (showWall ? patchMartinBRule(rule, patch) : { ...rule, ...patch }) : rule
+      ruleIndex === index ? (showWall ? patchMartinBRule(rule, patch, { z2 }) : { ...rule, ...patch }) : rule
     ));
     onChange({ ...martin, pattern_only: next });
   };
@@ -637,6 +639,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
           const rowIndex = visibleIndices ? visibleIndices[visibleIndex] : visibleIndex;
           const rule = rules[rowIndex];
           const cells = patternCells(rule, cellCount);
+          const frontWallIndices = z2 ? z2FrontWallIndices(cells) : [0, 1];
           const backWallIndices = cells.flatMap((value, index) => value === "P" || value === "B" ? [index] : []).slice(-2);
           const isDuplicate = duplicateRows[rowIndex];
           const direction = rule.direction === "P" || rule.direction === "B" ? rule.direction : "";
@@ -681,7 +684,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
                     key={`pattern-only-${rowIndex}-${cellIndex}`}
                     cellKey={`pattern-only-${rowIndex}-${cellIndex}`}
                     value={value}
-                    wallHighlight={(showWall && rule.wall_enabled && cellIndex < 2)
+                    wallHighlight={(showWall && rule.wall_enabled && frontWallIndices.includes(cellIndex))
                       || (showBackWall && rule.back_wall_enabled && backWallIndices.includes(cellIndex))}
                     onClick={() => updateRule(rowIndex, {
                       pattern: cyclePatternCell(cells, cellIndex),
@@ -697,12 +700,21 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
               />
               {showWall && <PatternWallCheckbox
                 rule={rule} onChange={(patch) => updateRule(rowIndex, patch)}
-                label="벽치기" ariaLabel={`마틴B ${rowLabel(rowIndex)}번 벽치기`}
+                label="벽치기" ariaLabel={`${z2 ? "마틴Z2" : "마틴B"} ${rowLabel(rowIndex)}번 벽치기`} z2={z2}
               />}
               {showBackWall && <PatternWallCheckbox
                 rule={rule} onChange={(patch) => updateRule(rowIndex, patch)}
                 label="뒷벽치기" ariaLabel={`마틴Z2 ${rowLabel(rowIndex)}번 뒷벽치기`} back
               />}
+              {z2 && <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  aria-label={`마틴Z2 ${rowLabel(rowIndex)}번 시작시만 적용`}
+                  checked={Boolean(rule.start_only)}
+                  onChange={(event) => updateRule(rowIndex, { start_only: event.target.checked })}
+                />
+                시작시만 적용
+              </label>}
               <label style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 6, cursor: "pointer" }}>
                 <input
                   type="checkbox"
@@ -768,14 +780,18 @@ function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
   const specialNumber = z2 ? MARTIN_Z2_SPECIAL_NUMBER : MARTIN_B_SPECIAL_NUMBER;
   const maxPartialPatternNumber = z2 ? MARTIN_Z2_MAX_PATTERN_NUMBER : specialNumber;
   const patternNumber = (index) => z2 ? martinZ2PatternNumber(index) : index + 1;
-  const compactCell = { ...normalCell, minWidth: 0, padding: "3px 2px", whiteSpace: "normal", overflowWrap: "anywhere", fontSize: 12 };
-  const options = z2 ? Array.from({ length: MARTIN_Z2_PATTERN_ONLY_ROW_COUNT }, (_, index) => ({
-    ...defaultMartinBPatternOption(), ...martin.pattern_options?.[index],
-    success_limit: martin.pattern_options?.[index]?.success_limit ?? 31,
-    assist_round: martin.pattern_options?.[index]?.assist_round ?? 0,
-    assist_losses: martin.pattern_options?.[index]?.assist_losses ?? 0,
-    partial_patterns: Array.from({ length: 15 }, (_, i) => martin.pattern_options?.[index]?.partial_patterns?.[i] ?? 0),
-  })) : martinBPatternOptions(martin.pattern_options);
+  const compactCell = { ...normalCell, minWidth: 0, padding: "3px 2px", whiteSpace: z2 ? "nowrap" : "normal", overflowWrap: "anywhere", fontSize: 12 };
+  const savedOptions = martin.pattern_options;
+  const options = useMemo(() => z2 ? Array.from({ length: MARTIN_Z2_PATTERN_ONLY_ROW_COUNT }, (_, index) => {
+    const saved = savedOptions?.[index];
+    return {
+      ...defaultMartinBPatternOption(), ...saved,
+      success_limit: saved?.success_limit ?? 31,
+      assist_round: saved?.assist_round ?? 0,
+      assist_losses: saved?.assist_losses ?? 0,
+      partial_patterns: Array.from({ length: 15 }, (_, i) => saved?.partial_patterns?.[i] ?? 0),
+    };
+  }) : martinBPatternOptions(savedOptions), [savedOptions, z2]);
   const updateOption = (index, patch) => onChange({
     ...martin,
     pattern_options: options.map((option, i) => i === index ? { ...option, ...patch } : option),
@@ -787,6 +803,46 @@ function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
       onChange={(event) => updateOption(index, { [field]: Number(event.target.value) })}
       style={{ width, maxWidth: "100%", boxSizing: "border-box" }} />
   );
+  const renderOptionRow = (index) => {
+    const option = options[index];
+    return (
+      <tr key={index} data-pattern-row={index} aria-rowindex={z2 ? index + 2 : undefined}
+        style={z2 ? { height: PATTERN_ROW_HEIGHT } : undefined}>
+        <td style={compactCell}>{patternNumber(index)}번</td>
+        <td style={compactCell}>{numberInput(index, "success_limit", 80, "성공마감")} 승</td>
+        <td style={compactCell}>{numberInput(index, "assist_round", 80, "어시회차", 52)}</td>
+        <td style={compactCell}>{numberInput(index, "assist_losses", 80, "어시패시")}</td>
+        <td style={compactCell}><select style={{ maxWidth: "100%", fontSize: 12,
+          backgroundColor: option.assist_mode === "partial" ? "#1565c0" : "#c62828", color: "#fff" }}
+          aria-label={`${label} ${patternNumber(index)}번 전체/부분`} value={option.assist_mode}
+          onChange={(event) => updateOption(index, { assist_mode: event.target.value })}>
+          <option value="all" style={{ backgroundColor: "#c62828", color: "#fff" }}>전체</option>
+          <option value="partial" style={{ backgroundColor: "#1565c0", color: "#fff" }}>부분</option>
+        </select></td>
+        <td style={compactCell}><Box sx={{ display: "grid", gridTemplateColumns: "repeat(15, minmax(0, 1fr))", gap: "1px" }}>{option.partial_patterns.map((number, partialIndex) => <input
+          key={partialIndex} type="number" min={0} max={maxPartialPatternNumber} step={1}
+          aria-label={`${label} ${patternNumber(index)}번 부분패턴 ${partialIndex + 1}`}
+          aria-invalid={z2 && number === specialNumber ? true : undefined}
+          title={z2 && number === specialNumber ? MARTIN_Z2_SPECIAL_ASSIST_ERROR : undefined}
+          value={number}
+          onChange={(event) => updateOption(index, {
+            partial_patterns: option.partial_patterns.map((value, i) => i === partialIndex ? Number(event.target.value) : value),
+          })}
+          style={{ width: "100%", minWidth: 0, boxSizing: "border-box", padding: "2px 0", fontSize: 12,
+            ...(z2 && number === specialNumber && { border: "1px solid #ff5252", color: "#ff5252" }) }} />)}</Box></td>
+        <td style={compactCell}>{numberInput(index, "untriggered_round", 80, "패턴 미발동 지정회차")} 회차</td>
+        <td style={compactCell}>
+          <select style={{ maxWidth: "100%", fontSize: 12,
+            backgroundColor: option.untriggered_action === "assist" ? "#1565c0" : "#c62828", color: "#fff" }}
+            aria-label={`${label} ${patternNumber(index)}번 지정회차 미발동 동작`} value={option.untriggered_action}
+            onChange={(event) => updateOption(index, { untriggered_action: event.target.value })}>
+            <option value="stop" style={{ backgroundColor: "#c62828", color: "#fff" }}>베팅포기</option>
+            <option value="assist" style={{ backgroundColor: "#1565c0", color: "#fff" }}>어시패턴사용</option>
+          </select>
+        </td>
+      </tr>
+    );
+  };
   return <>
     {!optionsOnly && <MartinSection name="martin_b" label={label} martin={martin} onChange={onChange} labelColor="#6a1b9a" />}
     <tr><td colSpan={6} style={{ ...normalCell, textAlign: "left" }}>
@@ -806,45 +862,14 @@ function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
     </td></tr>
     <tr><td colSpan={6} style={{ ...normalCell, padding: 0, whiteSpace: "normal" }}>
       <Box sx={{ "& th, & td, & input, & select, & option": { fontWeight: 700 } }}>
-        <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }} aria-label={`${label} 패턴별 옵션`}>
+        <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }} aria-label={`${label} 패턴별 옵션`} aria-rowcount={z2 ? options.length + 1 : undefined}>
           <colgroup>{[6, 6, 6, 6, 7, 48, 9, 12].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
           <thead style={{ position: "sticky", top: 0, background: "#252525", zIndex: 1 }}><tr>
             {["번호", "성공마감", "어시회차", "어시패시", "전체/부분", "부분패턴번호 지정선택 (0: 미지정)", "미발동 지정", "미발동시 동작"].map((label) => <th key={label} style={{ ...headerStyle, padding: "4px 2px", fontSize: 12, overflowWrap: "anywhere" }}>{label}</th>)}
           </tr></thead>
-          <tbody>{options.map((option, index) => <tr key={index}>
-            <td style={compactCell}>{patternNumber(index)}번</td>
-            <td style={compactCell}>{numberInput(index, "success_limit", 80, "성공마감")} 승</td>
-            <td style={compactCell}>{numberInput(index, "assist_round", 80, "어시회차", 52)}</td>
-            <td style={compactCell}>{numberInput(index, "assist_losses", 80, "어시패시")}</td>
-            <td style={compactCell}><select style={{ maxWidth: "100%", fontSize: 12,
-              backgroundColor: option.assist_mode === "partial" ? "#1565c0" : "#c62828", color: "#fff" }}
-              aria-label={`${label} ${patternNumber(index)}번 전체/부분`} value={option.assist_mode}
-              onChange={(event) => updateOption(index, { assist_mode: event.target.value })}>
-              <option value="all" style={{ backgroundColor: "#c62828", color: "#fff" }}>전체</option>
-              <option value="partial" style={{ backgroundColor: "#1565c0", color: "#fff" }}>부분</option>
-            </select></td>
-            <td style={compactCell}><Box sx={{ display: "grid", gridTemplateColumns: "repeat(15, minmax(0, 1fr))", gap: "1px" }}>{option.partial_patterns.map((number, partialIndex) => <input
-              key={partialIndex} type="number" min={0} max={maxPartialPatternNumber} step={1}
-              aria-label={`${label} ${patternNumber(index)}번 부분패턴 ${partialIndex + 1}`}
-              aria-invalid={z2 && number === specialNumber ? true : undefined}
-              title={z2 && number === specialNumber ? MARTIN_Z2_SPECIAL_ASSIST_ERROR : undefined}
-              value={number}
-              onChange={(event) => updateOption(index, {
-                partial_patterns: option.partial_patterns.map((value, i) => i === partialIndex ? Number(event.target.value) : value),
-              })}
-              style={{ width: "100%", minWidth: 0, boxSizing: "border-box", padding: "2px 0", fontSize: 12,
-                ...(z2 && number === specialNumber && { border: "1px solid #ff5252", color: "#ff5252" }) }} />)}</Box></td>
-            <td style={compactCell}>{numberInput(index, "untriggered_round", 80, "패턴 미발동 지정회차")} 회차</td>
-            <td style={compactCell}>
-              <select style={{ maxWidth: "100%", fontSize: 12,
-                backgroundColor: option.untriggered_action === "assist" ? "#1565c0" : "#c62828", color: "#fff" }}
-                aria-label={`${label} ${patternNumber(index)}번 지정회차 미발동 동작`} value={option.untriggered_action}
-                onChange={(event) => updateOption(index, { untriggered_action: event.target.value })}>
-                <option value="stop" style={{ backgroundColor: "#c62828", color: "#fff" }}>베팅포기</option>
-                <option value="assist" style={{ backgroundColor: "#1565c0", color: "#fff" }}>어시패턴사용</option>
-              </select>
-            </td>
-          </tr>)}</tbody>
+          {z2
+            ? <WindowedPatternRows rowCount={options.length} renderRow={renderOptionRow} columnCount={8} />
+            : <tbody>{options.map((_, index) => renderOptionRow(index))}</tbody>}
         </table>
       </Box>
       <Box sx={{ p: 0.75, textAlign: "left" }}>본픽이 발동하는 번호에는 어시를 사용하지 않습니다. 성공마감은 번호별 누적 승수이며, 도달하면 해당 번호의 본베팅과 어시베팅을 모두 종료합니다. 어시 승수는 어시를 지정한 번호에 누적됩니다. 어시 대상으로는 어시사용인 입력 패턴{!z2 && `과 특수 패턴 ${specialNumber}번`}을 사용하며, 어시 중첩배팅 불가를 체크하면 같은 회차에 베팅 가능한 어시 중 가장 낮은 번호 하나만 발동하고, 해제하면 동시에 발동합니다.</Box>
@@ -3386,7 +3411,7 @@ export default function GhUserSetupPage() {
               rowCount={MARTIN_Z2_PATTERN_ONLY_ROW_COUNT}
               rowLabel={martinZ2PatternNumber}
               cellCount={MARTIN_Z2_PATTERN_CELL_COUNT}
-              showAssistUsage showWall showBackWall
+              showAssistUsage showWall showBackWall z2
               showMissCondition
               highlightDuplicates
             />

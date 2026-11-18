@@ -26,12 +26,25 @@ export const martinBPatternOptions = (options) => Array.from(
 export const MARTIN_B_VISIBLE_INDICES = [0, 8, 16, 24, 32, ...Array.from({ length: MARTIN_B_PATTERN_COUNT - 5 }, (_, i) => i + 40)];
 export const validWallPattern = (pattern) => Array.isArray(pattern) && pattern.filter((v) => v === "B" || v === "P").length > 2
   && ["B", "P"].includes(pattern[0]) && pattern[0] === pattern[1];
+export function z2FrontWallIndices(pattern) {
+  const indices = [];
+  let first;
+  for (const [index, value] of (Array.isArray(pattern) ? pattern : []).entries()) {
+    if (value !== "B" && value !== "P") continue;
+    first ??= value;
+    if (value !== first) break;
+    indices.push(index);
+  }
+  return indices;
+}
+export const validZ2WallPattern = (pattern) => z2FrontWallIndices(pattern).length >= 2;
 export const validBackWallPattern = (pattern) => {
   const values = Array.isArray(pattern) ? pattern.filter((v) => v === "B" || v === "P") : [];
   return values.length > 2 && values.at(-1) === values.at(-2);
 };
-export const patchMartinBRule = (rule, patch) => {
+export const patchMartinBRule = (rule, patch, { z2 = false } = {}) => {
   const next = { ...rule, ...patch };
-  return { ...next, wall_enabled: Boolean(next.wall_enabled) && validWallPattern(next.pattern),
+  const isValidWall = z2 ? validZ2WallPattern : validWallPattern;
+  return { ...next, wall_enabled: Boolean(next.wall_enabled) && isValidWall(next.pattern),
     back_wall_enabled: Boolean(next.back_wall_enabled) && validBackWallPattern(next.pattern) };
 };
