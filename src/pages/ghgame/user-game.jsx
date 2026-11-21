@@ -47,10 +47,7 @@ import {
 } from "./slot-operating-options.js";
 import {
   GH_KEEP_COUNT_DEFAULT,
-  GH_KEEP_COUNT_MAX,
-  GH_KEEP_COUNT_MIN,
   ghKeepLabel,
-  parseGhKeepCount,
 } from "./keep-count.js";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
 import {
@@ -1216,8 +1213,6 @@ export default function GhUserGamePage() {
   const [autoStatus, setAutoStatus] = useState({ running: false, autoSessionId: null });
   const [autoPlayMode, setAutoPlayMode] = useState("one");
   const [keepCount, setKeepCount] = useState(GH_KEEP_COUNT_DEFAULT);
-  const [keepCountInput, setKeepCountInput] = useState(String(GH_KEEP_COUNT_DEFAULT));
-  const [keepCountOpen, setKeepCountOpen] = useState(false);
   const [preferredAmountViewMode, setAmountViewMode] = useState("calculated");
   const [autoError, setAutoError] = useState(null);
   const [rejectMsg, setRejectMsg] = useState(null);  // 베팅 거부 레이어 팝업
@@ -1916,22 +1911,8 @@ export default function GhUserGamePage() {
         );
         if (!ok) return;
       }
-      if (autoPlayMode === "keep") {
-        setKeepCountInput(String(keepCount));
-        setKeepCountOpen(true);
-        return;
-      }
       setAutoDialogOpen(true);
     }
-  };
-
-  const confirmKeepCount = () => {
-    const parsed = parseGhKeepCount(keepCountInput);
-    if (parsed == null) return;
-    setKeepCount(parsed);
-    setAutoPlayMode("keep");
-    setKeepCountOpen(false);
-    setAutoDialogOpen(true);
   };
 
   const handleInput = async (inputValue) => {
@@ -3798,32 +3779,6 @@ export default function GhUserGamePage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={keepCountOpen} onClose={() => setKeepCountOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>KEEP 반복 횟수</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            size="small"
-            type="number"
-            label="실행할 슈 수"
-            value={keepCountInput}
-            onChange={(event) => setKeepCountInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") confirmKeepCount();
-            }}
-            inputProps={{ min: GH_KEEP_COUNT_MIN, max: GH_KEEP_COUNT_MAX, step: 1 }}
-            error={keepCountInput !== "" && parseGhKeepCount(keepCountInput) == null}
-            helperText={`${GH_KEEP_COUNT_MIN}~${GH_KEEP_COUNT_MAX}회 · 1회는 ONE을 사용하세요`}
-            sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setKeepCountOpen(false)}>취소</Button>
-          <Button variant="contained" disabled={parseGhKeepCount(keepCountInput) == null} onClick={confirmKeepCount}>확인</Button>
-        </DialogActions>
-      </Dialog>
-
       {/* Auto 베팅 시작 모달 — mvp-aboo-integration.md §5.1 */}
       <AutoStartDialog
         open={autoDialogOpen}
@@ -3858,6 +3813,7 @@ export default function GhUserGamePage() {
         gameType="gh"
         playMode={autoPlayMode}
         keepCount={keepCount}
+        onKeepCountChange={setKeepCount}
       />
 
       {/* 베팅 거부 레이어 팝업 */}

@@ -7,14 +7,15 @@ import {
   parseNc2KeepCount,
 } from "../src/pages/nc2game/keep-count.js";
 
-test("NC2 KEEP defaults to five and accepts only two through ten shoes", () => {
+test("NC2 KEEP defaults to five and accepts only two through twenty shoes", () => {
   assert.equal(parseNc2KeepCount(2), 2);
   assert.equal(parseNc2KeepCount("5"), 5);
   assert.equal(parseNc2KeepCount(1), null);
   assert.equal(parseNc2KeepCount(6), 6);
   assert.equal(parseNc2KeepCount("10"), 10);
-  assert.equal(parseNc2KeepCount(11), null);
-  assert.equal(parseNc2KeepCount(20), null);
+  assert.equal(parseNc2KeepCount(11), 11);
+  assert.equal(parseNc2KeepCount(20), 20);
+  assert.equal(parseNc2KeepCount(21), null);
   assert.equal(parseNc2KeepCount("2.5"), null);
   assert.equal(NC2_KEEP_COUNT_DEFAULT, 5);
 });

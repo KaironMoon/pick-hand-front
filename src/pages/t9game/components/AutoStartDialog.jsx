@@ -2,7 +2,7 @@
  * Auto 시작 모달 — mvp-aboo-integration.md §5.1 step 3.
  *
  * 동작:
- *  - 열림 시 /auth/session-status 로 JSESSIONID 캡처 상태 확인.
+ *  - 열림 시 /auth/session-status?verify=true 로 JSESSIONID 실시간 검증.
  *  - 캡처 없거나 expired → "캡처 필요" 안내 + 입력 비활성.
  *  - 캡처 OK → table_id / server 입력 + "자동 베팅 시작" 활성.
  *  - 시작 호출 후 부모에서 폴링 시작.
@@ -29,6 +29,8 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import autoService from "@/services/auto-service";
+import { GH_KEEP_COUNT_DEFAULT, GH_KEEP_COUNT_MIN, GH_KEEP_COUNT_MAX, parseGhKeepCount } from "@/pages/ghgame/keep-count.js";
+import { NC2_KEEP_COUNT_DEFAULT, NC2_KEEP_COUNT_MIN, NC2_KEEP_COUNT_MAX, parseNc2KeepCount } from "@/pages/nc2game/keep-count.js";
 
 // 서버 옵션: gs1 ~ gs29 + (자동탐지) 빈값
 const SERVER_OPTIONS = ["", ...Array.from({ length: 29 }, (_, i) => `gs${i + 1}`)];
@@ -79,14 +81,25 @@ const formatAge = (sec) => {
   return `${Math.floor(sec / 3600)}시간 전`;
 };
 
-const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameId, pickhandId, gameType = "gh", playMode = "keep", keepCount = null }) => {
+const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameId, pickhandId, gameType = "gh", playMode = "keep", keepCount = null, onKeepCountChange }) => {
   const [sessionInfo, setSessionInfo] = useState(null);
+  const [sessionVerifying, setSessionVerifying] = useState(true);
   const [tableId, setTableId] = useState("");
   const [server, setServer] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [startMode, setStartMode] = useState("first_round");
+  const [startMode, setStartMode] = useState("immediate");
   const [featureDisabled, setFeatureDisabled] = useState(false);
+  const [keepCountInput, setKeepCountInput] = useState("");
+  const hasKeepCount = playMode === "keep" && ["gh", "nc2"].includes(gameType);
+  const keepCountDefault = gameType === "nc2" ? NC2_KEEP_COUNT_DEFAULT : GH_KEEP_COUNT_DEFAULT;
+  const keepCountMin = gameType === "nc2" ? NC2_KEEP_COUNT_MIN : GH_KEEP_COUNT_MIN;
+  const keepCountMax = gameType === "nc2" ? NC2_KEEP_COUNT_MAX : GH_KEEP_COUNT_MAX;
+  const parsedKeepCount = (gameType === "nc2" ? parseNc2KeepCount : parseGhKeepCount)(keepCountInput);
+
+  useEffect(() => {
+    if (open) setKeepCountInput(String(keepCount ?? keepCountDefault));
+  }, [open, keepCount, keepCountDefault]);
 
   // 테이블 목록 (pick-aboo /tables/discover 프록시)
   const [tables, setTables] = useState([]);
@@ -94,10 +107,15 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
   const [tablesError, setTablesError] = useState(null);
   const [filterMin1000, setFilterMin1000] = useState(true);  // 기본: 최소 1000원만
 
-  // 모달 열림 + 캡처 OK 시 테이블 목록 자동 로드
+  const isCaptureOk = open && !sessionVerifying
+    && sessionInfo?.pickhandId === pickhandId
+    && sessionInfo?.captured === true && sessionInfo?.status === "fresh"
+    && sessionInfo?.verified === true;
+
+  // 실제 세션 검증이 성공한 뒤 테이블 목록 자동 로드
   useEffect(() => {
     if (!open || !pickhandId) return undefined;
-    if (!sessionInfo || sessionInfo.status !== "fresh") return undefined;
+    if (!isCaptureOk) return undefined;
     let cancelled = false;
     (async () => {
       setTablesLoading(true);
@@ -128,10 +146,10 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
       }
     })();
     return () => { cancelled = true; };
-  }, [open, pickhandId, sessionInfo]);
+  }, [open, pickhandId, sessionInfo, isCaptureOk]);
 
   const refreshTables = async () => {
-    if (!pickhandId) return;
+    if (!pickhandId || !isCaptureOk) return;
     setTablesLoading(true);
     setTablesError(null);
     try {
@@ -156,10 +174,18 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
   };
 
   useEffect(() => {
+    setSessionInfo(null);
+    setSessionVerifying(true);
+    setFeatureDisabled(false);
+    setTableId("");
+    setTables([]);
+    setTablesError(null);
+    setTablesLoading(false);
+    setError(null);
     if (!open) {
       setError(null);
       setBusy(false);
-      setStartMode("first_round");
+      setStartMode("immediate");
       return;
     }
     if (!pickhandId) {
@@ -170,21 +196,28 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
     let cancelled = false;
     (async () => {
       try {
-        const info = await autoService.getSessionStatus(pickhandId);
-        if (!cancelled) setSessionInfo(info);
+        const info = await autoService.getSessionStatus(pickhandId, { verify: true });
+        if (cancelled) return;
+        setSessionInfo({ ...info, pickhandId });
+        if (info.captured && info.status === "fresh" && info.verified !== true) {
+          setError("세션을 검증하지 못했습니다. 잠시 후 시작 창을 다시 열어 주세요.");
+        }
       } catch (e) {
         if (cancelled) return;
         if (e?.response?.status === 503) {
           setFeatureDisabled(true);
         } else {
-          setError("세션 상태 조회 실패");
+          setError("세션 검증 실패. 잠시 후 시작 창을 다시 열어 주세요.");
         }
+      } finally {
+        if (!cancelled) setSessionVerifying(false);
       }
     })();
     return () => { cancelled = true; };
   }, [open, pickhandId]);
 
   const handleStart = async () => {
+    if (!isCaptureOk || (hasKeepCount && parsedKeepCount == null)) return;
     setError(null);
     setBusy(true);
     try {
@@ -203,9 +236,10 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
         server: server.trim() || null,
         gameType,
         playMode,
-        keepCount,
+        keepCount: hasKeepCount ? parsedKeepCount : keepCount,
         startMode,
       });
+      if (hasKeepCount) onKeepCountChange?.(parsedKeepCount);
       onStarted?.(resp);
       onClose?.();
     } catch (e) {
@@ -243,8 +277,7 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
     }
   };
 
-  const isCaptureOk = sessionInfo?.captured && sessionInfo?.status === "fresh";
-  const canStart = !!pickhandId && isCaptureOk && tableId.trim().length > 0 && !busy;
+  const canStart = !!pickhandId && isCaptureOk && tableId.trim().length > 0 && !busy && (!hasKeepCount || parsedKeepCount != null);
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
@@ -260,20 +293,36 @@ const AutoStartDialog = ({ open, onClose, onStarted, onError, beforeStart, gameI
             자동 베팅에 사용할 계정 정보를 확인할 수 없습니다.
           </Alert>
         )}
-        {!featureDisabled && sessionInfo && (
+        {!featureDisabled && pickhandId && (
           <Stack spacing={1} sx={{ mb: 2 }}>
             <Typography variant="body2">
               JSESSIONID:&nbsp;
-              {isCaptureOk
-                ? `캡처됨 (${formatAge(sessionInfo.age_seconds)})`
-                : "캡처 필요 / 만료"}
+              {sessionVerifying
+                ? "검증 중…"
+                : isCaptureOk
+                ? `유효함 (캡처 ${formatAge(sessionInfo.age_seconds)})`
+                : sessionInfo && (!sessionInfo.captured || sessionInfo.status !== "fresh")
+                ? "캡처 필요 / 만료"
+                : "검증 실패"}
             </Typography>
-            {!isCaptureOk && (
+            {!sessionVerifying && sessionInfo && (!sessionInfo.captured || sessionInfo.status !== "fresh") && (
               <Alert severity="warning">모바일 앱에서 JSESSIONID를 캡처하세요</Alert>
             )}
           </Stack>
         )}
         <Stack spacing={2}>
+          {hasKeepCount && <TextField
+            fullWidth
+            size="small"
+            type="number"
+            label="실행할 슈 수"
+            value={keepCountInput}
+            onChange={(event) => setKeepCountInput(event.target.value)}
+            disabled={busy}
+            inputProps={{ min: keepCountMin, max: keepCountMax, step: 1 }}
+            error={keepCountInput !== "" && parsedKeepCount == null}
+            helperText={`${keepCountMin}~${keepCountMax}회 · 1회는 ONE을 사용하세요`}
+          />}
           {gameType === "gh" && <FormControl size="small" disabled={busy} fullWidth>
             <InputLabel id="auto-start-mode-label">시작 방식</InputLabel>
             <Select labelId="auto-start-mode-label" label="시작 방식" value={startMode}

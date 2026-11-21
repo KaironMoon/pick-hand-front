@@ -7,14 +7,15 @@ import {
   parseGhKeepCount,
 } from "../src/pages/ghgame/keep-count.js";
 
-test("GH KEEP defaults to five and accepts only two through ten shoes", () => {
+test("GH KEEP defaults to five and accepts only two through twenty shoes", () => {
   assert.equal(parseGhKeepCount(2), 2);
   assert.equal(parseGhKeepCount("5"), 5);
   assert.equal(parseGhKeepCount(1), null);
   assert.equal(parseGhKeepCount(6), 6);
   assert.equal(parseGhKeepCount("10"), 10);
-  assert.equal(parseGhKeepCount(11), null);
-  assert.equal(parseGhKeepCount(20), null);
+  assert.equal(parseGhKeepCount(11), 11);
+  assert.equal(parseGhKeepCount(20), 20);
+  assert.equal(parseGhKeepCount(21), null);
   assert.equal(parseGhKeepCount("2.5"), null);
   assert.equal(GH_KEEP_COUNT_DEFAULT, 5);
 });

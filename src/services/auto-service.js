@@ -10,12 +10,12 @@ import apiCaller from "./api-caller";
 import { ABOO_API } from "@/constants/api-url";
 
 const autoService = {
-  async getSessionStatus(pickhandId) {
-    const resp = await apiCaller.get(ABOO_API.SESSION_STATUS, { caller_user_id: pickhandId });
+  async getSessionStatus(pickhandId, { verify = false } = {}) {
+    const resp = await apiCaller.get(ABOO_API.SESSION_STATUS, { caller_user_id: pickhandId, verify });
     return resp.data;
   },
 
-  async startAuto({ gameId, pickhandId, tableId, server, gameType = "gh", playMode = "keep", keepCount = null, startMode = "first_round" }) {
+  async startAuto({ gameId, pickhandId, tableId, server, gameType = "gh", playMode = "keep", keepCount = null, startMode = "immediate" }) {
     const resp = await apiCaller.post(ABOO_API.AUTO_START, {
       game_id: gameId,
       caller_user_id: pickhandId,

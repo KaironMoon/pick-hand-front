@@ -18,9 +18,6 @@ import { nc2ItemNumberStyle } from "./item-end-style.js";
 import { nc2AggregateDisplay } from "./nc-aggregate-display.js";
 import {
   NC2_KEEP_COUNT_DEFAULT,
-  NC2_KEEP_COUNT_MAX,
-  NC2_KEEP_COUNT_MIN,
-  parseNc2KeepCount,
 } from "./keep-count.js";
 import { clearNc2KeepCombination, loadNc2KeepCombination, saveNc2KeepCombination } from "./keep-combination.js";
 import { createGameResponseGuard } from "./game-response-guard.js";
@@ -409,8 +406,6 @@ export default function Nc2UserGamePage() {
   const [autoOpen, setAutoOpen] = useState(false);
   const [autoPlayMode, setAutoPlayMode] = useState("keep");
   const [keepCount, setKeepCount] = useState(NC2_KEEP_COUNT_DEFAULT);
-  const [keepCountInput, setKeepCountInput] = useState(String(NC2_KEEP_COUNT_DEFAULT));
-  const [keepCountOpen, setKeepCountOpen] = useState(false);
   const [autoStatus, setAutoStatus] = useState({ running: false });
   const [autoStatusError, setAutoStatusError] = useState(null);
   const [amountViewMode, setAmountViewMode] = useState("calculated");
@@ -1136,25 +1131,11 @@ export default function Nc2UserGamePage() {
       );
       if (!ok) return;
     }
-    if (autoPlayMode === "keep") {
-      setKeepCountInput(String(keepCount));
-      setKeepCountOpen(true);
-      return;
-    }
     setAutoOpen(true);
   };
 
   const handleAutoModeChange = (mode) => {
     setAutoPlayMode(mode === "one" ? "one" : "keep");
-  };
-
-  const confirmKeepCount = () => {
-    const parsed = parseNc2KeepCount(keepCountInput);
-    if (parsed == null) return;
-    setKeepCount(parsed);
-    setAutoPlayMode("keep");
-    setKeepCountOpen(false);
-    setAutoOpen(true);
   };
 
   const overallBettingStopped = state?.overall_stop?.stopped === true;
@@ -1462,32 +1443,7 @@ export default function Nc2UserGamePage() {
         setAutoStatus({ ...status, running: status?.running ?? status?.status === "running" });
         setAutoStatusError(null);
         refreshGameSlots().catch(() => {});
-      }} onError={(value) => setError(value.detail)} gameId={game?.game_id} pickhandId={user?.pickhand_id || user?.username} gameType="nc2" playMode={autoPlayMode} keepCount={keepCount} />
-      <Dialog open={keepCountOpen} onClose={() => setKeepCountOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>KEEP 반복 횟수</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            size="small"
-            type="number"
-            label="실행할 슈 수"
-            value={keepCountInput}
-            onChange={(event) => setKeepCountInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") confirmKeepCount();
-            }}
-            inputProps={{ min: NC2_KEEP_COUNT_MIN, max: NC2_KEEP_COUNT_MAX, step: 1 }}
-            error={keepCountInput !== "" && parseNc2KeepCount(keepCountInput) == null}
-            helperText={`${NC2_KEEP_COUNT_MIN}~${NC2_KEEP_COUNT_MAX}회 · 1회는 ONE을 사용하세요`}
-            sx={{ mt: 1 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setKeepCountOpen(false)}>취소</Button>
-          <Button variant="contained" disabled={parseNc2KeepCount(keepCountInput) == null} onClick={confirmKeepCount}>확인</Button>
-        </DialogActions>
-      </Dialog>
+      }} onError={(value) => setError(value.detail)} gameId={game?.game_id} pickhandId={user?.pickhand_id || user?.username} gameType="nc2" playMode={autoPlayMode} keepCount={keepCount} onKeepCountChange={setKeepCount} />
       <Dialog open={replayOpen} onClose={() => !replayLoading && setReplayOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>게임 리플레이</DialogTitle>
         <DialogContent>
