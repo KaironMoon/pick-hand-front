@@ -9,6 +9,7 @@ import { supportAdminUsername } from "@/services/gh-support-service";
 import autoService from "@/services/auto-service";
 import AutoStartDialog from "../t9game/components/AutoStartDialog";
 import GhStrategyBoard from "./components/GhStrategyBoard";
+import GhBetPauseControls from "./components/GhBetPauseControls";
 import GhBigRoad2 from "./components/GhBigRoad2";
 import MartinBPatternBoard from "./components/MartinBPatternBoard";
 import GhRoundBetDetailDialog from "./components/GhRoundBetDetailDialog";
@@ -401,51 +402,6 @@ function GhBetDirectionBadge({ side }) {
   );
 }
 
-function GhBetPauseControls({ mode, settings, disabled, onToggle, onSave }) {
-  const playing = mode === "play";
-  const settingsDisabled = disabled || mode === "manual_stop";
-  return (
-    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", width: "100%", pl: 4 }}>
-      <Button variant="outlined" size="small" disabled={disabled}
-        aria-label={playing ? "실배팅 중지" : "실배팅 재개"} aria-pressed={!playing}
-        onClick={() => onToggle(playing ? "manual_stop" : "play")}
-        sx={{ ...betPauseTileSx, width: 145, justifyContent: "center", color: playing ? "#00e676" : "#ffd54f" }}>
-        {playing ? "BET PLAY" : "BET STOP"}
-      </Button>
-      {[
-        ["bet_pause_losses", "연속패 STOP", "#ffd54f"],
-        ["bet_resume_wins", "연속승리 START", "#00e676"],
-      ].map(([key, label, color]) => {
-        const saved = settings?.[key] ?? 0;
-        return (
-          <Box key={key} component="label" sx={{
-            ...betPauseTileSx, color, gap: 0.5, width: 145, opacity: settingsDisabled ? 0.4 : 1,
-          }}>
-            <input key={saved} type="number" min="0" step="1" defaultValue={saved} disabled={settingsDisabled}
-              onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
-              onBlur={(event) => {
-                if (settingsDisabled) return;
-                const value = Number(event.currentTarget.value);
-                if (!Number.isSafeInteger(value) || value < 0 || value === saved) {
-                  event.currentTarget.value = saved;
-                  return;
-                }
-                onSave(key, value).then((success) => {
-                  if (!success && event.target.isConnected) event.target.value = saved;
-                });
-              }}
-              style={{ width: 45, color: "#fff", background: "#16213e", border: "1px solid #59616d" }}
-            />
-            <span>{label}</span>
-          </Box>
-        );
-      })}
-      <Button variant="outlined" size="small" disabled sx={{ ...betPauseTileSx, width: 145, justifyContent: "center" }}>
-        픽체인지
-      </Button>
-    </Box>
-  );
-}
 
 function GhRoundAmountTable({
   gameId,
@@ -741,6 +697,7 @@ function GhRoundAmountTable({
         ))}
       </Box>
       <GhBetPauseControls
+        tileSx={betPauseTileSx}
         key={gameId}
         mode={pauseMode}
         settings={roundState?.bet_pause_settings}
