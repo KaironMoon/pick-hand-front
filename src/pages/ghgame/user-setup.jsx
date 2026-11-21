@@ -3392,11 +3392,12 @@ export default function GhUserSetupPage() {
             </td></tr>
             <tr><td colSpan={6} style={{ padding: 8 }}>
               <Tooltip title={martinZRateSummary(martinZ2).replaceAll("마틴Z", "마틴Z2")}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                   <TextField size="small" type="number" label="마틴Z2 최소 승률 (%)"
+                    sx={{ width: 220, maxWidth: "100%", flexShrink: 0 }}
                     value={martinZ2.win_rate_threshold ?? 0} inputProps={{ min: 0, max: 100, step: 0.1 }}
                     onChange={(event) => martinChanges.martin_z2({ ...martinZ2, win_rate_threshold: Number(event.target.value) })} />
-                  <Typography variant="caption">미만이면 단계 유지·0.0P, 이상으로 회복하면 정상 배팅 · 0은 사용안함 ⓘ</Typography>
+                  <Typography variant="caption" sx={{ minWidth: 0, whiteSpace: "normal", overflowWrap: "anywhere" }}>미만이면 단계 유지·0.0P, 이상으로 회복하면 정상 배팅 · 0은 사용안함 ⓘ</Typography>
                 </Box>
               </Tooltip>
             </td></tr>
