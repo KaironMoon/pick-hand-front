@@ -338,12 +338,13 @@ function GhLossStopStatus({ roundState, autoStatus }) {
         <Tooltip title={finalBetCapSummary(roundState?.auto_final_bet_cap_amount)}>
           <Typography variant="caption" sx={{ color: "#ffe082" }}>최종 배팅 상한(×1): {roundState?.auto_final_bet_cap_amount || "사용안함"} {roundState?.auto_final_bet_cap_amount > 0 ? "P" : ""} ⓘ</Typography>
         </Tooltip>
-        <Tooltip title={martinZRateSummary({}, roundState?.pick_martin)}>
+        <Tooltip title={martinZRateSummary({}, {
+          win_rate_threshold: roundState?.pick_martin?.win_rate_threshold,
+          win_rate_blocked: roundState?.pick_martin?.win_rate_blocked,
+        })}>
           <Typography variant="caption" sx={{ color: roundState?.pick_martin?.win_rate_blocked ? "#ff8a80" : "#ffe082" }}>
             마틴{roundState?.martin_z_variant === "z2" ? "Z2" : "Z"} 승률 조건: {roundState?.pick_martin?.win_rate_threshold || "사용안함"}{roundState?.pick_martin?.win_rate_threshold > 0 ? "%" : ""}
-            {roundState?.pick_martin?.win_rate_threshold > 0 && (
-              <> · 현재 {roundState.pick_martin.win_rate_total ?? 0}전 {roundState.pick_martin.win_rate_wins ?? 0}승 {roundState.pick_martin.win_rate_losses ?? 0}패 ({roundState.pick_martin.win_rate ?? "—"}%)</>
-            )} ⓘ
+            {" ⓘ"}
           </Typography>
         </Tooltip>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.overall_stop?.reason === "overall_loss_limit_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>

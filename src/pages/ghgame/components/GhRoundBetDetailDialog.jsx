@@ -205,6 +205,7 @@ export default function GhRoundBetDetailDialog({ open, onClose, gameId, complete
   const sequenceLoading = Boolean(lookupKey && !sequenceResult);
   const virtualDetail = sequenceResult?.data?.virtual_detail;
   const virtualWager = virtualDetail ?? virtualBet;
+  const z2Rate = detail?.martin_z2_win_rate;
   const hasOrderRecord = Boolean(actualCell?.external_game_id || actualCell?.bet_placed || actualCell?.failure_code);
   const showOrder = hasOrderRecord || amountMode === "actual";
   const placed = Boolean(actualCell?.bet_placed);
@@ -228,6 +229,11 @@ export default function GhRoundBetDetailDialog({ open, onClose, gameId, complete
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 실제 결과: {detail.actual || "미입력"}
               </Typography>
+              {z2Rate && (
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  마틴Z2 배팅 전 승률 · {z2Rate.win_rate_total}전 {z2Rate.win_rate_wins}승 {z2Rate.win_rate_losses}패 ({z2Rate.win_rate == null ? "—" : `${z2Rate.win_rate}%`})
+                </Typography>
+              )}
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
                 <Box>
                   <Typography variant="subtitle1" fontWeight={700}>{showOrder ? "실배팅 (BET)" : "계산 배팅 (RE)"}</Typography>
