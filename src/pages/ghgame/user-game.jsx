@@ -339,7 +339,12 @@ function GhLossStopStatus({ roundState, autoStatus }) {
           <Typography variant="caption" sx={{ color: "#ffe082" }}>최종 배팅 상한(×1): {roundState?.auto_final_bet_cap_amount || "사용안함"} {roundState?.auto_final_bet_cap_amount > 0 ? "P" : ""} ⓘ</Typography>
         </Tooltip>
         <Tooltip title={martinZRateSummary({}, roundState?.pick_martin)}>
-          <Typography variant="caption" sx={{ color: roundState?.pick_martin?.win_rate_blocked ? "#ff8a80" : "#ffe082" }}>마틴{roundState?.martin_z_variant === "z2" ? "Z2" : "Z"} 승률 조건: {roundState?.pick_martin?.win_rate_threshold || "사용안함"}{roundState?.pick_martin?.win_rate_threshold > 0 ? "%" : ""} ⓘ</Typography>
+          <Typography variant="caption" sx={{ color: roundState?.pick_martin?.win_rate_blocked ? "#ff8a80" : "#ffe082" }}>
+            마틴{roundState?.martin_z_variant === "z2" ? "Z2" : "Z"} 승률 조건: {roundState?.pick_martin?.win_rate_threshold || "사용안함"}{roundState?.pick_martin?.win_rate_threshold > 0 ? "%" : ""}
+            {roundState?.pick_martin?.win_rate_threshold > 0 && (
+              <> · 현재 {roundState.pick_martin.win_rate_total ?? 0}전 {roundState.pick_martin.win_rate_wins ?? 0}승 {roundState.pick_martin.win_rate_losses ?? 0}패 ({roundState.pick_martin.win_rate ?? "—"}%)</>
+            )} ⓘ
+          </Typography>
         </Tooltip>
         <Typography variant="caption" sx={{ px: 1, py: 0.35, border: "1px solid rgba(255,193,7,.45)", borderRadius: 1, color: roundState?.overall_stop?.reason === "overall_loss_limit_reached" ? "#ff8a80" : "#ffe082", fontWeight: 800 }}>
           전체 손실종료조건: {overallLossStopStatusLabel(roundState?.overall_stop)}
@@ -707,10 +712,14 @@ function GhRoundAmountTable({
       />
       {patternDisplay ? <Box sx={{ width: amountGridWidth, maxWidth: "100%" }}><MartinBPatternBoard display={patternDisplay} /></Box> : <Box sx={{ display: "grid", gridTemplateRows: `repeat(${amountGridRowCount}, 31px)`, gridAutoFlow: "column", gridAutoColumns: "84px", gap: "2px" }}>
         {Array.from({ length: cellCount }, (_, idx) => {
-          const martinAmount = martinNetAmount(strategyCells[idx]);
           const held = isHeld(cells[idx]);
           const virtualBet = virtualOnlyWager(virtualBets?.rounds?.[idx], strategyCells[idx], actualCells[idx], amountMode);
-          const showMartinAmount = !held && !virtualBet && amountMode !== "actual" && martinAmount > 0;
+          const isVirtualZ2 = !hasRoundWager(strategyCells[idx], actualCells[idx], amountMode);
+          const z2Wager = amountMode !== "actual"
+            ? (isVirtualZ2 ? virtualBets?.rounds?.[idx]?.martin_z2_wager : strategyCells[idx]?.martin_z2_wager)
+            : null;
+          const martinAmount = z2Wager ? z2Wager.amount : martinNetAmount(strategyCells[idx]);
+          const showMartinAmount = Boolean(z2Wager) || (!held && !virtualBet && amountMode !== "actual" && martinAmount > 0);
           return (
             <Box
               key={idx}
@@ -734,7 +743,12 @@ function GhRoundAmountTable({
               }}>{idx + 1}</Box>
               <Box sx={{ color: "#fff", fontSize: showMartinAmount ? 9 : 11, fontWeight: "bold", textAlign: "right", pr: 0.4, whiteSpace: "nowrap" }}>
                 {fmt(held || virtualBet ? 0 : cells[idx]?.amount)}
-                {showMartinAmount && <span style={{ color: hasMartinZBet(strategyCells[idx]) ? "#ef5350" : "inherit" }}> ({fmt(martinAmount)})</span>}
+                {showMartinAmount && <span style={{
+                  color: z2Wager && isVirtualZ2 ? "#ffcdd2" : hasMartinZBet(strategyCells[idx]) ? "#ef5350" : "inherit",
+                  backgroundColor: z2Wager ? BET_BOARD_WAGER_BG[z2Wager.status] || "transparent" : "transparent",
+                  borderRadius: 2,
+                  padding: z2Wager ? "1px 2px" : undefined,
+                }}> ({fmt(martinAmount)})</span>}
               </Box>
             </Box>
           );

@@ -6,7 +6,7 @@ import { duplicatePatternRowGroups, duplicatePatternRows } from "./pattern-dupli
 import { MARTIN_B_SPECIAL_NUMBER, MARTIN_B_PATTERN_ROW_COUNT, MARTIN_B_VISIBLE_INDICES, validWallPattern, validZ2WallPattern, z2WallIndices, validBackWallPattern, patchMartinBRule, martinBPatternLabel, martinBPatternOptions, defaultMartinBPatternOption } from "./martin-b-settings.js";
 import { Fragment, memo, useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
-import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip } from "@mui/material";
+import { Box, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip, TablePagination } from "@mui/material";
 import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
 import apiCaller from "@/services/api-caller";
 import { GH_GAMES_API, USER_BET_SETTINGS_API } from "@/constants/api-url";
@@ -387,12 +387,13 @@ const EMPTY_MARTIN_PATTERN_RULE = {
 const PATTERN_ONLY_CELL_COUNT = 20;
 const PATTERN_ONLY_ROW_COUNT = 100;
 const MARTIN_Z2_PATTERN_CELL_COUNT = 30;
-const MARTIN_Z2_PATTERN_BLOCK_ROW_COUNT = 300;
+const MARTIN_Z2_PATTERN_BLOCK_ROW_COUNT = 5;
 const DUPLICATE_PATTERN_TITLE = "동일하거나 BP가 반전된 패턴이 중복 입력되어 있습니다.";
 const MARTIN_Z2_SPECIAL_NUMBER = 999;
 const MARTIN_Z2_SPECIAL_ASSIST_ERROR = `마틴Z2 부분 어시에 ${MARTIN_Z2_SPECIAL_NUMBER}번을 지정할 수 없습니다.`;
-const MARTIN_Z2_MAX_PATTERN_NUMBER = 1400;
+const MARTIN_Z2_MAX_PATTERN_NUMBER = 2400;
 const MARTIN_Z2_PATTERN_ONLY_ROW_COUNT = MARTIN_Z2_MAX_PATTERN_NUMBER - 1;
+const MARTIN_Z2_PAGE_SIZES = [100, 300, 500, 1000];
 const martinZ2PatternNumber = (index) => index < MARTIN_Z2_SPECIAL_NUMBER - 1 ? index + 1 : index + 2;
 
 function PatternCell({ value, onClick, cellKey, wallHighlight = false }) {
@@ -554,7 +555,7 @@ function MartinPatternBlockRows({ martin, onChange, color }) {
   );
 }
 
-const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, cellCount = PATTERN_ONLY_CELL_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false, showWall = false, showBackWall = false, z2 = false, visibleIndices, constrainWidth = false }) {
+const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onChange, color, rowCount = PATTERN_ONLY_ROW_COUNT, cellCount = PATTERN_ONLY_CELL_COUNT, rowLabel = (index) => String(index + 1), showMissCondition = false, showExactLossCondition = false, highlightDuplicates = true, recommendSingleStep = true, showAssistUsage = false, showWall = false, showBackWall = false, z2 = false, visibleIndices, pageRange, constrainWidth = false }) {
   const rawRules = Array.isArray(martin.pattern_only)
     ? martin.pattern_only
     : martin.pattern_only && typeof martin.pattern_only === "object"
@@ -568,6 +569,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
       ...(showAssistUsage ? { assist_enabled: Boolean(rawRule?.assist_enabled ?? rawRule?.enabled) } : {}),
     };
   });
+  const displayedCount = pageRange?.count ?? visibleIndices?.length ?? rowCount;
   const patternKeys = highlightDuplicates
     ? rules.map((rule) => patternCells(rule, cellCount).join(""))
     : [];
@@ -636,8 +638,8 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
           )}
         </Box>
         {/* All rules stay in state; only the visible inputs are mounted. */}
-        <WindowedPatternRows constrainWidth={constrainWidth} rowCount={visibleIndices?.length ?? rowCount} renderRow={(visibleIndex) => {
-          const rowIndex = visibleIndices ? visibleIndices[visibleIndex] : visibleIndex;
+        <WindowedPatternRows key={pageRange?.key} constrainWidth={constrainWidth} rowCount={displayedCount} renderRow={(visibleIndex) => {
+          const rowIndex = visibleIndices ? visibleIndices[visibleIndex] : (pageRange?.start ?? 0) + visibleIndex;
           const rule = rules[rowIndex];
           const cells = patternCells(rule, cellCount);
           const frontWallIndices = z2 ? z2WallIndices(cells) : [0, 1];
@@ -649,7 +651,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
           return (
             <Box
               key={`pattern-only-row-${rowIndex}`}
-              data-pattern-row={rowIndex}
+              data-pattern-row={visibleIndex}
               sx={{
                 height: PATTERN_ROW_HEIGHT,
                 display: "flex",
@@ -662,7 +664,7 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
                 borderTop: CELL_BORDER,
                 borderLeft: CELL_BORDER,
                 borderRight: CELL_BORDER,
-                borderBottom: visibleIndex === (visibleIndices?.length ?? rowCount) - 1 ? CELL_BORDER : undefined,
+                borderBottom: visibleIndex === displayedCount - 1 ? CELL_BORDER : undefined,
                 whiteSpace: "nowrap",
               }}
             >
@@ -777,7 +779,65 @@ const MartinPatternOnlyRows = memo(function MartinPatternOnlyRows({ martin, onCh
   );
 });
 
-function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
+function MartinZ2PatternLists({ martin, onChange }) {
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(300);
+  const start = page * pageSize;
+  const count = Math.min(pageSize, MARTIN_Z2_PATTERN_ONLY_ROW_COUNT - start);
+  const pageRange = useMemo(() => ({ start, count, key: `${start}:${count}` }), [start, count]);
+
+  const renderPagination = (position) => (
+    <tr><td colSpan={6}>
+      <TablePagination
+        component="div"
+        role="navigation"
+        aria-label={`마틴Z2 패턴 페이지 이동 ${position}`}
+        count={MARTIN_Z2_PATTERN_ONLY_ROW_COUNT}
+        page={page}
+        rowsPerPage={pageSize}
+        rowsPerPageOptions={MARTIN_Z2_PAGE_SIZES}
+        labelRowsPerPage="페이지당 패턴"
+        labelDisplayedRows={() =>
+          `${martinZ2PatternNumber(start)}~${martinZ2PatternNumber(start + count - 1)}번 · ${page + 1}/${Math.ceil(MARTIN_Z2_PATTERN_ONLY_ROW_COUNT / pageSize)} 페이지`
+        }
+        getItemAriaLabel={(type) => ({
+          first: "첫 페이지", previous: "이전 페이지", next: "다음 페이지", last: "마지막 페이지",
+        })[type]}
+        showFirstButton
+        showLastButton
+        onPageChange={(_, nextPage) => setPage(nextPage)}
+        onRowsPerPageChange={(event) => {
+          setPageSize(Number(event.target.value));
+          setPage(0);
+        }}
+        sx={{
+          "& .MuiTablePagination-toolbar": { flexWrap: "wrap", justifyContent: "flex-start", gap: 1, px: 1 },
+          "& .MuiTablePagination-spacer": { display: "none" },
+        }}
+      />
+    </td></tr>
+  );
+
+  return <>
+    {renderPagination("상단")}
+    <MartinBSection martin={martin} onChange={onChange} z2 optionsOnly pageRange={pageRange} />
+    {renderPagination("중간")}
+    <MartinPatternOnlyRows
+      martin={martin}
+      onChange={onChange}
+      color="#1565c0"
+      rowCount={MARTIN_Z2_PATTERN_ONLY_ROW_COUNT}
+      rowLabel={martinZ2PatternNumber}
+      cellCount={MARTIN_Z2_PATTERN_CELL_COUNT}
+      pageRange={pageRange}
+      showAssistUsage showWall showBackWall z2
+      showMissCondition
+    />
+    {renderPagination("하단")}
+  </>;
+}
+
+function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false, pageRange }) {
   const label = z2 ? "마틴Z2" : "마틴B";
   const specialNumber = z2 ? MARTIN_Z2_SPECIAL_NUMBER : MARTIN_B_SPECIAL_NUMBER;
   const maxPartialPatternNumber = z2 ? MARTIN_Z2_MAX_PATTERN_NUMBER : specialNumber;
@@ -805,10 +865,10 @@ function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
       onChange={(event) => updateOption(index, { [field]: Number(event.target.value) })}
       style={{ width, maxWidth: "100%", boxSizing: "border-box" }} />
   );
-  const renderOptionRow = (index) => {
+  const renderOptionRow = (index, visibleIndex = index) => {
     const option = options[index];
     return (
-      <tr key={index} data-pattern-row={index} aria-rowindex={z2 ? index + 2 : undefined}
+      <tr key={index} data-pattern-row={visibleIndex} aria-rowindex={z2 ? visibleIndex + 2 : undefined}
         style={z2 ? { height: PATTERN_ROW_HEIGHT } : undefined}>
         <td style={compactCell}>{patternNumber(index)}번</td>
         <td style={compactCell}>{numberInput(index, "success_limit", 80, "성공마감")} 승</td>
@@ -864,13 +924,14 @@ function MartinBSection({ martin, onChange, z2 = false, optionsOnly = false }) {
     </td></tr>
     <tr><td colSpan={6} style={{ ...normalCell, padding: 0, whiteSpace: "normal" }}>
       <Box sx={{ "& th, & td, & input, & select, & option": { fontWeight: 700 } }}>
-        <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }} aria-label={`${label} 패턴별 옵션`} aria-rowcount={z2 ? options.length + 1 : undefined}>
+        <table style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse" }} aria-label={`${label} 패턴별 옵션`} aria-rowcount={z2 ? (pageRange?.count ?? options.length) + 1 : undefined}>
           <colgroup>{[6, 6, 6, 6, 7, 48, 9, 12].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
           <thead style={{ position: "sticky", top: 0, background: "#252525", zIndex: 1 }}><tr>
             {["번호", "성공마감", "어시회차", "어시패시", "전체/부분", "부분패턴번호 지정선택 (0: 미지정)", "미발동 지정", "미발동시 동작"].map((label) => <th key={label} style={{ ...headerStyle, padding: "4px 2px", fontSize: 12, overflowWrap: "anywhere" }}>{label}</th>)}
           </tr></thead>
           {z2
-            ? <WindowedPatternRows rowCount={options.length} renderRow={renderOptionRow} columnCount={8} />
+            ? <WindowedPatternRows key={pageRange?.key} rowCount={pageRange?.count ?? options.length}
+                renderRow={(index) => renderOptionRow((pageRange?.start ?? 0) + index, index)} columnCount={8} />
             : <tbody>{options.map((_, index) => renderOptionRow(index))}</tbody>}
         </table>
       </Box>
@@ -3406,18 +3467,7 @@ export default function GhUserSetupPage() {
               onChange={martinChanges.martin_z2}
               color="#1565c0"
             />
-            <MartinBSection martin={martinZ2} onChange={martinChanges.martin_z2} z2 optionsOnly />
-            <MartinPatternOnlyRows
-              martin={martinZ2}
-              onChange={martinChanges.martin_z2}
-              color="#1565c0"
-              rowCount={MARTIN_Z2_PATTERN_ONLY_ROW_COUNT}
-              rowLabel={martinZ2PatternNumber}
-              cellCount={MARTIN_Z2_PATTERN_CELL_COUNT}
-              showAssistUsage showWall showBackWall z2
-              showMissCondition
-              highlightDuplicates
-            />
+            <MartinZ2PatternLists martin={martinZ2} onChange={martinChanges.martin_z2} />
             <MartinStopBetRoundRow
               martin={martinZ2}
               showStepRecovery
