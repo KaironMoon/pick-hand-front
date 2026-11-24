@@ -718,7 +718,7 @@ function GhRoundAmountTable({
           const isVirtualZ2 = !hasRoundWager(strategyCells[idx], actualCells[idx], amountMode);
           const z2Wager = amountMode !== "actual"
             ? (isVirtualZ2 ? virtualBets?.rounds?.[idx]?.martin_z2_wager : strategyCells[idx]?.martin_z2_wager)
-            : null;
+            : actualCells[idx]?.server_martin_z2_wager;
           const martinAmount = z2Wager ? z2Wager.amount : martinNetAmount(strategyCells[idx]);
           const showMartinAmount = Boolean(z2Wager) || (!held && !virtualBet && amountMode !== "actual" && martinAmount > 0);
           return (
