@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Box, Typography, useMediaQuery, useTheme, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Tooltip, Snackbar, Alert, MenuItem } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
@@ -35,6 +35,7 @@ import { resolveSlotPnl } from "./slot-summary.js";
 import { resolveBetBoardDirection } from "./bet-board-direction.js";
 import { createGameResponseGuard } from "../nc2game/game-response-guard.js";
 import { createStateRefreshQueue } from "./state-refresh-queue.js";
+import { createIncrementalView } from "./incremental-view.js";
 import {
   ghBetStopReasonLabel,
   ghDrawdownStatusLabel,
@@ -1118,6 +1119,11 @@ export default function GhUserGamePage() {
   const [roundStateUpper, setRoundStateUpper] = useState(null);
   const [betPauseBusy, setBetPauseBusy] = useState(false);
   const [roundStateLower, setRoundStateLower] = useState(null);
+  const ncRefControls = useMemo(() => ({
+    value: roundStateLower?.nc_ref_shoe_no ?? "",
+    setupValue: roundStateLower?.nc_ref_setup_game_seq ?? "랜덤",
+    readOnly: true,
+  }), [roundStateLower?.nc_ref_shoe_no, roundStateLower?.nc_ref_setup_game_seq]);
   const roundState = roundStateUpper;
   const martinBDisplay = roundState?.martin_b_display;
   const showMartinBBoard = showAutoOnly && !!martinBDisplay?.enabled;
@@ -1126,6 +1132,7 @@ export default function GhUserGamePage() {
   const [betData, setBetData] = useState(null);
   const [gameId, setGameId] = useState(null);
   const gameResponseGuardRef = useRef(createGameResponseGuard());
+  const incrementalViewRef = useRef(createIncrementalView());
   const [queueStateRefresh] = useState(() => createStateRefreshQueue());
   const [config, setConfig] = useState(null);
   const [cumPnL, setCumPnL] = useState({ gh: 0, user_a: 0, user_z: 0, user_s: 0, allp: 0, allb: 0, fail: 0, hnh: 0, one: 0, two: 0, labouchere: 0 });
@@ -1292,6 +1299,7 @@ export default function GhUserGamePage() {
   }, []);
 
   const applyGameData = useCallback((data, { preserveGameId = false } = {}) => {
+    if (!data._view) incrementalViewRef.current.reset(data);
     setLegacyRestoreBlocked(false);
     if (!preserveGameId) {
       if (!gameResponseGuardRef.current.isActive(data.game_id)) {
@@ -1368,20 +1376,21 @@ export default function GhUserGamePage() {
       const body = slotNo
         ? { slot_no: slotNo, replace_game_id: replaceGameId || null }
         : null;
-      const res = await apiCaller.post(GH_GAMES_API.START + "?mode=user", body);
+      const res = await apiCaller.post(GH_GAMES_API.START + "?mode=user&incremental_response=true", body);
+      const data = incrementalViewRef.current.accept(res.data);
       setAutoError(null);
       setAutoStatus(createEmptyAutoStatus());
       // 새 게임 응답을 전체 적용해 이전 게임의 results/빅로드/손익/베팅 상태를 함께 초기화한다.
-      applyGameData(res.data);
-      skipRestoreGameIdRef.current = res.data.game_id;
-      const responseSlotNo = res.data.slot_no || slotNo;
+      applyGameData(data);
+      skipRestoreGameIdRef.current = data.game_id;
+      const responseSlotNo = data.slot_no || slotNo;
       setSearchParams({
-        gameId: res.data.game_id,
+        gameId: data.game_id,
         ...(responseSlotNo ? { slot: responseSlotNo } : {}),
       }, { replace: true });
       if (responseSlotNo) setSelectedSlotNo(responseSlotNo);
       await refreshGameSlots();
-      return res.data;
+      return data;
     } catch (err) {
       console.error("Failed to start game:", err);
       if (err.response?.status === 400) {
@@ -1469,17 +1478,29 @@ export default function GhUserGamePage() {
       if (guard.getActiveGeneration(gid) !== queuedGeneration) return;
       const ticket = guard.begin(gid);
       try {
-        const res = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user");
+        const res = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user",
+          incrementalViewRef.current.request(gid, { full: activate }));
         if (!guard.canApply(ticket)) return;
+        const merged = incrementalViewRef.current.accept(res.data);
         if (options.partial) {
-          const data = res.data;
+          const data = merged;
           setBetData(data.bet ? { ...data.bet, user_martin: data.user_martin } : null);
           if (data.cum_pnl) setCumPnL((prev) => ({ ...prev, ...data.cum_pnl }));
         } else {
-          applyGameData(res.data);
+          applyGameData(merged);
         }
         if (options.diagnostic) reportAutoDiagnostic(options.diagnostic, "round_applied", { response: res });
       } catch (err) {
+        if (err.code === "GH_VIEW_RESYNC" && guard.canApply(ticket)) {
+          incrementalViewRef.current.reset();
+          try {
+            const full = await apiCaller.get(GH_GAMES_API.STATE(gid) + "?mode=user", { incremental_response: true });
+            if (guard.canApply(ticket)) applyGameData(incrementalViewRef.current.accept(full.data));
+            return;
+          } catch (refreshError) {
+            err = refreshError;
+          }
+        }
         if (options.diagnostic) reportAutoDiagnostic(options.diagnostic, "refresh_failed", { error: err });
         if (!guard.canApply(ticket)) return;
         if (options.partial) throw err;
@@ -1905,9 +1926,11 @@ export default function GhUserGamePage() {
 
     const ticket = gameResponseGuardRef.current.begin(gameId);
     try {
-      const res = await apiCaller.post(GH_GAMES_API.ROUND, { game_id: gameId, actual: inputValue });
+      const res = await apiCaller.post(GH_GAMES_API.ROUND, {
+        game_id: gameId, actual: inputValue, ...incrementalViewRef.current.request(gameId),
+      });
       if (!gameResponseGuardRef.current.canApply(ticket)) return;
-      const data = res.data;
+      const data = incrementalViewRef.current.accept(res.data);
       const nextStrategyRound = results.filter((result) => result.value === "P" || result.value === "B").length + 1;
       if (!wasCurrentReplay && inputValue !== "T" && data.round_num !== undefined && data.round_num !== nextStrategyRound) {
         alert("서버/클라이언트 불일치가 감지되어 페이지를 리로드합니다.");
@@ -1920,7 +1943,7 @@ export default function GhUserGamePage() {
         return;
       }
       if (wasCurrentReplay) {
-        applyGameData(data);
+        await restoreGame(gameId);
         return;
       }
       // 방금 입력한 라운드의 hit/miss를 서버 판정값으로 확정 (프론트 자체 계산 안 함)
@@ -1945,6 +1968,11 @@ export default function GhUserGamePage() {
 
     } catch (err) {
       if (!gameResponseGuardRef.current.canApply(ticket)) return;
+      if (err.code === "GH_VIEW_RESYNC") {
+        incrementalViewRef.current.reset();
+        await restoreGame(gameId);
+        return;
+      }
       console.error("Failed to record round:", err);
       setResults((prev) => prev.slice(0, -1));
       if (err.response?.data?.detail?.error === "auto_running_stop_first") {
@@ -1974,9 +2002,9 @@ export default function GhUserGamePage() {
     setProcessing(true);
     const ticket = gameResponseGuardRef.current.begin(gameId);
     try {
-      const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId));
+      const res = await apiCaller.delete(GH_GAMES_API.LAST_ROUND(gameId), incrementalViewRef.current.request(gameId));
       if (!gameResponseGuardRef.current.canApply(ticket)) return;
-      const data = res.data;
+      const data = incrementalViewRef.current.accept(res.data);
       if (data.tie_deleted) {
         setResults((prev) => prev.slice(0, -1));
         setRoundStateUpper(data.round_state_upper || null);
@@ -2007,14 +2035,20 @@ export default function GhUserGamePage() {
       setUserSummary(data.user_summary || null);
       setUserMartinDashboard(data.user_martin_dashboard || null);
     } catch (err) {
+      if (err.code === "GH_VIEW_RESYNC") {
+        incrementalViewRef.current.reset();
+        await restoreGame(gameId);
+        return;
+      }
       console.error("Failed to delete last round:", err);
     } finally {
       processingRef.current = false;
       setProcessing(false);
     }
-  }, [gameId, results]);
+  }, [gameId, results, restoreGame]);
 
   const clearCurrentGameView = () => {
+    incrementalViewRef.current.reset();
     gameResponseGuardRef.current.clear();
     setGameId(null);
     setResults([]);
@@ -2298,15 +2332,21 @@ export default function GhUserGamePage() {
       keepRefreshing = true;
       const scheduleStateRefresh = () => {
         stateRefreshTimer = window.setTimeout(() => {
-          stateRefreshPromise = apiCaller.get(GH_GAMES_API.SHOE_COPY_PROGRESS(gameId))
+          const ticket = gameResponseGuardRef.current.begin(gameId);
+          stateRefreshPromise = apiCaller.get(GH_GAMES_API.SHOE_COPY_PROGRESS(gameId),
+            incrementalViewRef.current.request(gameId))
             .then((stateRes) => {
-              applySavedRoundState(stateRes.data);
+              if (!gameResponseGuardRef.current.canApply(ticket)) return;
+              const data = incrementalViewRef.current.accept(stateRes.data);
+              applySavedRoundState(data);
               setShoeCopyProgress((prev) => ({
                 ...prev,
-                completed: Math.min(stateRes.data.completed_results, prev.total),
+                completed: Math.min(data.completed_results, prev.total),
               }));
             })
-            .catch(() => {})
+            .catch((error) => {
+              if (error.code === "GH_VIEW_RESYNC" && gameResponseGuardRef.current.canApply(ticket)) incrementalViewRef.current.reset();
+            })
             .finally(() => {
               stateRefreshPromise = null;
               if (keepRefreshing) scheduleStateRefresh();
@@ -3081,11 +3121,7 @@ export default function GhUserGamePage() {
                 subgameBasis={getRoundStateSubgameBasis(roundStateLower)}
                 ncRefShoes={roundStateLower?.nc_ref_shoes}
                 ncRefShoeNo={roundStateLower?.nc_ref_shoe_no}
-                ncRefControls={{
-                  value: roundStateLower?.nc_ref_shoe_no ?? "",
-                  setupValue: roundStateLower?.nc_ref_setup_game_seq ?? "랜덤",
-                  readOnly: true,
-                }}
+                ncRefControls={ncRefControls}
                 actualSeq={strategyResults.map((r) => r.value).join("")}
               />
             </>

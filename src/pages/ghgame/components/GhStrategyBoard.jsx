@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Box } from "@mui/material";
 
 import {
@@ -588,7 +588,7 @@ function withLiveData(base, ctx) {
   return out;
 }
 
-export default function GhStrategyBoard({ roundState }) {
+export default memo(function GhStrategyBoard({ roundState }) {
   const [maxBlinkActive, setMaxBlinkActive] = useState(false);
   const maxBlinkTimerRef = useRef(null);
   useEffect(() => () => clearTimeout(maxBlinkTimerRef.current), []);
@@ -618,4 +618,4 @@ export default function GhStrategyBoard({ roundState }) {
       </Box>
     </Box>
   );
-}
+});

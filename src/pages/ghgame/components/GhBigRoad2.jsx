@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Box, Tooltip } from "@mui/material";
 import { bigRoadCurrentStatus, isBigRoadWaitRow } from "../bigroad2-wait.js";
 
@@ -584,7 +584,7 @@ function SectionPanel({ section, ctx, selectedBasisMap, onSelectBasis }) {
   );
 }
 
-export default function GhBigRoad2({
+export default memo(function GhBigRoad2({
   roundState,
   subgameBasis,
   ncRefShoes,
@@ -647,4 +647,4 @@ export default function GhBigRoad2({
         ))}
     </Box>
   );
-}
+});
