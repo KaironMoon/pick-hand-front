@@ -2326,6 +2326,7 @@ export default function GhUserGamePage() {
     let stateRefreshTimer = null;
     let stateRefreshPromise = null;
     let keepRefreshing = false;
+    let displayedResults = getShoeResultCount({ round_state_upper: roundStateUpper });
     try {
       setShoeCopyOpen(false);
 
@@ -2336,12 +2337,15 @@ export default function GhUserGamePage() {
           stateRefreshPromise = apiCaller.get(GH_GAMES_API.SHOE_COPY_PROGRESS(gameId),
             incrementalViewRef.current.request(gameId))
             .then((stateRes) => {
-              if (!gameResponseGuardRef.current.canApply(ticket)) return;
+              if (!keepRefreshing || !gameResponseGuardRef.current.canApply(ticket)) return;
               const data = incrementalViewRef.current.accept(stateRes.data);
+              const processed = Math.max(data.completed_results, data.calculated_results ?? 0);
+              if (processed < displayedResults) return;
+              displayedResults = processed;
               applySavedRoundState(data);
               setShoeCopyProgress((prev) => ({
                 ...prev,
-                completed: Math.min(data.completed_results, prev.total),
+                completed: Math.min(processed, prev.total),
               }));
             })
             .catch((error) => {
@@ -2351,7 +2355,7 @@ export default function GhUserGamePage() {
               stateRefreshPromise = null;
               if (keepRefreshing) scheduleStateRefresh();
             });
-        }, 5000);
+        }, 400);
       };
       scheduleStateRefresh();
 
